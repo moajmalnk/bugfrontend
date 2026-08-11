@@ -4,6 +4,17 @@ import { sortUsersActiveFirst } from '@/lib/utils/userSort';
 import { User, UserRole } from '@/types';
 import axios from 'axios';
 
+export interface BirthdayPerson {
+  id: string;
+  username: string;
+  role?: string | null;
+  job_title?: string | null;
+  department?: string | null;
+  avatar?: string | null;
+  is_self?: boolean;
+  already_wished?: boolean;
+}
+
 export interface UserAnalyticsMember {
   user_id: string;
   username: string;
@@ -452,8 +463,49 @@ class UserService {
       };
     }
     
-    // Fallback if backend doesn't return data (shouldn't happen with new implementation)
     throw new Error("Backend did not return updated user data");
+  }
+
+  async getTodaysBirthdays(): Promise<{
+    date: string;
+    birthdays: BirthdayPerson[];
+  }> {
+    const response = await this.fetchWithAuth(
+      `${this.baseUrl}/todays_birthdays.php`
+    );
+    if (!response.success || !response.data) {
+      throw new Error(response.message || "Failed to load birthdays");
+    }
+    const birthdays = (response.data.birthdays || []).map(
+      (person: BirthdayPerson) => ({
+        ...person,
+        avatar: this.resolveUserAvatar(
+          person.avatar,
+          person.username || "User",
+          (person.role || "user") as UserRole
+        ),
+      })
+    );
+    return {
+      date: String(response.data.date || ""),
+      birthdays,
+    };
+  }
+
+  async sendBirthdayWish(userId: string): Promise<{ already_wished: boolean }> {
+    const response = await this.fetchWithAuth(
+      `${this.baseUrl}/send_birthday_wish.php`,
+      {
+        method: "POST",
+        body: JSON.stringify({ user_id: userId }),
+      }
+    );
+    if (!response.success) {
+      throw new Error(response.message || "Failed to send birthday wish");
+    }
+    return {
+      already_wished: Boolean(response.data?.already_wished ?? true),
+    };
   }
 
   async updateOwnProfile(payload: {

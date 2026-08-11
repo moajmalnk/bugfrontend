@@ -84,6 +84,7 @@ const CONTRACT_OPTIONS = [
   { value: "part_time", label: "Part-Time" },
   { value: "contract", label: "Contract" },
   { value: "intern", label: "Intern" },
+  { value: "probation", label: "Probation" },
   { value: "other", label: "Other" },
 ] as const;
 
@@ -576,11 +577,24 @@ export function EditUserDialog({
                             searchPlaceholder="Search manager..."
                           >
                             <SelectItem value="__none__">N/A</SelectItem>
-                            {managerOptions.map((m) => (
-                              <SelectItem key={m.id} value={m.id}>
-                                {m.username || m.name || m.email}
-                              </SelectItem>
-                            ))}
+                            {managerOptions.map((m) => {
+                              const name = m.username || m.name || m.email || "User";
+                              const position = (m.role || m.job_title || "")
+                                .replace(/_/g, " ")
+                                .trim();
+                              return (
+                                <SelectItem key={m.id} value={m.id}>
+                                  <span className="flex items-center gap-2 min-w-0">
+                                    <span className="truncate">{name}</span>
+                                    {position ? (
+                                      <span className="text-muted-foreground capitalize shrink-0">
+                                        · {position}
+                                      </span>
+                                    ) : null}
+                                  </span>
+                                </SelectItem>
+                              );
+                            })}
                           </SelectContent>
                         </Select>
                         <FormMessage />

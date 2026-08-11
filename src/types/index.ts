@@ -150,7 +150,7 @@ export interface User {
   department?: string | null;
   reports_to_user_id?: string | null;
   reports_to_username?: string | null;
-  contract_type?: 'full_time' | 'remote' | 'part_time' | 'contract' | 'intern' | 'other' | string | null;
+  contract_type?: 'full_time' | 'remote' | 'part_time' | 'contract' | 'intern' | 'probation' | 'other' | string | null;
   offer_letter_issued?: number | boolean | null;
   offer_letter_shared_date?: string | null;
   probation_end_date?: string | null;

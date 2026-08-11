@@ -10,6 +10,10 @@ export interface UserOnboardingDetails {
   date_of_birth?: string | null;
   gender?: "male" | "female" | "other" | "prefer_not_to_say" | string | null;
   marital_status?: "single" | "married" | "divorced" | "widowed" | "other" | string | null;
+  git_username?: string | null;
+  git_email?: string | null;
+  github_url?: string | null;
+  linkedin_url?: string | null;
   house_name_number?: string | null;
   landmark?: string | null;
   city?: string | null;
@@ -50,6 +54,8 @@ export interface OnboardingPayload {
   date_of_birth: string;
   gender: string;
   marital_status: string;
+  github_url: string;
+  linkedin_url: string;
   house_name_number: string;
   landmark: string;
   city: string;
@@ -128,7 +134,10 @@ export interface GetOnboardingResponse {
   privacy_accepted_at?: string | null;
 }
 
-function buildFormData(payload: OnboardingPayload): FormData {
+function buildFormData(
+  payload: OnboardingPayload,
+  options?: { forUserId?: string }
+): FormData {
   const fd = new FormData();
   const textKeys: (keyof OnboardingPayload)[] = [
     "emergency_contact",
@@ -136,6 +145,8 @@ function buildFormData(payload: OnboardingPayload): FormData {
     "date_of_birth",
     "gender",
     "marital_status",
+    "github_url",
+    "linkedin_url",
     "house_name_number",
     "landmark",
     "city",
@@ -197,6 +208,9 @@ function buildFormData(payload: OnboardingPayload): FormData {
   if (payload.pan_file) {
     fd.append("pan_file", payload.pan_file);
   }
+  if (options?.forUserId) {
+    fd.append("for_user_id", options.forUserId);
+  }
 
   return fd;
 }
@@ -204,14 +218,14 @@ function buildFormData(payload: OnboardingPayload): FormData {
 export const onboardingService = {
   async submit(
     payload: OnboardingPayload,
-    options?: { timeoutMs?: number }
+    options?: { timeoutMs?: number; forUserId?: string }
   ) {
     const hasFiles = !!(payload.aadhaar_file || payload.pan_file || payload.profile_photo);
     // Why: Text-only edits should not wait for the 120s file-upload budget.
     const timeout = options?.timeoutMs ?? (hasFiles ? 120_000 : 25_000);
     const response = await apiClient.post(
       "/users/submit_onboarding.php",
-      buildFormData(payload),
+      buildFormData(payload, { forUserId: options?.forUserId }),
       { timeout }
     );
     return response.data;

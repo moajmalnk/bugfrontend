@@ -28,7 +28,13 @@ import {
   ONBOARDING_REJECTION_REASONS,
   type OnboardingRejectionReasonCode,
 } from "@/lib/onboardingRejectionReasons";
+import {
+  ADMIN_ONBOARDING_URL_PARAM,
+  isOnboardingStepSlug,
+  ONBOARDING_URL_PARAM,
+} from "@/lib/onboardingPersistence";
 import { OnboardingVerificationBadge } from "@/components/onboarding/OnboardingVerificationBanner";
+import { OnboardingWizard } from "@/components/onboarding/OnboardingWizard";
 import {
   onboardingService,
   type UserOnboardingDetails,
@@ -44,7 +50,9 @@ import {
   Download,
   Eye,
   FileText,
+  Github,
   Landmark,
+  Linkedin,
   Loader2,
   Mail,
   MapPin,
@@ -53,9 +61,10 @@ import {
   RefreshCw,
   ShieldCheck,
   UserRound,
+  UserPen,
   XCircle,
 } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { MapContainer, Marker, TileLayer } from "react-leaflet";
 import "leaflet/dist/leaflet.css";
@@ -80,6 +89,7 @@ const HR_CONTRACT_TYPES = [
   { value: "part_time", label: "Part-Time" },
   { value: "contract", label: "Contract" },
   { value: "intern", label: "Intern" },
+  { value: "probation", label: "Probation" },
   { value: "other", label: "Other" },
 ] as const;
 
@@ -163,11 +173,16 @@ function DetailRow({
   );
 }
 
-type DetailCell = { label: string; value?: string | null };
+type DetailCell = {
+  label: string;
+  value?: string | null;
+  /** When set, value renders as an external link. */
+  href?: string | null;
+};
 
 /**
- * Why: Fixed-column table keeps label/value rows horizontally aligned
- * across the Employment / Address / Banking profile cards.
+ * Why: 12-column grid (gap-4) keeps profile detail cards aligned to Codo layout —
+ * not an HTML table with uneven pairing.
  */
 function DetailTable({
   columns,
@@ -176,44 +191,37 @@ function DetailTable({
   columns: 2 | 3;
   cells: DetailCell[];
 }) {
-  const rows: DetailCell[][] = [];
-  for (let i = 0; i < cells.length; i += columns) {
-    const slice = cells.slice(i, i + columns);
-    while (slice.length < columns) {
-      slice.push({ label: "", value: null });
-    }
-    rows.push(slice);
-  }
+  const spanClass =
+    columns === 3
+      ? "col-span-12 sm:col-span-6 lg:col-span-4"
+      : "col-span-12 sm:col-span-6";
 
   return (
-    <div className="w-full overflow-x-auto" style={{ scrollbarWidth: "thin" }}>
-      <table className="w-full table-fixed border-collapse">
-        <tbody>
-          {rows.map((row, ri) => (
-            <tr key={ri}>
-              {row.map((cell, ci) => (
-                <td
-                  key={`${ri}-${ci}-${cell.label || "empty"}`}
-                  className={cn(
-                    "align-top py-2.5 px-3 first:pl-0 last:pr-0 min-w-0",
-                    ri > 0 && "border-t border-border/50"
-                  )}
-                  style={{ width: `${100 / columns}%` }}
-                >
-                  {cell.label ? (
-                    <div className="min-w-0">
-                      <p className="text-xs text-muted-foreground">{cell.label}</p>
-                      <p className="text-sm text-foreground break-words mt-0.5">
-                        {(cell.value || "").trim() || "—"}
-                      </p>
-                    </div>
-                  ) : null}
-                </td>
-              ))}
-            </tr>
-          ))}
-        </tbody>
-      </table>
+    <div className="grid grid-cols-12 gap-4">
+      {cells.map((cell, i) => {
+        if (!cell.label) return null;
+        const display = (cell.value || "").trim();
+        const href = (cell.href || "").trim();
+        return (
+          <div key={`${cell.label}-${i}`} className={cn("min-w-0", spanClass)}>
+            <p className="text-xs text-muted-foreground">{cell.label}</p>
+            {href && display ? (
+              <a
+                href={href}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-sm text-primary break-all mt-0.5 inline-block hover:underline"
+              >
+                {display}
+              </a>
+            ) : (
+              <p className="text-sm text-foreground break-words mt-0.5">
+                {display || "—"}
+              </p>
+            )}
+          </div>
+        );
+      })}
     </div>
   );
 }
@@ -395,6 +403,9 @@ export function OnboardingProfileSection({
   const queryClient = useQueryClient();
   const [searchParams, setSearchParams] = useSearchParams();
   const reviewFromUrl = searchParams.get(REVIEW_QUERY_KEY) === REVIEW_QUERY_VALUE;
+  const adminOnboardingSlug = searchParams.get(ADMIN_ONBOARDING_URL_PARAM);
+  const adminEditOpen =
+    canVerify && isOnboardingStepSlug(adminOnboardingSlug);
   const [reviewOpen, setReviewOpen] = useState(false);
   const [pendingDecision, setPendingDecision] = useState<"verify" | "reject" | null>(null);
   const [rejectionReasons, setRejectionReasons] = useState<OnboardingRejectionReasonCode[]>([]);
@@ -404,6 +415,8 @@ export function OnboardingProfileSection({
   const [hrForm, setHrForm] = useState<HrEmploymentForm>(EMPTY_HR_FORM);
   const [hrSaving, setHrSaving] = useState(false);
   const [hrRegenerating, setHrRegenerating] = useState(false);
+  /** Why: Hydrate employment fields once per review open — do not clobber unsaved edits when queries refetch (e.g. Employee ID regenerate). */
+  const hrFormHydratedForReview = useRef(false);
   const [managerOptions, setManagerOptions] = useState<User[]>([]);
   const [docPreview, setDocPreview] = useState<{
     title: string;
@@ -543,8 +556,47 @@ export function OnboardingProfileSection({
     }
   }, [reviewFromUrl, canVerify, verifying, hrSaving, setSearchParams]);
 
+  // Why: Strip stale admin fill links when the viewer cannot edit, or slug is invalid.
   useEffect(() => {
-    if (!reviewOpen) return;
+    if (!adminOnboardingSlug) return;
+    if (canVerify && isOnboardingStepSlug(adminOnboardingSlug)) return;
+    setSearchParams(
+      (prev) => {
+        const next = new URLSearchParams(prev);
+        next.delete(ADMIN_ONBOARDING_URL_PARAM);
+        return next;
+      },
+      { replace: true }
+    );
+  }, [adminOnboardingSlug, canVerify, setSearchParams]);
+
+  // Why: Older admin fills wrote ?onboarding= — migrate to ?employee_onboarding= on User Details.
+  useEffect(() => {
+    if (!canVerify) return;
+    const legacy = searchParams.get(ONBOARDING_URL_PARAM);
+    if (!isOnboardingStepSlug(legacy)) return;
+    setSearchParams(
+      (prev) => {
+        const next = new URLSearchParams(prev);
+        next.delete(ONBOARDING_URL_PARAM);
+        if (!isOnboardingStepSlug(next.get(ADMIN_ONBOARDING_URL_PARAM))) {
+          next.set(ADMIN_ONBOARDING_URL_PARAM, legacy);
+        }
+        return next;
+      },
+      { replace: true }
+    );
+  }, [canVerify, searchParams, setSearchParams]);
+
+  useEffect(() => {
+    if (!reviewOpen) {
+      hrFormHydratedForReview.current = false;
+      return;
+    }
+    // Wait for onboarding payload, then hydrate once. Later refetches (Employee ID
+    // regenerate, Save employment) must not wipe fields the admin already typed.
+    if (hrFormHydratedForReview.current) return;
+    if (isLoading) return;
     setHrForm(
       hrFormFromUser({
         ...data?.user,
@@ -555,7 +607,14 @@ export function OnboardingProfileSection({
           null,
       })
     );
-  }, [reviewOpen, data?.user, employeeJoiningDate, employeeOfferLetterSharedDate]);
+    hrFormHydratedForReview.current = true;
+  }, [
+    reviewOpen,
+    isLoading,
+    data?.user,
+    employeeJoiningDate,
+    employeeOfferLetterSharedDate,
+  ]);
 
   useEffect(() => {
     if (!reviewOpen || !canVerify) return;
@@ -590,6 +649,7 @@ export function OnboardingProfileSection({
     setSearchParams(
       (prev) => {
         const next = new URLSearchParams(prev);
+        next.delete(ADMIN_ONBOARDING_URL_PARAM);
         next.set(REVIEW_QUERY_KEY, REVIEW_QUERY_VALUE);
         return next;
       },
@@ -607,6 +667,37 @@ export function OnboardingProfileSection({
       (prev) => {
         const next = new URLSearchParams(prev);
         next.delete(REVIEW_QUERY_KEY);
+        return next;
+      },
+      { replace: true }
+    );
+  };
+
+  /** Why: Admin fill/edit is URL-owned (?employee_onboarding=address|…|legal). */
+  const openAdminWizard = () => {
+    if (!canVerify || verifying || hrSaving) return;
+    setSearchParams(
+      (prev) => {
+        const next = new URLSearchParams(prev);
+        next.delete(REVIEW_QUERY_KEY);
+        if (!isOnboardingStepSlug(next.get(ADMIN_ONBOARDING_URL_PARAM))) {
+          next.set(ADMIN_ONBOARDING_URL_PARAM, "address");
+        }
+        return next;
+      },
+      { replace: false }
+    );
+  };
+
+  const setAdminEditOpen = (open: boolean) => {
+    if (open) {
+      openAdminWizard();
+      return;
+    }
+    setSearchParams(
+      (prev) => {
+        const next = new URLSearchParams(prev);
+        next.delete(ADMIN_ONBOARDING_URL_PARAM);
         return next;
       },
       { replace: true }
@@ -683,8 +774,9 @@ export function OnboardingProfileSection({
       setHrForm((prev) => ({
         ...prev,
         joining_date: String(updated.joining_date || prev.joining_date || "").slice(0, 10),
-        employee_code: String(updated.employee_code || ""),
+        employee_code: String(updated.employee_code || prev.employee_code || ""),
       }));
+      // Why: Refresh cached user elsewhere, but keep local unsaved HR fields intact.
       await queryClient.invalidateQueries({ queryKey: ["onboarding-details", userId] });
       await queryClient.invalidateQueries({ queryKey: ["userDetails"] });
       toast({
@@ -871,6 +963,45 @@ export function OnboardingProfileSection({
     }
   };
 
+  const adminOnboardingWizard = canVerify ? (
+    <OnboardingWizard
+      open={adminEditOpen}
+      userId={userId}
+      employeeName={
+        employeeName ||
+        employeeUsername ||
+        data?.user?.username ||
+        (employee.name !== "Employee" ? employee.name : "") ||
+        ""
+      }
+      employeePhone={
+        employeePhone ||
+        data?.user?.phone ||
+        details?.emergency_contact ||
+        ""
+      }
+      employeeEmail={
+        employeeEmail || data?.user?.email || details?.contact_email || ""
+      }
+      adminMode
+      stepQueryKey={ADMIN_ONBOARDING_URL_PARAM}
+      editMode={!!details || Number(data?.onboarding_completed ?? 0) === 1}
+      onOpenChange={setAdminEditOpen}
+      onCompleted={async () => {
+        setAdminEditOpen(false);
+        await queryClient.invalidateQueries({
+          queryKey: ["onboarding-details", userId],
+        });
+        await queryClient.invalidateQueries({ queryKey: ["users"] });
+        toast({
+          title: "Employee records saved",
+          description:
+            "Contacts are admin-attested (no employee OTP). You can Review & decide when ready.",
+        });
+      }}
+    />
+  ) : null;
+
   if (isLoading) {
     return (
       <Card className="rounded-2xl shadow-sm">
@@ -888,31 +1019,61 @@ export function OnboardingProfileSection({
 
   if (!completed) {
     return (
-      <Card className="rounded-2xl shadow-sm">
-        <CardHeader className="p-4 sm:p-5">
-          <CardTitle className="text-lg">Onboarding Profile</CardTitle>
-        </CardHeader>
-        <CardContent className="p-4 sm:p-5 pt-0">
-          <p className="text-sm text-muted-foreground">
-            Onboarding not completed yet. Statutory, banking, and address details will appear here after the wizard is finished.
-          </p>
-        </CardContent>
-      </Card>
+      <>
+        <Card className="rounded-2xl shadow-sm">
+          <CardHeader className="p-4 sm:p-5 flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
+            <div className="space-y-1 min-w-0">
+              <CardTitle className="text-lg">Onboarding Profile</CardTitle>
+              <p className="text-sm text-muted-foreground">
+                {canVerify
+                  ? "Employee has not finished the wizard yet. You can fill every record now — no employee WhatsApp or email OTP required — then Review & decide when ready."
+                  : "Onboarding not completed yet. Statutory, banking, and address details will appear here after the wizard is finished."}
+              </p>
+            </div>
+            {canVerify ? (
+              <Button
+                type="button"
+                className="rounded-xl h-10 shrink-0"
+                onClick={openAdminWizard}
+              >
+                <UserPen className="h-4 w-4 mr-2" />
+                Fill employee records
+              </Button>
+            ) : null}
+          </CardHeader>
+        </Card>
+        {adminOnboardingWizard}
+      </>
     );
   }
 
   if (isError || !details) {
     return (
-      <Card className="rounded-2xl shadow-sm">
-        <CardHeader className="p-4 sm:p-5">
-          <CardTitle className="text-lg">Onboarding Profile</CardTitle>
-        </CardHeader>
-        <CardContent className="p-4 sm:p-5 pt-0">
-          <p className="text-sm text-muted-foreground">
-            Could not load onboarding details.
-          </p>
-        </CardContent>
-      </Card>
+      <>
+        <Card className="rounded-2xl shadow-sm">
+          <CardHeader className="p-4 sm:p-5 flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
+            <div className="space-y-1 min-w-0">
+              <CardTitle className="text-lg">Onboarding Profile</CardTitle>
+              <p className="text-sm text-muted-foreground">
+                {canVerify
+                  ? "No onboarding details on file yet. Fill everything as admin without employee OTP."
+                  : "Could not load onboarding details."}
+              </p>
+            </div>
+            {canVerify ? (
+              <Button
+                type="button"
+                className="rounded-xl h-10 shrink-0"
+                onClick={openAdminWizard}
+              >
+                <UserPen className="h-4 w-4 mr-2" />
+                Fill employee records
+              </Button>
+            ) : null}
+          </CardHeader>
+        </Card>
+        {adminOnboardingWizard}
+      </>
     );
   }
 
@@ -952,17 +1113,31 @@ export function OnboardingProfileSection({
               </p>
             ) : null}
           </div>
-          {canVerify && completed ? (
+          {canVerify ? (
             <div className="flex flex-wrap gap-2 shrink-0">
               <Button
                 type="button"
+                variant="outline"
                 className="rounded-xl h-10"
-                disabled={verifying}
-                onClick={openReview}
+                disabled={verifying || hrSaving}
+                onClick={openAdminWizard}
               >
-                <ClipboardList className="h-4 w-4 mr-2" />
-                Review & decide
+                <UserPen className="h-4 w-4 mr-2" />
+                {completed || details
+                  ? "Edit all records"
+                  : "Fill employee records"}
               </Button>
+              {completed || details ? (
+                <Button
+                  type="button"
+                  className="rounded-xl h-10"
+                  disabled={verifying}
+                  onClick={openReview}
+                >
+                  <ClipboardList className="h-4 w-4 mr-2" />
+                  Review & decide
+                </Button>
+              ) : null}
             </div>
           ) : null}
         </CardContent>
@@ -999,7 +1174,10 @@ export function OnboardingProfileSection({
               {
                 label: "Contract type",
                 value: employment.contract_type
-                  ? String(employment.contract_type).replace(/_/g, " ")
+                  ? HR_CONTRACT_TYPES.find(
+                      (o) => o.value === employment.contract_type
+                    )?.label ||
+                    String(employment.contract_type).replace(/_/g, " ")
                   : null,
               },
               { label: "Offer letter", value: employment.offer_letter },
@@ -1033,7 +1211,7 @@ export function OnboardingProfileSection({
         </CardContent>
       </Card>
 
-      <Card className="col-span-12 lg:col-span-6 rounded-2xl shadow-sm">
+      <Card className="col-span-12 rounded-2xl shadow-sm">
         <CardHeader className="p-4 sm:p-5">
           <div className="flex items-center gap-2">
             <MapPin className="h-4 w-4 text-primary" />
@@ -1042,22 +1220,18 @@ export function OnboardingProfileSection({
         </CardHeader>
         <CardContent className="p-4 sm:p-5 pt-0">
           <DetailTable
-            columns={2}
+            columns={3}
             cells={[
               { label: "Emergency contact", value: details.emergency_contact },
-              { label: "House", value: details.house_name_number },
               {
                 label: "Emergency verified",
                 value: formatWhen(details.emergency_contact_verified_at),
               },
-              { label: "Landmark", value: details.landmark },
               { label: "Contact email", value: details.contact_email },
-              { label: "City", value: details.city },
               {
                 label: "Email verified",
                 value: formatWhen(details.contact_email_verified_at),
               },
-              { label: "Post office", value: details.post_office },
               {
                 label: "Date of birth",
                 value: details.date_of_birth
@@ -1070,7 +1244,6 @@ export function OnboardingProfileSection({
                     })
                   : null,
               },
-              { label: "PIN", value: details.pin_code },
               {
                 label: "Gender",
                 value: details.gender
@@ -1079,7 +1252,6 @@ export function OnboardingProfileSection({
                       .replace(/\b\w/g, (c) => c.toUpperCase())
                   : null,
               },
-              { label: "District", value: details.district },
               {
                 label: "Marital status",
                 value: details.marital_status
@@ -1088,10 +1260,70 @@ export function OnboardingProfileSection({
                     )
                   : null,
               },
+              { label: "House", value: details.house_name_number },
+              { label: "Landmark", value: details.landmark },
+              { label: "City", value: details.city },
+              { label: "Post office", value: details.post_office },
+              { label: "PIN", value: details.pin_code },
+              { label: "District", value: details.district },
               { label: "State", value: details.state },
               { label: "Country", value: details.country },
             ]}
           />
+        </CardContent>
+      </Card>
+
+      <Card className="col-span-12 lg:col-span-6 rounded-2xl shadow-sm">
+        <CardHeader className="p-4 sm:p-5">
+          <div className="flex items-center gap-2">
+            <Github className="h-4 w-4 text-primary" />
+            <CardTitle className="text-lg">Developer profiles</CardTitle>
+          </div>
+        </CardHeader>
+        <CardContent className="p-4 sm:p-5 pt-0 space-y-4">
+          <DetailTable
+            columns={2}
+            cells={[
+              {
+                label: "GitHub",
+                value: details.github_url || null,
+                href: details.github_url || null,
+              },
+              {
+                label: "LinkedIn",
+                value: details.linkedin_url || null,
+                href: details.linkedin_url || null,
+              },
+            ]}
+          />
+          <div className="flex flex-wrap gap-2">
+            {details.github_url ? (
+              <Button
+                type="button"
+                variant="outline"
+                className="rounded-xl h-10"
+                onClick={() => {
+                  window.open(details.github_url!, "_blank", "noopener,noreferrer");
+                }}
+              >
+                <Github className="h-4 w-4 mr-2" />
+                Open GitHub
+              </Button>
+            ) : null}
+            {details.linkedin_url ? (
+              <Button
+                type="button"
+                variant="outline"
+                className="rounded-xl h-10"
+                onClick={() =>
+                  window.open(details.linkedin_url!, "_blank", "noopener,noreferrer")
+                }
+              >
+                <Linkedin className="h-4 w-4 mr-2" />
+                Open LinkedIn
+              </Button>
+            ) : null}
+          </div>
         </CardContent>
       </Card>
 
@@ -1144,7 +1376,7 @@ export function OnboardingProfileSection({
         </CardContent>
       </Card>
 
-      <Card className="col-span-12 lg:col-span-6 rounded-2xl shadow-sm">
+      <Card className="col-span-12 rounded-2xl shadow-sm">
         <CardHeader className="p-4 sm:p-5">
           <div className="flex items-center gap-2">
             <FileText className="h-4 w-4 text-primary" />
@@ -1195,7 +1427,7 @@ export function OnboardingProfileSection({
         </CardContent>
       </Card>
 
-      <Card className="col-span-12 rounded-2xl shadow-sm">
+      <Card className="col-span-12 lg:col-span-6 rounded-2xl shadow-sm">
         <CardHeader className="p-4 sm:p-5">
           <div className="flex items-center gap-2">
             <ShieldCheck className="h-4 w-4 text-primary" />
@@ -1203,19 +1435,19 @@ export function OnboardingProfileSection({
           </div>
         </CardHeader>
         <CardContent className="p-4 sm:p-5 pt-0 grid grid-cols-12 gap-4">
-          <div className="col-span-12 md:col-span-4">
+          <div className="col-span-12">
             <DetailRow
               label="Terms accepted"
               value={formatWhen(data?.terms_accepted_at || data?.user?.terms_accepted_at)}
             />
           </div>
-          <div className="col-span-12 md:col-span-4">
+          <div className="col-span-12">
             <DetailRow
               label="Privacy accepted"
               value={formatWhen(data?.privacy_accepted_at || data?.user?.privacy_accepted_at)}
             />
           </div>
-          <div className="col-span-12 md:col-span-4">
+          <div className="col-span-12">
             <DetailRow
               label="Onboarding completed"
               value={formatWhen(
@@ -1488,11 +1720,24 @@ export function OnboardingProfileSection({
                         searchPlaceholder="Search manager..."
                       >
                         <SelectItem value="__none__">N/A</SelectItem>
-                        {managerOptions.map((m) => (
-                          <SelectItem key={m.id} value={m.id}>
-                            {m.username || m.name || m.email}
-                          </SelectItem>
-                        ))}
+                        {managerOptions.map((m) => {
+                          const name = m.username || m.name || m.email || "User";
+                          const position = (m.role || m.job_title || "")
+                            .replace(/_/g, " ")
+                            .trim();
+                          return (
+                            <SelectItem key={m.id} value={m.id}>
+                              <span className="flex items-center gap-2 min-w-0">
+                                <span className="truncate">{name}</span>
+                                {position ? (
+                                  <span className="text-muted-foreground capitalize shrink-0">
+                                    · {position}
+                                  </span>
+                                ) : null}
+                              </span>
+                            </SelectItem>
+                          );
+                        })}
                       </SelectContent>
                     </Select>
                   </div>
@@ -1900,6 +2145,8 @@ export function OnboardingProfileSection({
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {adminOnboardingWizard}
     </div>
   );
 }

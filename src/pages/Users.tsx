@@ -524,9 +524,19 @@ const Users = () => {
     const status = String(u.onboarding_verification_status || "").toLowerCase();
     return status === "pending" || status === "rejected";
   }).length;
+  const analyticsCount = users.length;
 
-  // Always keep role tabs mounted (even at 0) so URL tab + Radix Tabs don't
-  // snap back to "active" while users are still loading after Back.
+  const tabCounts: Record<string, number> = {
+    active: activeTodayCount,
+    pending: pendingVerificationCount,
+    admins: adminCount,
+    developers: developerCount,
+    testers: testerCount,
+    others: othersCount,
+    analytics: analyticsCount,
+  };
+
+  // Keep known tabs while loading so Back/URL does not snap early; hide empty after data is ready.
   const knownTabs = [
     "active",
     "pending",
@@ -537,15 +547,13 @@ const Users = () => {
     "analytics",
   ] as const;
   const isKnownTab = (knownTabs as readonly string[]).includes(tabFromUrl);
+  const tabHasRows = (tab: string) => (tabCounts[tab] ?? 0) > 0;
   const isValidTab =
-    tabFromUrl === "active" ||
-    tabFromUrl === "pending" ||
-    tabFromUrl === "analytics" ||
-    tabFromUrl === "admins" ||
-    tabFromUrl === "developers" ||
-    tabFromUrl === "testers" ||
-    (tabFromUrl === "others" && (isLoading || othersCount > 0));
-  const defaultTab = "active";
+    isKnownTab && (isLoading || tabHasRows(tabFromUrl));
+  const defaultTab =
+    (["active", "pending", "admins", "developers", "testers", "others", "analytics"] as const).find(
+      (tab) => tabHasRows(tab)
+    ) || "analytics";
   const activeTab = isValidTab ? tabFromUrl : defaultTab;
 
   const roleTabs = [
@@ -589,29 +597,27 @@ const Users = () => {
       count: testerCount,
       countClass: "bg-yellow-100 dark:bg-yellow-900/30 text-yellow-700 dark:text-yellow-300",
     },
-    ...(othersCount > 0 || tabFromUrl === "others"
-      ? [{
-          value: "others",
-          label: "Others",
-          shortLabel: "Others",
-          icon: UserRound,
-          count: othersCount,
-          countClass: "bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300",
-        }]
-      : []),
+    {
+      value: "others",
+      label: "Others",
+      shortLabel: "Others",
+      icon: UserRound,
+      count: othersCount,
+      countClass: "bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300",
+    },
     {
       value: "analytics",
       label: "Analytics",
       shortLabel: "Stats",
       icon: BarChart3,
-      count: adminCount + developerCount + testerCount,
+      count: analyticsCount,
       countClass: "bg-violet-100 dark:bg-violet-900/30 text-violet-700 dark:text-violet-300",
     },
-  ];
-  // Only rewrite an unknown tab after data is ready — never wipe developers/page on load
+  ].filter((tab) => isLoading || tab.count > 0);
+  // Only rewrite an unknown / empty tab after data is ready — never wipe developers/page on load
   useEffect(() => {
     if (isLoading) return;
-    if (!isValidTab && !isKnownTab && tabFromUrl !== defaultTab) {
+    if (!isValidTab && tabFromUrl !== defaultTab) {
       const params = new URLSearchParams(searchParams);
       params.set("tab", defaultTab);
       params.delete("page");
@@ -621,7 +627,6 @@ const Users = () => {
   }, [
     isLoading,
     isValidTab,
-    isKnownTab,
     defaultTab,
     tabFromUrl,
     searchParams,
@@ -1103,8 +1108,8 @@ const Users = () => {
           </div>
         )}
 
-        {/* User list */}
-        {totalFiltered > 0 && (
+        {/* User list — keep mounted while loading so refresh shows skeletons, not a blank panel */}
+        {(isLoading || totalFiltered > 0) && (
         <div className="relative">
           <div className="absolute inset-0 bg-gradient-to-r from-gray-50/20 to-blue-50/20 dark:from-gray-800/20 dark:to-blue-900/20 rounded-2xl"></div>
           <div className="relative bg-white/80 dark:bg-gray-900/80 backdrop-blur-sm border border-gray-200/50 dark:border-gray-700/50 rounded-2xl overflow-hidden shadow-xl">

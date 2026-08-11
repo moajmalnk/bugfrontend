@@ -73,7 +73,11 @@ export function BottomSheetTabs({
             ? "grid-cols-4"
             : items.length === 5
               ? "grid-cols-5"
-              : "grid-cols-6");
+              : items.length === 6
+                ? "grid-cols-6"
+                : items.length === 7
+                  ? "grid-cols-7"
+                  : "grid-cols-8");
 
   return (
     <div className={cn("relative w-full", className)}>
@@ -123,7 +127,9 @@ export function BottomSheetTabs({
                 className="flex h-full min-w-0 items-center justify-center gap-1.5 rounded-xl px-1 text-sm font-semibold transition-all duration-300 data-[state=active]:border data-[state=active]:border-gray-200 data-[state=active]:bg-white data-[state=active]:shadow-lg dark:data-[state=active]:border-gray-700 dark:data-[state=active]:bg-gray-800 sm:text-base sm:gap-2 sm:px-2"
               >
                 {Icon ? <Icon className="h-4 w-4 shrink-0 sm:h-5 sm:w-5" /> : null}
-                <span className="truncate">{tab.label}</span>
+                <span className="truncate">
+                  {items.length >= 7 && tab.shortLabel ? tab.shortLabel : tab.label}
+                </span>
                 {tab.count != null ? (
                   <span
                     className={cn(

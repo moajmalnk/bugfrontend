@@ -9,6 +9,7 @@ import {
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { DashboardPeriodFilter } from "@/components/dashboard/DashboardPeriodFilter";
+import { TeamBirthdayBanner } from "@/components/dashboard/TeamBirthdayBanner";
 import type { DashboardPeriod, WorkPeriodPreset } from "@/lib/dashboardPeriod";
 import { cn } from "@/lib/utils";
 import { AlertTriangle, ChevronDown, LayoutDashboard, type LucideIcon } from "lucide-react";
@@ -73,6 +74,7 @@ export function DashboardPageShell({
   return (
     <main className="min-h-[calc(100vh-4rem)] bg-background px-3 py-4 sm:px-6 sm:py-6 md:px-8 lg:px-10 lg:py-8">
       <section className="max-w-7xl mx-auto space-y-6 sm:space-y-8 min-w-0 w-full">
+        <TeamBirthdayBanner />
         <div className="relative overflow-hidden rounded-2xl">
           <div className="absolute inset-0 bg-gradient-to-r from-blue-50/50 via-transparent to-emerald-50/50 dark:from-blue-950/20 dark:via-transparent dark:to-emerald-950/20" />
           <div className="relative bg-white/80 dark:bg-gray-900/80 backdrop-blur-sm border border-gray-200/50 dark:border-gray-700/50 rounded-2xl p-4 sm:p-6 lg:p-8">

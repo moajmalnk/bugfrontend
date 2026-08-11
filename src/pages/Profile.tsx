@@ -19,6 +19,7 @@ import { UserWorkStats } from "@/components/users/UserWorkStats";
 import { ActiveHours } from "@/components/users/ActiveHours";
 import { UserLeaveDetails } from "@/components/users/UserLeaveDetails";
 import { EditOwnProfileDialog } from "@/components/profile/EditOwnProfileDialog";
+import { TeamBirthdayBanner } from "@/components/dashboard/TeamBirthdayBanner";
 import { OnboardingProfileSection } from "@/components/onboarding/OnboardingProfileSection";
 import { OnboardingWizard } from "@/components/onboarding/OnboardingWizard";
 import { OnboardingVerificationBadge } from "@/components/onboarding/OnboardingVerificationBanner";
@@ -27,6 +28,7 @@ import { formatLocalDate } from "@/lib/utils/dateUtils";
 import { cn, userRequiresOnboarding } from "@/lib/utils";
 import { API_BASE_URL } from "@/lib/env";
 import { resolveAvatarUrl } from "@/lib/avatarUrl";
+import { onboardingService } from "@/services/onboardingService";
 import { userService } from "@/services/userService";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import axios from "axios";
@@ -35,6 +37,8 @@ import { googleDocsService } from "@/services/googleDocsService";
 import {
   ArrowRight,
   AtSign,
+  BadgeCheck,
+  Building2,
   Bug,
   Briefcase,
   CalendarDays,
@@ -42,7 +46,10 @@ import {
   Rows3,
   Search,
   Github,
+  Hash,
+  IdCard,
   Instagram,
+  Landmark,
   Linkedin,
   Link as LinkIcon,
   Lock,
@@ -58,6 +65,40 @@ import {
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { ONBOARDING_STEP_SLUGS } from "@/lib/onboardingPersistence";
+
+const CONTRACT_LABELS: Record<string, string> = {
+  full_time: "Full-Time",
+  remote: "Remote",
+  part_time: "Part-Time",
+  contract: "Contract",
+  intern: "Intern",
+  probation: "Probation",
+  other: "Other",
+};
+
+function formatContractType(value?: string | null): string | null {
+  const raw = (value || "").trim();
+  if (!raw) return null;
+  return CONTRACT_LABELS[raw] || raw.replace(/_/g, " ");
+}
+
+/** Why: Mask account for at-a-glance profile without exposing full number. */
+function maskAccountNumber(value?: string | null): string | null {
+  const digits = String(value || "").replace(/\D/g, "");
+  if (digits.length < 4) return null;
+  return `•••• ${digits.slice(-4)}`;
+}
+
+function formatShortDate(value?: string | null): string | null {
+  if (!value) return null;
+  const d = new Date(value.includes("T") ? value : `${value}T00:00:00`);
+  if (Number.isNaN(d.getTime())) return null;
+  return d.toLocaleDateString(undefined, {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+  });
+}
 
 /** Why: Group profile content into scannable professional sections. */
 function ProfileSection({
@@ -261,6 +302,16 @@ export default function Profile() {
         ? userService.getUserStats(currentUser.id)
         : Promise.reject("User not logged in"),
     enabled: !!currentUser?.id,
+  });
+
+  // Why: Surface HR + onboarding highlights in the hero metrics row (not only deep below).
+  const { data: onboardingHighlight } = useQuery({
+    queryKey: ["onboarding-details", currentUser?.id],
+    queryFn: () => onboardingService.get(currentUser!.id),
+    enabled:
+      !!currentUser?.id &&
+      canUseOnboarding &&
+      Number(currentUser?.onboarding_completed ?? 0) === 1,
   });
 
   // Check Google connection status
@@ -593,12 +644,62 @@ export default function Profile() {
         })
       : null;
 
-  const statItems = [
+  const details = onboardingHighlight?.details ?? null;
+  const hrUser = onboardingHighlight?.user ?? null;
+
+  const employeeCode =
+    (currentUser.employee_code || hrUser?.employee_code || "").trim() || null;
+  const jobTitle =
+    (currentUser.job_title || hrUser?.job_title || "").trim() || null;
+  const department =
+    (currentUser.department || hrUser?.department || "").trim() || null;
+  const contractLabel = formatContractType(
+    currentUser.contract_type || hrUser?.contract_type
+  );
+  const reportsTo =
+    (currentUser.reports_to_username || hrUser?.reports_to_username || "").trim() ||
+    null;
+  const dobLabel = formatShortDate(details?.date_of_birth);
+  const locationLabel = [details?.city, details?.district, details?.state]
+    .map((v) => (v || "").trim())
+    .filter(Boolean)
+    .join(", ") || null;
+  const bankLabel = details?.bank_name
+    ? [details.bank_name, maskAccountNumber(details.account_number)]
+        .filter(Boolean)
+        .join(" · ")
+    : null;
+  const aadhaarStatus = details
+    ? details.has_aadhaar_file || details.aadhaar_file_path
+      ? details.aadhaar_number
+        ? `•••• ${String(details.aadhaar_number).slice(-4)}`
+        : "On file"
+      : "Missing"
+    : null;
+  const panStatus = details
+    ? details.has_pan_file || details.pan_file_path
+      ? details.pan_number || "On file"
+      : details.pan_number || "Missing"
+    : null;
+  const githubHref = (details?.github_url || "").trim() || null;
+  const linkedinHref = (details?.linkedin_url || "").trim() || null;
+
+  type ProfileMetric = {
+    label: string;
+    value: string | number;
+    empty?: string;
+    icon: typeof Briefcase;
+    kind: "number" | "text";
+    href?: string | null;
+  };
+
+  const statItems: ProfileMetric[] = [
     {
       label: "Projects",
       value: userStats?.total_projects ?? 0,
       empty: "—",
       icon: Briefcase,
+      kind: "number",
     },
     ...(currentUser.role === "admin" || currentUser.role === "tester"
       ? [
@@ -607,6 +708,7 @@ export default function Profile() {
             value: userStats?.total_bugs ?? 0,
             empty: "—",
             icon: Bug,
+            kind: "number" as const,
           },
         ]
       : []),
@@ -617,14 +719,149 @@ export default function Profile() {
             value: userStats?.total_fixes ?? 0,
             empty: "—",
             icon: Code2,
+            kind: "number" as const,
           },
         ]
       : []),
   ];
 
+  const highlightItems: ProfileMetric[] = [
+    ...(employeeCode
+      ? [
+          {
+            label: "Employee ID",
+            value: employeeCode,
+            icon: Hash,
+            kind: "text" as const,
+          },
+        ]
+      : []),
+    ...(jobTitle
+      ? [
+          {
+            label: "Job title",
+            value: jobTitle,
+            icon: Briefcase,
+            kind: "text" as const,
+          },
+        ]
+      : []),
+    ...(department
+      ? [
+          {
+            label: "Department",
+            value: department,
+            icon: Building2,
+            kind: "text" as const,
+          },
+        ]
+      : []),
+    ...(contractLabel
+      ? [
+          {
+            label: "Contract",
+            value: contractLabel,
+            icon: BadgeCheck,
+            kind: "text" as const,
+          },
+        ]
+      : []),
+    ...(reportsTo
+      ? [
+          {
+            label: "Reports to",
+            value: reportsTo,
+            icon: User,
+            kind: "text" as const,
+          },
+        ]
+      : []),
+    ...(dobLabel
+      ? [
+          {
+            label: "Date of birth",
+            value: dobLabel,
+            icon: CalendarDays,
+            kind: "text" as const,
+          },
+        ]
+      : []),
+    ...(locationLabel
+      ? [
+          {
+            label: "Location",
+            value: locationLabel,
+            icon: MapPin,
+            kind: "text" as const,
+          },
+        ]
+      : []),
+    ...(bankLabel
+      ? [
+          {
+            label: "Salary bank",
+            value: bankLabel,
+            icon: Landmark,
+            kind: "text" as const,
+          },
+        ]
+      : []),
+    ...(aadhaarStatus
+      ? [
+          {
+            label: "Aadhaar",
+            value: aadhaarStatus,
+            icon: IdCard,
+            kind: "text" as const,
+          },
+        ]
+      : []),
+    ...(panStatus
+      ? [
+          {
+            label: "PAN",
+            value: panStatus,
+            icon: IdCard,
+            kind: "text" as const,
+          },
+        ]
+      : []),
+    ...(githubHref
+      ? [
+          {
+            label: "GitHub",
+            value: "Profile",
+            icon: Github,
+            kind: "text" as const,
+            href: githubHref,
+          },
+        ]
+      : []),
+    ...(linkedinHref
+      ? [
+          {
+            label: "LinkedIn",
+            value: "Profile",
+            icon: Linkedin,
+            kind: "text" as const,
+            href: linkedinHref,
+          },
+        ]
+      : []),
+  ];
+
+  const metricItems = [...statItems, ...highlightItems];
+  const metricColSpan =
+    metricItems.length >= 6
+      ? "col-span-6 sm:col-span-4 lg:col-span-3"
+      : metricItems.length >= 4
+        ? "col-span-6 sm:col-span-3"
+        : "col-span-6 sm:col-span-4";
+
   return (
     <main className="min-h-[calc(100vh-4rem)] bg-background px-3 py-4 sm:px-6 sm:py-6 md:px-8 lg:px-10 lg:py-8">
       <section className="max-w-7xl mx-auto space-y-6 sm:space-y-8">
+        <TeamBirthdayBanner />
         {/* Identity */}
         <Card className="overflow-hidden border-border/60 bg-card/70 backdrop-blur shadow-sm">
           <div className="relative">
@@ -791,43 +1028,69 @@ export default function Profile() {
                 </div>
               </div>
 
-              {/* Compact metrics */}
+              {/* Compact metrics + most-wanted HR / onboarding highlights */}
               <div className="pt-1 border-t border-border/50">
                 {isLoadingStats ? (
                   <div className="grid grid-cols-12 gap-3 pt-4">
-                    {[1, 2, 3].map((i) => (
+                    {[1, 2, 3, 4, 5, 6].map((i) => (
                       <Skeleton
                         key={i}
-                        className="col-span-4 h-20 rounded-xl"
+                        className="col-span-6 sm:col-span-4 lg:col-span-3 h-20 rounded-xl"
                       />
                     ))}
                   </div>
                 ) : (
-                  <div
-                    className={cn(
-                      "grid grid-cols-12 gap-3 pt-4",
-                      statItems.length === 2 && "sm:max-w-xl"
-                    )}
-                  >
-                    {statItems.map((item) => {
+                  <div className="grid grid-cols-12 gap-3 pt-4">
+                    {metricItems.map((item) => {
                       const Icon = item.icon;
+                      const display =
+                        item.kind === "number"
+                          ? Number(item.value) > 0
+                            ? item.value
+                            : item.empty || "—"
+                          : String(item.value || item.empty || "—");
                       return (
                         <div
                           key={item.label}
                           className={cn(
-                            "col-span-4 rounded-xl border border-border/50 bg-muted/20 px-4 py-3.5",
-                            statItems.length === 2 && "sm:col-span-6"
+                            "rounded-xl border border-border/50 bg-muted/20 px-4 py-3.5 min-w-0",
+                            metricColSpan
                           )}
                         >
                           <div className="flex items-center gap-2 text-muted-foreground mb-1.5">
-                            <Icon className="h-3.5 w-3.5" />
-                            <span className="text-[11px] font-medium uppercase tracking-wide">
+                            <Icon className="h-3.5 w-3.5 shrink-0" />
+                            <span className="text-[11px] font-medium uppercase tracking-wide truncate">
                               {item.label}
                             </span>
                           </div>
-                          <p className="text-2xl font-semibold tabular-nums tracking-tight text-foreground">
-                            {item.value > 0 ? item.value : item.empty}
-                          </p>
+                          {item.href ? (
+                            <a
+                              href={item.href}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className={cn(
+                                "font-semibold tracking-tight text-primary truncate hover:underline block",
+                                item.kind === "number"
+                                  ? "text-2xl tabular-nums"
+                                  : "text-sm sm:text-base"
+                              )}
+                              title={String(display)}
+                            >
+                              {display}
+                            </a>
+                          ) : (
+                            <p
+                              className={cn(
+                                "font-semibold tracking-tight text-foreground truncate",
+                                item.kind === "number"
+                                  ? "text-2xl tabular-nums"
+                                  : "text-sm sm:text-base"
+                              )}
+                              title={String(display)}
+                            >
+                              {display}
+                            </p>
+                          )}
                         </div>
                       );
                     })}

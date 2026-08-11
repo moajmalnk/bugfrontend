@@ -31,13 +31,16 @@ import {
   normalizeIfsc,
 } from "@/lib/indiaIfscLookup";
 import {
+  ADMIN_ONBOARDING_URL_PARAM,
   clearOnboardingDraft,
   loadOnboardingDraft,
+  ONBOARDING_URL_PARAM,
   saveOnboardingDraft,
   slugToStep,
   stepToSlug,
 } from "@/lib/onboardingPersistence";
 import { onboardingService } from "@/services/onboardingService";
+import { googleDocsService } from "@/services/googleDocsService";
 import { WfhLocationMapPicker } from "@/components/onboarding/WfhLocationMapPicker";
 import {
   ProfilePhotoResizeModal,
@@ -510,6 +513,8 @@ export interface OnboardingFormState {
   date_of_birth: string;
   gender: string;
   marital_status: string;
+  github_url: string;
+  linkedin_url: string;
   house_name_number: string;
   landmark: string;
   city: string;
@@ -549,6 +554,8 @@ const INITIAL: OnboardingFormState = {
   date_of_birth: "",
   gender: "",
   marital_status: "",
+  github_url: "",
+  linkedin_url: "",
   house_name_number: "",
   landmark: "",
   city: "",
@@ -639,6 +646,8 @@ function mapDetailsToForm(
     date_of_birth: String(details.date_of_birth || "").slice(0, 10),
     gender: String(details.gender || "").toLowerCase(),
     marital_status: String(details.marital_status || "").toLowerCase(),
+    github_url: String(details.github_url || "").trim().slice(0, 255),
+    linkedin_url: String(details.linkedin_url || "").trim().slice(0, 255),
     house_name_number: String(details.house_name_number || "").slice(0, 150),
     landmark: String(details.landmark || "").slice(0, 200),
     city: String(details.city || "").slice(0, 100),
@@ -689,6 +698,16 @@ interface OnboardingWizardProps {
    * Closable; hydrates from saved onboarding; files optional when already on file.
    */
   editMode?: boolean;
+  /**
+   * Why: Admins may fill/edit all employee records before HR verify —
+   * no employee WhatsApp/email OTP required.
+   */
+  adminMode?: boolean;
+  /**
+   * Why: Admin User Details uses ?employee_onboarding=; Profile self-edit uses ?onboarding=.
+   * Defaults from adminMode so callers do not collide.
+   */
+  stepQueryKey?: string;
   onOpenChange?: (open: boolean) => void;
   onCompleted: (result?: { avatar?: string | null; updated?: boolean }) => void;
 }
@@ -701,9 +720,17 @@ export function OnboardingWizard({
   employeeEmail = "",
   mustSetPassword = false,
   editMode = false,
+  adminMode = false,
+  stepQueryKey,
   onOpenChange,
   onCompleted,
 }: OnboardingWizardProps) {
+  const canCloseWizard = editMode || adminMode;
+  const skipEmployeeOtp = adminMode;
+  const requirePassword = mustSetPassword && !editMode && !adminMode;
+  const urlParam =
+    stepQueryKey ||
+    (adminMode ? ADMIN_ONBOARDING_URL_PARAM : ONBOARDING_URL_PARAM);
   const [searchParams, setSearchParams] = useSearchParams();
   const [step, setStep] = useState(0);
   const [form, setForm] = useState<OnboardingFormState>(INITIAL);
@@ -762,17 +789,21 @@ export function OnboardingWizard({
     notifications: "idle",
   });
   const [permBusy, setPermBusy] = useState(false);
+  const [googleConnected, setGoogleConnected] = useState(false);
+  const [googleEmail, setGoogleEmail] = useState<string | null>(null);
+  const [googleChecking, setGoogleChecking] = useState(false);
+  const [googleConnecting, setGoogleConnecting] = useState(false);
 
   const syncStepToUrl = useCallback(
     (nextStep: number, replace = false) => {
       const slug = stepToSlug(nextStep);
       const next = new URLSearchParams(searchParams);
-      if (next.get("onboarding") === slug) return;
-      next.set("onboarding", slug);
+      if (next.get(urlParam) === slug) return;
+      next.set(urlParam, slug);
       skipUrlSync.current = true;
       setSearchParams(next, { replace });
     },
-    [searchParams, setSearchParams]
+    [searchParams, setSearchParams, urlParam]
   );
 
   const goToStep = useCallback(
@@ -788,7 +819,7 @@ export function OnboardingWizard({
       const payload = options?.formOverride ?? form;
       setStep(clamped);
       syncStepToUrl(clamped, options?.replace ?? false);
-      if (options?.persist !== false && userId && !editMode) {
+      if (options?.persist !== false && userId && !editMode && !adminMode) {
         try {
           await saveOnboardingDraft(userId, clamped, payload);
         } catch {
@@ -796,7 +827,7 @@ export function OnboardingWizard({
         }
       }
     },
-    [form, syncStepToUrl, userId, editMode]
+    [form, syncStepToUrl, userId, editMode, adminMode]
   );
 
   // Restore draft / saved details + URL step when wizard opens
@@ -837,7 +868,8 @@ export function OnboardingWizard({
           employeePhone.replace(/\D/g, "").slice(-10),
       });
 
-      if (editMode) {
+      // Why: Admin fill/edit loads the employee's saved row (no local draft, no OTP).
+      if (editMode || adminMode) {
         try {
           const data = await onboardingService.get(userId);
           if (cancelled) return;
@@ -868,7 +900,7 @@ export function OnboardingWizard({
           } else {
             setForm(withProfileDefaults(INITIAL));
           }
-          const urlSlug = searchParams.get("onboarding");
+          const urlSlug = searchParams.get(urlParam);
           const nextStep = urlSlug ? slugToStep(urlSlug) : 0;
           setStep(nextStep);
           syncStepToUrl(nextStep, true);
@@ -889,7 +921,7 @@ export function OnboardingWizard({
 
       const draft = await loadOnboardingDraft(userId, INITIAL);
       if (cancelled) return;
-      const urlSlug = searchParams.get("onboarding");
+      const urlSlug = searchParams.get(urlParam);
       const urlStep = slugToStep(urlSlug);
       if (draft) {
         setForm(
@@ -914,24 +946,24 @@ export function OnboardingWizard({
     };
     // Only hydrate when opened for a user
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open, userId, editMode]);
+  }, [open, userId, editMode, adminMode]);
 
   const closeWizard = useCallback(() => {
-    if (!editMode || loading) return;
-    // Why: Profile derives open from ?onboarding= — clearing the param closes the modal.
+    if (!canCloseWizard || loading) return;
+    // Why: Parent derives open from the step query — clearing the param closes the modal.
     const cleaned = new URLSearchParams(searchParams);
-    cleaned.delete("onboarding");
+    cleaned.delete(urlParam);
     setSearchParams(cleaned, { replace: true });
     onOpenChange?.(false);
-  }, [editMode, loading, searchParams, setSearchParams, onOpenChange]);
+  }, [canCloseWizard, loading, searchParams, setSearchParams, onOpenChange, urlParam]);
   // Browser back/forward within onboarding steps
   useEffect(() => {
     if (!open || !hydrated) return;
-    const slug = searchParams.get("onboarding");
+    const slug = searchParams.get(urlParam);
     if (!slug) {
-      // Why: Edit mode is URL-owned — missing slug means close. First-time
+      // Why: Edit/admin mode is URL-owned — missing slug means close. First-time
       // onboarding re-seeds the slug so refresh can resume the step.
-      if (editMode) {
+      if (canCloseWizard) {
         onOpenChange?.(false);
         return;
       }
@@ -944,16 +976,16 @@ export function OnboardingWizard({
     }
     const urlStep = slugToStep(slug);
     if (urlStep !== step) setStep(urlStep);
-  }, [open, hydrated, searchParams, step, syncStepToUrl, editMode, onOpenChange]);
+  }, [open, hydrated, searchParams, step, syncStepToUrl, canCloseWizard, onOpenChange, urlParam]);
 
   // Persist quietly when files / key fields change after hydrate (first-time only)
   useEffect(() => {
-    if (!open || !hydrated || !userId || editMode) return;
+    if (!open || !hydrated || !userId || editMode || adminMode) return;
     const t = window.setTimeout(() => {
       void saveOnboardingDraft(userId, step, form);
     }, 400);
     return () => window.clearTimeout(t);
-  }, [form, step, open, hydrated, userId, editMode]);
+  }, [form, step, open, hydrated, userId, editMode, adminMode]);
 
   const setField = useCallback(<K extends keyof OnboardingFormState>(key: K, value: OnboardingFormState[K]) => {
     setForm((prev) => ({ ...prev, [key]: value }));
@@ -1160,6 +1192,28 @@ export function OnboardingWizard({
   const isValidContactEmail = (email: string) =>
     /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim());
 
+  const isValidGithubUrl = (value: string) => {
+    const v = value.trim();
+    if (!v) return true;
+    try {
+      const u = new URL(/^https?:\/\//i.test(v) ? v : `https://${v}`);
+      return /^(www\.)?github\.com$/i.test(u.hostname);
+    } catch {
+      return false;
+    }
+  };
+
+  const isValidLinkedinUrl = (value: string) => {
+    const v = value.trim();
+    if (!v) return true;
+    try {
+      const u = new URL(/^https?:\/\//i.test(v) ? v : `https://${v}`);
+      return /(^|\.)linkedin\.com$/i.test(u.hostname);
+    } catch {
+      return false;
+    }
+  };
+
   const sendEmergencyOtp = async () => {
     const digits = form.emergency_contact.replace(/\D/g, "");
     if (
@@ -1299,35 +1353,50 @@ export function OnboardingWizard({
   };
 
   const step1Valid = useMemo(() => {
-    const hasPhoto = !!form.profile_photo || (editMode && !!existingAvatarUrl);
+    const hasPhoto =
+      !!form.profile_photo || ((editMode || adminMode) && !!existingAvatarUrl);
+    const contactsOk = skipEmployeeOtp
+      ? form.emergency_contact.replace(/\D/g, "").length >= 10 &&
+        isValidContactEmail(form.contact_email)
+      : form.emergency_contact_verified && form.contact_email_verified;
     return (
       hasPhoto &&
       form.emergency_contact.replace(/\D/g, "").length >= 10 &&
       !emgConflictMsg &&
-      form.emergency_contact_verified &&
+      contactsOk &&
       isValidContactEmail(form.contact_email) &&
       !mailConflictMsg &&
-      form.contact_email_verified &&
       !!form.date_of_birth &&
       !!form.gender &&
       !!form.marital_status &&
+      isValidGithubUrl(form.github_url) &&
+      isValidLinkedinUrl(form.linkedin_url) &&
       form.house_name_number.trim() &&
       form.city.trim() &&
       form.pin_code.replace(/\D/g, "").length >= 6 &&
       form.district.trim() &&
       form.state.trim()
     );
-  }, [form, editMode, existingAvatarUrl, emgConflictMsg, mailConflictMsg]);
+  }, [
+    form,
+    editMode,
+    adminMode,
+    skipEmployeeOtp,
+    existingAvatarUrl,
+    emgConflictMsg,
+    mailConflictMsg,
+  ]);
 
   const step2Valid = useMemo(() => {
-    const hasAadhaar = !!form.aadhaar_file || (editMode && hasExistingAadhaar);
+    const hasAadhaar =
+      !!form.aadhaar_file || ((editMode || adminMode) && hasExistingAadhaar);
     return (
       form.aadhaar_number.replace(/\D/g, "").length === 12 &&
       hasAadhaar &&
       !fileErrors.aadhaar_file &&
       !fileErrors.pan_file
     );
-  }, [form, fileErrors, editMode, hasExistingAadhaar]);
+  }, [form, fileErrors, editMode, adminMode, hasExistingAadhaar]);
   const step3Valid = useMemo(() => {
     return (
       form.account_holder_name.trim() &&
@@ -1340,13 +1409,13 @@ export function OnboardingWizard({
   }, [form]);
 
   const passwordValid =
-    !mustSetPassword ||
+    !requirePassword ||
     (password.length >= 6 &&
       confirmPassword.length >= 6 &&
       password === confirmPassword);
 
   const passwordError = useMemo(() => {
-    if (!mustSetPassword) return null;
+    if (!requirePassword) return null;
     if (!password && !confirmPassword) return null;
     if (password.length > 0 && password.length < 6) {
       return "Password must be at least 6 characters";
@@ -1355,7 +1424,7 @@ export function OnboardingWizard({
       return "Passwords do not match";
     }
     return null;
-  }, [mustSetPassword, password, confirmPassword]);
+  }, [requirePassword, password, confirmPassword]);
 
   const step5Valid =
     form.terms_accepted && form.privacy_accepted && passwordValid;
@@ -1365,25 +1434,37 @@ export function OnboardingWizard({
     [form.state]
   );
 
-  const canNext = [!!step1Valid, step2Valid, step3Valid, true, step5Valid][step];
+  const step4Valid = adminMode || googleConnected;
+
+  const canNext = [!!step1Valid, step2Valid, step3Valid, step4Valid, step5Valid][step];
 
   /** Why: Users need a clear reason when Continue stays disabled on long address forms. */
   const nextBlockedHint = useMemo(() => {
-    if (canNext || step !== 0) return null;
-    if (!(form.profile_photo || (editMode && existingAvatarUrl))) {
+    if (canNext) return null;
+    if (step === 3 && !adminMode && !googleConnected) {
+      return "Connect Google to continue — needed for Docs, Sheets, and Meet";
+    }
+    if (step !== 0) return null;
+    if (!(form.profile_photo || ((editMode || adminMode) && existingAvatarUrl))) {
       return "Upload a profile photo to continue";
     }
     if (form.emergency_contact.replace(/\D/g, "").length < 10) {
       return "Enter a 10-digit emergency WhatsApp number";
     }
     if (emgConflictMsg) return emgConflictMsg;
-    if (!form.emergency_contact_verified) return "Verify emergency WhatsApp with OTP";
+    if (!skipEmployeeOtp && !form.emergency_contact_verified) {
+      return "Verify emergency WhatsApp with OTP";
+    }
     if (!isValidContactEmail(form.contact_email)) return "Enter a valid contact email";
     if (mailConflictMsg) return mailConflictMsg;
-    if (!form.contact_email_verified) return "Verify contact email with OTP";
+    if (!skipEmployeeOtp && !form.contact_email_verified) {
+      return "Verify contact email with OTP";
+    }
     if (!form.date_of_birth) return "Enter your date of birth";
     if (!form.gender) return "Select your gender";
     if (!form.marital_status) return "Select your marital status";
+    if (!isValidGithubUrl(form.github_url)) return "Enter a valid GitHub profile URL";
+    if (!isValidLinkedinUrl(form.linkedin_url)) return "Enter a valid LinkedIn profile URL";
     if (!form.state.trim()) return "Select your state";
     if (!form.district.trim()) return "Select your district";
     if (!form.city.trim()) return "Enter your city";
@@ -1395,9 +1476,12 @@ export function OnboardingWizard({
     step,
     form,
     editMode,
+    adminMode,
+    skipEmployeeOtp,
     existingAvatarUrl,
     emgConflictMsg,
     mailConflictMsg,
+    googleConnected,
   ]);
 
   const handleStateChange = (state: string) => {
@@ -1578,13 +1662,127 @@ export function OnboardingWizard({
     void sync();
   }, [step]);
 
+  // Why: First-time setup also links Google for Docs, Sheets, and Meet (employee session only).
+  const refreshGoogleConnection = useCallback(async () => {
+    if (adminMode) return;
+    setGoogleChecking(true);
+    try {
+      const result = await googleDocsService.checkConnection();
+      setGoogleConnected(!!result.connected);
+      setGoogleEmail(result.email || null);
+    } catch {
+      setGoogleConnected(false);
+      setGoogleEmail(null);
+    } finally {
+      setGoogleChecking(false);
+    }
+  }, [adminMode]);
+
+  useEffect(() => {
+    if (!open || adminMode) return;
+    void refreshGoogleConnection();
+  }, [open, adminMode, refreshGoogleConnection]);
+
+  useEffect(() => {
+    if (!open || adminMode) return;
+    const googleOk = searchParams.get("google_connected");
+    const googleError = searchParams.get("google_error");
+    if (!googleOk && !googleError) return;
+
+    if (googleOk === "true") {
+      toast({
+        title: "Google connected",
+        description: "Docs, Sheets, and Meet are ready in BugRicer.",
+      });
+      void refreshGoogleConnection();
+    } else if (googleError) {
+      toast({
+        title: "Google connection failed",
+        description: decodeURIComponent(googleError),
+        variant: "destructive",
+      });
+    }
+
+    setSearchParams(
+      (prev) => {
+        const next = new URLSearchParams(prev);
+        next.delete("google_connected");
+        next.delete("google_error");
+        next.delete("email");
+        if (!next.get(urlParam)) next.set(urlParam, "permissions");
+        return next;
+      },
+      { replace: true }
+    );
+  }, [
+    open,
+    adminMode,
+    searchParams,
+    setSearchParams,
+    refreshGoogleConnection,
+    urlParam,
+  ]);
+
+  const connectGoogleAccount = () => {
+    if (adminMode || googleConnecting) return;
+    try {
+      setGoogleConnecting(true);
+      const token =
+        localStorage.getItem("token") || sessionStorage.getItem("token");
+      if (!token) {
+        toast({
+          title: "Please sign in again",
+          description: "Your session expired before Google connect.",
+          variant: "destructive",
+        });
+        return;
+      }
+      const payload = JSON.parse(atob(token.split(".")[1]));
+      const oauthUserId = payload.user_id as string;
+      if (!oauthUserId) throw new Error("Missing user id in session");
+
+      const returnUrl = new URL(window.location.href);
+      returnUrl.searchParams.delete("google_connected");
+      returnUrl.searchParams.delete("google_error");
+      returnUrl.searchParams.delete("email");
+      returnUrl.searchParams.set(urlParam, "permissions");
+
+      const isLocal =
+        window.location.hostname === "localhost" ||
+        window.location.hostname === "127.0.0.1";
+      const reauthUrl = isLocal
+        ? `http://localhost/BugRicer/backend/api/oauth/admin-reauth.php?user_id=${oauthUserId}&token=${encodeURIComponent(token)}&return_url=${encodeURIComponent(returnUrl.toString())}`
+        : `https://bugbackend.bugricer.com/api/oauth/production-reauth.php?user_id=${oauthUserId}&token=${encodeURIComponent(token)}&return_url=${encodeURIComponent(returnUrl.toString())}`;
+
+      window.location.href = reauthUrl;
+    } catch (err) {
+      setGoogleConnecting(false);
+      toast({
+        title: "Could not start Google sign-in",
+        description: err instanceof Error ? err.message : "Try again from Profile later.",
+        variant: "destructive",
+      });
+    }
+  };
+
   const handleFinalize = async () => {
-    const hasPhoto = !!form.profile_photo || (editMode && !!existingAvatarUrl);
-    const hasAadhaar = !!form.aadhaar_file || (editMode && hasExistingAadhaar);
+    const hasPhoto =
+      !!form.profile_photo || ((editMode || adminMode) && !!existingAvatarUrl);
+    const hasAadhaar =
+      !!form.aadhaar_file || ((editMode || adminMode) && hasExistingAadhaar);
     if (loading || !step5Valid || !hasPhoto || !hasAadhaar) {
       return;
     }
-    if (mustSetPassword && (!passwordValid || password !== confirmPassword)) {
+    if (!adminMode && !googleConnected) {
+      toast({
+        title: "Connect Google first",
+        description: "Docs, Sheets, and Meet require a connected Google account.",
+        variant: "destructive",
+      });
+      void goToStep(3);
+      return;
+    }
+    if (requirePassword && (!passwordValid || password !== confirmPassword)) {
       toast({
         title: "Set your password",
         description: "Enter a new password and confirm it before finishing.",
@@ -1593,18 +1791,25 @@ export function OnboardingWizard({
       return;
     }
 
+    const attestedAt = new Date().toISOString();
     const payload = {
       emergency_contact: form.emergency_contact,
       contact_email: form.contact_email.trim().toLowerCase(),
-      emergency_contact_verified_at: form.emergency_contact_verified
-        ? form.emergency_contact_verified_at || new Date().toISOString()
-        : null,
-      contact_email_verified_at: form.contact_email_verified
-        ? form.contact_email_verified_at || new Date().toISOString()
-        : null,
+      emergency_contact_verified_at: skipEmployeeOtp
+        ? form.emergency_contact_verified_at || attestedAt
+        : form.emergency_contact_verified
+          ? form.emergency_contact_verified_at || attestedAt
+          : null,
+      contact_email_verified_at: skipEmployeeOtp
+        ? form.contact_email_verified_at || attestedAt
+        : form.contact_email_verified
+          ? form.contact_email_verified_at || attestedAt
+          : null,
       date_of_birth: form.date_of_birth,
       gender: form.gender,
       marital_status: form.marital_status,
+      github_url: form.github_url.trim(),
+      linkedin_url: form.linkedin_url.trim(),
       house_name_number: form.house_name_number,
       landmark: form.landmark,
       city: form.city,
@@ -1629,7 +1834,7 @@ export function OnboardingWizard({
       privacy_accepted: form.privacy_accepted,
       terms_accepted_at: form.terms_accepted_at,
       privacy_accepted_at: form.privacy_accepted_at,
-      ...(mustSetPassword
+      ...(requirePassword
         ? { password, confirm_password: confirmPassword }
         : {}),
       // Why: Only send new blobs — re-uploading unchanged scans made Save crawl.
@@ -1640,19 +1845,23 @@ export function OnboardingWizard({
 
     setLoading(true);
 
-    // Why: Edit mode closes immediately so Save feels instant; request continues in background.
-    if (editMode) {
+    // Why: Edit/admin mode closes immediately so Save feels instant; request continues in background.
+    if (editMode || adminMode) {
       const cleaned = new URLSearchParams(searchParams);
-      cleaned.delete("onboarding");
+      cleaned.delete(urlParam);
       setSearchParams(cleaned, { replace: true });
       onOpenChange?.(false);
       toast({
         title: "Saving changes…",
-        description: "Updating your employee records.",
+        description: adminMode
+          ? "Updating employee records — marked verified (no Review & decide needed)."
+          : "Updating your employee records.",
       });
 
       try {
-        const result = await onboardingService.submit(payload);
+        const result = await onboardingService.submit(payload, {
+          forUserId: adminMode ? userId : undefined,
+        });
         setForm(INITIAL);
         setPassword("");
         setConfirmPassword("");
@@ -1680,7 +1889,7 @@ export function OnboardingWizard({
         setSearchParams(
           (prev) => {
             const next = new URLSearchParams(prev);
-            next.set("onboarding", "legal");
+            next.set(urlParam, "legal");
             return next;
           },
           { replace: false }
@@ -1695,7 +1904,7 @@ export function OnboardingWizard({
       const result = await onboardingService.submit(payload);
       await clearOnboardingDraft(userId);
       const cleaned = new URLSearchParams(searchParams);
-      cleaned.delete("onboarding");
+      cleaned.delete(urlParam);
       setSearchParams(cleaned, { replace: true });
       setForm(INITIAL);
       setPassword("");
@@ -1765,7 +1974,7 @@ export function OnboardingWizard({
       <Dialog
         open={open}
         onOpenChange={(next) => {
-          if (!editMode) return;
+          if (!canCloseWizard) return;
           if (!next) closeWizard();
         }}
       >
@@ -1784,10 +1993,10 @@ export function OnboardingWizard({
               e.preventDefault();
               return;
             }
-            if (!editMode) e.preventDefault();
+            if (!canCloseWizard) e.preventDefault();
           }}
           onEscapeKeyDown={(e) => {
-            if (!editMode) e.preventDefault();
+            if (!canCloseWizard) e.preventDefault();
           }}
         >
           <DialogHeader className="relative shrink-0 px-4 sm:px-8 pt-4 sm:pt-7 pb-3 sm:pb-5 border-b border-border/50 text-left space-y-0 overflow-hidden">
@@ -1796,15 +2005,25 @@ export function OnboardingWizard({
               <div className="flex flex-wrap items-start justify-between gap-3">
                 <div className="space-y-1 min-w-0">
                   <p className="text-[11px] uppercase tracking-[0.18em] text-muted-foreground font-medium">
-                    {editMode ? "Update employee records" : "Employee onboarding"}
+                    {adminMode
+                      ? "Admin · employee records"
+                      : editMode
+                        ? "Update employee records"
+                        : "Employee onboarding"}
                   </p>
                   <DialogTitle className="text-xl sm:text-[1.75rem] font-semibold tracking-tight text-foreground">
-                    {editMode ? "Edit onboarding details" : "Set up your workspace"}
+                    {adminMode
+                      ? "Complete employee onboarding"
+                      : editMode
+                        ? "Edit onboarding details"
+                        : "Set up your workspace"}
                   </DialogTitle>
                   <DialogDescription className="text-sm text-muted-foreground max-w-xl leading-relaxed hidden sm:block">
-                    {editMode
-                      ? "Update address, documents, banking, and permissions. Saving sends your profile back for HR verification."
-                      : "A short guided setup for address, documents, banking, and permissions. Required before you can enter BugRicer."}
+                    {adminMode
+                      ? "Fill or fix address, documents, banking, and contacts. Employee OTP is not required — you attest details as admin."
+                      : editMode
+                        ? "Update address, documents, banking, and permissions. Saving sends your profile back for HR verification."
+                        : "A short guided setup for address, documents, banking, and permissions. Required before you can enter BugRicer."}
                   </DialogDescription>
                 </div>
                 <div className="flex items-start gap-2 shrink-0">
@@ -1815,7 +2034,7 @@ export function OnboardingWizard({
                       <span className="text-muted-foreground font-normal text-sm"> / {STEPS.length}</span>
                     </p>
                   </div>
-                  {editMode ? (
+                  {canCloseWizard ? (
                     <Button
                       type="button"
                       variant="ghost"
@@ -1915,7 +2134,7 @@ export function OnboardingWizard({
                           Profile photo <span className="text-primary/80">*</span>
                         </p>
                         <p className="text-xs text-muted-foreground mt-1">
-                          {editMode && existingAvatarUrl && !form.profile_photo
+                          {(editMode || adminMode) && existingAvatarUrl && !form.profile_photo
                             ? "Current photo on file · replace to upload a new crop"
                             : "Square crop required · JPG / PNG / WebP · used across BugRicer"}
                         </p>
@@ -2020,22 +2239,27 @@ export function OnboardingWizard({
                       <p className="text-xs text-destructive">{emgConflictMsg}</p>
                     ) : null}
 
-                    {form.emergency_contact_verified ? (
+                    {form.emergency_contact_verified || skipEmployeeOtp ? (
                       <div className="flex flex-col gap-1 rounded-xl border border-emerald-500/30 bg-emerald-500/5 px-3 py-2.5">
                         <div className="flex items-center gap-2">
                           <CheckCircle2 className="h-4 w-4 text-emerald-500 shrink-0" />
                           <p className="text-xs text-emerald-600 dark:text-emerald-400">
-                            WhatsApp number verified
+                            {skipEmployeeOtp
+                              ? "WhatsApp number accepted (admin — no OTP)"
+                              : "WhatsApp number verified"}
                           </p>
                         </div>
-                        {formatVerifiedAt(form.emergency_contact_verified_at) ? (
+                        {!skipEmployeeOtp &&
+                        formatVerifiedAt(form.emergency_contact_verified_at) ? (
                           <p className="text-[11px] text-muted-foreground pl-6">
                             Verified {formatVerifiedAt(form.emergency_contact_verified_at)}
                           </p>
                         ) : null}
-                        <p className="text-[11px] text-muted-foreground pl-6">
-                          Change the number to verify again with OTP
-                        </p>
+                        {!skipEmployeeOtp ? (
+                          <p className="text-[11px] text-muted-foreground pl-6">
+                            Change the number to verify again with OTP
+                          </p>
+                        ) : null}
                       </div>
                     ) : !emgOtpSent ? (
                       <Button
@@ -2153,22 +2377,27 @@ export function OnboardingWizard({
                       <p className="text-xs text-destructive">{mailConflictMsg}</p>
                     ) : null}
 
-                    {form.contact_email_verified ? (
+                    {form.contact_email_verified || skipEmployeeOtp ? (
                       <div className="flex flex-col gap-1 rounded-xl border border-emerald-500/30 bg-emerald-500/5 px-3 py-2.5">
                         <div className="flex items-center gap-2">
                           <CheckCircle2 className="h-4 w-4 text-emerald-500 shrink-0" />
                           <p className="text-xs text-emerald-600 dark:text-emerald-400">
-                            Contact email verified
+                            {skipEmployeeOtp
+                              ? "Contact email accepted (admin — no OTP)"
+                              : "Contact email verified"}
                           </p>
                         </div>
-                        {formatVerifiedAt(form.contact_email_verified_at) ? (
+                        {!skipEmployeeOtp &&
+                        formatVerifiedAt(form.contact_email_verified_at) ? (
                           <p className="text-[11px] text-muted-foreground pl-6">
                             Verified {formatVerifiedAt(form.contact_email_verified_at)}
                           </p>
                         ) : null}
-                        <p className="text-[11px] text-muted-foreground pl-6">
-                          Change the email to verify again with OTP
-                        </p>
+                        {!skipEmployeeOtp ? (
+                          <p className="text-[11px] text-muted-foreground pl-6">
+                            Change the email to verify again with OTP
+                          </p>
+                        ) : null}
                       </div>
                     ) : !mailOtpSent ? (
                       <Button
@@ -2295,6 +2524,51 @@ export function OnboardingWizard({
                     </SelectContent>
                   </Select>
                 </FieldShell>
+
+                <div className="col-span-12 rounded-2xl border border-border/60 bg-muted/20 p-4 sm:p-5 space-y-4">
+                  <div className="space-y-1">
+                    <p className="text-[11px] uppercase tracking-[0.14em] text-muted-foreground font-medium">
+                      Developer profiles
+                    </p>
+                    <p className="text-sm text-muted-foreground leading-relaxed">
+                      GitHub and LinkedIn profile links used across BugRicer.
+                    </p>
+                  </div>
+                  <div className="grid grid-cols-12 gap-4">
+                    <FieldShell label="GitHub profile" className="col-span-12 md:col-span-6">
+                      <Input
+                        className={fieldClass}
+                        maxLength={255}
+                        placeholder="https://github.com/username"
+                        value={form.github_url}
+                        onChange={(e) =>
+                          setField("github_url", e.target.value.trim().slice(0, 255))
+                        }
+                      />
+                      {form.github_url && !isValidGithubUrl(form.github_url) ? (
+                        <p className="text-xs text-destructive mt-1">
+                          Use a github.com profile URL
+                        </p>
+                      ) : null}
+                    </FieldShell>
+                    <FieldShell label="LinkedIn profile" className="col-span-12 md:col-span-6">
+                      <Input
+                        className={fieldClass}
+                        maxLength={255}
+                        placeholder="https://linkedin.com/in/username"
+                        value={form.linkedin_url}
+                        onChange={(e) =>
+                          setField("linkedin_url", e.target.value.trim().slice(0, 255))
+                        }
+                      />
+                      {form.linkedin_url && !isValidLinkedinUrl(form.linkedin_url) ? (
+                        <p className="text-xs text-destructive mt-1">
+                          Use a linkedin.com profile URL
+                        </p>
+                      ) : null}
+                    </FieldShell>
+                  </div>
+                </div>
 
                 <FieldShell label="State" required className="md:col-span-4">
                   <Select value={form.state || undefined} onValueChange={handleStateChange}>
@@ -2523,7 +2797,7 @@ export function OnboardingWizard({
                   required
                   file={form.aadhaar_file}
                   existingLabel={
-                    editMode && hasExistingAadhaar ? "Aadhaar scan on file" : null
+                    (editMode || adminMode) && hasExistingAadhaar ? "Aadhaar scan on file" : null
                   }
                   error={fileErrors.aadhaar_file}
                   onSelect={(file, error) => {
@@ -2535,7 +2809,7 @@ export function OnboardingWizard({
                   label="PAN scan"
                   file={form.pan_file}
                   existingLabel={
-                    editMode && hasExistingPan ? "PAN scan on file" : null
+                    (editMode || adminMode) && hasExistingPan ? "PAN scan on file" : null
                   }
                   error={fileErrors.pan_file}
                   onSelect={(file, error) => {
@@ -2760,6 +3034,100 @@ export function OnboardingWizard({
                     </div>
                   </div>
                 </div>
+
+                <div className="col-span-12">
+                  <div className="rounded-2xl border border-border/60 bg-card/80 p-5 sm:p-6">
+                    <div className="flex flex-col sm:flex-row sm:items-center gap-4">
+                      <div className="h-12 w-12 rounded-2xl bg-background border border-border/60 flex items-center justify-center shrink-0 shadow-sm">
+                        <svg className="h-5 w-5" viewBox="0 0 24 24" aria-hidden>
+                          <path
+                            d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
+                            fill="#4285F4"
+                          />
+                          <path
+                            d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"
+                            fill="#34A853"
+                          />
+                          <path
+                            d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"
+                            fill="#FBBC05"
+                          />
+                          <path
+                            d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"
+                            fill="#EA4335"
+                          />
+                        </svg>
+                      </div>
+                      <div className="min-w-0 flex-1 space-y-1">
+                        <h3 className="text-base font-semibold tracking-tight text-foreground">
+                          Connect Google
+                          {!adminMode ? (
+                            <span className="text-destructive font-normal"> *</span>
+                          ) : null}
+                        </h3>
+                        <p className="text-sm text-muted-foreground leading-relaxed">
+                          Required for Docs, Sheets, and Meet inside BugRicer.
+                          {adminMode
+                            ? " The employee must connect Google on their own login before using those tools."
+                            : " Sign in once to continue — this step is required."}
+                        </p>
+                        {!adminMode && googleConnected && googleEmail ? (
+                          <p className="text-xs text-emerald-600 dark:text-emerald-400 truncate">
+                            Connected as {googleEmail}
+                          </p>
+                        ) : null}
+                        {!adminMode && !googleConnected && !googleChecking ? (
+                          <p className="text-xs text-amber-600 dark:text-amber-400">
+                            Connect Google to unlock Next.
+                          </p>
+                        ) : null}
+                      </div>
+                      <div className="shrink-0 w-full sm:w-auto">
+                        {adminMode ? (
+                          <div className="rounded-xl border border-border/60 bg-muted/30 px-3 py-2 text-xs text-muted-foreground text-center sm:text-left">
+                            Employee connects later
+                          </div>
+                        ) : googleChecking ? (
+                          <Button
+                            type="button"
+                            variant="outline"
+                            className="rounded-xl h-11 w-full sm:w-auto"
+                            disabled
+                          >
+                            <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                            Checking…
+                          </Button>
+                        ) : googleConnected ? (
+                          <Button
+                            type="button"
+                            variant="outline"
+                            className="rounded-xl h-11 w-full sm:w-auto border-emerald-500/30 text-emerald-700 dark:text-emerald-400"
+                            disabled
+                          >
+                            <CheckCircle2 className="h-4 w-4 mr-2" />
+                            Google ready
+                          </Button>
+                        ) : (
+                          <Button
+                            type="button"
+                            className="rounded-xl h-11 w-full sm:w-auto"
+                            disabled={googleConnecting}
+                            onClick={connectGoogleAccount}
+                          >
+                            {googleConnecting ? (
+                              <>
+                                <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                                Opening Google…
+                              </>
+                            ) : (
+                              "Connect Google"
+                            )}
+                          </Button>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                </div>
               </div>
             )}
 
@@ -2810,13 +3178,19 @@ export function OnboardingWizard({
                       <SummaryItem
                         label="Emergency mobile"
                         value={form.emergency_contact}
-                        status={form.emergency_contact_verified ? "verified" : "pending"}
+                        status={
+                          form.emergency_contact_verified || skipEmployeeOtp
+                            ? "verified"
+                            : "pending"
+                        }
                         statusDetail={
-                          form.emergency_contact_verified
-                            ? formatVerifiedAt(form.emergency_contact_verified_at)
-                              ? `Verified on ${formatVerifiedAt(form.emergency_contact_verified_at)}`
-                              : "WhatsApp OTP confirmed"
-                            : "WhatsApp OTP still required"
+                          skipEmployeeOtp
+                            ? "Admin attested — no OTP"
+                            : form.emergency_contact_verified
+                              ? formatVerifiedAt(form.emergency_contact_verified_at)
+                                ? `Verified on ${formatVerifiedAt(form.emergency_contact_verified_at)}`
+                                : "WhatsApp OTP confirmed"
+                              : "WhatsApp OTP still required"
                         }
                       />
                     </div>
@@ -2824,13 +3198,19 @@ export function OnboardingWizard({
                       <SummaryItem
                         label="Contact email"
                         value={form.contact_email}
-                        status={form.contact_email_verified ? "verified" : "pending"}
+                        status={
+                          form.contact_email_verified || skipEmployeeOtp
+                            ? "verified"
+                            : "pending"
+                        }
                         statusDetail={
-                          form.contact_email_verified
-                            ? formatVerifiedAt(form.contact_email_verified_at)
-                              ? `Verified on ${formatVerifiedAt(form.contact_email_verified_at)}`
-                              : "Email OTP confirmed"
-                            : "Email OTP still required"
+                          skipEmployeeOtp
+                            ? "Admin attested — no OTP"
+                            : form.contact_email_verified
+                              ? formatVerifiedAt(form.contact_email_verified_at)
+                                ? `Verified on ${formatVerifiedAt(form.contact_email_verified_at)}`
+                                : "Email OTP confirmed"
+                              : "Email OTP still required"
                         }
                       />
                     </div>
@@ -2868,6 +3248,23 @@ export function OnboardingWizard({
                             ? form.marital_status.replace(/\b\w/g, (c) => c.toUpperCase())
                             : "—"
                         }
+                      />
+                    </div>
+                  </SummarySection>
+
+                  <SummarySection title="Developer profiles">
+                    <div className="col-span-12 sm:col-span-6">
+                      <SummaryItem
+                        label="GitHub"
+                        value={form.github_url || "—"}
+                        status={form.github_url ? "ok" : "pending"}
+                      />
+                    </div>
+                    <div className="col-span-12 sm:col-span-6">
+                      <SummaryItem
+                        label="LinkedIn"
+                        value={form.linkedin_url || "Not provided"}
+                        status={form.linkedin_url ? "ok" : "pending"}
                       />
                     </div>
                   </SummarySection>
@@ -2935,14 +3332,14 @@ export function OnboardingWizard({
                         label="Aadhaar"
                         value={form.aadhaar_number}
                         status={
-                          form.aadhaar_file || (editMode && hasExistingAadhaar)
+                          form.aadhaar_file || ((editMode || adminMode) && hasExistingAadhaar)
                             ? "ok"
                             : "warn"
                         }
                         statusDetail={
                           form.aadhaar_file
                             ? `Scan ready · ${form.aadhaar_file.name}`
-                            : editMode && hasExistingAadhaar
+                            : (editMode || adminMode) && hasExistingAadhaar
                               ? "Scan on file"
                               : "Scan file missing"
                         }
@@ -2953,7 +3350,7 @@ export function OnboardingWizard({
                         label="PAN"
                         value={form.pan_number || "Not provided"}
                         status={
-                          form.pan_file || (editMode && hasExistingPan)
+                          form.pan_file || ((editMode || adminMode) && hasExistingPan)
                             ? "ok"
                             : form.pan_number
                               ? "warn"
@@ -2962,7 +3359,7 @@ export function OnboardingWizard({
                         statusDetail={
                           form.pan_file
                             ? `Scan ready · ${form.pan_file.name}`
-                            : editMode && hasExistingPan
+                            : (editMode || adminMode) && hasExistingPan
                               ? "Scan on file"
                               : form.pan_number
                                 ? "Number only — scan optional"
@@ -3013,7 +3410,7 @@ export function OnboardingWizard({
                 <SummaryBlock
                   icon={Shield}
                   title="Workspace permissions"
-                  subtitle="Browser access for check-ins, voice, and alerts"
+                  subtitle="Browser access and Google for Docs, Sheets, and Meet"
                   onEdit={() => void goToStep(3)}
                 >
                   <div className="grid grid-cols-12 gap-2.5 sm:gap-3">
@@ -3044,6 +3441,23 @@ export function OnboardingWizard({
                         />
                       </div>
                     ))}
+                    <div className="col-span-12">
+                      <SummaryItem
+                        label="Google"
+                        value={
+                          adminMode
+                            ? "Employee must connect on their login"
+                            : googleConnected
+                              ? googleEmail
+                                ? `Connected · ${googleEmail}`
+                                : "Connected"
+                              : "Required — not connected"
+                        }
+                        status={
+                          adminMode || googleConnected ? "verified" : "denied"
+                        }
+                      />
+                    </div>
                   </div>
                 </SummaryBlock>
 
@@ -3118,7 +3532,7 @@ export function OnboardingWizard({
                   </a>
                 </div>
 
-                {mustSetPassword ? (
+                {requirePassword ? (
                   <div className="col-span-12 rounded-2xl border border-border/60 bg-card/70 p-5 sm:p-6 space-y-4">
                     <div className="flex items-start gap-3">
                       <div className="h-11 w-11 rounded-xl bg-amber-500/15 text-amber-600 dark:text-amber-400 flex items-center justify-center shrink-0 border border-amber-500/25">
@@ -3293,7 +3707,7 @@ export function OnboardingWizard({
             ) : null}
             <div className="flex flex-col-reverse sm:flex-row sm:items-center sm:justify-between gap-2 sm:gap-3">
               <div className="flex items-center gap-2">
-                {editMode ? (
+                {canCloseWizard ? (
                   <Button
                     type="button"
                     variant="ghost"
@@ -3337,9 +3751,9 @@ export function OnboardingWizard({
                     {loading ? (
                       <>
                         <Loader2 className="h-4 w-4 animate-spin mr-2" />
-                        {editMode ? "Saving…" : "Finalizing…"}
+                        {editMode || adminMode ? "Saving…" : "Finalizing…"}
                       </>
-                    ) : editMode ? (
+                    ) : editMode || adminMode ? (
                       "Save changes"
                     ) : (
                       "Finish & enter"

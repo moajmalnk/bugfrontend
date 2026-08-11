@@ -63,6 +63,7 @@ import { updateService, type Update } from "@/services/updateService";
 import { userService } from "@/services/userService";
 import { RecentDeadlineRemindersPanel } from "@/components/dashboard/RecentDeadlineRemindersPanel";
 import { MonthlyOpsTimelinePanel } from "@/components/dashboard/MonthlyOpsTimelinePanel";
+import { TeamBirthdayBanner } from "@/components/dashboard/TeamBirthdayBanner";
 import { Bug, User } from "@/types";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
@@ -2419,6 +2420,7 @@ export default function AdminDashboard() {
   return (
     <main className="min-h-[calc(100vh-4rem)] bg-background px-3 py-4 sm:px-6 sm:py-6 md:px-8 lg:px-10 lg:py-8">
       <section className="max-w-7xl mx-auto space-y-6 sm:space-y-8 min-w-0 w-full">
+        <TeamBirthdayBanner />
         {/* Professional Header — matches Bugs / Fixes */}
         <div className="relative overflow-hidden rounded-2xl">
           <div className="absolute inset-0 bg-gradient-to-r from-blue-50/50 via-transparent to-emerald-50/50 dark:from-blue-950/20 dark:via-transparent dark:to-emerald-950/20" />

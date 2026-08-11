@@ -13,6 +13,21 @@ export const ONBOARDING_STEP_SLUGS = [
 
 export type OnboardingStepSlug = (typeof ONBOARDING_STEP_SLUGS)[number];
 
+/** Why: Employee self-setup / Profile "Edit profile" wizard (?onboarding=address). */
+export const ONBOARDING_URL_PARAM = "onboarding";
+
+/**
+ * Why: Admin fill/edit on User Details must not reuse ?onboarding= —
+ * that key drives Profile self-edit and would collide on shared routes.
+ */
+export const ADMIN_ONBOARDING_URL_PARAM = "employee_onboarding";
+
+export function isOnboardingStepSlug(
+  value: string | null | undefined
+): value is OnboardingStepSlug {
+  return !!value && (ONBOARDING_STEP_SLUGS as readonly string[]).includes(value);
+}
+
 const FILE_KEYS = ["aadhaar_file", "pan_file", "profile_photo"] as const;
 type FileField = (typeof FILE_KEYS)[number];
 
@@ -26,6 +41,8 @@ export type OnboardingDraftForm = {
   date_of_birth: string;
   gender: string;
   marital_status: string;
+  github_url: string;
+  linkedin_url: string;
   house_name_number: string;
   landmark: string;
   city: string;
@@ -205,6 +222,8 @@ export async function loadOnboardingDraft(
       date_of_birth: parsed.date_of_birth ?? "",
       gender: parsed.gender ?? "",
       marital_status: parsed.marital_status ?? "",
+      github_url: parsed.github_url ?? "",
+      linkedin_url: parsed.linkedin_url ?? "",
       house_name_number: parsed.house_name_number ?? "",
       landmark: parsed.landmark ?? "",
       city: parsed.city ?? "",
