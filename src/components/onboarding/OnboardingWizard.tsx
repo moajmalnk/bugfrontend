@@ -1720,6 +1720,16 @@ export function OnboardingWizard({
           className="max-w-[980px] w-[calc(100vw-1.25rem)] max-h-[92vh] overflow-hidden rounded-2xl p-0 gap-0 border-border/50 shadow-2xl bg-background z-[1000]"
           overlayClassName="z-[1000]"
           onInteractOutside={(e) => {
+            // Select/Popover portals render outside Dialog — don't treat as dismiss.
+            const target = e.target as HTMLElement | null;
+            if (
+              target?.closest?.(
+                "[data-radix-select-content], [data-radix-popper-content-wrapper]"
+              )
+            ) {
+              e.preventDefault();
+              return;
+            }
             if (!editMode) e.preventDefault();
           }}
           onEscapeKeyDown={(e) => {
@@ -2184,7 +2194,12 @@ export function OnboardingWizard({
                     <SelectTrigger className={cn(fieldClass, "w-full")}>
                       <SelectValue placeholder="Select state" />
                     </SelectTrigger>
-                    <SelectContent className="max-h-64 rounded-xl">
+                    {/* Why: Dialog uses z-[1000]; default Select z-50 renders under the modal. */}
+                    <SelectContent
+                      position="popper"
+                      className="max-h-64 rounded-xl z-[1100]"
+                      searchPlaceholder="Search state..."
+                    >
                       {INDIAN_STATES.map((state) => (
                         <SelectItem key={state} value={state}>
                           {state}
@@ -2206,7 +2221,11 @@ export function OnboardingWizard({
                         }
                       />
                     </SelectTrigger>
-                    <SelectContent className="max-h-64 rounded-xl">
+                    <SelectContent
+                      position="popper"
+                      className="max-h-64 rounded-xl z-[1100]"
+                      searchPlaceholder="Search district..."
+                    >
                       {districtOptions.map((district) => (
                         <SelectItem key={district} value={district}>
                           {district}
@@ -2279,7 +2298,11 @@ export function OnboardingWizard({
                       <SelectTrigger className={cn(fieldClass, "w-full")}>
                         <SelectValue placeholder="Select post office" />
                       </SelectTrigger>
-                      <SelectContent className="max-h-64 rounded-xl">
+                      <SelectContent
+                        position="popper"
+                        className="max-h-64 rounded-xl z-[1100]"
+                        searchPlaceholder="Search post office..."
+                      >
                         {pinPostOffices.map((office) => (
                           <SelectItem key={office} value={office}>
                             {office}
@@ -2516,7 +2539,11 @@ export function OnboardingWizard({
                     <SelectTrigger className={cn(fieldClass, "w-full")}>
                       <SelectValue placeholder="Select type" />
                     </SelectTrigger>
-                    <SelectContent>
+                    <SelectContent
+                      position="popper"
+                      className="rounded-xl z-[1100]"
+                      searchable={false}
+                    >
                       <SelectItem value="salary">Salary</SelectItem>
                       <SelectItem value="savings">Savings</SelectItem>
                       <SelectItem value="current">Current</SelectItem>
