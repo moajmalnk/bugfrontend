@@ -605,25 +605,25 @@ export default function DailyUpdate() {
         <div className="relative min-w-0 overflow-hidden rounded-2xl">
           <div className="absolute inset-0 bg-gradient-to-r from-blue-50/50 via-transparent to-emerald-50/50 dark:from-blue-950/20 dark:via-transparent dark:to-emerald-950/20"></div>
           <div className="relative bg-white/80 dark:bg-gray-900/80 backdrop-blur-sm border border-gray-200/50 dark:border-gray-700/50 rounded-2xl p-4 sm:p-6 md:p-8">
-            <div className="flex flex-col xl:flex-row justify-between xl:items-center gap-5 xl:gap-6 min-w-0">
-              <div className="space-y-3 min-w-0">
-                <div className="flex items-center gap-3 min-w-0">
+            <div className="grid grid-cols-12 gap-4 lg:gap-6 min-w-0">
+              <div className="col-span-12 lg:col-span-5 xl:col-span-4 space-y-3 min-w-0">
+                <div className="flex items-start gap-3 min-w-0">
                   <div className="p-2 bg-gradient-to-br from-blue-600 to-emerald-600 rounded-xl shadow-lg shrink-0">
                     <FileText className="h-6 w-6 text-white" />
                   </div>
-                  <div className="min-w-0">
-                    <h1 className="text-2xl sm:text-4xl lg:text-5xl font-bold bg-gradient-to-r from-gray-900 via-gray-800 to-gray-700 dark:from-white dark:via-gray-100 dark:to-gray-300 bg-clip-text text-transparent tracking-tight break-words">
+                  <div className="min-w-0 flex-1">
+                    <h1 className="text-2xl sm:text-3xl lg:text-4xl font-bold bg-gradient-to-r from-gray-900 via-gray-800 to-gray-700 dark:from-white dark:via-gray-100 dark:to-gray-300 bg-clip-text text-transparent tracking-tight">
                       Work Update
                     </h1>
                     <div className="h-1 w-20 bg-gradient-to-r from-blue-600 to-emerald-600 rounded-full mt-2"></div>
                   </div>
                 </div>
-                <p className="text-gray-600 dark:text-gray-400 text-sm sm:text-base lg:text-lg font-medium max-w-2xl leading-relaxed">
+                <p className="text-gray-600 dark:text-gray-400 text-sm sm:text-base font-medium leading-relaxed">
                   Track your daily progress, log hours.
                 </p>
               </div>
 
-              <div className="flex flex-col xl:flex-row items-stretch xl:items-center gap-4 shrink-0 w-full xl:w-auto">
+              <div className="col-span-12 lg:col-span-7 xl:col-span-8 flex flex-col gap-4 min-w-0">
                 {!(currentUser?.role === 'admin' && showRequestsOnly) && (
                   <DailyWorkFlowPanel
                     layout="header"
@@ -635,7 +635,7 @@ export default function DailyUpdate() {
                     onEditClose={clearWorkFlowParams}
                   />
                 )}
-                <div className="flex items-center gap-4">
+                <div className="flex items-center justify-start lg:justify-end">
                   <div className="flex items-center gap-3 px-4 py-3 bg-gradient-to-r from-emerald-50 to-blue-50 dark:from-emerald-950/30 dark:to-blue-950/30 border border-emerald-200 dark:border-emerald-800 rounded-xl shadow-sm">
                     <div className="p-1.5 bg-emerald-600 rounded-lg shrink-0">
                       <Calendar className="h-5 w-5 text-white" />

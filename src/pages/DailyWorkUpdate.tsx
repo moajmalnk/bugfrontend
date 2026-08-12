@@ -2134,14 +2134,17 @@ export function DailyWorkFlowPanel({
 
   const isHeaderLayout = layout === 'header';
   const primaryBtnClass =
-    'h-12 px-6 font-semibold shadow-lg hover:shadow-xl transition-all duration-300 transform hover:scale-105';
+    'h-11 sm:h-12 px-4 sm:px-6 font-semibold shadow-lg hover:shadow-xl transition-all duration-300';
   const outlineBtnClass =
-    'h-12 px-6 border-2 font-semibold shadow-sm transition-all duration-300 hover:scale-105';
+    'h-11 sm:h-12 px-4 sm:px-6 border-2 font-semibold shadow-sm transition-all duration-300';
 
-  return (
+  const alertBannerClass =
+    'w-full rounded-xl border px-4 py-3 text-sm flex items-start gap-2';
+
+  const flowAlerts = (
     <>
       {verificationRejected ? (
-        <div className="w-full rounded-xl border border-rose-200/80 dark:border-rose-800/60 bg-rose-50/90 dark:bg-rose-950/40 px-4 py-3 text-sm text-rose-900 dark:text-rose-100 flex items-start gap-2 mb-3">
+        <div className={`${alertBannerClass} border-rose-200/80 dark:border-rose-800/60 bg-rose-50/90 dark:bg-rose-950/40 text-rose-900 dark:text-rose-100`}>
           <ShieldAlert className="h-4 w-4 shrink-0 mt-0.5" />
           <div className="min-w-0">
             <p className="font-semibold">Check-in & checkout blocked</p>
@@ -2159,9 +2162,9 @@ export function DailyWorkFlowPanel({
         </div>
       ) : null}
       {attendanceBlocked && !hasCheckedIn ? (
-        <div className="w-full rounded-xl border border-rose-200/80 dark:border-rose-800/60 bg-rose-50/90 dark:bg-rose-950/40 px-4 py-3 text-sm text-rose-900 dark:text-rose-100 flex items-start gap-2 mb-3">
+        <div className={`${alertBannerClass} border-rose-200/80 dark:border-rose-800/60 bg-rose-50/90 dark:bg-rose-950/40 text-rose-900 dark:text-rose-100`}>
           <AlertTriangle className="h-4 w-4 shrink-0 mt-0.5" />
-          <div>
+          <div className="min-w-0">
             <p className="font-semibold">
               {attendanceGate?.reason === 'on_leave'
                 ? 'You are on approved leave today'
@@ -2190,7 +2193,7 @@ export function DailyWorkFlowPanel({
       ) : null}
 
       {officeOnlyActive ? (
-        <div className="w-full rounded-xl border border-amber-300/80 dark:border-amber-700/60 bg-amber-50/90 dark:bg-amber-950/40 px-4 py-3 text-sm text-amber-950 dark:text-amber-100 flex items-start gap-2 mb-3">
+        <div className={`${alertBannerClass} border-amber-300/80 dark:border-amber-700/60 bg-amber-50/90 dark:bg-amber-950/40 text-amber-950 dark:text-amber-100`}>
           <Building2 className="h-4 w-4 shrink-0 mt-0.5" />
           <div className="min-w-0">
             <p className="font-semibold">Office-only penalty week</p>
@@ -2203,7 +2206,7 @@ export function DailyWorkFlowPanel({
           </div>
         </div>
       ) : allowWfhToday ? (
-        <div className="w-full rounded-xl border border-emerald-300/80 dark:border-emerald-700/60 bg-emerald-50/90 dark:bg-emerald-950/40 px-4 py-3 text-sm text-emerald-950 dark:text-emerald-100 flex items-start gap-2 mb-3">
+        <div className={`${alertBannerClass} border-emerald-300/80 dark:border-emerald-700/60 bg-emerald-50/90 dark:bg-emerald-950/40 text-emerald-950 dark:text-emerald-100`}>
           <Home className="h-4 w-4 shrink-0 mt-0.5" />
           <div className="min-w-0">
             <p className="font-semibold">WFH available today (Attendance exception)</p>
@@ -2216,7 +2219,7 @@ export function DailyWorkFlowPanel({
           </div>
         </div>
       ) : upcomingOfficeWeek ? (
-        <div className="w-full rounded-xl border border-orange-300/80 dark:border-orange-700/60 bg-orange-50/90 dark:bg-orange-950/40 px-4 py-3 text-sm text-orange-950 dark:text-orange-100 flex items-start gap-2 mb-3">
+        <div className={`${alertBannerClass} border-orange-300/80 dark:border-orange-700/60 bg-orange-50/90 dark:bg-orange-950/40 text-orange-950 dark:text-orange-100`}>
           <AlertTriangle className="h-4 w-4 shrink-0 mt-0.5" />
           <div className="min-w-0">
             <p className="font-semibold">Upcoming Office-only penalty week</p>
@@ -2226,7 +2229,7 @@ export function DailyWorkFlowPanel({
           </div>
         </div>
       ) : lateCount > 0 && !hasCheckedIn ? (
-        <div className="w-full rounded-xl border border-sky-200/80 dark:border-sky-800/60 bg-sky-50/90 dark:bg-sky-950/40 px-4 py-3 text-sm text-sky-950 dark:text-sky-100 flex items-start gap-2 mb-3">
+        <div className={`${alertBannerClass} border-sky-200/80 dark:border-sky-800/60 bg-sky-50/90 dark:bg-sky-950/40 text-sky-950 dark:text-sky-100`}>
           <Clock className="h-4 w-4 shrink-0 mt-0.5" />
           <div className="min-w-0">
             <p className="font-semibold">
@@ -2242,7 +2245,7 @@ export function DailyWorkFlowPanel({
       ) : null}
 
       {isSundayHoliday && !hasCheckedIn && !attendanceBlocked ? (
-        <div className="w-full rounded-xl border border-violet-200/80 dark:border-violet-800/60 bg-violet-50/90 dark:bg-violet-950/40 px-4 py-3 text-sm text-violet-950 dark:text-violet-100 flex items-start gap-2 mb-3">
+        <div className={`${alertBannerClass} border-violet-200/80 dark:border-violet-800/60 bg-violet-50/90 dark:bg-violet-950/40 text-violet-950 dark:text-violet-100`}>
           <Calendar className="h-4 w-4 shrink-0 mt-0.5" />
           <div className="min-w-0">
             <p className="font-semibold">Sunday holiday</p>
@@ -2252,25 +2255,33 @@ export function DailyWorkFlowPanel({
           </div>
         </div>
       ) : null}
+    </>
+  );
+
+  const flowControls = (
+    <div
+      className={
+        isHeaderLayout
+          ? 'flex flex-col items-stretch gap-3 w-full min-w-0'
+          : 'flex flex-wrap items-center gap-2 sm:gap-3'
+      }
+    >
+      {isEditing && (
+        <span
+          className={
+            isHeaderLayout
+              ? 'text-xs font-medium text-gray-500 dark:text-gray-400 sm:text-right'
+              : 'w-full text-xs font-medium text-gray-500 dark:text-gray-400 sm:mr-1 sm:w-auto'
+          }
+        >
+          Editing submission
+        </span>
+      )}
       <div
-        className={
-          isHeaderLayout
-            ? 'flex flex-col items-stretch gap-3 w-full min-w-0 xl:items-end'
-            : 'flex flex-wrap items-center gap-2 sm:gap-3'
-        }
+        className={`flex flex-wrap items-center gap-2 sm:gap-3 w-full min-w-0 ${
+          isHeaderLayout ? 'justify-start sm:justify-end' : ''
+        }`}
       >
-        {isEditing && (
-          <span
-            className={
-              isHeaderLayout
-                ? 'text-xs font-medium text-gray-500 dark:text-gray-400 sm:text-right'
-                : 'w-full text-xs font-medium text-gray-500 dark:text-gray-400 sm:mr-1 sm:w-auto'
-            }
-          >
-            Editing submission
-          </span>
-        )}
-        <div className={`flex flex-wrap items-center gap-3 w-full min-w-0 ${isHeaderLayout ? 'xl:justify-end' : ''}`}>
         {hasActiveWorkSession && (
           <Button
             onClick={onToggleBreak}
@@ -2334,7 +2345,21 @@ export function DailyWorkFlowPanel({
             </div>
           </Button>
         ) : null}
-        </div>
+      </div>
+    </div>
+  );
+
+  return (
+    <>
+      <div
+        className={
+          isHeaderLayout
+            ? 'flex flex-col gap-3 w-full min-w-0'
+            : 'flex flex-col gap-3 w-full min-w-0 mb-3'
+        }
+      >
+        {flowAlerts}
+        {flowControls}
       </div>
 
       {/* Professional Check-in Dialog */}
