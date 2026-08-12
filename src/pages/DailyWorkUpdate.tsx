@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, useCallback, useRef } from 'react';
+import { useEffect, useMemo, useState, useCallback, useRef, type ReactNode } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { submitWork, WorkSubmission, listMyTasks, UserTask, updateTask, listMySubmissions, checkIn, notifyWorkActivity, parseSubmissionsListResponse } from '@/services/todoService';
 import { CheckoutProjectUpdatesCard } from '@/components/daily-work/CheckoutProjectUpdatesCard';
@@ -237,6 +237,8 @@ export type DailyWorkFlowPanelProps = {
   onFlowActionChange?: (action: WorkFlowAction | null) => void;
   onEditClose?: () => void;
   layout?: 'header' | 'inline';
+  /** Why: Header row aligns action buttons with trailing stats (e.g. month hours). */
+  headerTrailing?: ReactNode;
 };
 
 export function DailyWorkFlowPanel({
@@ -247,6 +249,7 @@ export function DailyWorkFlowPanel({
   onFlowActionChange,
   onEditClose,
   layout = 'inline',
+  headerTrailing,
 }: DailyWorkFlowPanelProps) {
   const { currentUser } = useAuth();
   const navigate = useNavigate();
@@ -2262,7 +2265,7 @@ export function DailyWorkFlowPanel({
     <div
       className={
         isHeaderLayout
-          ? 'flex flex-col items-stretch gap-3 w-full min-w-0'
+          ? 'flex flex-col items-stretch gap-2 w-full min-w-0'
           : 'flex flex-wrap items-center gap-2 sm:gap-3'
       }
     >
@@ -2270,7 +2273,7 @@ export function DailyWorkFlowPanel({
         <span
           className={
             isHeaderLayout
-              ? 'text-xs font-medium text-gray-500 dark:text-gray-400 sm:text-right'
+              ? 'text-xs font-medium text-gray-500 dark:text-gray-400 text-right'
               : 'w-full text-xs font-medium text-gray-500 dark:text-gray-400 sm:mr-1 sm:w-auto'
           }
         >
@@ -2278,10 +2281,13 @@ export function DailyWorkFlowPanel({
         </span>
       )}
       <div
-        className={`flex flex-wrap items-center gap-2 sm:gap-3 w-full min-w-0 ${
-          isHeaderLayout ? 'justify-start sm:justify-end' : ''
-        }`}
+        className={
+          isHeaderLayout
+            ? 'flex flex-wrap items-center justify-end gap-3 w-full min-w-0'
+            : 'flex flex-wrap items-center gap-2 sm:gap-3 w-full min-w-0'
+        }
       >
+        <div className="flex flex-wrap items-center gap-2 sm:gap-3 min-w-0">
         {hasActiveWorkSession && (
           <Button
             onClick={onToggleBreak}
@@ -2344,6 +2350,10 @@ export function DailyWorkFlowPanel({
               <span>Update Submission</span>
             </div>
           </Button>
+        ) : null}
+        </div>
+        {isHeaderLayout && headerTrailing ? (
+          <div className="shrink-0">{headerTrailing}</div>
         ) : null}
       </div>
     </div>

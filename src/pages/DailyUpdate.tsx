@@ -605,8 +605,8 @@ export default function DailyUpdate() {
         <div className="relative min-w-0 overflow-hidden rounded-2xl">
           <div className="absolute inset-0 bg-gradient-to-r from-blue-50/50 via-transparent to-emerald-50/50 dark:from-blue-950/20 dark:via-transparent dark:to-emerald-950/20"></div>
           <div className="relative bg-white/80 dark:bg-gray-900/80 backdrop-blur-sm border border-gray-200/50 dark:border-gray-700/50 rounded-2xl p-4 sm:p-6 md:p-8">
-            <div className="grid grid-cols-12 gap-4 lg:gap-6 min-w-0">
-              <div className="col-span-12 lg:col-span-5 xl:col-span-4 space-y-3 min-w-0">
+            <div className="grid grid-cols-12 gap-4 lg:gap-6 min-w-0 lg:items-center">
+              <div className="col-span-12 lg:col-span-4 space-y-3 min-w-0">
                 <div className="flex items-start gap-3 min-w-0">
                   <div className="p-2 bg-gradient-to-br from-blue-600 to-emerald-600 rounded-xl shadow-lg shrink-0">
                     <FileText className="h-6 w-6 text-white" />
@@ -618,13 +618,13 @@ export default function DailyUpdate() {
                     <div className="h-1 w-20 bg-gradient-to-r from-blue-600 to-emerald-600 rounded-full mt-2"></div>
                   </div>
                 </div>
-                <p className="text-gray-600 dark:text-gray-400 text-sm sm:text-base font-medium leading-relaxed">
+                <p className="text-gray-600 dark:text-gray-400 text-sm sm:text-base font-medium leading-relaxed pl-[3.25rem]">
                   Track your daily progress, log hours.
                 </p>
               </div>
 
-              <div className="col-span-12 lg:col-span-7 xl:col-span-8 flex flex-col gap-4 min-w-0">
-                {!(currentUser?.role === 'admin' && showRequestsOnly) && (
+              <div className="col-span-12 lg:col-span-8 flex flex-col gap-3 min-w-0">
+                {!(currentUser?.role === 'admin' && showRequestsOnly) ? (
                   <DailyWorkFlowPanel
                     layout="header"
                     editId={searchParams.get('edit')}
@@ -633,20 +633,29 @@ export default function DailyUpdate() {
                     onSaved={() => void loadSubmissions()}
                     onCheckInTimeChange={setLiveCheckInTime}
                     onEditClose={clearWorkFlowParams}
+                    headerTrailing={
+                      <div className="flex items-center gap-3 px-4 py-2.5 bg-gradient-to-r from-emerald-50 to-blue-50 dark:from-emerald-950/30 dark:to-blue-950/30 border border-emerald-200 dark:border-emerald-800 rounded-xl shadow-sm h-11 sm:h-12">
+                        <div className="p-1.5 bg-emerald-600 rounded-lg shrink-0">
+                          <Calendar className="h-4 w-4 sm:h-5 sm:w-5 text-white" />
+                        </div>
+                        <div className="text-xl sm:text-2xl font-bold text-emerald-700 dark:text-emerald-300 tabular-nums leading-none">
+                          {monthHours}
+                        </div>
+                      </div>
+                    }
                   />
-                )}
-                <div className="flex items-center justify-start lg:justify-end">
-                  <div className="flex items-center gap-3 px-4 py-3 bg-gradient-to-r from-emerald-50 to-blue-50 dark:from-emerald-950/30 dark:to-blue-950/30 border border-emerald-200 dark:border-emerald-800 rounded-xl shadow-sm">
-                    <div className="p-1.5 bg-emerald-600 rounded-lg shrink-0">
-                      <Calendar className="h-5 w-5 text-white" />
-                    </div>
-                    <div>
-                      <div className="text-2xl font-bold text-emerald-700 dark:text-emerald-300 tabular-nums">
+                ) : (
+                  <div className="flex justify-end">
+                    <div className="flex items-center gap-3 px-4 py-2.5 bg-gradient-to-r from-emerald-50 to-blue-50 dark:from-emerald-950/30 dark:to-blue-950/30 border border-emerald-200 dark:border-emerald-800 rounded-xl shadow-sm h-11 sm:h-12">
+                      <div className="p-1.5 bg-emerald-600 rounded-lg shrink-0">
+                        <Calendar className="h-4 w-4 sm:h-5 sm:w-5 text-white" />
+                      </div>
+                      <div className="text-xl sm:text-2xl font-bold text-emerald-700 dark:text-emerald-300 tabular-nums leading-none">
                         {monthHours}
                       </div>
                     </div>
                   </div>
-                </div>
+                )}
               </div>
             </div>
           </div>
