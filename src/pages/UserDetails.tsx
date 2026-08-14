@@ -6,6 +6,7 @@ import { EditUserDialog } from "@/components/users/EditUserDialog";
 import { UserProjectsDialog } from "@/components/users/UserProjectsDialog";
 import { UserWorkStats } from "@/components/users/UserWorkStats";
 import { UserLeaveDetails } from "@/components/users/UserLeaveDetails";
+import { UserOfficeWfhCalendar } from "@/components/users/UserOfficeWfhCalendar";
 import { UserAttendanceExceptions } from "@/components/users/UserAttendanceExceptions";
 import { UserProjectPortfolio } from "@/components/users/UserProjectPortfolio";
 import { UserAvatar } from "@/components/users/UserAvatar";
@@ -872,6 +873,13 @@ export default function UserDetails() {
                   />
                 </CardContent>
               </Card>
+              {effectiveRole === "admin" ? (
+                <Card className="xl:col-span-12 border-border/60 bg-card/60 backdrop-blur">
+                  <CardContent className="p-5 sm:p-6">
+                    <UserOfficeWfhCalendar userId={user.id} />
+                  </CardContent>
+                </Card>
+              ) : null}
               {effectiveRole === "admin" ? (
                 <Card className="xl:col-span-12 border-border/60 bg-card/60 backdrop-blur">
                   <CardContent className="p-5 sm:p-6 space-y-6">

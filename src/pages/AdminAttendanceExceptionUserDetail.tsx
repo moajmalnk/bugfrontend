@@ -37,14 +37,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Switch } from '@/components/ui/switch';
@@ -66,6 +58,7 @@ import {
   reviewWfhRequest,
   type WfhRequest,
 } from '@/services/wfhRequestService';
+import { listLeaveRequests, type LeaveRequest } from '@/services/leaveService';
 import { userService } from '@/services/userService';
 import type { User } from '@/types';
 import {
@@ -79,7 +72,13 @@ import {
   summarizeDates,
   todayYMD,
   wfhStatusBadgeClass,
+  type AttendancePeriodRow,
 } from '@/pages/adminAttendanceShared';
+import {
+  AttendanceDayCalendar,
+  AttendancePeriodTable,
+} from '@/components/attendance/AttendanceDayCalendar';
+
 
 /**
  * Admin attendance exception detail — one teammate's day tables, grants, WFH, lates.
@@ -98,10 +97,13 @@ export default function AdminAttendanceExceptionUserDetail() {
   const [detailExceptions, setDetailExceptions] = useState<AttendanceDayException[]>([]);
   const [detailLates, setDetailLates] = useState<LateDayRow[]>([]);
   const [detailWfhRequests, setDetailWfhRequests] = useState<WfhRequest[]>([]);
+  const [detailLeaveRequests, setDetailLeaveRequests] = useState<LeaveRequest[]>([]);
   const [detailOfficeActiveDays, setDetailOfficeActiveDays] = useState(0);
   const [detailWfhActiveDays, setDetailWfhActiveDays] = useState(0);
   const [detailAttendanceDays, setDetailAttendanceDays] = useState<AttendanceModeDay[]>([]);
-  const [attendanceTableTab, setAttendanceTableTab] = useState<'weekly' | 'monthly'>('weekly');
+  const [attendanceTableTab, setAttendanceTableTab] = useState<'day' | 'weekly' | 'monthly'>(
+    'day'
+  );
   const [searchQuery, setSearchQuery] = useState('');
   const [sectionFilter, setSectionFilter] = useState('all');
   const [wfhStatusFilter, setWfhStatusFilter] = useState('all');
@@ -126,10 +128,11 @@ export default function AdminAttendanceExceptionUserDetail() {
       if (!userId) return;
       if (!opts?.silent) setLoading(true);
       try {
-        const [payload, wfhHistory, userList] = await Promise.all([
+        const [payload, wfhHistory, userList, leaveRows] = await Promise.all([
           listAttendanceExceptions(userId),
           listUserWfhRequests(userId).catch(() => null),
           userService.getUsers().catch(() => [] as User[]),
+          listLeaveRequests({ user_id: userId }).catch(() => [] as LeaveRequest[]),
         ]);
 
         const fromList = (userList || []).find((u) => String(u.id) === userId) ?? null;
@@ -174,6 +177,7 @@ export default function AdminAttendanceExceptionUserDetail() {
               }))
             : []
         );
+        setDetailLeaveRequests(Array.isArray(leaveRows) ? leaveRows : []);
         setDetailOfficeActiveDays(Number(payload.office_active_days ?? 0) || 0);
         setDetailWfhActiveDays(Number(payload.wfh_active_days ?? 0) || 0);
         setDetailAttendanceDays(
@@ -194,6 +198,7 @@ export default function AdminAttendanceExceptionUserDetail() {
         setDetailExceptions([]);
         setDetailLates([]);
         setDetailWfhRequests([]);
+        setDetailLeaveRequests([]);
         setDetailOfficeActiveDays(0);
         setDetailWfhActiveDays(0);
         setDetailAttendanceDays([]);
@@ -208,13 +213,38 @@ export default function AdminAttendanceExceptionUserDetail() {
     void loadUserDetail();
   }, [loadUserDetail]);
 
+  const dailyAttendanceRows = useMemo(
+    () =>
+      buildAttendancePeriodRows(
+        detailAttendanceDays,
+        'day',
+        detailWfhRequests,
+        detailExceptions,
+        detailLeaveRequests
+      ),
+    [detailAttendanceDays, detailWfhRequests, detailExceptions, detailLeaveRequests]
+  );
   const weeklyAttendanceRows = useMemo(
-    () => buildAttendancePeriodRows(detailAttendanceDays, 'week', detailWfhRequests),
-    [detailAttendanceDays, detailWfhRequests]
+    () =>
+      buildAttendancePeriodRows(
+        detailAttendanceDays,
+        'week',
+        detailWfhRequests,
+        detailExceptions,
+        detailLeaveRequests
+      ),
+    [detailAttendanceDays, detailWfhRequests, detailExceptions, detailLeaveRequests]
   );
   const monthlyAttendanceRows = useMemo(
-    () => buildAttendancePeriodRows(detailAttendanceDays, 'month', detailWfhRequests),
-    [detailAttendanceDays, detailWfhRequests]
+    () =>
+      buildAttendancePeriodRows(
+        detailAttendanceDays,
+        'month',
+        detailWfhRequests,
+        detailExceptions,
+        detailLeaveRequests
+      ),
+    [detailAttendanceDays, detailWfhRequests, detailExceptions, detailLeaveRequests]
   );
 
   const filteredExceptions = useMemo(() => {
@@ -253,6 +283,12 @@ export default function AdminAttendanceExceptionUserDetail() {
       return hay.includes(q);
     });
   }, [detailLates, searchQuery]);
+
+  const filteredDailyRows = useMemo(() => {
+    const q = searchQuery.trim().toLowerCase();
+    if (!q) return dailyAttendanceRows;
+    return dailyAttendanceRows.filter((row) => row.label.toLowerCase().includes(q));
+  }, [dailyAttendanceRows, searchQuery]);
 
   const filteredWeeklyRows = useMemo(() => {
     const q = searchQuery.trim().toLowerCase();
@@ -830,17 +866,25 @@ export default function AdminAttendanceExceptionUserDetail() {
                     </p>
                   </div>
                   <p className="text-[11px] sm:text-xs text-muted-foreground">
-                    Last ~120 days · check-ins + WFH requests
+                    Last ~120 days · office, leave, exceptions, WFH
                   </p>
                 </div>
                 <Tabs
                   value={attendanceTableTab}
                   onValueChange={(v) =>
-                    setAttendanceTableTab(v === 'monthly' ? 'monthly' : 'weekly')
+                    setAttendanceTableTab(
+                      v === 'weekly' ? 'weekly' : v === 'monthly' ? 'monthly' : 'day'
+                    )
                   }
                   className="w-full"
                 >
-                  <TabsList className="grid w-full grid-cols-2 rounded-xl h-10 bg-sky-50/80 dark:bg-sky-950/30 border border-sky-100 dark:border-sky-900/50 p-1">
+                  <TabsList className="grid w-full grid-cols-3 rounded-xl h-10 bg-sky-50/80 dark:bg-sky-950/30 border border-sky-100 dark:border-sky-900/50 p-1">
+                    <TabsTrigger
+                      value="day"
+                      className="rounded-xl text-xs sm:text-sm data-[state=active]:bg-white dark:data-[state=active]:bg-gray-900 data-[state=active]:text-sky-700 dark:data-[state=active]:text-sky-300 data-[state=active]:shadow-sm"
+                    >
+                      Day
+                    </TabsTrigger>
                     <TabsTrigger
                       value="weekly"
                       className="rounded-xl text-xs sm:text-sm data-[state=active]:bg-white dark:data-[state=active]:bg-gray-900 data-[state=active]:text-sky-700 dark:data-[state=active]:text-sky-300 data-[state=active]:shadow-sm"
@@ -854,133 +898,32 @@ export default function AdminAttendanceExceptionUserDetail() {
                       Monthly
                     </TabsTrigger>
                   </TabsList>
+                  <TabsContent value="day" className="mt-3">
+                    <AttendanceDayCalendar
+                      rows={filteredDailyRows}
+                      emptySearch={searchQuery.trim() ? 'No days match this search.' : ''}
+                      attendanceDays={detailAttendanceDays}
+                      exceptions={detailExceptions}
+                      wfhRequests={detailWfhRequests}
+                      lates={detailLates}
+                      leaveRequests={detailLeaveRequests}
+                    />
+                  </TabsContent>
                   <TabsContent value="weekly" className="mt-3">
-                    {filteredWeeklyRows.length === 0 ? (
-                      <p className="text-sm text-muted-foreground rounded-xl border border-dashed border-gray-200 dark:border-gray-700 px-4 py-8 text-center bg-white/40 dark:bg-gray-900/40">
-                        {searchQuery.trim()
-                          ? 'No weeks match this search.'
-                          : 'No office or WFH days recorded for this user yet.'}
-                      </p>
-                    ) : (
-                      <div className="rounded-xl border border-gray-200/70 dark:border-gray-700/70 overflow-x-auto bg-white/60 dark:bg-gray-900/40">
-                        <Table>
-                          <TableHeader>
-                            <TableRow className="hover:bg-transparent bg-sky-50/50 dark:bg-sky-950/20">
-                              <TableHead className="text-xs sm:text-sm">Week</TableHead>
-                              <TableHead className="text-xs sm:text-sm text-right tabular-nums">
-                                Office
-                              </TableHead>
-                              <TableHead className="text-xs sm:text-sm text-right tabular-nums">
-                                WFH
-                              </TableHead>
-                              <TableHead className="text-xs sm:text-sm text-right tabular-nums text-emerald-700 dark:text-emerald-400">
-                                Approved
-                              </TableHead>
-                              <TableHead className="text-xs sm:text-sm text-right tabular-nums text-rose-700 dark:text-rose-400">
-                                Rejected
-                              </TableHead>
-                              <TableHead className="text-xs sm:text-sm text-right tabular-nums">
-                                Late
-                              </TableHead>
-                              <TableHead className="text-xs sm:text-sm text-right tabular-nums">
-                                Total
-                              </TableHead>
-                            </TableRow>
-                          </TableHeader>
-                          <TableBody>
-                            {filteredWeeklyRows.map((row) => (
-                              <TableRow key={row.key}>
-                                <TableCell className="text-xs sm:text-sm font-medium whitespace-nowrap">
-                                  {row.label}
-                                </TableCell>
-                                <TableCell className="text-xs sm:text-sm text-right tabular-nums">
-                                  {row.office}
-                                </TableCell>
-                                <TableCell className="text-xs sm:text-sm text-right tabular-nums">
-                                  {row.wfh}
-                                </TableCell>
-                                <TableCell className="text-xs sm:text-sm text-right tabular-nums text-emerald-700 dark:text-emerald-400">
-                                  {row.approved}
-                                </TableCell>
-                                <TableCell className="text-xs sm:text-sm text-right tabular-nums text-rose-700 dark:text-rose-400">
-                                  {row.rejected}
-                                </TableCell>
-                                <TableCell className="text-xs sm:text-sm text-right tabular-nums text-muted-foreground">
-                                  {row.late}
-                                </TableCell>
-                                <TableCell className="text-xs sm:text-sm text-right tabular-nums font-semibold">
-                                  {row.total}
-                                </TableCell>
-                              </TableRow>
-                            ))}
-                          </TableBody>
-                        </Table>
-                      </div>
-                    )}
+                    <AttendancePeriodTable
+                      rows={filteredWeeklyRows}
+                      periodLabel="Week"
+                      emptySearch={searchQuery.trim() ? 'No weeks match this search.' : ''}
+                      emptyDefault="No office or WFH days recorded for this user yet."
+                    />
                   </TabsContent>
                   <TabsContent value="monthly" className="mt-3">
-                    {filteredMonthlyRows.length === 0 ? (
-                      <p className="text-sm text-muted-foreground rounded-xl border border-dashed border-gray-200 dark:border-gray-700 px-4 py-8 text-center bg-white/40 dark:bg-gray-900/40">
-                        {searchQuery.trim()
-                          ? 'No months match this search.'
-                          : 'No office or WFH days recorded for this user yet.'}
-                      </p>
-                    ) : (
-                      <div className="rounded-xl border border-gray-200/70 dark:border-gray-700/70 overflow-x-auto bg-white/60 dark:bg-gray-900/40">
-                        <Table>
-                          <TableHeader>
-                            <TableRow className="hover:bg-transparent bg-sky-50/50 dark:bg-sky-950/20">
-                              <TableHead className="text-xs sm:text-sm">Month</TableHead>
-                              <TableHead className="text-xs sm:text-sm text-right tabular-nums">
-                                Office
-                              </TableHead>
-                              <TableHead className="text-xs sm:text-sm text-right tabular-nums">
-                                WFH
-                              </TableHead>
-                              <TableHead className="text-xs sm:text-sm text-right tabular-nums text-emerald-700 dark:text-emerald-400">
-                                Approved
-                              </TableHead>
-                              <TableHead className="text-xs sm:text-sm text-right tabular-nums text-rose-700 dark:text-rose-400">
-                                Rejected
-                              </TableHead>
-                              <TableHead className="text-xs sm:text-sm text-right tabular-nums">
-                                Late
-                              </TableHead>
-                              <TableHead className="text-xs sm:text-sm text-right tabular-nums">
-                                Total
-                              </TableHead>
-                            </TableRow>
-                          </TableHeader>
-                          <TableBody>
-                            {filteredMonthlyRows.map((row) => (
-                              <TableRow key={row.key}>
-                                <TableCell className="text-xs sm:text-sm font-medium whitespace-nowrap">
-                                  {row.label}
-                                </TableCell>
-                                <TableCell className="text-xs sm:text-sm text-right tabular-nums">
-                                  {row.office}
-                                </TableCell>
-                                <TableCell className="text-xs sm:text-sm text-right tabular-nums">
-                                  {row.wfh}
-                                </TableCell>
-                                <TableCell className="text-xs sm:text-sm text-right tabular-nums text-emerald-700 dark:text-emerald-400">
-                                  {row.approved}
-                                </TableCell>
-                                <TableCell className="text-xs sm:text-sm text-right tabular-nums text-rose-700 dark:text-rose-400">
-                                  {row.rejected}
-                                </TableCell>
-                                <TableCell className="text-xs sm:text-sm text-right tabular-nums text-muted-foreground">
-                                  {row.late}
-                                </TableCell>
-                                <TableCell className="text-xs sm:text-sm text-right tabular-nums font-semibold">
-                                  {row.total}
-                                </TableCell>
-                              </TableRow>
-                            ))}
-                          </TableBody>
-                        </Table>
-                      </div>
-                    )}
+                    <AttendancePeriodTable
+                      rows={filteredMonthlyRows}
+                      periodLabel="Month"
+                      emptySearch={searchQuery.trim() ? 'No months match this search.' : ''}
+                      emptyDefault="No office or WFH days recorded for this user yet."
+                    />
                   </TabsContent>
                 </Tabs>
               </div>
