@@ -182,6 +182,7 @@ const STATIC_RESOURCES = [
 // URLs that should never be cached
 const EXCLUDE_FROM_CACHE = [
   '/api/',
+  '/br-api/',
   'chrome-extension://',
   'moz-extension://',
   'safari-extension://',
@@ -272,7 +273,7 @@ function getCacheStrategy(request) {
   const url = new URL(request.url);
   
   // API requests: Network First (fresh data preferred)
-  if (url.pathname.includes('/api/')) {
+  if (url.pathname.includes('/api/') || url.pathname.includes('/br-api/')) {
     return 'networkFirst';
   }
   

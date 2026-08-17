@@ -1,11 +1,15 @@
 {
   "rewrites": [
     {
+      "source": "/br-api/:path*",
+      "destination": "https://bugbackend.bugricer.com/api/:path*"
+    },
+    {
       "source": "/share-target",
       "destination": "/api/share-target"
     },
     {
-      "source": "/((?!assets/|service-worker\\.js|firebase-messaging-sw\\.js|manifest\\.json|version\\.json|robots\\.txt|sitemap\\.xml|llms\\.txt|favicon\\.ico|browserconfig\\.xml|apple-touch-icon\\.png|icon-.*\\.png|share-target|api/).*)",
+      "source": "/((?!assets/|service-worker\\.js|firebase-messaging-sw\\.js|manifest\\.json|version\\.json|robots\\.txt|sitemap\\.xml|llms\\.txt|favicon\\.ico|browserconfig\\.xml|apple-touch-icon\\.png|icon-.*\\.png|share-target|api/|br-api/).*)",
       "destination": "/index.html"
     }
   ],
