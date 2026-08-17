@@ -1,5 +1,0 @@
-<IfModule mod_rewrite.c>
-  RewriteEngine On
-  RewriteRule ^proxy\.php$ - [L]
-  RewriteRule ^(.*)$ proxy.php [QSA,L]
-</IfModule>

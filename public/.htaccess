@@ -15,10 +15,6 @@
 RewriteEngine On
 RewriteBase /
 
-# Same-origin API proxy — must run before the SPA fallback
-RewriteRule ^api/proxy\.php$ - [L]
-RewriteRule ^api(/.*)?$ api/proxy.php [QSA,L]
-
 # IMPORTANT: Don't rewrite existing files or directories
 # This prevents JavaScript/CSS files from being redirected to index.html
 RewriteCond %{REQUEST_FILENAME} -f [OR]
