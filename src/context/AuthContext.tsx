@@ -62,10 +62,13 @@ function handleAuthFcmSync(payload?: {
 }) {
   const epoch = payload?.fcm_token_epoch ?? payload?.user?.fcm_token_epoch;
   applyServerFcmEpoch(epoch);
-  void (async () => {
-    await prepareFcmOnLogin();
-    await syncFcmTokenForSession({ force: true, retries: 1, timeoutMs: 30_000 });
-  })();
+  // Why: Defer push-token sync so login/dashboard API burst does not hit Vercel 429.
+  window.setTimeout(() => {
+    void (async () => {
+      await prepareFcmOnLogin();
+      await syncFcmTokenForSession({ force: true, retries: 1, timeoutMs: 30_000 });
+    })();
+  }, 5000);
 }
 
 export function AuthProvider({ children }: { children: ReactNode }) {

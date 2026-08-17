@@ -85,11 +85,11 @@ const queryClient = new QueryClient({
       staleTime: 5 * 60 * 1000, // Consider data fresh for 5 minutes
       gcTime: 10 * 60 * 1000, // Keep in cache for 10 minutes (renamed from cacheTime in v5)
       retry: (failureCount, error: any) => {
-        // Don't retry on auth errors (401, 403)
-        if (error?.response?.status === 401 || error?.response?.status === 403) {
+        const status = error?.response?.status;
+        // Don't retry on auth errors or rate limits (retries amplify Vercel 429 bursts)
+        if (status === 401 || status === 403 || status === 429) {
           return false;
         }
-        // Retry up to 2 times for other errors
         return failureCount < 2;
       },
       refetchOnWindowFocus: false, // Don't refetch when window gains focus

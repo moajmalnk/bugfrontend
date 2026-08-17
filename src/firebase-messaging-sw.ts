@@ -635,15 +635,19 @@ async function saveFcmToken(token: string, options?: { force?: boolean }): Promi
     pwa_installed: pwaInstalled,
   };
 
-  const savePaths = [
-    "/save-fcm-token.php",
-    // Production fallback only when not already on the local /api proxy
-    ...(typeof window !== "undefined" &&
-    (window.location.hostname === "localhost" ||
-      window.location.hostname === "127.0.0.1")
-      ? []
-      : ["https://bugbackend.bugricer.com/api/save-fcm-token.php"]),
-  ];
+  const hostname =
+    typeof window !== "undefined" ? window.location.hostname : "";
+  const onProxiedFrontend =
+    hostname === "bugs.bugricer.com" ||
+    hostname === "localhost" ||
+    hostname === "127.0.0.1";
+
+  const savePaths = onProxiedFrontend
+    ? ["/save-fcm-token.php"]
+    : [
+        "/save-fcm-token.php",
+        "https://bugbackend.bugricer.com/api/save-fcm-token.php",
+      ];
 
   let lastError = "";
   for (const path of savePaths) {
@@ -676,12 +680,22 @@ async function saveFcmToken(token: string, options?: { force?: boolean }): Promi
       }
     } catch (err: unknown) {
       const axiosErr = err as { response?: { status?: number }; message?: string };
-      if (axiosErr.response?.status) {
-        lastError = `HTTP ${axiosErr.response.status} (${path})`;
+      const status = axiosErr.response?.status;
+      if (status === 429) {
+        lastError = `Rate limited (${path})`;
+        await sleep(2500);
+        continue;
+      }
+      if (status) {
+        lastError = `HTTP ${status} (${path})`;
       } else {
         lastError = `Request failed (${path}): ${String(axiosErr.message || err)}`;
       }
     }
+  }
+
+  if (/rate limited|429/i.test(lastError)) {
+    return false;
   }
 
   clearFcmRegistrationCache();

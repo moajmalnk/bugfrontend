@@ -27,16 +27,6 @@ const getApiUrl = () => {
   ) {
     return '/api';
   }
-  if (
-    import.meta.env.DEV &&
-    isLocalhost &&
-    configured &&
-    /^https?:\/\//.test(configured) &&
-    !configured.includes('localhost') &&
-    !configured.includes('127.0.0.1')
-  ) {
-    return '/api';
-  }
 
   if (configured) {
     return configured;

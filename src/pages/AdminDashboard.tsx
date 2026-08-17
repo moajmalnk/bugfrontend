@@ -296,28 +296,27 @@ function sortByPriorityThenDate(bugs: Bug[]): Bug[] {
 async function loadDashboardData() {
   const today = startOfDay(new Date());
   const listLimit = 40;
+  const bugStatuses: BugStatusKey[] = [
+    "pending",
+    "in_progress",
+    "fixed",
+    "declined",
+    "rejected",
+  ];
 
-  const [
-    projects,
-    users,
-    lifetimeStats,
-    pendingResult,
-    progressResult,
-    fixedResult,
-    declinedResult,
-    rejectedResult,
-    allUpdates,
-  ] = await Promise.all([
+  const [projects, users, lifetimeStats, allUpdates] = await Promise.all([
     projectService.getProjects(),
     userService.getUsers(),
     bugService.getDashboardStats(),
-    bugService.getBugs({ page: 1, limit: listLimit, status: "pending" }),
-    bugService.getBugs({ page: 1, limit: listLimit, status: "in_progress" }),
-    bugService.getBugs({ page: 1, limit: listLimit, status: "fixed" }),
-    bugService.getBugs({ page: 1, limit: listLimit, status: "declined" }),
-    bugService.getBugs({ page: 1, limit: listLimit, status: "rejected" }),
     updateService.getUpdates().catch(() => [] as Awaited<ReturnType<typeof updateService.getUpdates>>),
   ]);
+
+  // Why: Stagger bug-list fetches — 9 parallel /br-api calls trigger Vercel 429.
+  const bugResults = await mapWithConcurrency(bugStatuses, 2, (status) =>
+    bugService.getBugs({ page: 1, limit: listLimit, status })
+  );
+  const [pendingResult, progressResult, fixedResult, declinedResult, rejectedResult] =
+    bugResults;
 
   const updatesByProject = new Map<string, number>();
   const updateStatusCounts = {
@@ -2079,6 +2078,11 @@ export default function AdminDashboard() {
     enabled: isAdmin,
     staleTime: 60_000,
     refetchOnWindowFocus: false,
+    retry: (failureCount, error: unknown) => {
+      const status = (error as { response?: { status?: number } })?.response?.status;
+      if (status === 429) return false;
+      return failureCount < 1;
+    },
   });
 
   const {
