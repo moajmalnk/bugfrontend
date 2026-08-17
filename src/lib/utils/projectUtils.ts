@@ -369,8 +369,8 @@ export interface CreateProjectData {
   testing_end_date?: string;
   frontend_finish_date?: string;
   backend_finish_date?: string;
-  tester_compliance_complete_date?: string;
-  developer_compliance_complete_date?: string;
+  tester_compliance_complete_date?: string | null;
+  developer_compliance_complete_date?: string | null;
   members?: ProjectMemberInput[];
 }
 
@@ -544,8 +544,8 @@ export function formValuesToPayload(values: ProjectFormValues): CreateProjectDat
     testing_end_date: values.testing_end_date || undefined,
     frontend_finish_date: values.frontend_finish_date || undefined,
     backend_finish_date: values.backend_finish_date || undefined,
-    tester_compliance_complete_date: values.tester_compliance_complete_date || undefined,
-    developer_compliance_complete_date: values.developer_compliance_complete_date || undefined,
+    tester_compliance_complete_date: values.tester_compliance_complete_date || null,
+    developer_compliance_complete_date: values.developer_compliance_complete_date || null,
     members,
   };
 }
