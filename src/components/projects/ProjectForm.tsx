@@ -768,7 +768,7 @@ export function ProjectForm({
 
               <SectionBlock
                 title="Team Allocation"
-                description="Project Lead, Developer, QA & Testing"
+                description="A project lead can also be assigned as a developer"
                 icon={Users}
                 iconClass="bg-gradient-to-br from-purple-500 to-violet-600"
               >
@@ -1082,6 +1082,8 @@ export function ProjectForm({
                     { key: 'testing_end_date' as const, label: 'Testing End', dot: 'from-lime-500 to-green-600' },
                     { key: 'frontend_finish_date' as const, label: 'Frontend Finish', dot: 'from-green-500 to-emerald-600' },
                     { key: 'backend_finish_date' as const, label: 'Backend Finish', dot: 'from-emerald-500 to-teal-600' },
+                    { key: 'tester_compliance_complete_date' as const, label: 'Tester Compliance Complete', dot: 'from-cyan-500 to-sky-600' },
+                    { key: 'developer_compliance_complete_date' as const, label: 'Developer Compliance Complete', dot: 'from-indigo-500 to-blue-600' },
                   ].map(({ key, label, dot }) => (
                     <div key={key} className="space-y-3">
                       <FieldLabel dotClass={dot}>{label}</FieldLabel>

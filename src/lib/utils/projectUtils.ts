@@ -285,6 +285,8 @@ export interface Project {
   testing_end_date?: string | null;
   frontend_finish_date?: string | null;
   backend_finish_date?: string | null;
+  tester_compliance_complete_date?: string | null;
+  developer_compliance_complete_date?: string | null;
   members?: string[];
   members_detail?: ProjectMemberDetail[];
   bug_stats?: ProjectBugStatsLite;
@@ -367,6 +369,8 @@ export interface CreateProjectData {
   testing_end_date?: string;
   frontend_finish_date?: string;
   backend_finish_date?: string;
+  tester_compliance_complete_date?: string;
+  developer_compliance_complete_date?: string;
   members?: ProjectMemberInput[];
 }
 
@@ -405,6 +409,8 @@ export interface ProjectFormValues {
   testing_end_date: string;
   frontend_finish_date: string;
   backend_finish_date: string;
+  tester_compliance_complete_date: string;
+  developer_compliance_complete_date: string;
   project_lead_id: string;
   developer_ids: string[];
   tester_ids: string[];
@@ -443,6 +449,8 @@ export const emptyProjectFormValues = (): ProjectFormValues => ({
   testing_end_date: '',
   frontend_finish_date: '',
   backend_finish_date: '',
+  tester_compliance_complete_date: '',
+  developer_compliance_complete_date: '',
   project_lead_id: '',
   developer_ids: [],
   tester_ids: [],
@@ -483,6 +491,8 @@ export function projectToFormValues(project: Project): ProjectFormValues {
     testing_end_date: project.testing_end_date || '',
     frontend_finish_date: project.frontend_finish_date || '',
     backend_finish_date: project.backend_finish_date || '',
+    tester_compliance_complete_date: project.tester_compliance_complete_date || '',
+    developer_compliance_complete_date: project.developer_compliance_complete_date || '',
     project_lead_id: members.find((m) => m.role === 'manager')?.user_id || '',
     developer_ids: members.filter((m) => m.role === 'developer').map((m) => m.user_id),
     tester_ids: members.filter((m) => m.role === 'tester').map((m) => m.user_id),
@@ -534,6 +544,8 @@ export function formValuesToPayload(values: ProjectFormValues): CreateProjectDat
     testing_end_date: values.testing_end_date || undefined,
     frontend_finish_date: values.frontend_finish_date || undefined,
     backend_finish_date: values.backend_finish_date || undefined,
+    tester_compliance_complete_date: values.tester_compliance_complete_date || undefined,
+    developer_compliance_complete_date: values.developer_compliance_complete_date || undefined,
     members,
   };
 }

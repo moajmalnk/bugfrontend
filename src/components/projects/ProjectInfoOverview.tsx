@@ -431,6 +431,14 @@ export function ProjectInfoOverview({ project, createdByName }: ProjectInfoOverv
     { label: 'Testing End', value: formatProjectDate(project.testing_end_date) },
     { label: 'Frontend Finish', value: formatProjectDate(project.frontend_finish_date) },
     { label: 'Backend Finish', value: formatProjectDate(project.backend_finish_date) },
+    {
+      label: 'Tester Compliance Complete',
+      value: formatProjectDate(project.tester_compliance_complete_date),
+    },
+    {
+      label: 'Developer Compliance Complete',
+      value: formatProjectDate(project.developer_compliance_complete_date),
+    },
     { label: 'Duration', value: `${duration} days` },
   ];
 
