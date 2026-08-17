@@ -6,8 +6,16 @@ const isLocalhost = typeof window !== 'undefined' &&
 
 const PRODUCTION_API_URL = 'https://bugbackend.bugricer.com/api';
 
+/** Hosts that serve the PHP /api reverse proxy next to the SPA. */
+const SAME_ORIGIN_API_HOSTS = new Set(['bugs.bugricer.com', 'bugs.moajmalnk.in']);
+
 const getApiUrl = () => {
   const configured = (import.meta.env.VITE_API_URL as string | undefined)?.replace(/\/$/, '');
+
+  // Production SPA: same-origin /api (no browser CORS / OPTIONS to bugbackend)
+  if (typeof window !== 'undefined' && SAME_ORIGIN_API_HOSTS.has(window.location.hostname)) {
+    return '/api';
+  }
 
   // Local dev: proxy /api -> production backend (see vite.config.ts) to avoid CORS
   if (
@@ -104,7 +112,7 @@ export const getWebSocketUrl = () => {
   }
   
   const apiUrl = getApiUrl();
-  if (apiUrl.includes('bugbackend.bugricer.com')) {
+  if (apiUrl.includes('bugbackend.bugricer.com') || apiUrl === '/api') {
     return 'wss://bugbackend.bugricer.com:8089';
   }
 
