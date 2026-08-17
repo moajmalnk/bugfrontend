@@ -41,6 +41,13 @@ export async function fetchServerClock(): Promise<ServerClock> {
     method: 'GET',
     cache: 'no-store',
   });
+
+  // Why: During Vercel/Cloudflare rate-limit bursts, skip clock check instead of
+  // showing a red console error on the login page.
+  if (res.status === 429) {
+    throw new Error('RATE_LIMITED');
+  }
+
   const data = await readApiJson<{
     success?: boolean;
     server_today?: string;
