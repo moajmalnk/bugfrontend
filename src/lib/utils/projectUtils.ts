@@ -813,19 +813,35 @@ export function joinProjectDateTime(
   return `${ymd} ${hhmm}:00`;
 }
 
-export function formatProjectDateTime(value?: string | null): string {
-  if (!value) return 'Not set';
+function toProjectDate(value?: string | null): Date | null {
+  if (!value) return null;
   const normalized = value.includes('T')
     ? value
     : value.includes(' ')
       ? value.replace(' ', 'T')
       : `${value}T${DEFAULT_COMPLIANCE_TIME}:00`;
   const date = new Date(normalized);
-  if (Number.isNaN(date.getTime())) return 'Not set';
+  return Number.isNaN(date.getTime()) ? null : date;
+}
+
+export function formatProjectDateTime(value?: string | null): string {
+  const date = toProjectDate(value);
+  if (!date) return 'Not set';
   return date.toLocaleString('en-IN', {
     day: '2-digit',
     month: 'short',
     year: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit',
+    hour12: true,
+    timeZone: 'Asia/Kolkata',
+  });
+}
+
+export function formatProjectTime(value?: string | null): string {
+  const date = toProjectDate(value);
+  if (!date) return 'Not set';
+  return date.toLocaleTimeString('en-IN', {
     hour: 'numeric',
     minute: '2-digit',
     hour12: true,

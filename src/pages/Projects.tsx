@@ -41,6 +41,7 @@ import {
   PROJECT_PLATFORM_OPTIONS,
   sortProjectsByWorkload,
   formatProjectDate,
+  formatProjectTime,
 } from "@/lib/utils/projectUtils";
 import { Project, projectService } from "@/services/projectService";
 import { userService } from "@/services/userService";
@@ -91,11 +92,13 @@ function formatProjectPlatformsLabel(value?: string | null): string | null {
   );
 }
 
-/** Compact date for project cards; empty string when unset. */
-function formatCardMilestone(value?: string | null): string {
-  if (!value) return "";
-  const formatted = formatProjectDate(value);
-  return formatted === "Not set" ? "" : formatted;
+/** Compact date + time for project cards; empty when unset. */
+function formatCardMilestone(value?: string | null): { date: string; time: string } {
+  if (!value) return { date: "", time: "" };
+  const date = formatProjectDate(value);
+  if (date === "Not set") return { date: "", time: "" };
+  const time = formatProjectTime(value);
+  return { date, time: time === "Not set" ? "" : time };
 }
 
 function isDeadlineOverdue(
@@ -1506,7 +1509,7 @@ const Projects = () => {
                         project.testing_end_date || project.testing_start_date
                       );
                       const hasAny =
-                        startLabel || deadlineLabel || testingLabel;
+                        startLabel.date || deadlineLabel.date || testingLabel.date;
                       if (!hasAny) return null;
 
                       const overdue = isDeadlineOverdue(
@@ -1540,10 +1543,13 @@ const Projects = () => {
                               </p>
                               <p className="text-xs sm:text-sm font-bold leading-snug break-words">
                                 {timer.label}
-                                {deadlineLabel ? (
+                                {deadlineLabel.date ? (
                                   <span className="font-medium opacity-80">
                                     {" "}
-                                    · {deadlineLabel}
+                                    · {deadlineLabel.date}
+                                    {deadlineLabel.time
+                                      ? ` · ${deadlineLabel.time}`
+                                      : ""}
                                   </span>
                                 ) : null}
                               </p>
@@ -1556,8 +1562,20 @@ const Projects = () => {
                                 <span className="h-1.5 w-1.5 rounded-full bg-gradient-to-br from-rose-500 to-pink-600 shrink-0" />
                                 Start
                               </div>
-                              <p className="mt-0.5 text-[11px] sm:text-xs font-semibold text-foreground truncate">
-                                {startLabel || "—"}
+                              <p
+                                className="mt-0.5 text-[11px] sm:text-xs font-semibold text-foreground leading-snug break-words"
+                                title={
+                                  startLabel.date
+                                    ? `${startLabel.date}${startLabel.time ? ` · ${startLabel.time}` : ""}`
+                                    : undefined
+                                }
+                              >
+                                {startLabel.date || "—"}
+                                {startLabel.time ? (
+                                  <span className="mt-0.5 block text-[10px] font-medium text-muted-foreground">
+                                    {startLabel.time}
+                                  </span>
+                                ) : null}
                               </p>
                             </div>
                             <div
@@ -1578,13 +1596,29 @@ const Projects = () => {
                                 Deadline
                               </div>
                               <p
-                                className={`mt-0.5 text-[11px] sm:text-xs font-semibold truncate ${
+                                className={`mt-0.5 text-[11px] sm:text-xs font-semibold leading-snug break-words ${
                                   overdue
                                     ? "text-red-700 dark:text-red-300"
                                     : "text-foreground"
                                 }`}
+                                title={
+                                  deadlineLabel.date
+                                    ? `${deadlineLabel.date}${deadlineLabel.time ? ` · ${deadlineLabel.time}` : ""}`
+                                    : undefined
+                                }
                               >
-                                {deadlineLabel || "—"}
+                                {deadlineLabel.date || "—"}
+                                {deadlineLabel.time ? (
+                                  <span
+                                    className={`mt-0.5 block text-[10px] font-medium ${
+                                      overdue
+                                        ? "text-red-600/80 dark:text-red-300/80"
+                                        : "text-muted-foreground"
+                                    }`}
+                                  >
+                                    {deadlineLabel.time}
+                                  </span>
+                                ) : null}
                               </p>
                             </div>
                             <div className="rounded-xl border border-border/50 bg-background/70 dark:bg-background/40 px-2 py-1.5 min-w-0">
@@ -1592,8 +1626,20 @@ const Projects = () => {
                                 <span className="h-1.5 w-1.5 rounded-full bg-gradient-to-br from-lime-500 to-green-600 shrink-0" />
                                 Testing
                               </div>
-                              <p className="mt-0.5 text-[11px] sm:text-xs font-semibold text-foreground truncate">
-                                {testingLabel || "—"}
+                              <p
+                                className="mt-0.5 text-[11px] sm:text-xs font-semibold text-foreground leading-snug break-words"
+                                title={
+                                  testingLabel.date
+                                    ? `${testingLabel.date}${testingLabel.time ? ` · ${testingLabel.time}` : ""}`
+                                    : undefined
+                                }
+                              >
+                                {testingLabel.date || "—"}
+                                {testingLabel.time ? (
+                                  <span className="mt-0.5 block text-[10px] font-medium text-muted-foreground">
+                                    {testingLabel.time}
+                                  </span>
+                                ) : null}
                               </p>
                             </div>
                           </div>
