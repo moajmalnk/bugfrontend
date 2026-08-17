@@ -31,6 +31,11 @@ import { ProjectCategoryAssets, cnCategoryChip } from '@/components/projects/Pro
 import {
   computeProjectDurationDays,
   formatProjectDate,
+  formatProjectDateTime,
+  joinProjectDateTime,
+  projectDatePart,
+  projectTimePart,
+  DEFAULT_COMPLIANCE_TIME,
   getProjectStatusLabel,
   PROJECT_CATEGORY_OPTIONS,
   PROJECT_PLATFORM_OPTIONS,
@@ -1082,17 +1087,56 @@ export function ProjectForm({
                     { key: 'testing_end_date' as const, label: 'Testing End', dot: 'from-lime-500 to-green-600' },
                     { key: 'frontend_finish_date' as const, label: 'Frontend Finish', dot: 'from-green-500 to-emerald-600' },
                     { key: 'backend_finish_date' as const, label: 'Backend Finish', dot: 'from-emerald-500 to-teal-600' },
-                    { key: 'tester_compliance_complete_date' as const, label: 'Tester Compliance Complete', dot: 'from-cyan-500 to-sky-600' },
-                    { key: 'developer_compliance_complete_date' as const, label: 'Developer Compliance Complete', dot: 'from-indigo-500 to-blue-600' },
-                  ].map(({ key, label, dot }) => (
+                    {
+                      key: 'tester_compliance_complete_date' as const,
+                      label: 'Tester Compliance Complete',
+                      dot: 'from-cyan-500 to-sky-600',
+                      withTime: true,
+                    },
+                    {
+                      key: 'developer_compliance_complete_date' as const,
+                      label: 'Developer Compliance Complete',
+                      dot: 'from-indigo-500 to-blue-600',
+                      withTime: true,
+                    },
+                  ].map(({ key, label, dot, withTime }) => (
                     <div key={key} className="space-y-3">
                       <FieldLabel dotClass={dot}>{label}</FieldLabel>
-                      <DatePicker
-                        value={values[key]}
-                        onChange={(v) => setField(key, v)}
-                        placeholder="Not set"
-                        className={cn(selectTriggerClass, 'focus:ring-2')}
-                      />
+                      {withTime ? (
+                        <div className="grid grid-cols-12 gap-2">
+                          <div className="col-span-12 sm:col-span-7">
+                            <DatePicker
+                              value={projectDatePart(values[key])}
+                              onChange={(v) =>
+                                setField(key, v ? joinProjectDateTime(v, projectTimePart(values[key])) : '')
+                              }
+                              placeholder="Not set"
+                              className={cn(selectTriggerClass, 'focus:ring-2')}
+                            />
+                          </div>
+                          <div className="col-span-12 sm:col-span-5">
+                            <Input
+                              type="time"
+                              value={projectDatePart(values[key]) ? projectTimePart(values[key]) : DEFAULT_COMPLIANCE_TIME}
+                              disabled={!projectDatePart(values[key])}
+                              onChange={(e) => {
+                                const date = projectDatePart(values[key]);
+                                if (!date) return;
+                                setField(key, joinProjectDateTime(date, e.target.value || DEFAULT_COMPLIANCE_TIME));
+                              }}
+                              className={cn(selectTriggerClass, 'h-12 focus:ring-2')}
+                              aria-label={`${label} time`}
+                            />
+                          </div>
+                        </div>
+                      ) : (
+                        <DatePicker
+                          value={values[key]}
+                          onChange={(v) => setField(key, v)}
+                          placeholder="Not set"
+                          className={cn(selectTriggerClass, 'focus:ring-2')}
+                        />
+                      )}
                     </div>
                   ))}
                   <div className="space-y-3">

@@ -784,3 +784,47 @@ export function formatProjectDate(value?: string | null): string {
     timeZone: 'Asia/Kolkata',
   });
 }
+
+/** Default clock time when a compliance completing date is picked. */
+export const DEFAULT_COMPLIANCE_TIME = '09:00';
+
+export function projectDatePart(value?: string | null): string {
+  const raw = String(value || '').trim();
+  return /^\d{4}-\d{2}-\d{2}/.test(raw) ? raw.slice(0, 10) : '';
+}
+
+export function projectTimePart(value?: string | null): string {
+  const raw = String(value || '').trim();
+  const match = raw.match(/[T ](\d{2}:\d{2})/);
+  return match ? match[1] : DEFAULT_COMPLIANCE_TIME;
+}
+
+export function joinProjectDateTime(
+  date: string,
+  time: string = DEFAULT_COMPLIANCE_TIME
+): string {
+  const ymd = projectDatePart(date);
+  if (!ymd) return '';
+  const hhmm = /^\d{2}:\d{2}$/.test(time) ? time : DEFAULT_COMPLIANCE_TIME;
+  return `${ymd} ${hhmm}:00`;
+}
+
+export function formatProjectDateTime(value?: string | null): string {
+  if (!value) return 'Not set';
+  const normalized = value.includes('T')
+    ? value
+    : value.includes(' ')
+      ? value.replace(' ', 'T')
+      : `${value}T${DEFAULT_COMPLIANCE_TIME}:00`;
+  const date = new Date(normalized);
+  if (Number.isNaN(date.getTime())) return 'Not set';
+  return date.toLocaleString('en-IN', {
+    day: '2-digit',
+    month: 'short',
+    year: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit',
+    hour12: true,
+    timeZone: 'Asia/Kolkata',
+  });
+}
