@@ -104,7 +104,8 @@ function isDeadlineOverdue(
 ): boolean {
   if (!deadline) return false;
   if (status === "completed" || status === "archived") return false;
-  const d = new Date(deadline.includes("T") ? deadline : `${deadline}T00:00:00`);
+  const ymd = deadline.slice(0, 10);
+  const d = new Date(/^\d{4}-\d{2}-\d{2}$/.test(ymd) ? `${ymd}T00:00:00` : deadline);
   if (Number.isNaN(d.getTime())) return false;
   const today = new Date();
   today.setHours(0, 0, 0, 0);
@@ -124,8 +125,9 @@ function getDeadlineTimerReminder(
   if (status === "completed" || status === "archived") {
     return { label: "Project closed", tone: "done", daysUntil: null };
   }
+  const ymd = deadline.slice(0, 10);
   const end = new Date(
-    deadline.includes("T") ? deadline : `${deadline}T00:00:00`
+    /^\d{4}-\d{2}-\d{2}$/.test(ymd) ? `${ymd}T00:00:00` : deadline
   );
   if (Number.isNaN(end.getTime())) {
     return { label: "No deadline set", tone: "none", daysUntil: null };

@@ -537,13 +537,13 @@ export function formValuesToPayload(values: ProjectFormValues): CreateProjectDat
     github_frontend: values.github_frontend.trim() || undefined,
     github_backend: values.github_backend.trim() || undefined,
     github_app: values.github_app.trim() || undefined,
-    start_date: values.start_date || undefined,
-    deadline_date: values.deadline_date || undefined,
-    expected_publish_date: values.expected_publish_date || undefined,
-    testing_start_date: values.testing_start_date || undefined,
-    testing_end_date: values.testing_end_date || undefined,
-    frontend_finish_date: values.frontend_finish_date || undefined,
-    backend_finish_date: values.backend_finish_date || undefined,
+    start_date: values.start_date || null,
+    deadline_date: values.deadline_date || null,
+    expected_publish_date: values.expected_publish_date || null,
+    testing_start_date: values.testing_start_date || null,
+    testing_end_date: values.testing_end_date || null,
+    frontend_finish_date: values.frontend_finish_date || null,
+    backend_finish_date: values.backend_finish_date || null,
     tester_compliance_complete_date: values.tester_compliance_complete_date || null,
     developer_compliance_complete_date: values.developer_compliance_complete_date || null,
     members,
@@ -593,7 +593,8 @@ export function getDeadlineTimerReminder(
   if (status === 'completed' || status === 'archived') {
     return { label: 'Project closed', tone: 'done', daysUntil: null };
   }
-  const end = new Date(deadline.includes('T') ? deadline : `${deadline}T00:00:00`);
+  const ymd = projectDatePart(deadline);
+  const end = new Date(ymd ? `${ymd}T00:00:00` : deadline);
   if (Number.isNaN(end.getTime())) {
     return { label: 'No deadline set', tone: 'none', daysUntil: null };
   }
@@ -762,20 +763,22 @@ export function sortProjectsForPicker<
 
 
 export function computeProjectDurationDays(project: Pick<Project, 'start_date' | 'created_at' | 'deadline_date' | 'status'>): number {
-  const start = project.start_date || project.created_at?.slice(0, 10);
+  const start = projectDatePart(project.start_date) || project.created_at?.slice(0, 10);
   if (!start) return 0;
 
-  const startDate = new Date(start);
+  const startDate = new Date(`${start}T00:00:00`);
   if (Number.isNaN(startDate.getTime())) return 0;
 
-  const end = project.deadline_date ? new Date(project.deadline_date) : new Date();
+  const endYmd = projectDatePart(project.deadline_date);
+  const end = endYmd ? new Date(`${endYmd}T00:00:00`) : new Date();
   const diffMs = end.getTime() - startDate.getTime();
   return Math.max(0, Math.floor(diffMs / (1000 * 60 * 60 * 24)));
 }
 
 export function formatProjectDate(value?: string | null): string {
   if (!value) return 'Not set';
-  const date = new Date(value.includes('T') ? value : `${value}T00:00:00`);
+  const ymd = projectDatePart(value);
+  const date = new Date(ymd ? `${ymd}T00:00:00` : value);
   if (Number.isNaN(date.getTime())) return 'Not set';
   return date.toLocaleDateString('en-IN', {
     day: '2-digit',
@@ -785,7 +788,7 @@ export function formatProjectDate(value?: string | null): string {
   });
 }
 
-/** Default clock time when a compliance completing date is picked. */
+/** Default clock time when a timeline date is picked. */
 export const DEFAULT_COMPLIANCE_TIME = '09:00';
 
 export function projectDatePart(value?: string | null): string {
@@ -805,7 +808,8 @@ export function joinProjectDateTime(
 ): string {
   const ymd = projectDatePart(date);
   if (!ymd) return '';
-  const hhmm = /^\d{2}:\d{2}$/.test(time) ? time : DEFAULT_COMPLIANCE_TIME;
+  const match = time.trim().match(/^(\d{2}):(\d{2})(?::\d{2})?$/);
+  const hhmm = match ? `${match[1]}:${match[2]}` : DEFAULT_COMPLIANCE_TIME;
   return `${ymd} ${hhmm}:00`;
 }
 

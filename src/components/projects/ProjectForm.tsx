@@ -19,6 +19,7 @@ import {
   CommandList,
 } from '@/components/ui/command';
 import { DatePicker } from '@/components/ui/DatePicker';
+import { TimePicker } from '@/components/ui/TimePicker';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
@@ -31,7 +32,6 @@ import { ProjectCategoryAssets, cnCategoryChip } from '@/components/projects/Pro
 import {
   computeProjectDurationDays,
   formatProjectDate,
-  formatProjectDateTime,
   joinProjectDateTime,
   projectDatePart,
   projectTimePart,
@@ -1087,56 +1087,37 @@ export function ProjectForm({
                     { key: 'testing_end_date' as const, label: 'Testing End', dot: 'from-lime-500 to-green-600' },
                     { key: 'frontend_finish_date' as const, label: 'Frontend Finish', dot: 'from-green-500 to-emerald-600' },
                     { key: 'backend_finish_date' as const, label: 'Backend Finish', dot: 'from-emerald-500 to-teal-600' },
-                    {
-                      key: 'tester_compliance_complete_date' as const,
-                      label: 'Tester Compliance Complete',
-                      dot: 'from-cyan-500 to-sky-600',
-                      withTime: true,
-                    },
-                    {
-                      key: 'developer_compliance_complete_date' as const,
-                      label: 'Developer Compliance Complete',
-                      dot: 'from-indigo-500 to-blue-600',
-                      withTime: true,
-                    },
-                  ].map(({ key, label, dot, withTime }) => (
+                    { key: 'tester_compliance_complete_date' as const, label: 'Tester Compliance Complete', dot: 'from-cyan-500 to-sky-600' },
+                    { key: 'developer_compliance_complete_date' as const, label: 'Developer Compliance Complete', dot: 'from-indigo-500 to-blue-600' },
+                  ].map(({ key, label, dot }) => (
                     <div key={key} className="space-y-3">
                       <FieldLabel dotClass={dot}>{label}</FieldLabel>
-                      {withTime ? (
-                        <div className="grid grid-cols-12 gap-2">
-                          <div className="col-span-12 sm:col-span-7">
-                            <DatePicker
-                              value={projectDatePart(values[key])}
-                              onChange={(v) =>
-                                setField(key, v ? joinProjectDateTime(v, projectTimePart(values[key])) : '')
-                              }
-                              placeholder="Not set"
-                              className={cn(selectTriggerClass, 'focus:ring-2')}
-                            />
-                          </div>
-                          <div className="col-span-12 sm:col-span-5">
-                            <Input
-                              type="time"
-                              value={projectDatePart(values[key]) ? projectTimePart(values[key]) : DEFAULT_COMPLIANCE_TIME}
-                              disabled={!projectDatePart(values[key])}
-                              onChange={(e) => {
-                                const date = projectDatePart(values[key]);
-                                if (!date) return;
-                                setField(key, joinProjectDateTime(date, e.target.value || DEFAULT_COMPLIANCE_TIME));
-                              }}
-                              className={cn(selectTriggerClass, 'h-12 focus:ring-2')}
-                              aria-label={`${label} time`}
-                            />
-                          </div>
+                      <div className="grid grid-cols-12 gap-2">
+                        <div className="col-span-12 sm:col-span-7">
+                          <DatePicker
+                            value={projectDatePart(values[key])}
+                            onChange={(v) =>
+                              setField(key, v ? joinProjectDateTime(v, projectTimePart(values[key])) : '')
+                            }
+                            placeholder="Not set"
+                            className={cn(selectTriggerClass, 'focus:ring-2')}
+                          />
                         </div>
-                      ) : (
-                        <DatePicker
-                          value={values[key]}
-                          onChange={(v) => setField(key, v)}
-                          placeholder="Not set"
-                          className={cn(selectTriggerClass, 'focus:ring-2')}
-                        />
-                      )}
+                        <div className="col-span-12 sm:col-span-5">
+                          <TimePicker
+                            value={projectDatePart(values[key]) ? projectTimePart(values[key]) : DEFAULT_COMPLIANCE_TIME}
+                            disabled={!projectDatePart(values[key])}
+                            onChange={(t) => {
+                              const date = projectDatePart(values[key]);
+                              if (!date) return;
+                              setField(key, joinProjectDateTime(date, t || DEFAULT_COMPLIANCE_TIME));
+                            }}
+                            placeholder="09:00 AM"
+                            className={cn(selectTriggerClass, 'h-12')}
+                            aria-label={`${label} time`}
+                          />
+                        </div>
+                      </div>
                     </div>
                   ))}
                   <div className="space-y-3">

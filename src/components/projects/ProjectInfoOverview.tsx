@@ -420,18 +420,18 @@ export function ProjectInfoOverview({ project, createdByName }: ProjectInfoOverv
   const deadlineReminder = getDeadlineTimerReminder(project.deadline_date, project.status);
 
   const timelineItems = [
-    { label: 'Start Date', value: formatProjectDate(project.start_date) },
+    { label: 'Start Date', value: formatProjectDateTime(project.start_date) },
     {
       label: 'Deadline',
-      value: formatProjectDate(project.deadline_date),
+      value: formatProjectDateTime(project.deadline_date),
       deadlineHint: project.deadline_date ? deadlineReminder.label : undefined,
       deadlineTone: project.deadline_date ? deadlineReminder.tone : undefined,
     },
-    { label: 'Expected Publish', value: formatProjectDate(project.expected_publish_date) },
-    { label: 'Testing Start', value: formatProjectDate(project.testing_start_date) },
-    { label: 'Testing End', value: formatProjectDate(project.testing_end_date) },
-    { label: 'Frontend Finish', value: formatProjectDate(project.frontend_finish_date) },
-    { label: 'Backend Finish', value: formatProjectDate(project.backend_finish_date) },
+    { label: 'Expected Publish', value: formatProjectDateTime(project.expected_publish_date) },
+    { label: 'Testing Start', value: formatProjectDateTime(project.testing_start_date) },
+    { label: 'Testing End', value: formatProjectDateTime(project.testing_end_date) },
+    { label: 'Frontend Finish', value: formatProjectDateTime(project.frontend_finish_date) },
+    { label: 'Backend Finish', value: formatProjectDateTime(project.backend_finish_date) },
     {
       label: 'Tester Compliance Complete',
       value: formatProjectDateTime(project.tester_compliance_complete_date),
