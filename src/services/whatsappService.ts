@@ -60,6 +60,15 @@ export interface ProjectWhatsAppShareData {
   testerCount?: number | null;
   /** Compliance */
   complianceStage?: string | null;
+  developerComplianceVerified?: number | null;
+  developerComplianceTotal?: number | null;
+  testerComplianceVerified?: number | null;
+  testerComplianceTotal?: number | null;
+  adminComplianceVerified?: number | null;
+  adminComplianceTotal?: number | null;
+  complianceBypass?: boolean | null;
+  developerComplianceCompleteAt?: string | null;
+  testerComplianceCompleteAt?: string | null;
   /** Extra note for developers receiving the message */
   developerNote?: string | null;
 }
@@ -133,6 +142,40 @@ class WhatsAppService {
     message += `Testers (${data.testerCount ?? data.testers?.length ?? 0}):\n`;
     message += `${this.formatList(data.testers)}\n`;
 
+    const hasComplianceCounts =
+      data.developerComplianceTotal != null ||
+      data.testerComplianceTotal != null ||
+      data.adminComplianceTotal != null;
+    if (data.complianceStage || hasComplianceCounts) {
+      const fraction = (verified?: number | null, total?: number | null) =>
+        `*${verified ?? 0}/${total ?? 0}*`;
+      message += `\n✅ *Compliance*\n`;
+      if (data.complianceStage) {
+        message += `• Stage: *${data.complianceStage}*\n`;
+      }
+      message += `• Developer: ${fraction(
+        data.developerComplianceVerified,
+        data.developerComplianceTotal
+      )}\n`;
+      message += `• Tester: ${fraction(
+        data.testerComplianceVerified,
+        data.testerComplianceTotal
+      )}\n`;
+      message += `• Admin: ${fraction(
+        data.adminComplianceVerified,
+        data.adminComplianceTotal
+      )}\n`;
+      if (data.developerComplianceCompleteAt) {
+        message += `• Developer complete: ${data.developerComplianceCompleteAt}\n`;
+      }
+      if (data.testerComplianceCompleteAt) {
+        message += `• Tester complete: ${data.testerComplianceCompleteAt}\n`;
+      }
+      if (data.complianceBypass) {
+        message += `• Emergency bypass: *Authorized*\n`;
+      }
+    }
+
     const techBits = [
       data.technologyStack ? `• Stack: ${data.technologyStack}` : "",
       data.platforms ? `• Platforms: ${data.platforms}` : "",
@@ -148,10 +191,6 @@ class WhatsAppService {
 
     if (techBits.length > 0) {
       message += `\n🛠️ *Technical details*\n${techBits.join("\n")}\n`;
-    }
-
-    if (data.complianceStage) {
-      message += `\n✅ *Compliance:* ${data.complianceStage}\n`;
     }
 
     message += `\n👨‍💻 *Note for developers*\n`;

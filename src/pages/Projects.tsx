@@ -44,6 +44,7 @@ import {
   formatProjectTime,
 } from "@/lib/utils/projectUtils";
 import { Project, projectService } from "@/services/projectService";
+import { complianceService } from "@/services/complianceService";
 import { userService } from "@/services/userService";
 import { whatsappService } from "@/services/whatsappService";
 import { clientService } from "@/services/clientService";
@@ -71,7 +72,7 @@ import {
   Users,
   Plus,
 } from "lucide-react";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { UndoDeleteNotificationPortal } from "@/components/ui/UndoDeleteNotification";
 import { Link, useSearchParams, useLocation } from "react-router-dom";
 import { usePersistedFilters } from "@/hooks/usePersistedFilters";
@@ -427,6 +428,19 @@ const Projects = () => {
             ? getPipelineStageLabel(
                 project.compliance.pipeline_stage as CompliancePipelineStage
               )
+            : null,
+          developerComplianceVerified: project.compliance?.developer_verified ?? 0,
+          developerComplianceTotal: project.compliance?.developer_total ?? 0,
+          testerComplianceVerified: project.compliance?.tester_verified ?? 0,
+          testerComplianceTotal: project.compliance?.tester_total ?? 0,
+          adminComplianceVerified: project.compliance?.project_verified ?? 0,
+          adminComplianceTotal: project.compliance?.project_total ?? 0,
+          complianceBypass: project.compliance?.emergency_bypass ?? false,
+          developerComplianceCompleteAt: project.developer_compliance_complete_date
+            ? formatLocalDate(project.developer_compliance_complete_date, "date")
+            : null,
+          testerComplianceCompleteAt: project.tester_compliance_complete_date
+            ? formatLocalDate(project.tester_compliance_complete_date, "date")
             : null,
         });
 
@@ -951,8 +965,58 @@ const Projects = () => {
     (currentPage - 1) * itemsPerPage,
     currentPage * itemsPerPage
   );
+  const pageProjectIds = paginatedProjects.map((project) => project.id).join(",");
   const totalPages = Math.max(1, Math.ceil(totalFiltered / itemsPerPage) || 1);
   useClampUrlPage(clampToTotalPages, totalPages);
+
+  /**
+   * Why: getAll.php historically omitted compliance. Hydrate the visible page
+   * from the compliance endpoint until list responses include those counts.
+   */
+  const attemptedComplianceIds = useRef(new Set<string>());
+  useEffect(() => {
+    const ids = pageProjectIds ? pageProjectIds.split(",") : [];
+    const missing = projects.filter(
+      (project) =>
+        ids.includes(project.id) &&
+        !project.compliance &&
+        !attemptedComplianceIds.current.has(project.id)
+    );
+    if (missing.length === 0) return;
+
+    let cancelled = false;
+    const hydrate = async () => {
+      for (const project of missing) {
+        if (cancelled) return;
+        try {
+          const data = await complianceService.getCompliance(project.id);
+          if (cancelled) return;
+          attemptedComplianceIds.current.add(project.id);
+          const summary = {
+            pipeline_stage: data.pipeline_stage,
+            developer_verified: data.developer_progress?.verified ?? 0,
+            developer_total: data.developer_progress?.total ?? 0,
+            tester_verified: data.tester_progress?.verified ?? 0,
+            tester_total: data.tester_progress?.total ?? 0,
+            project_verified: data.project_progress?.verified ?? 0,
+            project_total: data.project_progress?.total ?? 0,
+            emergency_bypass: Boolean(data.emergency_bypass),
+          };
+          setProjects((prev) =>
+            prev.map((item) =>
+              item.id === project.id ? { ...item, compliance: summary } : item
+            )
+          );
+        } catch {
+          attemptedComplianceIds.current.add(project.id);
+        }
+      }
+    };
+    void hydrate();
+    return () => {
+      cancelled = true;
+    };
+  }, [pageProjectIds]);
   const userProjectsCount = (currentUser?.role === "admin") ? projects.length : projects.filter((p) => userProjectMemberships[p.id]).length;
 
   // NOTE: The component's actual return is defined after helper functions below.
