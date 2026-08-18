@@ -712,36 +712,47 @@ const TesterReportBug = () => {
                 aria-hidden="true"
                 tabIndex={-1}
               />
-              <Button
-                type="button"
-                variant="outline"
-                disabled={isSubmitting}
-                onClick={() => cameraPhotoRef.current?.click()}
-                className="h-14 w-full rounded-xl border-2 border-dashed"
-              >
-                <Camera className="mr-2 h-5 w-5 shrink-0" />
-                Take photo
-              </Button>
-              <Button
-                type="button"
-                variant="outline"
-                disabled={isSubmitting}
-                onClick={() => cameraVideoRef.current?.click()}
-                className="h-14 w-full rounded-xl border-2 border-dashed"
-              >
-                <Video className="mr-2 h-5 w-5 shrink-0" />
-                Record video
-              </Button>
-              <Button
-                type="button"
-                variant="ghost"
-                disabled={isSubmitting}
-                onClick={() => galleryVideoRef.current?.click()}
-                className="rounded-xl text-muted-foreground"
-              >
-                <FileVideo className="mr-2 h-4 w-4 shrink-0" />
-                Choose video
-              </Button>
+              <div className="flex flex-col gap-2">
+                {(
+                  [
+                    {
+                      key: "photo",
+                      label: "Take photo",
+                      icon: Camera,
+                      onClick: () => cameraPhotoRef.current?.click(),
+                    },
+                    {
+                      key: "record",
+                      label: "Record video",
+                      icon: Video,
+                      onClick: () => cameraVideoRef.current?.click(),
+                    },
+                    {
+                      key: "choose",
+                      label: "Choose video",
+                      icon: FileVideo,
+                      onClick: () => galleryVideoRef.current?.click(),
+                    },
+                  ] as const
+                ).map(({ key, label, icon: Icon, onClick }) => (
+                  <button
+                    key={key}
+                    type="button"
+                    disabled={isSubmitting}
+                    onClick={onClick}
+                    className={cn(
+                      "flex h-14 w-full items-center justify-center gap-2 rounded-xl",
+                      "border-2 border-dashed border-gray-300 dark:border-gray-600",
+                      "text-sm font-semibold text-gray-700 dark:text-gray-300",
+                      "hover:border-blue-400 dark:hover:border-blue-500 hover:bg-blue-50/50 dark:hover:bg-blue-950/20",
+                      "transition-all duration-200 disabled:pointer-events-none disabled:opacity-50"
+                    )}
+                  >
+                    <Icon className="h-5 w-5 shrink-0 text-blue-600 dark:text-blue-400" aria-hidden />
+                    {label}
+                  </button>
+                ))}
+              </div>
               {videos.length > 0 && (
                 <div className="flex flex-col gap-2">
                   {videos.map((file, index) => (
