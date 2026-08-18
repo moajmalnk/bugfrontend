@@ -1,9 +1,19 @@
+import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from "@/components/ui/command";
 import { Label } from "@/components/ui/label";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { cn } from "@/lib/utils";
 import { bugTypeService } from "@/services/bugTypeService";
 import type { BugType } from "@/types";
 import { useQuery } from "@tanstack/react-query";
-import { Tags } from "lucide-react";
+import { Check, ChevronDown, Tags } from "lucide-react";
+import { useMemo, useState } from "react";
 
 type BugTypeMultiSelectProps = {
   selectedIds: string[];
@@ -31,6 +41,20 @@ export function BugTypeMultiSelect({
     staleTime: 5 * 60 * 1000,
   });
 
+  const [open, setOpen] = useState(false);
+
+  const selectedTypes = useMemo(
+    () => types.filter((type: BugType) => selectedIds.includes(type.id)),
+    [types, selectedIds]
+  );
+
+  const summary = useMemo(() => {
+    if (isLoading) return "Loading…";
+    if (selectedTypes.length === 0) return "Select types";
+    if (selectedTypes.length === 1) return selectedTypes[0].name;
+    return `${selectedTypes[0].name} +${selectedTypes.length - 1}`;
+  }, [isLoading, selectedTypes]);
+
   const toggle = (id: string) => {
     if (disabled) return;
     if (selectedIds.includes(id)) {
@@ -39,6 +63,73 @@ export function BugTypeMultiSelect({
       onChange([...selectedIds, id]);
     }
   };
+
+  if (compact) {
+    return (
+      <div className={cn("space-y-1.5", className)}>
+        {hideLabel ? null : (
+          <Label className="text-xs sm:text-sm">Bug Type</Label>
+        )}
+        <Popover open={open} onOpenChange={setOpen}>
+          <PopoverTrigger asChild>
+            <button
+              type="button"
+              disabled={disabled || isLoading}
+              aria-label="Bug types"
+              className={cn(
+                "flex h-8 sm:h-9 w-full min-w-0 items-center justify-between gap-2 rounded-xl border border-gray-200 bg-white px-3 text-xs sm:text-sm dark:border-gray-700 dark:bg-gray-800",
+                "focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-0",
+                "disabled:cursor-not-allowed disabled:opacity-50"
+              )}
+            >
+              <span
+                className={cn(
+                  "min-w-0 flex-1 truncate text-left",
+                  selectedTypes.length === 0 && "text-muted-foreground"
+                )}
+              >
+                {summary}
+              </span>
+              <ChevronDown className="h-4 w-4 shrink-0 opacity-50" aria-hidden />
+            </button>
+          </PopoverTrigger>
+          <PopoverContent
+            align="start"
+            className="z-[100] w-[var(--radix-popover-trigger-width)] min-w-[16rem] rounded-xl p-0"
+          >
+            <Command className="rounded-xl">
+              <CommandInput placeholder="Search types..." />
+              <CommandList className="max-h-60 [scrollbar-width:thin]">
+                <CommandEmpty>No types found.</CommandEmpty>
+                <CommandGroup>
+                  {types.map((type: BugType) => {
+                    const selected = selectedIds.includes(type.id);
+                    return (
+                      <CommandItem
+                        key={type.id}
+                        value={`${type.name} ${type.slug || ""}`}
+                        disabled={disabled}
+                        onSelect={() => toggle(type.id)}
+                        className="rounded-xl"
+                      >
+                        <Check
+                          className={cn(
+                            "mr-2 h-4 w-4 shrink-0",
+                            selected ? "opacity-100 text-sky-600" : "opacity-0"
+                          )}
+                        />
+                        <span className="min-w-0 flex-1 truncate">{type.name}</span>
+                      </CommandItem>
+                    );
+                  })}
+                </CommandGroup>
+              </CommandList>
+            </Command>
+          </PopoverContent>
+        </Popover>
+      </div>
+    );
+  }
 
   return (
     <div className={cn(compact ? "space-y-2" : "space-y-3", className)}>
