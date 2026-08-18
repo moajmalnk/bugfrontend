@@ -14,7 +14,8 @@ import { Bug } from "@/types";
 import { useUndoDelete } from "@/hooks/useUndoDelete";
 import { UndoDeleteNotificationPortal } from "@/components/ui/UndoDeleteNotification";
 import { prefetchFixBugPage } from "@/utils/prefetchFixBug";
-import { ArrowRightLeft, CheckSquare, ChevronLeft, Edit2, Share2, Trash2 } from "lucide-react";
+import { AskDoubtDialog } from "@/components/bugs/details/AskDoubtDialog";
+import { ArrowRightLeft, CheckSquare, ChevronLeft, CircleHelp, Edit2, Share2, Trash2 } from "lucide-react";
 import { useMemo, useState } from "react";
 import { createPortal } from "react-dom";
 import { useLocation, useNavigate } from "react-router-dom";
@@ -57,6 +58,9 @@ export const BugHeader = ({
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const [convertOpen, setConvertOpen] = useState(false);
+  const [askDoubtOpen, setAskDoubtOpen] = useState(false);
+  const canAskDoubt =
+    !!currentUser?.id && String(currentUser.id) !== String(bug.reported_by);
   const canConvert =
     (currentUser?.role === "admin" ||
       currentUser?.role === "developer" ||
@@ -376,6 +380,20 @@ export const BugHeader = ({
             aria-label="Bug actions"
             className="flex flex-wrap items-center gap-2 w-full lg:w-auto lg:max-w-md lg:justify-end"
           >
+            {canAskDoubt && (
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                title="Ask a doubt"
+                aria-label="Ask a doubt"
+                className="h-9 w-9 p-0 shrink-0 rounded-xl"
+                onClick={() => setAskDoubtOpen(true)}
+              >
+                <CircleHelp className="h-4 w-4" />
+              </Button>
+            )}
+
             <CopyTextButton
               text={bug.title}
               label="title"
@@ -538,6 +556,17 @@ export const BugHeader = ({
           }}
           onConvertedToUpdate={(updateId) => {
             navigate(`/${role}/updates/${updateId}`, { replace: true });
+          }}
+        />
+      )}
+
+      {canAskDoubt && (
+        <AskDoubtDialog
+          open={askDoubtOpen}
+          onOpenChange={setAskDoubtOpen}
+          bugId={bug.id}
+          onCreated={() => {
+            queryClient.invalidateQueries({ queryKey: ["bug-doubts", bug.id] });
           }}
         />
       )}

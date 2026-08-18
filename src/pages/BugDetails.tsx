@@ -5,6 +5,7 @@ import {
   BugHeader,
   BugHeaderSkeletonDetailed,
 } from "@/components/bugs/details/BugHeader";
+import { BugDoubtClearingCard } from "@/components/bugs/details/BugDoubtClearingCard";
 import { BugNotFound } from "@/components/bugs/details/BugNotFound";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -1031,6 +1032,7 @@ const BugDetails = () => {
         <div className="grid grid-cols-1 gap-8">
           {/* Main Content - Description, Screenshots, Voice Notes, Attachments, Bug Information */}
           <section className="space-y-8">
+            <BugDoubtClearingCard bugId={bug.id} />
             <BugContentCards
               bug={bug}
               onBugUpdated={(updated) => {
