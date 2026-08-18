@@ -699,6 +699,20 @@ const Projects = () => {
     return value ?? 0;
   };
 
+  /**
+   * Why: Project cards show CODO checklist progress as verified/total so
+   * Developer, Tester, and Admin status is readable next to Updates counts.
+   */
+  const renderComplianceCount = (
+    verified: number | undefined,
+    total: number | undefined
+  ) => {
+    if (statsLoading) {
+      return <Skeleton className="h-6 w-10" />;
+    }
+    return `${verified ?? 0}/${total ?? 0}`;
+  };
+
   // Undo delete functionality
   const { isCountingDown, timeLeft, startCountdown, cancelCountdown, confirmDelete } = useUndoDelete({
     duration: 10,
@@ -1726,6 +1740,60 @@ const Projects = () => {
                           </span>
                           <span className="text-[10px] sm:text-xs text-muted-foreground">
                             Updates
+                          </span>
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-12 gap-2 sm:gap-3">
+                        <div
+                          className="col-span-4 flex flex-col items-center justify-center min-h-[5rem] p-2 sm:p-3 rounded-xl bg-emerald-50/70 dark:bg-emerald-900/20 hover:bg-emerald-100/80 dark:hover:bg-emerald-900/30 transition-colors duration-200 text-center"
+                          title="Developer compliance checks verified"
+                        >
+                          <span className="text-xs sm:text-sm text-muted-foreground">
+                            Developer
+                          </span>
+                          <span className="font-semibold text-lg sm:text-xl text-emerald-600 dark:text-emerald-400">
+                            {renderComplianceCount(
+                              project.compliance?.developer_verified,
+                              project.compliance?.developer_total
+                            )}
+                          </span>
+                          <span className="text-[10px] sm:text-xs text-muted-foreground">
+                            Compliance
+                          </span>
+                        </div>
+                        <div
+                          className="col-span-4 flex flex-col items-center justify-center min-h-[5rem] p-2 sm:p-3 rounded-xl bg-purple-50/70 dark:bg-purple-900/20 hover:bg-purple-100/80 dark:hover:bg-purple-900/30 transition-colors duration-200 text-center"
+                          title="Tester compliance checks verified"
+                        >
+                          <span className="text-xs sm:text-sm text-muted-foreground">
+                            Tester
+                          </span>
+                          <span className="font-semibold text-lg sm:text-xl text-purple-600 dark:text-purple-400">
+                            {renderComplianceCount(
+                              project.compliance?.tester_verified,
+                              project.compliance?.tester_total
+                            )}
+                          </span>
+                          <span className="text-[10px] sm:text-xs text-muted-foreground">
+                            Compliance
+                          </span>
+                        </div>
+                        <div
+                          className="col-span-4 flex flex-col items-center justify-center min-h-[5rem] p-2 sm:p-3 rounded-xl bg-blue-50/70 dark:bg-blue-900/20 hover:bg-blue-100/80 dark:hover:bg-blue-900/30 transition-colors duration-200 text-center"
+                          title="Admin project compliance checks verified"
+                        >
+                          <span className="text-xs sm:text-sm text-muted-foreground">
+                            Admin
+                          </span>
+                          <span className="font-semibold text-lg sm:text-xl text-blue-600 dark:text-blue-400">
+                            {renderComplianceCount(
+                              project.compliance?.project_verified,
+                              project.compliance?.project_total
+                            )}
+                          </span>
+                          <span className="text-[10px] sm:text-xs text-muted-foreground">
+                            Compliance
                           </span>
                         </div>
                       </div>
