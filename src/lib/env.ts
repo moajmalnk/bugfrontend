@@ -8,6 +8,10 @@ const isLocalhost = typeof window !== 'undefined' &&
 const PRODUCTION_API_URL = 'https://bugbackend.bugricer.com/api';
 
 const getApiUrl = (): string => {
+  if (import.meta.env.DEV && isLocalhost) {
+    return '/br-api';
+  }
+
   const configured = (import.meta.env.VITE_API_URL as string | undefined)?.replace(/\/$/, '');
   if (configured) {
     return configured;
