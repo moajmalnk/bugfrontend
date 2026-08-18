@@ -14,7 +14,6 @@ import { toast } from "@/components/ui/use-toast";
 import { useAuth } from "@/context/AuthContext";
 import { API_BASE_URL } from "@/lib/env";
 import { extractApiErrorMessage, getNetworkErrorMessage } from "@/lib/apiError";
-import { assertDeviceClockMatchesServer, getDeviceClockSkewDetails } from "@/lib/deviceClock";
 import axios from "axios";
 import { 
   AlertCircle, 
@@ -102,23 +101,6 @@ const Login = () => {
     }
     return () => interval && clearInterval(interval);
   }, [otpCountdown]);
-
-  useEffect(() => {
-    let cancelled = false;
-    (async () => {
-      const skew = await getDeviceClockSkewDetails();
-      if (cancelled || !skew?.mismatched) return;
-      setDeviceClockWarning(skew.message);
-      toast({
-        title: "Device date is incorrect",
-        description: skew.message,
-        variant: "destructive",
-      });
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, []);
 
   const handleMagicLinkVerification = useCallback(
     async (token: string) => {
@@ -338,7 +320,6 @@ const Login = () => {
     setIsLoading(true);
 
     try {
-      await assertDeviceClockMatchesServer('sign in');
       let success = false;
       let user: UserType | null = null;
 
@@ -447,14 +428,21 @@ const Login = () => {
       }
     } catch (error: unknown) {
       const description = getNetworkErrorMessage(error, extractApiErrorMessage(error, "An error occurred during login"));
+      const lower = description.toLowerCase();
+      const isRateLimited =
+        lower.includes("429") || lower.includes("too many requests");
       if (description.toLowerCase().includes('device shows')) {
         setDeviceClockWarning(description);
       }
       toast({
         title: description.toLowerCase().includes('device shows')
           ? "Login blocked"
-          : "Error",
-        description,
+          : isRateLimited
+            ? "Server busy"
+            : "Error",
+        description: isRateLimited
+          ? "Too many requests right now. Wait 20-30 seconds, then sign in again."
+          : description,
         variant: "destructive",
       });
     } finally {
