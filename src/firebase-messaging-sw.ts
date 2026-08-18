@@ -637,6 +637,16 @@ async function saveFcmToken(token: string, options?: { force?: boolean }): Promi
 
   const hostname =
     typeof window !== "undefined" ? window.location.hostname : "";
+  const isLocalDevHost = hostname === "localhost" || hostname === "127.0.0.1";
+
+  // Why: local dev uses production backend and can hit shared rate limits quickly.
+  // Skip token sync network traffic on localhost to keep dashboard/API usable.
+  if (import.meta.env.DEV && isLocalDevHost) {
+    localStorage.setItem(TOKEN_CACHE_KEY, currentSignature);
+    localStorage.setItem(TOKEN_PWA_STATE_KEY, String(pwaInstalled));
+    return true;
+  }
+
   const onProxiedFrontend =
     hostname === "bugs.bugricer.com" ||
     hostname === "localhost" ||

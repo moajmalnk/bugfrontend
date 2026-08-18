@@ -295,7 +295,8 @@ function sortByPriorityThenDate(bugs: Bug[]): Bug[] {
 
 async function loadDashboardData() {
   const today = startOfDay(new Date());
-  const listLimit = 40;
+  const listLimit = import.meta.env.DEV ? 20 : 40;
+  const bugFetchConcurrency = import.meta.env.DEV ? 1 : 2;
   const bugStatuses: BugStatusKey[] = [
     "pending",
     "in_progress",
@@ -312,7 +313,7 @@ async function loadDashboardData() {
   ]);
 
   // Why: Stagger bug-list fetches — 9 parallel /br-api calls trigger Vercel 429.
-  const bugResults = await mapWithConcurrency(bugStatuses, 2, (status) =>
+  const bugResults = await mapWithConcurrency(bugStatuses, bugFetchConcurrency, (status) =>
     bugService.getBugs({ page: 1, limit: listLimit, status })
   );
   const [pendingResult, progressResult, fixedResult, declinedResult, rejectedResult] =

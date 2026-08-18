@@ -1,9 +1,3 @@
-// Environment configuration
-const isLocalhost = typeof window !== 'undefined' && 
-  (window.location.hostname === 'localhost' || 
-   window.location.hostname === '127.0.0.1' ||
-   window.location.hostname.includes('localhost'));
-
 /** Live production backend API. Never use a local PHP API. */
 const PRODUCTION_API_URL = 'https://bugbackend.bugricer.com/api';
 
@@ -98,7 +92,11 @@ export const getWebSocketUrl = () => {
   }
 
   // Auto-detect based on current URL
-  if (isLocalhost) {
+  if (typeof window !== 'undefined' && (
+    window.location.hostname === 'localhost' ||
+    window.location.hostname === '127.0.0.1' ||
+    window.location.hostname.includes('localhost')
+  )) {
     return 'ws://localhost:8089';
   }
   
