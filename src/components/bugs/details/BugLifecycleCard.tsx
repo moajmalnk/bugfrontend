@@ -2,6 +2,7 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { buildFullBugJourney, formatJourneyHeadline } from "@/lib/bugJourney";
+import { formatMetaChangeValue } from "@/lib/bugMetaUtils";
 import { cn } from "@/lib/utils";
 import { formatLocalDate } from "@/lib/utils/dateUtils";
 import { bugService, type BugConversionEvent, type BugLifecycleStep } from "@/services/bugService";
@@ -20,6 +21,7 @@ import {
   Hourglass,
   Percent,
   RotateCcw,
+  Tags,
   Timer,
   UserRound,
   Wrench,
@@ -136,6 +138,16 @@ const STEP_VISUALS: Record<string, StepVisual> = {
     ring: "ring-cyan-400/50",
     glow: "shadow-cyan-500/30",
     path: "bg-cyan-500",
+  },
+  meta: {
+    key: "meta",
+    label: "Details",
+    Icon: Tags,
+    accent: "text-sky-600 dark:text-sky-300",
+    soft: "bg-sky-500/15 text-sky-800 dark:text-sky-200",
+    ring: "ring-sky-400/50",
+    glow: "shadow-sky-500/30",
+    path: "bg-sky-500",
   },
   default: {
     key: "default",
@@ -363,6 +375,14 @@ function eventLabelForStep(step: BugLifecycleStep): string | null {
   const kind = step.kind || "status";
   if (kind === "conversion") return "Converted";
   if (kind === "retest") return "Retest";
+  if (kind === "meta") {
+    const field = String(step.field || "").toLowerCase();
+    if (field === "bug_level") return "Level";
+    if (field === "already_raised") return "Raised before";
+    if (field === "bug_types") return "Type";
+    if (field === "priority") return "Priority";
+    return "Details";
+  }
   const label = String(step.event_label || "").toLowerCase();
   if (label === "reopened") return "Reopened";
   if (label === "fixed") return "Fixed";
@@ -380,6 +400,7 @@ function eventLabelForStep(step: BugLifecycleStep): string | null {
 }
 
 function visualForStep(step: BugLifecycleStep): StepVisual {
+  if ((step.kind || "") === "meta") return STEP_VISUALS.meta;
   const eventLabel = eventLabelForStep(step)?.toLowerCase();
   if (eventLabel === "converted") return STEP_VISUALS.converted;
   if (eventLabel === "retest") return STEP_VISUALS.retested;
@@ -467,6 +488,16 @@ function JourneyStepCard({
             <Badge variant="outline" className="h-5 rounded-full px-2 text-[10px] font-semibold">
               {step.retest_label || "Retest recorded"}
             </Badge>
+          ) : step.kind === "meta" ? (
+            <div className="flex min-w-0 flex-wrap items-center gap-1.5">
+              <Badge variant="outline" className="max-w-full truncate h-5 rounded-full px-2 text-[10px]">
+                {formatMetaChangeValue(step.field, step.from_value)}
+              </Badge>
+              <span className="text-[11px] text-muted-foreground">→</span>
+              <Badge variant="outline" className="max-w-full truncate h-5 rounded-full px-2 text-[10px]">
+                {formatMetaChangeValue(step.field, step.to_value)}
+              </Badge>
+            </div>
           ) : step.from_status ? (
             <div className="flex flex-wrap items-center gap-1.5">
               <StatusBadge status={step.from_status} />
@@ -486,7 +517,7 @@ function JourneyStepCard({
               <CalendarClock className="h-3 w-3 shrink-0" />
               <span className="truncate">{formatDateTime(step.entered_at)}</span>
             </span>
-            {step.duration_label ? (
+            {step.kind !== "meta" && step.duration_label ? (
               <span className="inline-flex items-center gap-1.5 tabular-nums">
                 <Hourglass className="h-3 w-3 shrink-0" />
                 {step.duration_label}
@@ -562,15 +593,17 @@ function StatusTimeline({
 
   const shares = getLifecycleShares(steps, riseSeconds);
   const shareByIndex = new Map(
-    shares.map((step, index) => {
-      const originalIndex = steps.findIndex(
-        (s, i) =>
-          i >= index &&
-          s.status === step.status &&
-          s.entered_at === step.entered_at
-      );
-      return [originalIndex === -1 ? index : originalIndex, step.share_percent];
-    })
+    shares
+      .map((step) => {
+        const originalIndex = steps.findIndex(
+          (s) =>
+            (s.kind || "status") === "status" &&
+            s.status === step.status &&
+            s.entered_at === step.entered_at
+        );
+        return [originalIndex, step.share_percent] as const;
+      })
+      .filter(([originalIndex]) => originalIndex >= 0)
   );
 
   return (
@@ -589,7 +622,8 @@ function StatusTimeline({
         {steps.map((step, index) => {
           const isClosedCurrent =
             !!step.is_current && CLOSED.has((step.status || "").toLowerCase());
-          const share = isClosedCurrent ? null : shareByIndex.get(index);
+          const share =
+            step.kind === "meta" || isClosedCurrent ? null : shareByIndex.get(index);
           const eventLabel = eventLabelForStep(step);
           const visual = visualForStep(step);
           const onLeft = index % 2 === 0;
@@ -890,7 +924,7 @@ export function BugLifecycleCard({ bugId, bug, className }: BugLifecycleCardProp
                     Status journey
                   </p>
                   <p className="mt-0.5 text-xs text-muted-foreground">
-                    Raised, conversions, retests, and every status change on the path
+                    Raised, conversions, retests, and every status, level, and type change on the path
                   </p>
                 </div>
                 <Badge variant="outline" className="h-5 rounded-full px-2 text-[10px] tabular-nums">

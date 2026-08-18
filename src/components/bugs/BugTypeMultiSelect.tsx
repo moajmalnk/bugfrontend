@@ -10,6 +10,8 @@ type BugTypeMultiSelectProps = {
   onChange: (ids: string[]) => void;
   disabled?: boolean;
   className?: string;
+  hideLabel?: boolean;
+  compact?: boolean;
 };
 
 const SELECTED_CLASS =
@@ -20,6 +22,8 @@ export function BugTypeMultiSelect({
   onChange,
   disabled = false,
   className,
+  hideLabel = false,
+  compact = false,
 }: BugTypeMultiSelectProps) {
   const { data: types = [], isLoading } = useQuery({
     queryKey: ["bug-types", "active"],
@@ -37,17 +41,26 @@ export function BugTypeMultiSelect({
   };
 
   return (
-    <div className={cn("space-y-3", className)}>
-      <Label className="text-base font-semibold text-gray-900 dark:text-white flex items-center gap-2">
-        <div className="w-2 h-2 shrink-0 bg-gradient-to-r from-sky-500 to-blue-600 rounded-full" />
-        Bug Type
-        <span className="text-xs font-normal text-muted-foreground">(optional · multi-select)</span>
-      </Label>
-      <div className="rounded-xl border border-sky-200/60 dark:border-sky-800/50 bg-gradient-to-br from-sky-50/50 to-blue-50/30 dark:from-sky-950/15 dark:to-blue-950/10 p-4 shadow-sm">
-        <p className="text-xs text-gray-500 dark:text-gray-400 mb-3 flex items-center gap-1.5">
-          <Tags className="h-3.5 w-3.5 shrink-0" />
-          Choose one or more categories. Default priority from the type is suggested automatically.
-        </p>
+    <div className={cn(compact ? "space-y-2" : "space-y-3", className)}>
+      {hideLabel ? null : (
+        <Label className="text-base font-semibold text-gray-900 dark:text-white flex items-center gap-2">
+          <div className="w-2 h-2 shrink-0 bg-gradient-to-r from-sky-500 to-blue-600 rounded-full" />
+          Bug Type
+          <span className="text-xs font-normal text-muted-foreground">(optional · multi-select)</span>
+        </Label>
+      )}
+      <div
+        className={cn(
+          "rounded-xl border border-sky-200/60 dark:border-sky-800/50 bg-gradient-to-br from-sky-50/50 to-blue-50/30 dark:from-sky-950/15 dark:to-blue-950/10 shadow-sm",
+          compact ? "p-2.5" : "p-4"
+        )}
+      >
+        {compact ? null : (
+          <p className="text-xs text-gray-500 dark:text-gray-400 mb-3 flex items-center gap-1.5">
+            <Tags className="h-3.5 w-3.5 shrink-0" />
+            Choose one or more categories. Default priority from the type is suggested automatically.
+          </p>
+        )}
         {isLoading ? (
           <p className="text-sm text-muted-foreground py-2">Loading types…</p>
         ) : types.length === 0 ? (
@@ -56,7 +69,10 @@ export function BugTypeMultiSelect({
           </p>
         ) : (
           <div
-            className="grid w-full grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2"
+            className={cn(
+              "grid w-full gap-2",
+              compact ? "grid-cols-2" : "grid-cols-1 sm:grid-cols-2 lg:grid-cols-3"
+            )}
             role="group"
             aria-label="Bug types"
           >
@@ -76,21 +92,24 @@ export function BugTypeMultiSelect({
                   disabled={disabled}
                   onClick={() => toggle(type.id)}
                   className={cn(
-                    "min-h-11 w-full cursor-pointer flex flex-col items-center justify-center gap-0.5 rounded-lg border px-3 py-2.5 text-sm font-semibold transition-all disabled:opacity-50 disabled:cursor-not-allowed",
+                    "min-h-11 w-full cursor-pointer flex flex-col items-center justify-center gap-0.5 rounded-xl border px-3 text-sm font-semibold transition-all disabled:opacity-50 disabled:cursor-not-allowed",
+                    compact ? "py-2" : "py-2.5",
                     selected
                       ? SELECTED_CLASS
                       : "border-gray-200/80 bg-white text-gray-900 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100 hover:border-gray-300 dark:hover:border-gray-600"
                   )}
                 >
                   <span className="text-center leading-tight">{type.name}</span>
-                  <span
-                    className={cn(
-                      "text-[10px] font-medium",
-                      selected ? "text-white/80" : "text-muted-foreground"
-                    )}
-                  >
-                    Default: {priorityLabel}
-                  </span>
+                  {compact ? null : (
+                    <span
+                      className={cn(
+                        "text-[10px] font-medium",
+                        selected ? "text-white/80" : "text-muted-foreground"
+                      )}
+                    >
+                      Default: {priorityLabel}
+                    </span>
+                  )}
                 </button>
               );
             })}

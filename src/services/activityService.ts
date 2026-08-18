@@ -427,6 +427,7 @@ class ActivityService {
       'bug_assigned': { icon: '👤', color: 'text-blue-600', label: 'Bug Assigned' },
       'bug_deleted': { icon: '🗑️', color: 'text-red-800', label: 'Bug Deleted' },
       'bug_status_changed': { icon: '🔄', color: 'text-orange-600', label: 'Bug Status Changed' },
+      'bug_meta_changed': { icon: '🏷️', color: 'text-sky-600', label: 'Bug Details Changed' },
       
       // Task Activities
       'task_created': { icon: '📝', color: 'text-blue-600', label: 'Task Created' },

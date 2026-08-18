@@ -73,6 +73,48 @@ export function suggestedPriorityFromTypes(
   return best;
 }
 
+export function formatMetaFieldLabel(field?: string | null): string {
+  switch (field) {
+    case "bug_level":
+      return "Bug level";
+    case "already_raised":
+      return "Already raised";
+    case "bug_types":
+      return "Bug type";
+    case "priority":
+      return "Priority";
+    default:
+      return "Details";
+  }
+}
+
+/**
+ * Why: Journey cards reuse the same labels as Bug Details so Yes/No and
+ * Utter Floap never render as raw 1/0 or snake_case.
+ */
+export function formatMetaChangeValue(
+  field: string | undefined | null,
+  value: string | undefined | null
+): string {
+  if (value === null || value === undefined || String(value).trim() === "") {
+    return "None";
+  }
+  if (field === "bug_level") {
+    return formatBugLevelLabel(value);
+  }
+  if (field === "already_raised") {
+    const normalized = String(value).trim().toLowerCase();
+    if (normalized === "yes" || normalized === "no") {
+      return normalized === "yes" ? "Yes" : "No";
+    }
+    return formatAlreadyRaisedLabel(value);
+  }
+  if (field === "priority") {
+    return String(value).replace(/_/g, " ");
+  }
+  return String(value);
+}
+
 /** HTML rows for email templates */
 export function bugMetaEmailRows(bug: {
   bug_level?: BugLevel | string | null;

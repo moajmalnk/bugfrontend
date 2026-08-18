@@ -1,4 +1,5 @@
 import { formatRetestSummary, triState } from "@/components/bugs/details/TesterVerificationPanel";
+import { formatMetaChangeValue, formatMetaFieldLabel } from "@/lib/bugMetaUtils";
 import { formatLocalDate } from "@/lib/utils/dateUtils";
 import type {
   BugConversionEvent,
@@ -6,7 +7,7 @@ import type {
 } from "@/services/bugService";
 import type { Bug } from "@/types";
 
-export type BugJourneyKind = "status" | "conversion" | "retest";
+export type BugJourneyKind = "status" | "conversion" | "retest" | "meta";
 
 export type BugJourneyStep = BugLifecycleStep & {
   kind?: BugJourneyKind;
@@ -84,7 +85,12 @@ export function buildFullBugJourney(
       if (tb === 0) return -1;
       return ta - tb;
     }
-    const rank = { status: 0, conversion: 1, retest: 2 };
+    const rank: Record<BugJourneyKind, number> = {
+      status: 0,
+      conversion: 1,
+      retest: 2,
+      meta: 3,
+    };
     return (rank[a.kind || "status"] || 0) - (rank[b.kind || "status"] || 0);
   });
 }
@@ -98,6 +104,12 @@ export function formatJourneyHeadline(step: BugJourneyStep): string {
   }
   if (kind === "retest") {
     return `Retest · ${step.retest_label || "Recorded"}`;
+  }
+  if (kind === "meta") {
+    const fieldLabel = formatMetaFieldLabel(step.field);
+    const fromValue = formatMetaChangeValue(step.field, step.from_value);
+    const toValue = formatMetaChangeValue(step.field, step.to_value);
+    return `${fieldLabel}: ${fromValue} → ${toValue}`;
   }
   const label = String(step.event_label || "").toLowerCase();
   if (label === "reopened") return "Bug reopened";

@@ -13,19 +13,22 @@ import { apiClient } from "@/lib/axios";
 import { broadcastNotificationService } from "@/services/broadcastNotificationService";
 import { notificationService } from "@/services/notificationService";
 import { whatsappService } from "@/services/whatsappService";
-import { Bug, BugStatus, Project } from "@/types";
+import { Bug, BugLevel, BugStatus, BugType, Project } from "@/types";
 import {
   alreadyRaisedBadgeClass,
+  BUG_LEVEL_FORM_OPTIONS,
   bugLevelBadgeClass,
   bugTypeBadgeClass,
   formatAlreadyRaisedLabel,
   formatBugLevelLabel,
+  isAlreadyRaised,
 } from "@/lib/bugMetaUtils";
 import { Badge } from "@/components/ui/badge";
 import { formatRetestSummary } from "@/components/bugs/details/TesterVerificationPanel";
+import { BugTypeMultiSelect } from "@/components/bugs/BugTypeMultiSelect";
 import { cn } from "@/lib/utils";
 import { useQueryClient } from "@tanstack/react-query";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { GoogleDocsButton } from "./GoogleDocsButton";
 import { BugFixCelebration } from "@/components/celebration/BugFixCelebration";
 
@@ -47,6 +50,7 @@ export const BugDetailsCard = ({
   const { currentUser } = useAuth();
   const queryClient = useQueryClient();
   const [updating, setUpdating] = useState(false);
+  const updatingRef = useRef(false);
   const [bugState, setBugState] = useState(bug);
   const [showCelebration, setShowCelebration] = useState(false);
 
@@ -54,7 +58,10 @@ export const BugDetailsCard = ({
     setBugState(bug);
   }, [bug]);
 
-  const handleUpdate = async (field: "status" | "priority", value: string) => {
+  const handleUpdate = async (
+    field: "status" | "priority" | "bug_level" | "already_raised",
+    value: string
+  ) => {
     if (!currentUser) {
       toast({
         title: "Error",
@@ -64,13 +71,23 @@ export const BugDetailsCard = ({
       return;
     }
 
-    if (bugState[field] === value) return;
+    const currentValue =
+      field === "already_raised"
+        ? isAlreadyRaised(bugState.already_raised)
+          ? "1"
+          : "0"
+        : String(bugState[field] ?? "");
+    if (currentValue === value) return;
 
     const previous = bugState;
     const markingFixed = field === "status" && value === "fixed";
     const optimistic: Bug = {
       ...bugState,
-      [field]: value,
+      ...(field === "already_raised"
+        ? { already_raised: value === "1" }
+        : field === "bug_level"
+          ? { bug_level: value as BugLevel }
+          : { [field]: value }),
       updated_by: currentUser.id,
       updated_by_name: currentUser.name || currentUser.username,
       ...(markingFixed
@@ -81,22 +98,85 @@ export const BugDetailsCard = ({
         : {}),
     };
 
-    // Instant UI feedback — don't wait on email/broadcast
+    await persistBugUpdate(
+      {
+        id: bug.id,
+        [field]: value,
+        updated_by: currentUser.id,
+        ...(markingFixed ? { fixed_by: currentUser.id } : {}),
+      },
+      previous,
+      optimistic,
+      field.replace(/_/g, " "),
+      markingFixed
+    );
+  };
+
+  const handleTypesUpdate = async (ids: string[]) => {
+    if (!currentUser) {
+      toast({
+        title: "Error",
+        description: "You must be logged in to update bugs.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    const previousIds = [...(bugState.bug_types || []).map((type) => type.id)].sort().join(",");
+    const nextIds = [...ids].sort().join(",");
+    if (previousIds === nextIds) return;
+
+    const catalog =
+      queryClient.getQueryData<BugType[]>(["bug-types", "active"]) || [];
+    const optimisticTypes = ids
+      .map(
+        (id) =>
+          catalog.find((type) => type.id === id) ||
+          bugState.bug_types?.find((type) => type.id === id)
+      )
+      .filter((type): type is BugType => Boolean(type))
+      .map((type) => ({
+        id: type.id,
+        name: type.name,
+        slug: type.slug,
+      }));
+
+    const previous = bugState;
+    const optimistic: Bug = {
+      ...bugState,
+      bug_types: optimisticTypes,
+      updated_by: currentUser.id,
+      updated_by_name: currentUser.name || currentUser.username,
+    };
+
+    await persistBugUpdate(
+      {
+        id: bug.id,
+        bug_types: JSON.stringify(ids),
+        bug_type_ids: ids,
+        updated_by: currentUser.id,
+      },
+      previous,
+      optimistic,
+      "bug type"
+    );
+  };
+
+  const persistBugUpdate = async (
+    payload: Record<string, unknown>,
+    previous: Bug,
+    optimistic: Bug,
+    fieldLabel: string,
+    markingFixed = false
+  ) => {
+    if (updatingRef.current) return;
+    updatingRef.current = true;
+
     setBugState(optimistic);
     setUpdating(true);
     queryClient.setQueryData(["bug", bug.id], optimistic);
 
     try {
-      // Minimal payload so developers aren't blocked by unrelated field diffs
-      const payload: Record<string, string> = {
-        id: bug.id,
-        [field]: value,
-        updated_by: currentUser.id,
-      };
-      if (markingFixed) {
-        payload.fixed_by = currentUser.id;
-      }
-
       const response = await apiClient.post<{
         success: boolean;
         data?: Bug;
@@ -104,7 +184,7 @@ export const BugDetailsCard = ({
       }>("/bugs/update.php", payload);
 
       if (!response.data?.success) {
-        throw new Error(response.data?.message || `Failed to update bug ${field}`);
+        throw new Error(response.data?.message || `Failed to update bug ${fieldLabel}`);
       }
 
       const serverBug = response.data.data
@@ -113,24 +193,21 @@ export const BugDetailsCard = ({
       setBugState(serverBug);
       queryClient.setQueryData(["bug", bug.id], serverBug);
 
-      // Soft refresh related views without blocking the status control
       void queryClient.invalidateQueries({ queryKey: ["bugs"] });
       void queryClient.invalidateQueries({ queryKey: ["bugLifecycle", bug.id] });
       void queryClient.invalidateQueries({
-        queryKey: ["userStats", currentUser.id],
+        queryKey: ["userStats", currentUser?.id],
       });
       void queryClient.invalidateQueries({ queryKey: ["userProfilePortfolio"] });
 
       toast({
         title: "Success",
-        description: `Bug ${field} updated successfully.`,
+        description: `Bug ${fieldLabel} updated successfully.`,
       });
 
-      if (markingFixed) {
+      if (markingFixed && currentUser) {
         setShowCelebration(true);
 
-        // Backend already sends in-app/push notifications after the API responds.
-        // Keep browser/WhatsApp side-effects non-blocking.
         void broadcastNotificationService
           .broadcastStatusChange(
             serverBug.title,
@@ -170,10 +247,11 @@ export const BugDetailsCard = ({
         description:
           error instanceof Error
             ? error.message
-            : `Failed to update bug ${field}.`,
+            : `Failed to update bug ${fieldLabel}.`,
         variant: "destructive",
       });
     } finally {
+      updatingRef.current = false;
       setUpdating(false);
     }
   };
@@ -196,7 +274,7 @@ export const BugDetailsCard = ({
                 onValueChange={(value) => void handleUpdate("status", value)}
                 disabled={updating}
               >
-                <SelectTrigger className="h-8 sm:h-9 text-xs sm:text-sm w-full bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700">
+                <SelectTrigger className="h-8 sm:h-9 text-xs sm:text-sm w-full rounded-xl bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent searchable={false}>
@@ -224,7 +302,7 @@ export const BugDetailsCard = ({
                 onValueChange={(value) => void handleUpdate("priority", value)}
                 disabled={updating}
               >
-                <SelectTrigger className="h-8 sm:h-9 text-xs sm:text-sm w-full bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700">
+                <SelectTrigger className="h-8 sm:h-9 text-xs sm:text-sm w-full rounded-xl bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent searchable={false}>
@@ -242,47 +320,96 @@ export const BugDetailsCard = ({
 
           <div className="space-y-1.5">
             <Label className="text-xs sm:text-sm">Bug Level</Label>
-            <div className="p-2 border rounded-md text-xs sm:text-sm bg-muted/30 w-full">
-              <Badge
-                variant="outline"
-                className={bugLevelBadgeClass(bug.bug_level)}
+            {canUpdateStatus ? (
+              <Select
+                value={
+                  bugState.bug_level === "floap" || bugState.bug_level === "utter_floap"
+                    ? bugState.bug_level
+                    : "normal"
+                }
+                onValueChange={(value) => void handleUpdate("bug_level", value)}
+                disabled={updating}
               >
-                {formatBugLevelLabel(bug.bug_level)}
-              </Badge>
-            </div>
+                <SelectTrigger className="h-8 sm:h-9 text-xs sm:text-sm w-full rounded-xl bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent searchable={false}>
+                  {BUG_LEVEL_FORM_OPTIONS.map((option) => (
+                    <SelectItem key={option.value} value={option.value}>
+                      {option.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            ) : (
+              <div className="p-2 border rounded-xl text-xs sm:text-sm bg-muted/30 w-full">
+                <Badge
+                  variant="outline"
+                  className={bugLevelBadgeClass(bugState.bug_level)}
+                >
+                  {formatBugLevelLabel(bugState.bug_level)}
+                </Badge>
+              </div>
+            )}
           </div>
 
           <div className="space-y-1.5">
             <Label className="text-xs sm:text-sm">Bug Type</Label>
-            <div className="p-2 border rounded-md text-xs sm:text-sm bg-muted/30 w-full">
-              {bug.bug_types && bug.bug_types.length > 0 ? (
-                <div className="flex flex-wrap gap-1.5">
-                  {bug.bug_types.map((type) => (
-                    <Badge
-                      key={type.id}
-                      variant="outline"
-                      className={bugTypeBadgeClass()}
-                    >
-                      {type.name}
-                    </Badge>
-                  ))}
-                </div>
-              ) : (
-                <span className="text-muted-foreground">—</span>
-              )}
-            </div>
+            {canUpdateStatus ? (
+              <BugTypeMultiSelect
+                hideLabel
+                compact
+                disabled={updating}
+                selectedIds={(bugState.bug_types || []).map((type) => type.id)}
+                onChange={(ids) => void handleTypesUpdate(ids)}
+              />
+            ) : (
+              <div className="p-2 border rounded-xl text-xs sm:text-sm bg-muted/30 w-full">
+                {bugState.bug_types && bugState.bug_types.length > 0 ? (
+                  <div className="flex flex-wrap gap-1.5">
+                    {bugState.bug_types.map((type) => (
+                      <Badge
+                        key={type.id}
+                        variant="outline"
+                        className={bugTypeBadgeClass()}
+                      >
+                        {type.name}
+                      </Badge>
+                    ))}
+                  </div>
+                ) : (
+                  <span className="text-muted-foreground">—</span>
+                )}
+              </div>
+            )}
           </div>
 
           <div className="space-y-1.5">
             <Label className="text-xs sm:text-sm">Already Raised</Label>
-            <div className="p-2 border rounded-md text-xs sm:text-sm bg-muted/30 w-full">
-              <Badge
-                variant="outline"
-                className={alreadyRaisedBadgeClass(bug.already_raised)}
+            {canUpdateStatus ? (
+              <Select
+                value={isAlreadyRaised(bugState.already_raised) ? "1" : "0"}
+                onValueChange={(value) => void handleUpdate("already_raised", value)}
+                disabled={updating}
               >
-                {formatAlreadyRaisedLabel(bug.already_raised)}
-              </Badge>
-            </div>
+                <SelectTrigger className="h-8 sm:h-9 text-xs sm:text-sm w-full rounded-xl bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent searchable={false}>
+                  <SelectItem value="0">No</SelectItem>
+                  <SelectItem value="1">Yes</SelectItem>
+                </SelectContent>
+              </Select>
+            ) : (
+              <div className="p-2 border rounded-xl text-xs sm:text-sm bg-muted/30 w-full">
+                <Badge
+                  variant="outline"
+                  className={alreadyRaisedBadgeClass(bugState.already_raised)}
+                >
+                  {formatAlreadyRaisedLabel(bugState.already_raised)}
+                </Badge>
+              </div>
+            )}
           </div>
 
           <div className="space-y-2 py-3 border-t border-border">

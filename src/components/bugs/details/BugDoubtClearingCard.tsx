@@ -9,13 +9,16 @@ import {
   WhatsAppVoiceRecorder,
 } from "@/components/voice/WhatsAppVoiceRecorder";
 import { WhatsAppVoiceMessage } from "@/components/voice/WhatsAppVoiceMessage";
+import { useAuth } from "@/context/AuthContext";
 import { extractApiErrorMessage } from "@/lib/apiError";
 import { formatDetailedDate } from "@/lib/dateUtils";
 import { ENV } from "@/lib/env";
+import { cn } from "@/lib/utils";
 import {
   bugDoubtService,
   type BugDoubt,
   type BugDoubtAttachment,
+  type BugDoubtReply,
 } from "@/services/bugDoubtService";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { CircleHelp, Loader2, MessageCircleReply, User } from "lucide-react";
@@ -23,22 +26,38 @@ import { FormEvent, useState } from "react";
 
 const BODY_MAX = 2000;
 
+type ChatMessage = {
+  id: string;
+  userId: string;
+  name: string;
+  body: string;
+  createdAt: string;
+  attachments: BugDoubtAttachment[];
+  prefix: string;
+};
+
 function audioUrl(path: string): string {
   if (/^https?:\/\//i.test(path)) return path;
   return `${ENV.API_URL}/audio.php?path=${encodeURIComponent(path)}`;
 }
 
+function sameUser(a?: string | null, b?: string | null): boolean {
+  return Boolean(a) && Boolean(b) && String(a) === String(b);
+}
+
 function VoiceList({
   attachments,
   prefix,
+  mine,
 }: {
   attachments: BugDoubtAttachment[];
   prefix: string;
+  mine: boolean;
 }) {
   const [activeId, setActiveId] = useState<string | null>(null);
   if (!attachments?.length) return null;
   return (
-    <div className="flex flex-col gap-2">
+    <div className="flex w-full min-w-0 flex-col gap-2">
       {attachments.map((att) => {
         const id = `${prefix}-${att.id}`;
         return (
@@ -48,7 +67,8 @@ function VoiceList({
             audioSource={audioUrl(att.file_path)}
             duration={att.duration || 0}
             fileName={att.file_name || "voice-note.webm"}
-            accent="received"
+            accent={mine ? "sent" : "received"}
+            layout="form"
             isActive={activeId === id}
             onPlay={(voiceId) => setActiveId(voiceId)}
             onPause={(voiceId) => {
@@ -57,6 +77,78 @@ function VoiceList({
           />
         );
       })}
+    </div>
+  );
+}
+
+function ChatBubble({
+  message,
+  mine,
+}: {
+  message: ChatMessage;
+  mine: boolean;
+}) {
+  const hasText = Boolean(message.body.trim());
+  const hasVoice = (message.attachments || []).length > 0;
+
+  return (
+    <div
+      className={cn(
+        "flex w-full min-w-0",
+        mine ? "justify-end" : "justify-start"
+      )}
+    >
+      <div
+        className={cn(
+          "flex min-w-0 max-w-[85%] sm:max-w-[75%] gap-2",
+          mine ? "flex-row-reverse" : "flex-row"
+        )}
+      >
+        {!mine ? (
+          <span className="mt-5 inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-violet-500/15 text-violet-700 dark:text-violet-300">
+            <User className="h-4 w-4" />
+          </span>
+        ) : null}
+        <div
+          className={cn(
+            "flex min-w-0 flex-1 flex-col gap-1",
+            mine ? "items-end" : "items-start"
+          )}
+        >
+          <div
+            className={cn(
+              "flex flex-wrap items-center gap-2 px-1 text-xs",
+              mine ? "flex-row-reverse" : "flex-row"
+            )}
+          >
+            <span className="font-medium text-foreground">
+              {mine ? "You" : message.name || "Unknown"}
+            </span>
+            <span className="text-muted-foreground">
+              {formatDetailedDate(message.createdAt)}
+            </span>
+          </div>
+          {hasText ? (
+            <div
+              className={cn(
+                "w-fit max-w-full rounded-2xl border px-3 py-2 text-sm shadow-sm",
+                mine
+                  ? "rounded-br-md border-emerald-500/30 bg-emerald-600 text-white"
+                  : "rounded-bl-md border-border/60 bg-muted/70 text-foreground dark:bg-slate-800/90"
+              )}
+            >
+              <p className="whitespace-pre-wrap break-words">{message.body}</p>
+            </div>
+          ) : null}
+          {hasVoice ? (
+            <VoiceList
+              attachments={message.attachments}
+              prefix={message.prefix}
+              mine={mine}
+            />
+          ) : null}
+        </div>
+      </div>
     </div>
   );
 }
@@ -104,7 +196,10 @@ function ReplyComposer({
   };
 
   return (
-    <form onSubmit={handleSubmit} className="flex flex-col gap-3 rounded-xl border border-border/60 bg-muted/20 p-3">
+    <form
+      onSubmit={handleSubmit}
+      className="flex w-full flex-col gap-3 rounded-xl border border-border/60 bg-muted/20 p-3"
+    >
       <div className="flex flex-col gap-2">
         <Label htmlFor={`doubt-reply-${doubtId}`}>Reply</Label>
         <Textarea
@@ -117,19 +212,21 @@ function ReplyComposer({
           className="min-h-[80px] rounded-xl"
         />
       </div>
-      <WhatsAppVoiceRecorder
-        onComplete={(note) => setVoice(note)}
-        disabled={mutation.isPending}
-        maxDuration={300}
-      />
-      {voice && (
+      {voice ? (
         <WhatsAppVoiceMessage
           id={`reply-preview-${doubtId}`}
           audioSource={voice.blob}
           duration={voice.duration}
           waveform={voice.waveform}
           accent="sent"
+          layout="form"
           onRemove={() => setVoice(null)}
+        />
+      ) : (
+        <WhatsAppVoiceRecorder
+          onComplete={(note) => setVoice(note)}
+          disabled={mutation.isPending}
+          maxDuration={300}
         />
       )}
       <div className="flex justify-end">
@@ -152,75 +249,78 @@ function ReplyComposer({
   );
 }
 
-function DoubtThread({ doubt }: { doubt: BugDoubt }) {
+function toChatMessages(doubt: BugDoubt): ChatMessage[] {
+  const asked: ChatMessage = {
+    id: doubt.id,
+    userId: doubt.asked_by,
+    name: doubt.asked_by_name || "Unknown",
+    body: doubt.body || "",
+    createdAt: doubt.created_at,
+    attachments: doubt.attachments || [],
+    prefix: `doubt-${doubt.id}`,
+  };
+  const replies: ChatMessage[] = (doubt.replies || []).map(
+    (reply: BugDoubtReply) => ({
+      id: reply.id,
+      userId: reply.user_id,
+      name: reply.user_name || "Unknown",
+      body: reply.body || "",
+      createdAt: reply.created_at,
+      attachments: reply.attachments || [],
+      prefix: `reply-${reply.id}`,
+    })
+  );
+  return [asked, ...replies];
+}
+
+function DoubtThread({
+  doubt,
+  currentUserId,
+}: {
+  doubt: BugDoubt;
+  currentUserId?: string;
+}) {
   const [replyOpen, setReplyOpen] = useState(false);
+  const messages = toChatMessages(doubt);
 
   return (
-    <article className="flex flex-col gap-3 rounded-xl border border-border/60 bg-background/80 p-4">
-      <div className="flex flex-wrap items-center gap-2 min-w-0">
-        <span className="inline-flex h-8 w-8 items-center justify-center rounded-xl bg-violet-500/15 text-violet-700 dark:text-violet-300 shrink-0">
-          <User className="h-4 w-4" />
-        </span>
-        <div className="min-w-0">
-          <p className="text-sm font-semibold text-foreground truncate">
-            {doubt.asked_by_name || "Unknown"}
-          </p>
-          <p className="text-xs text-muted-foreground">
-            {formatDetailedDate(doubt.created_at)}
-          </p>
-        </div>
+    <article className="flex flex-col gap-3 rounded-2xl border border-border/60 bg-background/70 p-3 sm:p-4">
+      <div
+        className="flex max-h-[32rem] flex-col gap-3 overflow-y-auto pr-1 [scrollbar-width:thin]"
+        style={{
+          scrollbarColor: "hsl(var(--muted-foreground) / 0.35) transparent",
+        }}
+      >
+        {messages.map((message) => (
+          <ChatBubble
+            key={message.id}
+            message={message}
+            mine={sameUser(message.userId, currentUserId)}
+          />
+        ))}
       </div>
-      {doubt.body.trim() ? (
-        <p className="text-sm text-foreground whitespace-pre-wrap break-words">
-          {doubt.body}
-        </p>
-      ) : null}
-      <VoiceList attachments={doubt.attachments || []} prefix={`doubt-${doubt.id}`} />
-
-      {(doubt.replies || []).length > 0 && (
-        <div className="flex flex-col gap-3 border-l-2 border-violet-200 dark:border-violet-800 pl-3">
-          {doubt.replies.map((reply) => (
-            <div key={reply.id} className="flex flex-col gap-2 rounded-xl bg-muted/30 p-3">
-              <div className="flex flex-wrap items-center justify-between gap-2">
-                <p className="text-sm font-medium text-foreground truncate">
-                  {reply.user_name || "Unknown"}
-                </p>
-                <p className="text-xs text-muted-foreground">
-                  {formatDetailedDate(reply.created_at)}
-                </p>
-              </div>
-              {reply.body.trim() ? (
-                <p className="text-sm text-foreground whitespace-pre-wrap break-words">
-                  {reply.body}
-                </p>
-              ) : null}
-              <VoiceList
-                attachments={reply.attachments || []}
-                prefix={`reply-${reply.id}`}
-              />
-            </div>
-          ))}
-        </div>
-      )}
 
       {replyOpen ? (
         <ReplyComposer doubtId={doubt.id} onDone={() => setReplyOpen(false)} />
       ) : (
-        <Button
-          type="button"
-          variant="outline"
-          className="rounded-xl self-start"
-          onClick={() => setReplyOpen(true)}
-        >
-          <MessageCircleReply className="mr-2 h-4 w-4" />
-          Reply
-        </Button>
+        <div className="flex justify-end">
+          <Button
+            type="button"
+            variant="outline"
+            className="rounded-xl"
+            onClick={() => setReplyOpen(true)}
+          >
+            <MessageCircleReply className="mr-2 h-4 w-4" />
+            Reply
+          </Button>
+        </div>
       )}
     </article>
   );
 }
 
 export function BugDoubtClearingCard({ bugId }: { bugId: string }) {
+  const { currentUser } = useAuth();
   const { data: doubts = [], isLoading, isError } = useQuery({
     queryKey: ["bug-doubts", bugId],
     queryFn: () => bugDoubtService.list(bugId),
@@ -247,7 +347,7 @@ export function BugDoubtClearingCard({ bugId }: { bugId: string }) {
   }
 
   return (
-    <Card className="relative overflow-hidden rounded-2xl border border-gray-200/60 dark:border-gray-800/60 bg-white/80 dark:bg-gray-900/80 backdrop-blur-sm">
+    <Card className="relative overflow-hidden rounded-2xl border border-gray-200/60 bg-white/80 backdrop-blur-sm dark:border-gray-800/60 dark:bg-gray-900/80">
       <div className="pointer-events-none absolute inset-0 bg-gradient-to-br from-violet-50/40 via-transparent to-indigo-50/30 dark:from-violet-950/20 dark:via-transparent dark:to-indigo-950/10" />
       <CardHeader className="relative">
         <CardTitle className="flex items-center gap-2">
@@ -255,10 +355,16 @@ export function BugDoubtClearingCard({ bugId }: { bugId: string }) {
           Doubt clearing ({doubts.length})
         </CardTitle>
       </CardHeader>
-      <CardContent className="relative flex flex-col gap-4">
-        {doubts.map((doubt) => (
-          <DoubtThread key={doubt.id} doubt={doubt} />
-        ))}
+      <CardContent className="relative grid grid-cols-12 gap-4">
+        <div className="col-span-12 flex flex-col gap-4">
+          {doubts.map((doubt) => (
+            <DoubtThread
+              key={doubt.id}
+              doubt={doubt}
+              currentUserId={currentUser?.id}
+            />
+          ))}
+        </div>
       </CardContent>
     </Card>
   );

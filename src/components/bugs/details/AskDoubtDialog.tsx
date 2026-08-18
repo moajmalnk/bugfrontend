@@ -181,26 +181,28 @@ export function AskDoubtDialog({
               </span>
             </div>
 
-            <div className="flex flex-col gap-3">
+            <div className="flex flex-col gap-2">
               <Label>Voice message</Label>
-              <WhatsAppVoiceRecorder
-                onComplete={(note) => setVoice(note)}
-                disabled={submitting}
-                maxDuration={300}
-              />
-              {voice && (
+              {voice ? (
                 <WhatsAppVoiceMessage
                   id="ask-doubt-preview"
                   audioSource={voice.blob}
                   duration={voice.duration}
                   waveform={voice.waveform}
                   accent="sent"
+                  layout="form"
                   onRemove={() => setVoice(null)}
+                />
+              ) : (
+                <WhatsAppVoiceRecorder
+                  onComplete={(note) => setVoice(note)}
+                  disabled={submitting}
+                  maxDuration={300}
                 />
               )}
             </div>
 
-            <DialogFooter className="gap-2 sm:gap-2">
+            <DialogFooter className="w-full gap-2 sm:gap-2 sm:space-x-0">
               <Button
                 type="button"
                 variant="outline"

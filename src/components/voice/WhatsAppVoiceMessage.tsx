@@ -18,6 +18,8 @@ export interface WhatsAppVoiceMessageProps {
   onPlay?: (id: string) => void;
   onPause?: (id: string) => void;
   isActive?: boolean;
+  /** bubble = chat alignment; form = full-width, left-aligned like other inputs */
+  layout?: "bubble" | "form";
 }
 
 const SPEED_STEPS: Array<0.75 | 1 | 1.5 | 2> = [0.75, 1, 1.5, 2];
@@ -63,6 +65,7 @@ export function WhatsAppVoiceMessage({
   onPlay,
   onPause,
   isActive = false,
+  layout = "bubble",
 }: WhatsAppVoiceMessageProps) {
   const [audioUrl, setAudioUrl] = useState<string | null>(null);
   const [isPlaying, setIsPlaying] = useState(false);
@@ -526,21 +529,26 @@ export function WhatsAppVoiceMessage({
     });
   }, [accent, id, isScrubbing, progress, waveValues]);
 
+  const isForm = layout === "form";
+
   return (
     <div
       className={cn(
         "flex w-full min-w-0 max-w-full items-end gap-1.5 sm:gap-2",
-        accent === "sent" ? "justify-end" : "justify-start"
+        isForm || accent !== "sent" ? "justify-start" : "justify-end"
       )}
     >
-      {accent === "received" && (
+      {accent === "received" && !isForm && (
         <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-emerald-500 text-white shadow sm:h-8 sm:w-8">
           <Volume2 className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
         </div>
       )}
       <div
         className={cn(
-          "flex min-w-0 flex-1 items-center gap-2 rounded-2xl px-2 py-2 shadow-sm sm:max-w-[360px] sm:gap-3 sm:rounded-3xl sm:px-3",
+          "flex min-w-0 items-center gap-2 rounded-2xl px-2 py-2 shadow-sm sm:gap-3 sm:px-3",
+          isForm
+            ? "w-full max-w-full flex-1 rounded-xl"
+            : "flex-1 sm:max-w-[360px] sm:rounded-3xl",
           accent === "sent"
             ? "bg-emerald-500 text-white"
             : "bg-white text-slate-900 dark:bg-slate-800 dark:text-white"
