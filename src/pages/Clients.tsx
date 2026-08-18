@@ -1,5 +1,6 @@
 import { Button } from '@/components/ui/button';
 import { ItemsPerPageSelect } from '@/components/pagination/ItemsPerPageSelect';
+import { PageJumpSelect } from '@/components/pagination/PageJumpSelect';
 import { Badge } from '@/components/ui/badge';
 import { Drawer, DrawerContent, DrawerDescription, DrawerHeader, DrawerTitle } from '@/components/ui/drawer';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -383,21 +384,12 @@ const Clients = () => {
                     );
                   })}
               </div>
-              <div className="md:hidden flex items-center gap-3 bg-muted/20 rounded-lg px-3 py-2 border border-border/30">
-                <select
-                  value={activePage}
-                  onChange={(e) => setCurrentPage(Number(e.target.value))}
-                  className="border-0 bg-transparent text-sm font-semibold text-primary focus:outline-none min-w-[50px]"
-                  aria-label="Go to page"
-                >
-                  {Array.from({ length: totalPages }, (_, i) => (
-                    <option key={i + 1} value={i + 1}>
-                      {i + 1}
-                    </option>
-                  ))}
-                </select>
-                <span className="text-sm text-muted-foreground">/ {totalPages}</span>
-              </div>
+              <PageJumpSelect
+                className="md:hidden"
+                currentPage={activePage}
+                totalPages={totalPages}
+                onPageChange={setCurrentPage}
+              />
               <button
                 onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
                 disabled={activePage === totalPages}

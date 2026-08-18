@@ -14,6 +14,8 @@ interface WhatsAppMessageData {
   projectName?: string;
   bugLevel?: string;
   alreadyRaised?: boolean | number | string | null;
+  /** Full status journey including conversions and retests */
+  statusJourneyText?: string | null;
   // For general updates
   updateTitle?: string;
   updateId?: string;
@@ -64,8 +66,7 @@ export interface ProjectWhatsAppShareData {
   developerComplianceTotal?: number | null;
   testerComplianceVerified?: number | null;
   testerComplianceTotal?: number | null;
-  adminComplianceVerified?: number | null;
-  adminComplianceTotal?: number | null;
+  adminVerified?: boolean | null;
   complianceBypass?: boolean | null;
   developerComplianceCompleteAt?: string | null;
   testerComplianceCompleteAt?: string | null;
@@ -145,7 +146,7 @@ class WhatsAppService {
     const hasComplianceCounts =
       data.developerComplianceTotal != null ||
       data.testerComplianceTotal != null ||
-      data.adminComplianceTotal != null;
+      data.adminVerified != null;
     if (data.complianceStage || hasComplianceCounts) {
       const fraction = (verified?: number | null, total?: number | null) =>
         `*${verified ?? 0}/${total ?? 0}*`;
@@ -161,10 +162,7 @@ class WhatsAppService {
         data.testerComplianceVerified,
         data.testerComplianceTotal
       )}\n`;
-      message += `• Admin: ${fraction(
-        data.adminComplianceVerified,
-        data.adminComplianceTotal
-      )}\n`;
+      message += `• Admin: *${data.adminVerified ? "Verified" : "Not verified"}*\n`;
       if (data.developerComplianceCompleteAt) {
         message += `• Developer complete: ${data.developerComplianceCompleteAt}\n`;
       }
@@ -312,6 +310,10 @@ class WhatsAppService {
       bug_level: data.bugLevel,
       already_raised: data.alreadyRaised,
     })}\n`;
+
+    if (data.statusJourneyText?.trim()) {
+      message += `\n${data.statusJourneyText.trim()}\n`;
+    }
     
     if (data.description && data.description.length > 0) {
       const shortDescription = data.description.length > 100 
@@ -365,6 +367,10 @@ class WhatsAppService {
         bug_level: data.bugLevel,
         already_raised: data.alreadyRaised,
       })}\n`;
+    }
+
+    if (data.statusJourneyText?.trim()) {
+      message += `\n${data.statusJourneyText.trim()}\n`;
     }
     
     message += `\n🔗 *View Bug:* ${bugUrl}`;

@@ -1,4 +1,5 @@
 import { LogoutConfirmDialog } from "@/components/auth/LogoutConfirmDialog";
+import { PageJumpSelect } from "@/components/pagination/PageJumpSelect";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -1550,28 +1551,12 @@ export default function Profile() {
                         )}
 
                         {/* Mobile-friendly page selector */}
-                        <div className="md:hidden flex items-center gap-3 bg-gradient-to-r from-muted/20 to-muted/30 rounded-lg px-3 py-2 border border-border/30 hover:border-primary/30 transition-all duration-200">
-                          <select
-                            value={currentPage}
-                            onChange={(e) =>
-                              setCurrentPage(Number(e.target.value))
-                            }
-                            className="border-0 bg-transparent text-sm font-semibold text-primary focus:outline-none focus:ring-0 min-w-[50px] cursor-pointer hover:text-primary/80 transition-colors duration-200"
-                            aria-label="Go to page"
-                          >
-                            {Array.from({ length: totalPages }, (_, i) => (
-                              <option key={i + 1} value={i + 1}>
-                                {i + 1}
-                              </option>
-                            ))}
-                          </select>
-                          <span className="text-sm text-muted-foreground font-medium">
-                            {" "}
-                            <span className="text-primary font-semibold bg-gradient-to-r from-primary to-primary/80 bg-clip-text text-transparent">
-                              {totalPages}
-                            </span>
-                          </span>
-                        </div>
+                        <PageJumpSelect
+                          className="md:hidden"
+                          currentPage={currentPage}
+                          totalPages={totalPages}
+                          onPageChange={setCurrentPage}
+                        />
                       </div>
 
                       {/* Next Button */}

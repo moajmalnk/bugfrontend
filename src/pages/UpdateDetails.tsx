@@ -49,6 +49,7 @@ import { format } from "date-fns";
 import { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import { buildAudioUrl } from "@/lib/mediaUrls";
 import { ENV } from "@/lib/env";
+import { downloadAttachmentFile } from "@/lib/attachmentUtils";
 import { UpdateDetailsCard } from "@/components/updates/UpdateDetailsCard";
 import { UpdateLifecycleCard } from "@/components/updates/UpdateLifecycleCard";
 import { userService } from "@/services/userService";
@@ -666,12 +667,7 @@ const UpdateDetails = () => {
     });
   };
   const downloadAttachment = (file: { file_path: string; file_name: string }) => {
-    const link = document.createElement("a");
-    link.href = buildDownloadUrl(file.file_path, file.file_name);
-    link.download = file.file_name;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+    void downloadAttachmentFile(file.file_path, file.file_name);
   };
   const isVideoFile = (file: { file_type?: string; file_name?: string }) =>
     file.file_type?.startsWith("video/") ||
@@ -1048,6 +1044,7 @@ const UpdateDetails = () => {
                                 voiceNote.full_url
                               )}
                               duration={voiceNote.duration || 0}
+                              fileName={voiceNote.file_name || "voice-note.webm"}
                               accent="received"
                               isActive={activeVoiceNoteId === voiceNote.id}
                               onPlay={(id) => setActiveVoiceNoteId(id)}

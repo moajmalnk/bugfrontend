@@ -39,6 +39,7 @@ import { sendBugStatusUpdateNotification } from "@/services/emailService";
 import { Bug, BugLevel, BugPriority, BugStatus, Project } from "@/types";
 import { cn } from "@/lib/utils";
 import { ENV } from "@/lib/env";
+import { downloadAttachmentFile } from "@/lib/attachmentUtils";
 import {
   sortProjectsForPicker,
   type ProjectBugStatsLite,
@@ -418,16 +419,10 @@ const EditBugForm = ({ bug, onCancel, onSuccess }: EditBugFormProps) => {
   };
 
   const downloadAttachment = (attachment: Attachment) => {
-    if (!attachment.full_url) return;
-    
-    // Create a temporary anchor element to trigger download
-    const link = document.createElement('a');
-    link.href = attachment.full_url;
-    link.download = attachment.file_name;
-    link.target = '_blank';
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+    void downloadAttachmentFile(
+      attachment.file_path,
+      attachment.file_name || "voice-note.webm"
+    );
   };
 
   const handleVoiceRecorderComplete = ({
@@ -1359,6 +1354,7 @@ const EditBugForm = ({ bug, onCancel, onSuccess }: EditBugFormProps) => {
                                         ? attachment.duration
                                         : 0
                                     }
+                                    fileName={attachment.file_name || "voice-note.webm"}
                                     accent="received"
                                     autoPlay
                                     isActive={activeVoiceId === messageId}

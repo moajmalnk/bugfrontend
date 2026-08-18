@@ -260,7 +260,59 @@ export function ProjectHealthTable({
 
   return (
     <div className={cn(DASHBOARD_PANEL, "overflow-hidden")}>
-      <div className="overflow-x-auto">
+      <div className="flex flex-col gap-3 p-3 md:hidden">
+        {rows.map((row) => (
+          <Link
+            key={row.project.id}
+            to={`/${role}/projects/${row.project.id}`}
+            className="block min-w-0 rounded-xl border border-border/60 bg-background/70 p-4 hover:bg-muted/40"
+          >
+            <div className="flex min-w-0 items-start justify-between gap-3">
+              <div className="min-w-0">
+                <p className="truncate font-semibold text-foreground">
+                  {row.project.name}
+                </p>
+                {row.project.client_name ? (
+                  <p className="mt-0.5 truncate text-xs text-muted-foreground">
+                    {row.project.client_name}
+                  </p>
+                ) : null}
+              </div>
+              <Badge className={cn("shrink-0 rounded-xl border-0", statusBadgeClass(row.project.status))}>
+                {getProjectStatusLabel(row.project.status)}
+              </Badge>
+            </div>
+            <div className="mt-3 grid grid-cols-12 gap-3">
+              <div className="col-span-7 min-w-0">
+                <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+                  Deadline
+                </p>
+                <p className={cn("mt-0.5 text-sm font-medium", deadlineTone(row.bucket))}>
+                  {formatProjectDate(row.project.deadline_date)}
+                </p>
+                <p className={cn("text-xs", deadlineTone(row.bucket))}>
+                  {deadlineLabel(row.bucket, row.daysUntil)}
+                </p>
+              </div>
+              <div className="col-span-5 min-w-0 text-right">
+                <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+                  Open bugs
+                </p>
+                <p
+                  className={cn(
+                    "mt-0.5 text-sm tabular-nums font-semibold",
+                    row.openBugs > 0 ? "text-amber-600 dark:text-amber-400" : "text-foreground"
+                  )}
+                >
+                  {row.openBugs}
+                </p>
+              </div>
+            </div>
+          </Link>
+        ))}
+      </div>
+
+      <div className="hidden overflow-x-auto md:block">
         <Table>
           <TableHeader>
             <TableRow className="bg-gray-50/80 dark:bg-gray-800/50 hover:bg-gray-50/80 dark:hover:bg-gray-800/50">
@@ -338,7 +390,32 @@ export function BugListTable({
 
   return (
     <div className={cn(DASHBOARD_PANEL, "overflow-hidden")}>
-      <div className="overflow-x-auto">
+      <div className="flex flex-col gap-3 p-3 md:hidden">
+        {bugs.map((bug) => (
+          <Link
+            key={bug.id}
+            to={`/${role}/bugs/${bug.id}`}
+            className="block min-w-0 rounded-xl border border-border/60 bg-background/70 p-4 hover:bg-muted/40"
+          >
+            <p className="font-semibold leading-snug text-foreground break-words">
+              {bug.title}
+            </p>
+            <div className="mt-3 flex min-w-0 flex-wrap items-center gap-2">
+              <Badge className={cn("rounded-xl border-0 capitalize", priorityBadgeClass(bug.priority))}>
+                {bug.priority}
+              </Badge>
+              <span className="text-sm capitalize text-muted-foreground">
+                {String(bug.status).replace(/_/g, " ")}
+              </span>
+            </div>
+            <p className="mt-2 truncate text-xs text-muted-foreground">
+              {bug.project_name || "—"}
+            </p>
+          </Link>
+        ))}
+      </div>
+
+      <div className="hidden overflow-x-auto md:block">
         <Table>
           <TableHeader>
             <TableRow className="bg-gray-50/80 dark:bg-gray-800/50">

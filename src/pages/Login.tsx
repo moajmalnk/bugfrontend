@@ -10,6 +10,13 @@ import {
 } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { toast } from "@/components/ui/use-toast";
 import { useAuth } from "@/context/AuthContext";
 import { API_BASE_URL } from "@/lib/env";
@@ -1684,18 +1691,24 @@ const Login = () => {
                       <User className="h-4 w-4" />
                       Role
                     </Label>
-                    <select
-                      id="role"
-                      className="w-full h-11 sm:h-12 text-sm border-2 border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-800 text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-slate-500 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-blue-500/20 focus-visible:border-blue-500 disabled:cursor-not-allowed disabled:opacity-50 rounded-lg sm:rounded-xl px-3 sm:px-4 transition-all duration-300"
-                      value={role}
-                      onChange={(e) => setRole(e.target.value)}
-                      required
-                      disabled
-                    >
-                      <option value="tester">Tester</option>
-                      <option value="developer">Developer</option>
-                      <option value="admin">Admin</option>
-                    </select>
+                    <Select value={role} onValueChange={setRole} disabled>
+                      <SelectTrigger
+                        id="role"
+                        className="h-11 sm:h-12 text-sm border-2 border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-800 text-slate-900 dark:text-white rounded-lg sm:rounded-xl px-3 sm:px-4"
+                        aria-label="Role"
+                      >
+                        <SelectValue placeholder="Select role" />
+                      </SelectTrigger>
+                      <SelectContent
+                        position="popper"
+                        className="z-[100] rounded-xl"
+                        searchable={false}
+                      >
+                        <SelectItem value="tester">Tester</SelectItem>
+                        <SelectItem value="developer">Developer</SelectItem>
+                        <SelectItem value="admin">Admin</SelectItem>
+                      </SelectContent>
+                    </Select>
                   </div>
 
                   <Alert className="bg-gradient-to-r from-amber-50 to-orange-50 dark:from-amber-900/20 dark:to-orange-900/20 border-2 border-amber-200 dark:border-amber-800 rounded-lg sm:rounded-xl shadow-lg">

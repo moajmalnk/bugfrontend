@@ -1,4 +1,6 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import { ItemsPerPageSelect } from "@/components/pagination/ItemsPerPageSelect";
+import { PageJumpSelect } from "@/components/pagination/PageJumpSelect";
 import { Button } from '@/components/ui/button';
 import {
   Select,
@@ -736,38 +738,11 @@ const Activity = () => {
                       >
                         Items per page:
                       </label>
-                      <div className="relative group">
-                        <select
-                          id="items-per-page"
-                          value={itemsPerPage}
-                          onChange={(e) =>
-                            setItemsPerPage(Number(e.target.value))
-                          }
-                          className="appearance-none border border-border/60 rounded-lg px-4 py-2.5 text-sm bg-background/80 focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary/50 transition-all duration-200 min-w-[90px] font-medium group-hover:border-primary/40 group-hover:bg-background/90"
-                          aria-label="Items per page"
-                        >
-                          {[10, 25, 50].map((n) => (
-                            <option key={n} value={n}>
-                              {n}
-                            </option>
-                          ))}
-                        </select>
-                        <div className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none transition-transform duration-200 group-hover:scale-110">
-                          <svg
-                            className="w-4 h-4 text-muted-foreground group-hover:text-primary/70"
-                            fill="none"
-                            stroke="currentColor"
-                            viewBox="0 0 24 24"
-                          >
-                            <path
-                              strokeLinecap="round"
-                              strokeLinejoin="round"
-                              strokeWidth={2}
-                              d="M19 9l-7 7-7-7"
-                            />
-                          </svg>
-                        </div>
-                      </div>
+                      <ItemsPerPageSelect
+                        id="items-per-page"
+                        value={itemsPerPage}
+                        onChange={setItemsPerPage}
+                      />
                     </div>
                   </div>
 
@@ -883,28 +858,12 @@ const Activity = () => {
                         )}
 
                         {/* Mobile-friendly page selector */}
-                        <div className="md:hidden flex items-center gap-3 bg-gradient-to-r from-muted/20 to-muted/30 rounded-lg px-3 py-2 border border-border/30 hover:border-primary/30 transition-all duration-200">
-                          <select
-                            value={currentPage}
-                            onChange={(e) =>
-                              setCurrentPage(Number(e.target.value))
-                            }
-                            className="border-0 bg-transparent text-sm font-semibold text-primary focus:outline-none focus:ring-0 min-w-[50px] cursor-pointer hover:text-primary/80 transition-colors duration-200"
-                            aria-label="Go to page"
-                          >
-                            {Array.from({ length: totalPages }, (_, i) => (
-                              <option key={i + 1} value={i + 1}>
-                                {i + 1}
-                              </option>
-                            ))}
-                          </select>
-                          <span className="text-sm text-muted-foreground font-medium">
-                            {" "}
-                            <span className="text-primary font-semibold bg-gradient-to-r from-primary to-primary/80 bg-clip-text text-transparent">
-                              {totalPages}
-                            </span>
-                          </span>
-                        </div>
+                        <PageJumpSelect
+                          className="md:hidden"
+                          currentPage={currentPage}
+                          totalPages={totalPages}
+                          onPageChange={setCurrentPage}
+                        />
                       </div>
 
                       {/* Next Button */}
@@ -971,38 +930,11 @@ const Activity = () => {
                     >
                       Items per page:
                     </label>
-                    <div className="relative group">
-                      <select
-                        id="items-per-page-simple"
-                        value={itemsPerPage}
-                        onChange={(e) =>
-                          setItemsPerPage(Number(e.target.value))
-                        }
-                        className="appearance-none border border-border/60 rounded-lg px-4 py-2.5 text-sm bg-background/80 focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary/50 transition-all duration-200 min-w-[90px] font-medium group-hover:border-primary/40 group-hover:bg-background/90"
-                        aria-label="Items per page"
-                      >
-                        {[10, 25, 50].map((n) => (
-                          <option key={n} value={n}>
-                            {n}
-                          </option>
-                        ))}
-                      </select>
-                      <div className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none transition-transform duration-200 group-hover:scale-110">
-                        <svg
-                          className="w-4 h-4 text-muted-foreground group-hover:text-primary/70"
-                          fill="none"
-                          stroke="currentColor"
-                          viewBox="0 0 24 24"
-                        >
-                          <path
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                            strokeWidth={2}
-                            d="M19 9l-7 7-7-7"
-                          />
-                        </svg>
-                      </div>
-                    </div>
+                    <ItemsPerPageSelect
+                      id="items-per-page-simple"
+                      value={itemsPerPage}
+                      onChange={setItemsPerPage}
+                    />
                   </div>
                 </div>
               )}

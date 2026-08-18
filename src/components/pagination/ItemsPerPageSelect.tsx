@@ -59,7 +59,7 @@ export function ItemsPerPageSelect({
         >
           <SelectValue placeholder={String(options[0])} />
         </SelectTrigger>
-        <SelectContent position="popper" className="z-[100]">
+        <SelectContent position="popper" className="z-[100] rounded-xl" searchable={false}>
           {options.map((n) => (
             <SelectItem key={n} value={String(n)}>
               {n}

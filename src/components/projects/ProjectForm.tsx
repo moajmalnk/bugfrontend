@@ -714,7 +714,10 @@ export function ProjectForm({
                             QA {complianceSummary.tester_verified}/{complianceSummary.tester_total}
                           </span>
                           <span className="rounded-full bg-violet-100 dark:bg-violet-900/30 text-violet-700 dark:text-violet-300 px-2 py-1">
-                            Project {complianceSummary.project_verified}/{complianceSummary.project_total}
+                            Admin{" "}
+                            {isCompliancePipelineSatisfied(complianceSummary)
+                              ? "Verified"
+                              : "Not verified"}
                           </span>
                         </div>
                       </div>

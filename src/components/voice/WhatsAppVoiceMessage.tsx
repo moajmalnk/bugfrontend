@@ -1,13 +1,15 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, type MouseEvent } from "react";
 import { Play, Pause, Download, Volume2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { probeAudioDuration } from "@/components/voice/probeAudioDuration";
+import { triggerBlobDownload } from "@/lib/attachmentUtils";
 
 export interface WhatsAppVoiceMessageProps {
   id: string;
   audioSource: string | Blob;
   duration?: number;
+  fileName?: string;
   onDownload?: () => void;
   onRemove?: () => void;
   accent?: "sent" | "received";
@@ -52,6 +54,7 @@ export function WhatsAppVoiceMessage({
   id,
   audioSource,
   duration = 0,
+  fileName,
   onDownload,
   onRemove,
   accent = "received",
@@ -389,6 +392,25 @@ export function WhatsAppVoiceMessage({
     }
   };
 
+  const handleDownload = async (event: MouseEvent) => {
+    event.preventDefault();
+    event.stopPropagation();
+    const name = fileName || `voice-note-${id}.webm`;
+    try {
+      if (audioSource instanceof Blob) {
+        await triggerBlobDownload(audioSource, name);
+        return;
+      }
+      if (audioUrl) {
+        await triggerBlobDownload(audioUrl, name);
+        return;
+      }
+      onDownload?.();
+    } catch {
+      onDownload?.();
+    }
+  };
+
   const cycleSpeed = () => {
     setSpeedIndex((prev) => (prev + 1) % SPEED_STEPS.length);
   };
@@ -507,18 +529,18 @@ export function WhatsAppVoiceMessage({
   return (
     <div
       className={cn(
-        "flex w-full max-w-full items-end gap-2",
+        "flex w-full min-w-0 max-w-full items-end gap-1.5 sm:gap-2",
         accent === "sent" ? "justify-end" : "justify-start"
       )}
     >
       {accent === "received" && (
-        <div className="flex h-8 w-8 items-center justify-center rounded-full bg-emerald-500 text-white shadow">
-          <Volume2 className="h-4 w-4" />
+        <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-emerald-500 text-white shadow sm:h-8 sm:w-8">
+          <Volume2 className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
         </div>
       )}
       <div
         className={cn(
-          "flex w-full max-w-full items-center gap-3 rounded-3xl px-3 py-2 shadow-sm sm:max-w-[360px]",
+          "flex min-w-0 flex-1 items-center gap-2 rounded-2xl px-2 py-2 shadow-sm sm:max-w-[360px] sm:gap-3 sm:rounded-3xl sm:px-3",
           accent === "sent"
             ? "bg-emerald-500 text-white"
             : "bg-white text-slate-900 dark:bg-slate-800 dark:text-white"
@@ -534,7 +556,7 @@ export function WhatsAppVoiceMessage({
           }}
           disabled={!audioUrl}
           className={cn(
-            "h-10 w-10 rounded-full border border-white/20 bg-white/10 text-current backdrop-blur transition hover:bg-white/20",
+            "h-9 w-9 shrink-0 rounded-full border border-white/20 bg-white/10 text-current backdrop-blur transition hover:bg-white/20 sm:h-10 sm:w-10",
             accent === "received" &&
               "border-transparent bg-emerald-500/10 text-emerald-500 hover:bg-emerald-500/20",
             isPlaying && "ring-2 ring-white/40 dark:ring-emerald-400/60",
@@ -549,7 +571,7 @@ export function WhatsAppVoiceMessage({
           )}
         </Button>
 
-        <div className="flex-1 min-w-0">
+        <div className="min-w-0 flex-1 overflow-hidden">
           <div className="flex items-center justify-between text-[11px] uppercase tracking-wide">
             <span className="font-semibold tabular-nums">
               {displayCurrentTime}
@@ -609,13 +631,13 @@ export function WhatsAppVoiceMessage({
             </div>
           </div>
           {loadError && (
-            <p className="mt-2 text-[11px] font-medium text-red-500 dark:text-red-300">
+            <p className="mt-2 break-words text-[11px] font-medium leading-tight text-red-500 dark:text-red-300">
               {loadError}
             </p>
           )}
         </div>
 
-        <div className="flex flex-col items-end gap-1">
+        <div className="flex shrink-0 flex-col items-end gap-1">
           <Button
             type="button"
             size="sm"
@@ -623,7 +645,7 @@ export function WhatsAppVoiceMessage({
             onClick={cycleSpeed}
             disabled={!audioUrl}
             className={cn(
-              "h-7 rounded-full border border-white/30 bg-white/10 px-3 text-[11px] font-semibold uppercase tracking-wide hover:bg-white/20",
+              "h-7 rounded-full border border-white/30 bg-white/10 px-2 text-[11px] font-semibold uppercase tracking-wide hover:bg-white/20 sm:px-3",
               accent === "received" &&
                 "border-emerald-500/30 bg-emerald-500/10 text-emerald-600 hover:bg-emerald-500/20",
               !audioUrl && "opacity-60"
@@ -632,11 +654,14 @@ export function WhatsAppVoiceMessage({
             {`${SPEED_STEPS[speedIndex]}`.replace(/\.0$/, "")}x
           </Button>
           <div className="flex items-center gap-1">
-            {onDownload && (
+            {(onDownload || audioUrl) && (
               <Button
+                type="button"
                 size="icon"
                 variant="ghost"
-                onClick={onDownload}
+                onClick={(event) => {
+                  void handleDownload(event);
+                }}
                 className={cn(
                   "h-7 w-7 rounded-full border border-transparent bg-white/10 text-current hover:bg-white/20",
                   accent === "received" &&

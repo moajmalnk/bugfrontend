@@ -1050,7 +1050,7 @@ const BugDetails = () => {
               updateBugStatus={handleStatusUpdate}
               formattedUpdatedDate={formattedUpdatedDate}
             />
-            <BugLifecycleCard bugId={bug.id} />
+            <BugLifecycleCard bugId={bug.id} bug={bug} />
           </section>
         </div>
       </section>

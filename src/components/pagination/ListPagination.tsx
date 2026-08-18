@@ -1,6 +1,7 @@
 import { Button } from "@/components/ui/button";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { ItemsPerPageSelect } from "./ItemsPerPageSelect";
+import { PageJumpSelect } from "./PageJumpSelect";
 import { cn } from "@/lib/utils";
 
 export interface ListPaginationProps {
@@ -137,23 +138,12 @@ export function ListPagination({
               )}
             </div>
 
-            <div className="md:hidden">
-              <label className="sr-only" htmlFor="page-select">
-                Go to page
-              </label>
-              <select
-                id="page-select"
-                value={currentPage}
-                onChange={(e) => onPageChange(Number(e.target.value))}
-                className="h-9 rounded-lg border border-border bg-background px-2 text-sm font-medium"
-              >
-                {Array.from({ length: safeTotalPages }, (_, i) => i + 1).map((p) => (
-                  <option key={p} value={p}>
-                    Page {p}
-                  </option>
-                ))}
-              </select>
-            </div>
+            <PageJumpSelect
+              className="md:hidden"
+              currentPage={currentPage}
+              totalPages={safeTotalPages}
+              onPageChange={(page) => onPageChange(page)}
+            />
 
             <Button
               variant="outline"

@@ -627,7 +627,59 @@ function DeadlineTable({
 
   return (
     <div className={cn(PANEL, "overflow-hidden")}>
-      <div className="overflow-x-auto">
+      <div className="flex flex-col gap-3 p-3 md:hidden">
+        {rows.map((row) => (
+          <Link
+            key={row.project.id}
+            to={`/${role}/projects/${row.project.id}`}
+            className="block min-w-0 rounded-xl border border-border/60 bg-background/70 p-4 hover:bg-muted/40"
+          >
+            <div className="flex min-w-0 items-start justify-between gap-3">
+              <div className="min-w-0">
+                <p className="truncate font-semibold text-foreground">{row.project.name}</p>
+                {row.project.client_name ? (
+                  <p className="mt-0.5 truncate text-xs text-muted-foreground">
+                    {row.project.client_name}
+                  </p>
+                ) : null}
+              </div>
+              <Badge className={cn("shrink-0 rounded-xl border-0", statusBadgeClass(row.project.status))}>
+                {getProjectStatusLabel(row.project.status)}
+              </Badge>
+            </div>
+            <div className="mt-3 grid grid-cols-12 gap-3">
+              <div className="col-span-7 min-w-0">
+                <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+                  Deadline
+                </p>
+                <p className={cn("mt-0.5 text-sm font-medium", deadlineTone(row.bucket))}>
+                  {formatProjectDate(row.project.deadline_date)}
+                </p>
+                <p className={cn("text-xs", deadlineTone(row.bucket))}>
+                  {deadlineLabel(row.bucket, row.daysUntil)}
+                </p>
+              </div>
+              <div className="col-span-5 min-w-0 text-right">
+                <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+                  Open bugs
+                </p>
+                <p
+                  className={cn(
+                    "mt-0.5 text-sm tabular-nums font-semibold",
+                    row.openBugs > 0 ? "text-amber-600 dark:text-amber-400" : "text-foreground"
+                  )}
+                >
+                  {row.openBugs}
+                </p>
+                {row.highBugs > 0 ? (
+                  <p className="text-xs text-red-600 dark:text-red-400">{row.highBugs} high</p>
+                ) : null}
+              </div>
+            </div>
+          </Link>
+        ))}
+      </div>
+      <div className="hidden overflow-x-auto md:block">
       <Table>
         <TableHeader>
           <TableRow className="bg-gray-50/80 dark:bg-gray-800/50 hover:bg-gray-50/80 dark:hover:bg-gray-800/50">
@@ -2938,7 +2990,65 @@ export default function AdminDashboard() {
                     }
                   />
                   <div className={cn(PANEL, "overflow-hidden")}>
-                    <div className="overflow-x-auto">
+                    <div className="flex flex-col gap-3 p-3 md:hidden">
+                      {data.projectHealthRows.length === 0 ? (
+                        <p className="py-8 text-center text-sm text-muted-foreground">
+                          No ongoing projects to show.
+                        </p>
+                      ) : (
+                        data.projectHealthRows.map((row) => (
+                          <Link
+                            key={row.project.id}
+                            to={`/${role}/projects/${row.project.id}`}
+                            className="block min-w-0 rounded-xl border border-border/60 bg-background/70 p-4 hover:bg-muted/40"
+                          >
+                            <div className="flex min-w-0 items-start justify-between gap-3">
+                              <p className="min-w-0 truncate font-semibold text-foreground">
+                                {row.project.name}
+                              </p>
+                              <Badge className={cn("shrink-0 rounded-xl border-0", statusBadgeClass(row.project.status))}>
+                                {getProjectStatusLabel(row.project.status)}
+                              </Badge>
+                            </div>
+                            <div className="mt-2">
+                              <p className={cn("text-sm font-medium", deadlineTone(row.bucket))}>
+                                {row.deadline
+                                  ? formatProjectDate(row.project.deadline_date)
+                                  : "—"}
+                              </p>
+                              <p className={cn("text-xs", deadlineTone(row.bucket))}>
+                                {deadlineLabel(row.bucket, row.daysUntil)}
+                              </p>
+                            </div>
+                            <div className="mt-3 grid grid-cols-12 gap-2 text-center">
+                              <div className="col-span-3 min-w-0">
+                                <p className="text-[10px] uppercase text-muted-foreground">Open</p>
+                                <p className="text-sm font-semibold tabular-nums">{row.openBugs}</p>
+                              </div>
+                              <div className="col-span-3 min-w-0">
+                                <p className="text-[10px] uppercase text-muted-foreground">High</p>
+                                <p className="text-sm font-semibold tabular-nums text-red-600 dark:text-red-400">
+                                  {row.highBugs}
+                                </p>
+                              </div>
+                              <div className="col-span-3 min-w-0">
+                                <p className="text-[10px] uppercase text-muted-foreground">Fixed</p>
+                                <p className="text-sm font-semibold tabular-nums text-emerald-600 dark:text-emerald-400">
+                                  {row.fixedBugs}
+                                </p>
+                              </div>
+                              <div className="col-span-3 min-w-0">
+                                <p className="text-[10px] uppercase text-muted-foreground">Updates</p>
+                                <p className="text-sm font-semibold tabular-nums text-sky-600 dark:text-sky-400">
+                                  {row.updatesCount}
+                                </p>
+                              </div>
+                            </div>
+                          </Link>
+                        ))
+                      )}
+                    </div>
+                    <div className="hidden overflow-x-auto md:block">
                       <Table>
                         <TableHeader>
                           <TableRow className="bg-gray-50/80 dark:bg-gray-800/50 hover:bg-gray-50/80 dark:hover:bg-gray-800/50">

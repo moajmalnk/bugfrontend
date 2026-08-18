@@ -24,6 +24,9 @@ const OnboardingVerificationBanner = lazy(
 const BugBotFab = lazy(() =>
   import("@/components/bugbot/BugBotFab").then((m) => ({ default: m.BugBotFab }))
 );
+const ReportBugFab = lazy(() =>
+  import("@/components/bugs/ReportBugFab").then((m) => ({ default: m.ReportBugFab }))
+);
 
 interface MainLayoutProps {
   children: ReactNode;
@@ -267,6 +270,7 @@ export const MainLayout = ({ children }: MainLayoutProps) => {
         <AnnouncementPopup />
         <FeedbackWidget />
         <BugBotFab />
+        <ReportBugFab />
       </Suspense>
     </GlobalSearchProvider>
   );

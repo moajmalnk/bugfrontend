@@ -3,6 +3,7 @@ import {
   CommonBugCard,
 } from "@/components/bugs/BugCard";
 import { ItemsPerPageSelect } from "@/components/pagination/ItemsPerPageSelect";
+import { PageJumpSelect } from "@/components/pagination/PageJumpSelect";
 import { Button } from "@/components/ui/button";
 import {
   Drawer,
@@ -360,6 +361,12 @@ const CommonBugs = () => {
                 <span className="hidden sm:inline">Previous</span>
                 <span className="sm:hidden text-lg">‹</span>
               </Button>
+              <PageJumpSelect
+                className="sm:hidden"
+                currentPage={currentPage}
+                totalPages={totalPages}
+                onPageChange={setCurrentPage}
+              />
               <div className="hidden sm:flex items-center gap-2 text-sm text-muted-foreground font-medium">
                 Page{" "}
                 <span className="text-primary font-semibold">{currentPage}</span> of{" "}

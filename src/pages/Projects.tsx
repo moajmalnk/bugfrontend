@@ -1,4 +1,5 @@
 import { ItemsPerPageSelect } from "@/components/pagination/ItemsPerPageSelect";
+import { PageJumpSelect } from "@/components/pagination/PageJumpSelect";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -32,9 +33,13 @@ import { toast, useToast } from "@/components/ui/use-toast";
 import { useAuth } from "@/context/AuthContext";
 import { useUndoDelete } from "@/hooks/useUndoDelete";
 import { ENV } from "@/lib/env";
-import { CompliancePipelineStage, getPipelineStageLabel } from "@/lib/codo/complianceRules";
+import {
+  CompliancePipelineStage,
+  getPipelineStageLabel,
+  isCompliancePipelineSatisfied,
+} from "@/lib/codo/complianceRules";
 import { formatLocalDate } from "@/lib/utils/dateUtils";
-import { canReportBug } from "@/lib/utils";
+import { canReportBug, cn } from "@/lib/utils";
 import {
   getProjectStatusLabel,
   parseProjectPlatforms,
@@ -433,8 +438,7 @@ const Projects = () => {
           developerComplianceTotal: project.compliance?.developer_total ?? 0,
           testerComplianceVerified: project.compliance?.tester_verified ?? 0,
           testerComplianceTotal: project.compliance?.tester_total ?? 0,
-          adminComplianceVerified: project.compliance?.project_verified ?? 0,
-          adminComplianceTotal: project.compliance?.project_total ?? 0,
+          adminVerified: isCompliancePipelineSatisfied(project.compliance),
           complianceBypass: project.compliance?.emergency_bypass ?? false,
           developerComplianceCompleteAt: project.developer_compliance_complete_date
             ? formatLocalDate(project.developer_compliance_complete_date, "date")
@@ -714,8 +718,8 @@ const Projects = () => {
   };
 
   /**
-   * Why: Project cards show CODO checklist progress as verified/total so
-   * Developer, Tester, and Admin status is readable next to Updates counts.
+   * Why: Developer and Tester CODO checklists are item counts. Admin is a
+   * final lock (pipeline admin_ready or emergency bypass), not a ratio.
    */
   const renderComplianceCount = (
     verified: number | undefined,
@@ -725,6 +729,17 @@ const Projects = () => {
       return <Skeleton className="h-6 w-10" />;
     }
     return `${verified ?? 0}/${total ?? 0}`;
+  };
+
+  const renderAdminComplianceStatus = (
+    compliance: Parameters<typeof isCompliancePipelineSatisfied>[0]
+  ) => {
+    if (statsLoading) {
+      return <Skeleton className="h-6 w-16" />;
+    }
+    return isCompliancePipelineSatisfied(compliance)
+      ? "Verified"
+      : "Not verified";
   };
 
   // Undo delete functionality
@@ -1328,26 +1343,12 @@ const Projects = () => {
                   )}
 
                   {/* Mobile-friendly page selector */}
-                  <div className="md:hidden flex items-center gap-3 bg-gradient-to-r from-muted/20 to-muted/30 rounded-lg px-3 py-2 border border-border/30 hover:border-primary/30 transition-all duration-200">
-                    <select
-                      value={currentPage}
-                      onChange={(e) => setCurrentPage(Number(e.target.value))}
-                      className="border-0 bg-transparent text-sm font-semibold text-primary focus:outline-none focus:ring-0 min-w-[50px] cursor-pointer hover:text-primary/80 transition-colors duration-200"
-                      aria-label="Go to page"
-                    >
-                      {Array.from({ length: totalPages }, (_, i) => (
-                        <option key={i + 1} value={i + 1}>
-                          {i + 1}
-                        </option>
-                      ))}
-                    </select>
-                    <span className="text-sm text-muted-foreground font-medium">
-                      {" "}
-                      <span className="text-primary font-semibold bg-gradient-to-r from-primary to-primary/80 bg-clip-text text-transparent">
-                        {totalPages}
-                      </span>
-                    </span>
-                  </div>
+                  <PageJumpSelect
+                    className="md:hidden"
+                    currentPage={currentPage}
+                    totalPages={totalPages}
+                    onPageChange={setCurrentPage}
+                  />
                 </div>
 
                 {/* Next Button */}
@@ -1844,20 +1845,37 @@ const Projects = () => {
                           </span>
                         </div>
                         <div
-                          className="col-span-4 flex flex-col items-center justify-center min-h-[5rem] p-2 sm:p-3 rounded-xl bg-blue-50/70 dark:bg-blue-900/20 hover:bg-blue-100/80 dark:hover:bg-blue-900/30 transition-colors duration-200 text-center"
-                          title="Admin project compliance checks verified"
+                          className={cn(
+                            "col-span-4 flex flex-col items-center justify-center min-h-[5rem] p-2 sm:p-3 rounded-xl transition-colors duration-200 text-center",
+                            isCompliancePipelineSatisfied(project.compliance)
+                              ? "bg-blue-50/70 dark:bg-blue-900/20 hover:bg-blue-100/80 dark:hover:bg-blue-900/30"
+                              : "bg-slate-50/70 dark:bg-slate-900/20 hover:bg-slate-100/80 dark:hover:bg-slate-900/30"
+                          )}
+                          title={
+                            isCompliancePipelineSatisfied(project.compliance)
+                              ? project.compliance?.emergency_bypass
+                                ? "Admin verified via emergency bypass"
+                                : "Admin final lock is verified"
+                              : "Admin has not verified this project"
+                          }
                         >
                           <span className="text-xs sm:text-sm text-muted-foreground">
                             Admin
                           </span>
-                          <span className="font-semibold text-lg sm:text-xl text-blue-600 dark:text-blue-400">
-                            {renderComplianceCount(
-                              project.compliance?.project_verified,
-                              project.compliance?.project_total
+                          <span
+                            className={cn(
+                              "font-semibold text-sm sm:text-base leading-tight",
+                              isCompliancePipelineSatisfied(project.compliance)
+                                ? "text-blue-600 dark:text-blue-400"
+                                : "text-muted-foreground"
                             )}
+                          >
+                            {renderAdminComplianceStatus(project.compliance)}
                           </span>
                           <span className="text-[10px] sm:text-xs text-muted-foreground">
-                            Compliance
+                            {project.compliance?.emergency_bypass
+                              ? "Bypass"
+                              : "Status"}
                           </span>
                         </div>
                       </div>

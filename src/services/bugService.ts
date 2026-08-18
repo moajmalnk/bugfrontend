@@ -13,9 +13,13 @@ export interface BugLifecycleStep {
   is_current?: boolean;
   source?: string;
   actor_name?: string | null;
-  /** raised | fixed | reopened | status_changed */
+  /** raised | fixed | reopened | status_changed | converted | retested */
   event_label?: string | null;
   reason?: string | null;
+  kind?: "status" | "conversion" | "retest";
+  from_project_name?: string | null;
+  to_project_name?: string | null;
+  retest_label?: string | null;
 }
 
 export interface BugConversionEvent {

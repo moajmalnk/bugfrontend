@@ -1,9 +1,11 @@
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
+import { buildFullBugJourney, formatJourneyHeadline } from "@/lib/bugJourney";
 import { cn } from "@/lib/utils";
 import { formatLocalDate } from "@/lib/utils/dateUtils";
 import { bugService, type BugConversionEvent, type BugLifecycleStep } from "@/services/bugService";
+import { Bug as BugRecord } from "@/types";
 import { useQuery } from "@tanstack/react-query";
 import { motion } from "framer-motion";
 import type { LucideIcon } from "lucide-react";
@@ -12,6 +14,7 @@ import {
   Bug,
   CalendarClock,
   CheckCircle2,
+  ClipboardCheck,
   Clock3,
   Flag,
   Hourglass,
@@ -24,6 +27,7 @@ import {
 
 type BugLifecycleCardProps = {
   bugId: string;
+  bug?: BugRecord | null;
   className?: string;
 };
 
@@ -112,6 +116,26 @@ const STEP_VISUALS: Record<string, StepVisual> = {
     ring: "ring-amber-400/50",
     glow: "shadow-amber-500/30",
     path: "bg-amber-500",
+  },
+  converted: {
+    key: "converted",
+    label: "Converted",
+    Icon: ArrowRightLeft,
+    accent: "text-sky-600 dark:text-sky-300",
+    soft: "bg-sky-500/15 text-sky-800 dark:text-sky-200",
+    ring: "ring-sky-400/50",
+    glow: "shadow-sky-500/30",
+    path: "bg-sky-500",
+  },
+  retested: {
+    key: "retested",
+    label: "Retest",
+    Icon: ClipboardCheck,
+    accent: "text-cyan-600 dark:text-cyan-300",
+    soft: "bg-cyan-500/15 text-cyan-800 dark:text-cyan-200",
+    ring: "ring-cyan-400/50",
+    glow: "shadow-cyan-500/30",
+    path: "bg-cyan-500",
   },
   default: {
     key: "default",
@@ -214,13 +238,13 @@ function toneFromDuration(seconds: number | null | undefined): RatioTone {
 
 function getLifecycleShares(steps: BugLifecycleStep[], riseSeconds?: number | null) {
   if (!steps?.length) return [];
-  // Keep full reopen cycles (fixed → pending → fixed); only zero duration on
-  // the current closed step so the bar stays readable.
-  const lifecycle = steps.map((step) =>
-    step.is_current && CLOSED.has((step.status || "").toLowerCase())
-      ? { ...step, duration_seconds: 0 }
-      : step
-  );
+  const lifecycle = steps
+    .filter((step) => (step.kind || "status") === "status")
+    .map((step) =>
+      step.is_current && CLOSED.has((step.status || "").toLowerCase())
+        ? { ...step, duration_seconds: 0 }
+        : step
+    );
 
   const summed = lifecycle.reduce(
     (sum, step) => sum + Math.max(0, step.duration_seconds || 0),
@@ -336,10 +360,15 @@ function CycleShareBar({
 }
 
 function eventLabelForStep(step: BugLifecycleStep): string | null {
+  const kind = step.kind || "status";
+  if (kind === "conversion") return "Converted";
+  if (kind === "retest") return "Retest";
   const label = String(step.event_label || "").toLowerCase();
   if (label === "reopened") return "Reopened";
   if (label === "fixed") return "Fixed";
   if (label === "raised") return "Raised";
+  if (label === "converted") return "Converted";
+  if (label === "retested") return "Retest";
   const from = String(step.from_status || "").toLowerCase();
   const to = String(step.status || "").toLowerCase();
   if (CLOSED.has(from) && (to === "pending" || to === "in_progress")) {
@@ -352,6 +381,8 @@ function eventLabelForStep(step: BugLifecycleStep): string | null {
 
 function visualForStep(step: BugLifecycleStep): StepVisual {
   const eventLabel = eventLabelForStep(step)?.toLowerCase();
+  if (eventLabel === "converted") return STEP_VISUALS.converted;
+  if (eventLabel === "retest") return STEP_VISUALS.retested;
   if (eventLabel === "reopened") return STEP_VISUALS.reopened;
   if (eventLabel === "fixed") return STEP_VISUALS.fixed;
   if (eventLabel === "raised") return STEP_VISUALS.raised;
@@ -360,13 +391,7 @@ function visualForStep(step: BugLifecycleStep): StepVisual {
 }
 
 function stepHeadline(step: BugLifecycleStep, eventLabel: string | null): string {
-  if (eventLabel === "Reopened") return "Bug reopened";
-  if (eventLabel === "Fixed") return "Marked fixed";
-  if (eventLabel === "Raised") return "Bug raised";
-  if (step.from_status) {
-    return `${formatStatusLabel(step.from_status)} → ${formatStatusLabel(step.status)}`;
-  }
-  return formatStatusLabel(step.status);
+  return formatJourneyHeadline({ ...step, kind: step.kind || "status" });
 }
 
 function JourneyStepCard({
@@ -428,7 +453,21 @@ function JourneyStepCard({
           <p className="text-sm font-semibold text-foreground leading-snug">
             {stepHeadline(step, eventLabel)}
           </p>
-          {step.from_status ? (
+          {step.kind === "conversion" ? (
+            <div className="flex min-w-0 flex-wrap items-center gap-1.5">
+              <Badge variant="outline" className="max-w-full truncate">
+                {step.from_project_name || "Unknown"}
+              </Badge>
+              <ArrowRightLeft className="h-3 w-3 shrink-0 text-sky-600 dark:text-sky-400" />
+              <Badge variant="outline" className="max-w-full truncate">
+                {step.to_project_name || "Unknown"}
+              </Badge>
+            </div>
+          ) : step.kind === "retest" ? (
+            <Badge variant="outline" className="h-5 rounded-full px-2 text-[10px] font-semibold">
+              {step.retest_label || "Retest recorded"}
+            </Badge>
+          ) : step.from_status ? (
             <div className="flex flex-wrap items-center gap-1.5">
               <StatusBadge status={step.from_status} />
               <span className="text-[11px] text-muted-foreground">→</span>
@@ -670,15 +709,21 @@ function ConversionHistory({ events }: { events: BugConversionEvent[] }) {
   );
 }
 
-export function BugLifecycleCard({ bugId, className }: BugLifecycleCardProps) {
+export function BugLifecycleCard({ bugId, bug, className }: BugLifecycleCardProps) {
   const { data, isLoading, isError, error } = useQuery({
     queryKey: ["bugLifecycle", bugId],
     queryFn: () => bugService.getBugLifecycle(bugId),
     enabled: !!bugId,
   });
 
+  const journey = buildFullBugJourney(
+    data?.status_timeline,
+    data?.conversion_history,
+    bug
+  );
+
   const shares = data
-    ? getLifecycleShares(data.status_timeline || [], data.rise_duration_seconds)
+    ? getLifecycleShares(journey, data.rise_duration_seconds)
     : [];
 
   return (
@@ -845,16 +890,16 @@ export function BugLifecycleCard({ bugId, className }: BugLifecycleCardProps) {
                     Status journey
                   </p>
                   <p className="mt-0.5 text-xs text-muted-foreground">
-                    Follow raised → fixed → reopened → fixed again along the path
+                    Raised, conversions, retests, and every status change on the path
                   </p>
                 </div>
                 <Badge variant="outline" className="h-5 rounded-full px-2 text-[10px] tabular-nums">
-                  {(data.status_timeline || []).length} step
-                  {(data.status_timeline || []).length === 1 ? "" : "s"}
+                  {journey.length} step
+                  {journey.length === 1 ? "" : "s"}
                 </Badge>
               </div>
               <StatusTimeline
-                steps={data.status_timeline || []}
+                steps={journey}
                 riseSeconds={data.rise_duration_seconds}
               />
             </div>

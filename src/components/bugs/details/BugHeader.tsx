@@ -8,16 +8,17 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { toast } from "@/components/ui/use-toast";
 import { useAuth } from "@/context/AuthContext";
 import { generateShareableUrl, getEffectiveRole } from "@/lib/utils";
+import { buildFullBugJourney, formatBugJourneyMessage } from "@/lib/bugJourney";
 import { bugService } from "@/services/bugService";
 import { Bug } from "@/types";
 import { useUndoDelete } from "@/hooks/useUndoDelete";
 import { UndoDeleteNotificationPortal } from "@/components/ui/UndoDeleteNotification";
 import { prefetchFixBugPage } from "@/utils/prefetchFixBug";
 import { ArrowRightLeft, CheckSquare, ChevronLeft, Edit2, Share2, Trash2 } from "lucide-react";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { createPortal } from "react-dom";
 import { useLocation, useNavigate } from "react-router-dom";
-import { useQueryClient } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 
 const UNDO_DELETE_DURATION = 10;
 
@@ -61,6 +62,24 @@ export const BugHeader = ({
       currentUser?.role === "developer" ||
       currentUser?.role === "tester") &&
     bug.status !== "declined";
+
+  const { data: lifecycle } = useQuery({
+    queryKey: ["bugLifecycle", bug.id],
+    queryFn: () => bugService.getBugLifecycle(bug.id),
+    enabled: !!bug.id,
+    staleTime: 30_000,
+  });
+  const statusJourneyText = useMemo(
+    () =>
+      formatBugJourneyMessage(
+        buildFullBugJourney(
+          lifecycle?.status_timeline,
+          lifecycle?.conversion_history,
+          bug
+        )
+      ),
+    [lifecycle?.status_timeline, lifecycle?.conversion_history, bug]
+  );
 
   const searchParams = new URLSearchParams(location.search);
   const fromParam = searchParams.get("from");
@@ -142,7 +161,13 @@ export const BugHeader = ({
 
   const handleShare = async () => {
     const roleNeutralUrl = generateRoleNeutralUrl();
-    const shareText = `Check out this bug: ${bug.title}\n${roleNeutralUrl}`;
+    const shareText = [
+      `Check out this bug: ${bug.title}`,
+      statusJourneyText,
+      roleNeutralUrl,
+    ]
+      .filter(Boolean)
+      .join("\n\n");
 
     // Try Web Share API first
     if (navigator.share) {
@@ -415,6 +440,7 @@ export const BugHeader = ({
                 projectName: bug.project_name || bug.project_id,
                 bugLevel: bug.bug_level,
                 alreadyRaised: bug.already_raised,
+                statusJourneyText,
               }}
               type={bug.status === "fixed" ? "status_update" : "new_bug"}
               variant="outline"

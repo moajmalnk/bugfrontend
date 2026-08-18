@@ -1,6 +1,13 @@
 import { useEffect, useMemo, useRef, useState, useCallback } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { joinMeeting, leaveMeeting } from "@/services/meetings";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { WS_URL } from "@/lib/env";
@@ -2250,36 +2257,58 @@ export default function MeetRoom() {
                       <div className="space-y-4">
                         <div>
                           <label className="block text-sm font-medium text-gray-300 mb-2">Camera</label>
-                          <select
-                            value={selectedVideoDevice}
-                            onChange={(e) => switchVideoDevice(e.target.value)}
-                            className="w-full bg-gray-700/50 border border-gray-600 rounded-lg px-3 py-2 text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200"
+                          <Select
+                            value={selectedVideoDevice || undefined}
+                            onValueChange={switchVideoDevice}
                           >
-                            {availableDevices
-                              .filter(device => device.kind === 'videoinput')
-                              .map(device => (
-                                <option key={device.deviceId} value={device.deviceId}>
-                                  {device.label || `Camera ${device.deviceId.slice(0, 8)}`}
-                                </option>
-                              ))}
-                          </select>
+                            <SelectTrigger
+                              className="w-full h-10 rounded-xl bg-gray-700/50 border-gray-600 text-white"
+                              aria-label="Camera"
+                            >
+                              <SelectValue placeholder="Select camera" />
+                            </SelectTrigger>
+                            <SelectContent
+                              position="popper"
+                              className="z-[200] rounded-xl"
+                              searchable={false}
+                            >
+                              {availableDevices
+                                .filter((device) => device.kind === "videoinput" && device.deviceId)
+                                .map((device) => (
+                                  <SelectItem key={device.deviceId} value={device.deviceId}>
+                                    {device.label || `Camera ${device.deviceId.slice(0, 8)}`}
+                                  </SelectItem>
+                                ))}
+                            </SelectContent>
+                          </Select>
                         </div>
                         
                         <div>
                           <label className="block text-sm font-medium text-gray-300 mb-2">Microphone</label>
-                          <select
-                            value={selectedAudioDevice}
-                            onChange={(e) => switchAudioDevice(e.target.value)}
-                            className="w-full bg-gray-700/50 border border-gray-600 rounded-lg px-3 py-2 text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200"
+                          <Select
+                            value={selectedAudioDevice || undefined}
+                            onValueChange={switchAudioDevice}
                           >
-                            {availableDevices
-                              .filter(device => device.kind === 'audioinput')
-                              .map(device => (
-                                <option key={device.deviceId} value={device.deviceId}>
-                                  {device.label || `Microphone ${device.deviceId.slice(0, 8)}`}
-                                </option>
-                              ))}
-                          </select>
+                            <SelectTrigger
+                              className="w-full h-10 rounded-xl bg-gray-700/50 border-gray-600 text-white"
+                              aria-label="Microphone"
+                            >
+                              <SelectValue placeholder="Select microphone" />
+                            </SelectTrigger>
+                            <SelectContent
+                              position="popper"
+                              className="z-[200] rounded-xl"
+                              searchable={false}
+                            >
+                              {availableDevices
+                                .filter((device) => device.kind === "audioinput" && device.deviceId)
+                                .map((device) => (
+                                  <SelectItem key={device.deviceId} value={device.deviceId}>
+                                    {device.label || `Microphone ${device.deviceId.slice(0, 8)}`}
+                                  </SelectItem>
+                                ))}
+                            </SelectContent>
+                          </Select>
                         </div>
                         
                         {/* Audio Processing Settings */}

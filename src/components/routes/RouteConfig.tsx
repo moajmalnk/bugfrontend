@@ -77,6 +77,7 @@ const BugDetailsDiagnostic = lazy(() =>
   })
 );
 const NewBug = lazy(() => import("@/pages/NewBug"));
+const TesterReportBug = lazy(() => import("@/pages/TesterReportBug"));
 const Activity = lazy(() => import("@/pages/Activity"));
 const Users = lazy(() => import("@/pages/Users"));
 const Clients = lazy(() => import("@/pages/Clients"));
@@ -321,6 +322,7 @@ const RouteConfig = () => {
 
       {/* Role-neutral deep links for push notifications */}
       <Route path="/bugs/new" element={<RolePathRedirect suffix="bugs/new" />} />
+      <Route path="/bugs/report" element={<RolePathRedirect suffix="bugs/report" />} />
       <Route path="/bugs/:bugId" element={<BugRedirect />} />
       <Route path="/updates/:updateId" element={<UpdateRedirect />} />
       <Route path="/projects/:projectId" element={<ProjectRedirect />} />
@@ -373,6 +375,7 @@ const RouteConfig = () => {
           <Route path="document" element={<DocumentPreviewPage />} />
           <Route path="bugs" element={<Bugs />} />
           <Route path="bugs/new" element={<NewBug />} />
+          <Route path="bugs/report" element={<TesterReportBug />} />
           {/* More specific routes must come BEFORE the general bugs/:bugId route */}
           <Route path="bugs/:bugId/diagnostic" element={<BugDetailsDiagnostic />} />
           <Route path="bugs/:bugId/fix" element={<FixBug />} />

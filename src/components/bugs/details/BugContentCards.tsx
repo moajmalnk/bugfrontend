@@ -9,11 +9,8 @@ import {
 } from "@/components/ui/dialog";
 import { DocumentPreviewBody } from "@/components/attachments/DocumentPreviewBody";
 import { ScreenshotViewer } from "@/components/ui/ScreenshotViewer";
-import {
-  formatRetestSummary,
-  TesterVerificationPanel,
-  triState,
-} from "@/components/bugs/details/TesterVerificationPanel";
+import { formatRetestSummary, TesterVerificationPanel, triState } from "@/components/bugs/details/TesterVerificationPanel";
+import { buildFullBugJourney } from "@/lib/bugJourney";
 import { formatDetailedDate } from "@/lib/dateUtils";
 import {
   alreadyRaisedBadgeClass,
@@ -28,6 +25,7 @@ import { MalayalamVoiceToolbar } from "@/components/ui/MalayalamVoiceToolbar";
 import { useMalayalamToggle } from "@/hooks/useMalayalamToggle";
 import { Bug } from "@/types";
 import { ENV } from "@/lib/env";
+import { downloadAttachmentFile } from "@/lib/attachmentUtils";
 import { WhatsAppVoiceMessage } from "@/components/voice/WhatsAppVoiceMessage";
 import { cn } from "@/lib/utils";
 import { formatLocalDate } from "@/lib/utils/dateUtils";
@@ -75,8 +73,13 @@ export function BugContentCards({ bug, onBugUpdated }: BugContentCardsProps) {
   });
   const conversionHistory = lifecycle?.conversion_history || [];
   const statusHistory = useMemo(
-    () => lifecycle?.status_timeline || [],
-    [lifecycle?.status_timeline]
+    () =>
+      buildFullBugJourney(
+        lifecycle?.status_timeline,
+        lifecycle?.conversion_history,
+        bug
+      ),
+    [lifecycle?.status_timeline, lifecycle?.conversion_history, bug]
   );
 
   const handleBugUpdated = (updated: Bug) => {
@@ -204,12 +207,11 @@ export function BugContentCards({ bug, onBugUpdated }: BugContentCardsProps) {
     file_path: string;
     file_name?: string;
   }) => {
-    const link = document.createElement("a");
-    link.href = buildDownloadUrl(attachment.file_path, attachment.file_name);
-    link.download = attachment.file_name || "attachment";
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+    void downloadAttachmentFile(
+      attachment.file_path,
+      attachment.file_name || "attachment",
+      bug.id
+    );
   };
 
   const openAttachmentPreview = (attachment: {
@@ -508,7 +510,7 @@ export function BugContentCards({ bug, onBugUpdated }: BugContentCardsProps) {
 
       {/* Voice Notes Card */}
       {voiceNotes.length > 0 && (
-        <Card className="relative overflow-hidden rounded-2xl border border-gray-200/60 dark:border-gray-800/60 bg-white/80 dark:bg-gray-900/80 backdrop-blur-sm">
+        <Card className="relative min-w-0 overflow-hidden rounded-2xl border border-gray-200/60 dark:border-gray-800/60 bg-white/80 dark:bg-gray-900/80 backdrop-blur-sm">
           <div className="pointer-events-none absolute inset-0 bg-gradient-to-br from-orange-50/30 via-transparent to-red-50/30 dark:from-orange-950/10 dark:via-transparent dark:to-red-950/10" />
           <CardHeader className="relative">
             <CardTitle className="flex items-center gap-2">
@@ -516,8 +518,8 @@ export function BugContentCards({ bug, onBugUpdated }: BugContentCardsProps) {
               Voice Notes ({voiceNotes.length})
             </CardTitle>
           </CardHeader>
-          <CardContent className="relative">
-            <div className="space-y-3">
+          <CardContent className="relative min-w-0 p-4 sm:p-6">
+            <div className="flex min-w-0 flex-col gap-3">
               {voiceNotes.map((attachment) => {
                 const audioUrl = buildAudioUrl(attachment.file_path);
                 const duration =
@@ -534,12 +536,13 @@ export function BugContentCards({ bug, onBugUpdated }: BugContentCardsProps) {
                 return (
                   <div
                     key={attachment.id}
-                    className="rounded-xl border border-purple-100 dark:border-purple-900/50 bg-purple-50/40 dark:bg-purple-900/20 p-3"
+                    className="min-w-0 overflow-hidden rounded-xl border border-purple-100 dark:border-purple-900/50 bg-purple-50/40 dark:bg-purple-900/20 p-2 sm:p-3"
                   >
                     <WhatsAppVoiceMessage
                       id={voiceId}
                       audioSource={audioUrl}
                       duration={duration}
+                      fileName={attachment.file_name || "voice-note.webm"}
                       accent="received"
                       autoPlay
                       isActive={activeVoiceId === voiceId}
@@ -813,7 +816,7 @@ export function BugContentCards({ bug, onBugUpdated }: BugContentCardsProps) {
               <div className="flex items-center gap-2">
                 <History className="h-4 w-4 text-muted-foreground" />
                 <span className="text-sm font-semibold text-foreground">
-                  Status history
+                  Status journey
                 </span>
                 <Badge
                   variant="outline"
@@ -824,63 +827,93 @@ export function BugContentCards({ bug, onBugUpdated }: BugContentCardsProps) {
               </div>
               <ol className="relative ml-1.5 flex flex-col gap-3 border-l border-border/70 pl-4">
                 {statusHistory.map((step, index) => {
+                  const kind = step.kind || "status";
                   const label = String(step.event_label || "").toLowerCase();
                   const from = String(step.from_status || "").toLowerCase();
                   const to = String(step.status || "").toLowerCase();
                   const closed = new Set(["fixed", "declined", "rejected"]);
                   const eventLabel =
-                    label === "reopened" ||
-                    (closed.has(from) && (to === "pending" || to === "in_progress"))
-                      ? "Reopened"
-                      : label === "fixed" || (to === "fixed" && !!from)
-                        ? "Fixed"
-                        : label === "raised" || !from
-                          ? "Raised"
-                          : null;
+                    kind === "conversion"
+                      ? "Converted"
+                      : kind === "retest"
+                        ? "Retest"
+                      : label === "reopened" ||
+                          (closed.has(from) && (to === "pending" || to === "in_progress"))
+                        ? "Reopened"
+                        : label === "fixed" || (to === "fixed" && !!from)
+                          ? "Fixed"
+                          : label === "raised" || !from
+                            ? "Raised"
+                            : null;
                   const isReopen = eventLabel === "Reopened";
 
                   return (
                     <li
-                      key={`${step.status}-${step.entered_at || index}-${index}`}
+                      key={`${step.kind || "status"}-${step.status}-${step.entered_at || index}-${index}`}
                       className="relative min-w-0"
                     >
                       <span
                         className={cn(
                           "absolute -left-[21px] top-1.5 h-2.5 w-2.5 rounded-full border-2 border-background",
-                          isReopen
-                            ? "bg-orange-500"
-                            : step.is_current
-                              ? "bg-primary"
-                              : eventLabel === "Fixed"
-                                ? "bg-emerald-500"
-                                : "bg-muted-foreground/50"
+                          kind === "conversion"
+                            ? "bg-sky-500"
+                            : kind === "retest"
+                              ? "bg-cyan-500"
+                            : isReopen
+                              ? "bg-orange-500"
+                              : step.is_current
+                                ? "bg-primary"
+                                : eventLabel === "Fixed"
+                                  ? "bg-emerald-500"
+                                  : "bg-muted-foreground/50"
                         )}
                       />
                       <div className="flex min-w-0 flex-wrap items-center gap-2">
-                        {step.from_status ? (
+                        {kind === "conversion" ? (
                           <>
+                            <span className="text-xs font-medium text-foreground">
+                              {step.from_project_name || "Unknown"}
+                            </span>
+                            <ArrowRightLeft className="h-3 w-3 text-sky-600 dark:text-sky-400" />
+                            <span className="text-xs font-medium text-foreground">
+                              {step.to_project_name || "Unknown"}
+                            </span>
+                          </>
+                        ) : kind === "retest" ? (
+                          <Badge
+                            variant="outline"
+                            className="h-5 rounded-full px-2 text-[10px] font-semibold"
+                          >
+                            {step.retest_label || "Retest"}
+                          </Badge>
+                        ) : (
+                          <>
+                            {step.from_status ? (
+                              <>
+                                <Badge
+                                  variant="outline"
+                                  className="h-5 rounded-full px-2 text-[10px] capitalize"
+                                >
+                                  {String(step.from_status).replace(/_/g, " ")}
+                                </Badge>
+                                <span className="text-[11px] text-muted-foreground">→</span>
+                              </>
+                            ) : null}
                             <Badge
                               variant="outline"
-                              className="h-5 rounded-full px-2 text-[10px] capitalize"
+                              className={cn(
+                                "h-5 rounded-full px-2 text-[10px] font-semibold capitalize",
+                                to === "fixed"
+                                  ? "border-emerald-300 bg-emerald-50 text-emerald-800 dark:border-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-200"
+                                  : isReopen || to === "pending" || to === "in_progress"
+                                    ? "border-amber-300 bg-amber-50 text-amber-900 dark:border-amber-700 dark:bg-amber-950/40 dark:text-amber-200"
+                                    : ""
+                              )}
                             >
-                              {String(step.from_status).replace(/_/g, " ")}
+                              {String(step.status || "unknown").replace(/_/g, " ")}
                             </Badge>
-                            <span className="text-[11px] text-muted-foreground">→</span>
                           </>
-                        ) : null}
-                        <Badge
-                          variant="outline"
-                          className={cn(
-                            "h-5 rounded-full px-2 text-[10px] font-semibold capitalize",
-                            to === "fixed"
-                              ? "border-emerald-300 bg-emerald-50 text-emerald-800 dark:border-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-200"
-                              : isReopen || to === "pending" || to === "in_progress"
-                                ? "border-amber-300 bg-amber-50 text-amber-900 dark:border-amber-700 dark:bg-amber-950/40 dark:text-amber-200"
-                                : ""
-                          )}
-                        >
-                          {String(step.status || "unknown").replace(/_/g, " ")}
-                        </Badge>
+                        )}
                         {eventLabel ? (
                           <Badge
                             variant="outline"
@@ -890,13 +923,17 @@ export function BugContentCards({ bug, onBugUpdated }: BugContentCardsProps) {
                                 ? "border-orange-300 bg-orange-50 text-orange-800 dark:border-orange-700 dark:bg-orange-950/40 dark:text-orange-200"
                                 : eventLabel === "Fixed"
                                   ? "border-emerald-300 bg-emerald-50 text-emerald-800 dark:border-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-200"
-                                  : "border-border/60"
+                                  : eventLabel === "Converted"
+                                    ? "border-sky-300 bg-sky-50 text-sky-800 dark:border-sky-700 dark:bg-sky-950/40 dark:text-sky-200"
+                                    : eventLabel === "Retest"
+                                      ? "border-cyan-300 bg-cyan-50 text-cyan-800 dark:border-cyan-700 dark:bg-cyan-950/40 dark:text-cyan-200"
+                                      : "border-border/60"
                             )}
                           >
                             {eventLabel}
                           </Badge>
                         ) : null}
-                        {step.is_current ? (
+                        {step.is_current && kind === "status" ? (
                           <Badge
                             variant="secondary"
                             className="h-5 rounded-full px-2 text-[10px]"
@@ -908,8 +945,13 @@ export function BugContentCards({ bug, onBugUpdated }: BugContentCardsProps) {
                       <p className="mt-1 text-xs text-muted-foreground">
                         {step.entered_at
                           ? formatLocalDate(step.entered_at, "datetime")
-                          : "—"}
+                          : kind === "retest"
+                            ? "No timestamp yet"
+                            : "—"}
                         {step.actor_name ? ` · ${step.actor_name}` : ""}
+                        {step.duration_label && kind === "status"
+                          ? ` · ${step.duration_label}${step.is_current ? " so far" : ""}`
+                          : ""}
                         {step.reason === "tester_verification_failed"
                           ? " · Still broken — reopened"
                           : ""}

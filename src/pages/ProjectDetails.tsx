@@ -1,4 +1,6 @@
 import { ActivityList } from "@/components/activities/ActivityList";
+import { ItemsPerPageSelect } from "@/components/pagination/ItemsPerPageSelect";
+import { PageJumpSelect } from "@/components/pagination/PageJumpSelect";
 import { BugCard } from "@/components/bugs/BugCard";
 import { BulkConvertBar } from "@/components/bugs/BulkConvertBar";
 import { BulkConvertBugsDialog } from "@/components/bugs/BulkConvertBugsDialog";
@@ -1120,38 +1122,11 @@ const BugsWithInitialParams = ({ projectId, initialTab, initialStatus }: { proje
                     >
                       Items per page:
                     </label>
-                    <div className="relative group">
-                      <select
-                        id="items-per-page"
-                        value={itemsPerPage}
-                        onChange={(e) =>
-                          setItemsPerPage(Number(e.target.value))
-                        }
-                        className="appearance-none border border-border/60 rounded-lg px-4 py-2.5 text-sm bg-background/80 focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary/50 transition-all duration-200 min-w-[90px] font-medium group-hover:border-primary/40 group-hover:bg-background/90"
-                        aria-label="Items per page"
-                      >
-                        {[10, 25, 50].map((n) => (
-                          <option key={n} value={n}>
-                            {n}
-                          </option>
-                        ))}
-                      </select>
-                      <div className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none transition-transform duration-200 group-hover:scale-110">
-                        <svg
-                          className="w-4 h-4 text-muted-foreground group-hover:text-primary/70"
-                          fill="none"
-                          stroke="currentColor"
-                          viewBox="0 0 24 24"
-                        >
-                          <path
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                            strokeWidth={2}
-                            d="M19 9l-7 7-7-7"
-                          />
-                        </svg>
-                      </div>
-                    </div>
+                    <ItemsPerPageSelect
+                      id="items-per-page"
+                      value={itemsPerPage}
+                      onChange={setItemsPerPage}
+                    />
                   </div>
                 </div>
 
@@ -1267,28 +1242,12 @@ const BugsWithInitialParams = ({ projectId, initialTab, initialStatus }: { proje
                       )}
 
                       {/* Mobile-friendly page selector */}
-                      <div className="md:hidden flex items-center gap-3 bg-gradient-to-r from-muted/20 to-muted/30 rounded-lg px-3 py-2 border border-border/30 hover:border-primary/30 transition-all duration-200">
-                        <select
-                          value={currentPage}
-                          onChange={(e) =>
-                            setCurrentPage(Number(e.target.value))
-                          }
-                          className="border-0 bg-transparent text-sm font-semibold text-primary focus:outline-none focus:ring-0 min-w-[50px] cursor-pointer hover:text-primary/80 transition-colors duration-200"
-                          aria-label="Go to page"
-                        >
-                          {Array.from({ length: totalPages }, (_, i) => (
-                            <option key={i + 1} value={i + 1}>
-                              {i + 1}
-                            </option>
-                          ))}
-                        </select>
-                        <span className="text-sm text-muted-foreground font-medium">
-                          {" "}
-                          <span className="text-primary font-semibold bg-gradient-to-r from-primary to-primary/80 bg-clip-text text-transparent">
-                            {totalPages}
-                          </span>
-                        </span>
-                      </div>
+                      <PageJumpSelect
+                        className="md:hidden"
+                        currentPage={currentPage}
+                        totalPages={totalPages}
+                        onPageChange={setCurrentPage}
+                      />
                     </div>
 
                     {/* Next Button */}
@@ -1355,38 +1314,11 @@ const BugsWithInitialParams = ({ projectId, initialTab, initialStatus }: { proje
                   >
                     Items per page:
                   </label>
-                  <div className="relative group">
-                    <select
-                      id="items-per-page-simple"
-                      value={itemsPerPage}
-                      onChange={(e) =>
-                        setItemsPerPage(Number(e.target.value))
-                      }
-                      className="appearance-none border border-border/60 rounded-lg px-4 py-2.5 text-sm bg-background/80 focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary/50 transition-all duration-200 min-w-[90px] font-medium group-hover:border-primary/40 group-hover:bg-background/90"
-                      aria-label="Items per page"
-                    >
-                      {[10, 25, 50].map((n) => (
-                        <option key={n} value={n}>
-                          {n}
-                        </option>
-                      ))}
-                    </select>
-                    <div className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none transition-transform duration-200 group-hover:scale-110">
-                      <svg
-                        className="w-4 h-4 text-muted-foreground group-hover:text-primary/70"
-                        fill="none"
-                        stroke="currentColor"
-                        viewBox="0 0 24 24"
-                      >
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          strokeWidth={2}
-                          d="M19 9l-7 7-7-7"
-                        />
-                      </svg>
-                    </div>
-                  </div>
+                  <ItemsPerPageSelect
+                    id="items-per-page-simple"
+                    value={itemsPerPage}
+                    onChange={setItemsPerPage}
+                  />
                 </div>
               </div>
             )}
@@ -1564,38 +1496,11 @@ const BugsWithInitialParams = ({ projectId, initialTab, initialStatus }: { proje
                     >
                       Items per page:
                     </label>
-                    <div className="relative group">
-                      <select
-                        id="items-per-page-dev"
-                        value={itemsPerPage}
-                        onChange={(e) =>
-                          setItemsPerPage(Number(e.target.value))
-                        }
-                        className="appearance-none border border-border/60 rounded-lg px-4 py-2.5 text-sm bg-background/80 focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary/50 transition-all duration-200 min-w-[90px] font-medium group-hover:border-primary/40 group-hover:bg-background/90"
-                        aria-label="Items per page"
-                      >
-                        {[10, 25, 50].map((n) => (
-                          <option key={n} value={n}>
-                            {n}
-                          </option>
-                        ))}
-                      </select>
-                      <div className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none transition-transform duration-200 group-hover:scale-110">
-                        <svg
-                          className="w-4 h-4 text-muted-foreground group-hover:text-primary/70"
-                          fill="none"
-                          stroke="currentColor"
-                          viewBox="0 0 24 24"
-                        >
-                          <path
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                            strokeWidth={2}
-                            d="M19 9l-7 7-7-7"
-                          />
-                        </svg>
-                      </div>
-                    </div>
+                    <ItemsPerPageSelect
+                      id="items-per-page-dev"
+                      value={itemsPerPage}
+                      onChange={setItemsPerPage}
+                    />
                   </div>
                 </div>
 
@@ -1711,28 +1616,12 @@ const BugsWithInitialParams = ({ projectId, initialTab, initialStatus }: { proje
                       )}
 
                       {/* Mobile-friendly page selector */}
-                      <div className="md:hidden flex items-center gap-3 bg-gradient-to-r from-muted/20 to-muted/30 rounded-lg px-3 py-2 border border-border/30 hover:border-primary/30 transition-all duration-200">
-                        <select
-                          value={currentPage}
-                          onChange={(e) =>
-                            setCurrentPage(Number(e.target.value))
-                          }
-                          className="border-0 bg-transparent text-sm font-semibold text-primary focus:outline-none focus:ring-0 min-w-[50px] cursor-pointer hover:text-primary/80 transition-colors duration-200"
-                          aria-label="Go to page"
-                        >
-                          {Array.from({ length: totalPages }, (_, i) => (
-                            <option key={i + 1} value={i + 1}>
-                              {i + 1}
-                            </option>
-                          ))}
-                        </select>
-                        <span className="text-sm text-muted-foreground font-medium">
-                          {" "}
-                          <span className="text-primary font-semibold bg-gradient-to-r from-primary to-primary/80 bg-clip-text text-transparent">
-                            {totalPages}
-                          </span>
-                        </span>
-                      </div>
+                      <PageJumpSelect
+                        className="md:hidden"
+                        currentPage={currentPage}
+                        totalPages={totalPages}
+                        onPageChange={setCurrentPage}
+                      />
                     </div>
 
                     {/* Next Button */}
@@ -1802,38 +1691,11 @@ const BugsWithInitialParams = ({ projectId, initialTab, initialStatus }: { proje
                   >
                     Items per page:
                   </label>
-                  <div className="relative group">
-                    <select
-                      id="items-per-page-dev-simple"
-                      value={itemsPerPage}
-                      onChange={(e) =>
-                        setItemsPerPage(Number(e.target.value))
-                      }
-                      className="appearance-none border border-border/60 rounded-lg px-4 py-2.5 text-sm bg-background/80 focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary/50 transition-all duration-200 min-w-[90px] font-medium group-hover:border-primary/40 group-hover:bg-background/90"
-                      aria-label="Items per page"
-                    >
-                      {[10, 25, 50].map((n) => (
-                        <option key={n} value={n}>
-                          {n}
-                        </option>
-                      ))}
-                    </select>
-                    <div className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none transition-transform duration-200 group-hover:scale-110">
-                      <svg
-                        className="w-4 h-4 text-muted-foreground group-hover:text-primary/70"
-                        fill="none"
-                        stroke="currentColor"
-                        viewBox="0 0 24 24"
-                      >
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          strokeWidth={2}
-                          d="M19 9l-7 7-7-7"
-                        />
-                      </svg>
-                    </div>
-                  </div>
+                  <ItemsPerPageSelect
+                    id="items-per-page-dev-simple"
+                    value={itemsPerPage}
+                    onChange={setItemsPerPage}
+                  />
                 </div>
               </div>
             )}
@@ -2397,38 +2259,11 @@ const FixesWithInitialParams = ({ projectId, initialTab, initialStatus }: { proj
                     >
                       Items per page:
                     </label>
-                    <div className="relative group">
-                      <select
-                        id="items-per-page-fixes"
-                        value={itemsPerPage}
-                        onChange={(e) =>
-                          setItemsPerPage(Number(e.target.value))
-                        }
-                        className="appearance-none border border-border/60 rounded-lg px-4 py-2.5 text-sm bg-background/80 focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary/50 transition-all duration-200 min-w-[90px] font-medium group-hover:border-primary/40 group-hover:bg-background/90"
-                        aria-label="Items per page"
-                      >
-                        {[10, 25, 50].map((n) => (
-                          <option key={n} value={n}>
-                            {n}
-                          </option>
-                        ))}
-                      </select>
-                      <div className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none transition-transform duration-200 group-hover:scale-110">
-                        <svg
-                          className="w-4 h-4 text-muted-foreground group-hover:text-primary/70"
-                          fill="none"
-                          stroke="currentColor"
-                          viewBox="0 0 24 24"
-                        >
-                          <path
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                            strokeWidth={2}
-                            d="M19 9l-7 7-7-7"
-                          />
-                        </svg>
-                      </div>
-                    </div>
+                    <ItemsPerPageSelect
+                      id="items-per-page-fixes"
+                      value={itemsPerPage}
+                      onChange={setItemsPerPage}
+                    />
                   </div>
                 </div>
 
@@ -2544,28 +2379,12 @@ const FixesWithInitialParams = ({ projectId, initialTab, initialStatus }: { proj
                       )}
 
                       {/* Mobile-friendly page selector */}
-                      <div className="md:hidden flex items-center gap-3 bg-gradient-to-r from-muted/20 to-muted/30 rounded-lg px-3 py-2 border border-border/30 hover:border-primary/30 transition-all duration-200">
-                        <select
-                          value={currentPage}
-                          onChange={(e) =>
-                            setCurrentPage(Number(e.target.value))
-                          }
-                          className="border-0 bg-transparent text-sm font-semibold text-primary focus:outline-none focus:ring-0 min-w-[50px] cursor-pointer hover:text-primary/80 transition-colors duration-200"
-                          aria-label="Go to page"
-                        >
-                          {Array.from({ length: totalPages }, (_, i) => (
-                            <option key={i + 1} value={i + 1}>
-                              {i + 1}
-                            </option>
-                          ))}
-                        </select>
-                        <span className="text-sm text-muted-foreground font-medium">
-                          {" "}
-                          <span className="text-primary font-semibold bg-gradient-to-r from-primary to-primary/80 bg-clip-text text-transparent">
-                            {totalPages}
-                          </span>
-                        </span>
-                      </div>
+                      <PageJumpSelect
+                        className="md:hidden"
+                        currentPage={currentPage}
+                        totalPages={totalPages}
+                        onPageChange={setCurrentPage}
+                      />
                     </div>
 
                     {/* Next Button */}
@@ -2632,38 +2451,11 @@ const FixesWithInitialParams = ({ projectId, initialTab, initialStatus }: { proj
                   >
                     Items per page:
                   </label>
-                  <div className="relative group">
-                    <select
-                      id="items-per-page-fixes-simple"
-                      value={itemsPerPage}
-                      onChange={(e) =>
-                        setItemsPerPage(Number(e.target.value))
-                      }
-                      className="appearance-none border border-border/60 rounded-lg px-4 py-2.5 text-sm bg-background/80 focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary/50 transition-all duration-200 min-w-[90px] font-medium group-hover:border-primary/40 group-hover:bg-background/90"
-                      aria-label="Items per page"
-                    >
-                      {[10, 25, 50].map((n) => (
-                        <option key={n} value={n}>
-                          {n}
-                        </option>
-                      ))}
-                    </select>
-                    <div className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none transition-transform duration-200 group-hover:scale-110">
-                      <svg
-                        className="w-4 h-4 text-muted-foreground group-hover:text-primary/70"
-                        fill="none"
-                        stroke="currentColor"
-                        viewBox="0 0 24 24"
-                      >
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          strokeWidth={2}
-                          d="M19 9l-7 7-7-7"
-                        />
-                      </svg>
-                    </div>
-                  </div>
+                  <ItemsPerPageSelect
+                    id="items-per-page-fixes-simple"
+                    value={itemsPerPage}
+                    onChange={setItemsPerPage}
+                  />
                 </div>
               </div>
             )}
@@ -2850,38 +2642,11 @@ const FixesWithInitialParams = ({ projectId, initialTab, initialStatus }: { proj
                     >
                       Items per page:
                     </label>
-                    <div className="relative group">
-                      <select
-                        id="items-per-page-dev-fixes"
-                        value={itemsPerPage}
-                        onChange={(e) =>
-                          setItemsPerPage(Number(e.target.value))
-                        }
-                        className="appearance-none border border-border/60 rounded-lg px-4 py-2.5 text-sm bg-background/80 focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary/50 transition-all duration-200 min-w-[90px] font-medium group-hover:border-primary/40 group-hover:bg-background/90"
-                        aria-label="Items per page"
-                      >
-                        {[10, 25, 50].map((n) => (
-                          <option key={n} value={n}>
-                            {n}
-                          </option>
-                        ))}
-                      </select>
-                      <div className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none transition-transform duration-200 group-hover:scale-110">
-                        <svg
-                          className="w-4 h-4 text-muted-foreground group-hover:text-primary/70"
-                          fill="none"
-                          stroke="currentColor"
-                          viewBox="0 0 24 24"
-                        >
-                          <path
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                            strokeWidth={2}
-                            d="M19 9l-7 7-7-7"
-                          />
-                        </svg>
-                      </div>
-                    </div>
+                    <ItemsPerPageSelect
+                      id="items-per-page-dev-fixes"
+                      value={itemsPerPage}
+                      onChange={setItemsPerPage}
+                    />
                   </div>
                 </div>
 
@@ -2997,28 +2762,12 @@ const FixesWithInitialParams = ({ projectId, initialTab, initialStatus }: { proj
                       )}
 
                       {/* Mobile-friendly page selector */}
-                      <div className="md:hidden flex items-center gap-3 bg-gradient-to-r from-muted/20 to-muted/30 rounded-lg px-3 py-2 border border-border/30 hover:border-primary/30 transition-all duration-200">
-                        <select
-                          value={currentPage}
-                          onChange={(e) =>
-                            setCurrentPage(Number(e.target.value))
-                          }
-                          className="border-0 bg-transparent text-sm font-semibold text-primary focus:outline-none focus:ring-0 min-w-[50px] cursor-pointer hover:text-primary/80 transition-colors duration-200"
-                          aria-label="Go to page"
-                        >
-                          {Array.from({ length: totalPages }, (_, i) => (
-                            <option key={i + 1} value={i + 1}>
-                              {i + 1}
-                            </option>
-                          ))}
-                        </select>
-                        <span className="text-sm text-muted-foreground font-medium">
-                          {" "}
-                          <span className="text-primary font-semibold bg-gradient-to-r from-primary to-primary/80 bg-clip-text text-transparent">
-                            {totalPages}
-                          </span>
-                        </span>
-                      </div>
+                      <PageJumpSelect
+                        className="md:hidden"
+                        currentPage={currentPage}
+                        totalPages={totalPages}
+                        onPageChange={setCurrentPage}
+                      />
                     </div>
 
                     {/* Next Button */}
@@ -3088,38 +2837,11 @@ const FixesWithInitialParams = ({ projectId, initialTab, initialStatus }: { proj
                   >
                     Items per page:
                   </label>
-                  <div className="relative group">
-                    <select
-                      id="items-per-page-dev-fixes-simple"
-                      value={itemsPerPage}
-                      onChange={(e) =>
-                        setItemsPerPage(Number(e.target.value))
-                      }
-                      className="appearance-none border border-border/60 rounded-lg px-4 py-2.5 text-sm bg-background/80 focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary/50 transition-all duration-200 min-w-[90px] font-medium group-hover:border-primary/40 group-hover:bg-background/90"
-                      aria-label="Items per page"
-                    >
-                      {[10, 25, 50].map((n) => (
-                        <option key={n} value={n}>
-                          {n}
-                        </option>
-                      ))}
-                    </select>
-                    <div className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none transition-transform duration-200 group-hover:scale-110">
-                      <svg
-                        className="w-4 h-4 text-muted-foreground group-hover:text-primary/70"
-                        fill="none"
-                        stroke="currentColor"
-                        viewBox="0 0 24 24"
-                      >
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          strokeWidth={2}
-                          d="M19 9l-7 7-7-7"
-                        />
-                      </svg>
-                    </div>
-                  </div>
+                  <ItemsPerPageSelect
+                    id="items-per-page-dev-fixes-simple"
+                    value={itemsPerPage}
+                    onChange={setItemsPerPage}
+                  />
                 </div>
               </div>
             )}
@@ -3586,38 +3308,11 @@ const UpdatesWithInitialParams = ({ projectId, initialTab, initialStatus }: { pr
                     >
                       Items per page:
                     </label>
-                    <div className="relative group">
-                      <select
-                        id="items-per-page-updates"
-                        value={itemsPerPage}
-                        onChange={(e) =>
-                          setItemsPerPage(Number(e.target.value))
-                        }
-                        className="appearance-none border border-border/60 rounded-lg px-4 py-2.5 text-sm bg-background/80 focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary/50 transition-all duration-200 min-w-[90px] font-medium group-hover:border-primary/40 group-hover:bg-background/90"
-                        aria-label="Items per page"
-                      >
-                        {[10, 25, 50].map((n) => (
-                          <option key={n} value={n}>
-                            {n}
-                          </option>
-                        ))}
-                      </select>
-                      <div className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none transition-transform duration-200 group-hover:scale-110">
-                        <svg
-                          className="w-4 h-4 text-muted-foreground group-hover:text-primary/70"
-                          fill="none"
-                          stroke="currentColor"
-                          viewBox="0 0 24 24"
-                        >
-                          <path
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                            strokeWidth={2}
-                            d="M19 9l-7 7-7-7"
-                          />
-                        </svg>
-                      </div>
-                    </div>
+                    <ItemsPerPageSelect
+                      id="items-per-page-updates"
+                      value={itemsPerPage}
+                      onChange={setItemsPerPage}
+                    />
                   </div>
                 </div>
 
@@ -3733,28 +3428,12 @@ const UpdatesWithInitialParams = ({ projectId, initialTab, initialStatus }: { pr
                       )}
 
                       {/* Mobile-friendly page selector */}
-                      <div className="md:hidden flex items-center gap-3 bg-gradient-to-r from-muted/20 to-muted/30 rounded-lg px-3 py-2 border border-border/30 hover:border-primary/30 transition-all duration-200">
-                        <select
-                          value={currentPage}
-                          onChange={(e) =>
-                            setCurrentPage(Number(e.target.value))
-                          }
-                          className="border-0 bg-transparent text-sm font-semibold text-primary focus:outline-none focus:ring-0 min-w-[50px] cursor-pointer hover:text-primary/80 transition-colors duration-200"
-                          aria-label="Go to page"
-                        >
-                          {Array.from({ length: totalPages }, (_, i) => (
-                            <option key={i + 1} value={i + 1}>
-                              {i + 1}
-                            </option>
-                          ))}
-                        </select>
-                        <span className="text-sm text-muted-foreground font-medium">
-                          {" "}
-                          <span className="text-primary font-semibold bg-gradient-to-r from-primary to-primary/80 bg-clip-text text-transparent">
-                            {totalPages}
-                          </span>
-                        </span>
-                      </div>
+                      <PageJumpSelect
+                        className="md:hidden"
+                        currentPage={currentPage}
+                        totalPages={totalPages}
+                        onPageChange={setCurrentPage}
+                      />
                     </div>
 
                     {/* Next Button */}
@@ -3821,38 +3500,11 @@ const UpdatesWithInitialParams = ({ projectId, initialTab, initialStatus }: { pr
                   >
                     Items per page:
                   </label>
-                  <div className="relative group">
-                    <select
-                      id="items-per-page-updates-simple"
-                      value={itemsPerPage}
-                      onChange={(e) =>
-                        setItemsPerPage(Number(e.target.value))
-                      }
-                      className="appearance-none border border-border/60 rounded-lg px-4 py-2.5 text-sm bg-background/80 focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary/50 transition-all duration-200 min-w-[90px] font-medium group-hover:border-primary/40 group-hover:bg-background/90"
-                      aria-label="Items per page"
-                    >
-                      {[10, 25, 50].map((n) => (
-                        <option key={n} value={n}>
-                          {n}
-                        </option>
-                      ))}
-                    </select>
-                    <div className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none transition-transform duration-200 group-hover:scale-110">
-                      <svg
-                        className="w-4 h-4 text-muted-foreground group-hover:text-primary/70"
-                        fill="none"
-                        stroke="currentColor"
-                        viewBox="0 0 24 24"
-                      >
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          strokeWidth={2}
-                          d="M19 9l-7 7-7-7"
-                        />
-                      </svg>
-                    </div>
-                  </div>
+                  <ItemsPerPageSelect
+                    id="items-per-page-updates-simple"
+                    value={itemsPerPage}
+                    onChange={setItemsPerPage}
+                  />
                 </div>
               </div>
             )}
@@ -5829,20 +5481,27 @@ const ProjectDetails = () => {
                 </div>
               </div>
                   <div className="sm:w-48">
-                    <div className="relative">
-                      <select
-                        value={taskStatusFilter}
-                        onChange={(e) => setTaskStatusFilter(e.target.value)}
-                        className="w-full h-11 pl-10 pr-10 border border-gray-200 dark:border-gray-700 rounded-xl bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500 transition-all duration-200 appearance-none"
+                    <Select
+                      value={taskStatusFilter}
+                      onValueChange={setTaskStatusFilter}
+                    >
+                      <SelectTrigger
+                        className="h-11 rounded-xl border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800"
+                        aria-label="Filter tasks by status"
                       >
-                        <option value="all">All Status</option>
-                        <option value="pending">Pending</option>
-                        <option value="in_progress">In Progress</option>
-                        <option value="completed">Completed</option>
-                      </select>
-                      <Clock className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
-                      <ChevronDown className="absolute right-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400 pointer-events-none" />
-                      </div>
+                        <SelectValue placeholder="All Status" />
+                      </SelectTrigger>
+                      <SelectContent
+                        position="popper"
+                        className="z-[100] rounded-xl"
+                        searchable={false}
+                      >
+                        <SelectItem value="all">All Status</SelectItem>
+                        <SelectItem value="pending">Pending</SelectItem>
+                        <SelectItem value="in_progress">In Progress</SelectItem>
+                        <SelectItem value="completed">Completed</SelectItem>
+                      </SelectContent>
+                    </Select>
                     </div>
                 </div>
                 </div>
