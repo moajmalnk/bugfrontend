@@ -5,7 +5,7 @@ const isLocalhost = typeof window !== 'undefined' &&
    window.location.hostname.includes('localhost'));
 
 /** Live production backend API. Never use a local PHP API. */
-const PRODUCTION_API_URL = 'https://bugbackend.bugricer.com/br-api';
+const PRODUCTION_API_URL = 'https://bugbackend.bugricer.com/api';
 
 const getApiUrl = (): string => {
   const configured = (import.meta.env.VITE_API_URL as string | undefined)?.replace(/\/$/, '');
@@ -93,7 +93,7 @@ export const getWebSocketUrl = () => {
   }
   
   const apiUrl = getApiUrl();
-  if (apiUrl.includes('bugricer.com') || apiUrl.startsWith('/br-api')) {
+  if (apiUrl.includes('bugricer.com') || apiUrl.startsWith('/api')) {
     return 'wss://bugbackend.bugricer.com:8089';
   }
 
