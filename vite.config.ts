@@ -45,7 +45,7 @@ export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), "");
   const apiProxyTarget =
     env.VITE_API_PROXY_TARGET?.replace(/\/$/, "") ||
-    "https://bugbackend.bugricer.com";
+    "https://bugs.bugricer.com";
   const isProd = mode === "production";
 
   return {
@@ -65,10 +65,32 @@ export default defineConfig(({ mode }) => {
       middlewareMode: false,
       cors: true,
       proxy: {
+        // Local /br-api and leftover /api both go to production (bugs.bugricer.com).
+        "/br-api": {
+          target: apiProxyTarget,
+          changeOrigin: true,
+          secure: true,
+          headers: {
+            Origin: "https://bugs.bugricer.com",
+            Referer: "https://bugs.bugricer.com/",
+            "User-Agent":
+              "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/127.0.0.0 Safari/537.36",
+            Accept: "application/json, text/plain, */*",
+          },
+        },
         "/api": {
           target: apiProxyTarget,
           changeOrigin: true,
           secure: true,
+          headers: {
+            Origin: "https://bugs.bugricer.com",
+            Referer: "https://bugs.bugricer.com/",
+            "User-Agent":
+              "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/127.0.0.0 Safari/537.36",
+            Accept: "application/json, text/plain, */*",
+          },
+          rewrite: (requestPath) =>
+            requestPath.replace(/^\/api(?=\/|$)/, "/br-api"),
         },
       },
       watch: {

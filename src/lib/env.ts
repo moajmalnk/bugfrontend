@@ -4,34 +4,16 @@ const isLocalhost = typeof window !== 'undefined' &&
    window.location.hostname === '127.0.0.1' ||
    window.location.hostname.includes('localhost'));
 
-const PRODUCTION_API_URL = 'https://bugbackend.bugricer.com/api';
+/** Live production backend API. Never use a local PHP API. */
+const PRODUCTION_API_URL = 'https://bugbackend.bugricer.com/br-api';
 
-const getApiUrl = () => {
+const getApiUrl = (): string => {
   const configured = (import.meta.env.VITE_API_URL as string | undefined)?.replace(/\/$/, '');
-
-  // Production Vercel SPA: same-origin proxy (avoids CORS when Cloudflare/Hostinger
-  // return a 403 HTML page with no Access-Control-Allow-Origin). Path is /br-api
-  // not /api — Vercel treats /api as serverless and can 403 it with a checkpoint.
-  if (typeof window !== 'undefined' && window.location.hostname === 'bugs.bugricer.com') {
-    return '/br-api';
-  }
-
-  // Local dev: proxy /api -> production backend (see vite.config.ts) to avoid CORS
-  if (
-    import.meta.env.DEV &&
-    isLocalhost &&
-    configured &&
-    /^https?:\/\//.test(configured) &&
-    !configured.includes('localhost') &&
-    !configured.includes('127.0.0.1')
-  ) {
-    return '/api';
-  }
-
   if (configured) {
     return configured;
   }
 
+  // Use production backend directly for both local and production frontend.
   return PRODUCTION_API_URL;
 };
 
@@ -111,7 +93,7 @@ export const getWebSocketUrl = () => {
   }
   
   const apiUrl = getApiUrl();
-  if (apiUrl.includes('bugbackend.bugricer.com') || apiUrl === '/br-api' || apiUrl === '/api') {
+  if (apiUrl.includes('bugricer.com') || apiUrl.startsWith('/br-api')) {
     return 'wss://bugbackend.bugricer.com:8089';
   }
 
