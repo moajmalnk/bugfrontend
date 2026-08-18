@@ -448,6 +448,7 @@ class ActivityService {
       // Project Activities
       'project_created': { icon: '🎉', color: 'text-purple-600', label: 'Project Created' },
       'project_updated': { icon: '⚡', color: 'text-orange-600', label: 'Project Updated' },
+      'project_timeline_updated': { icon: '📅', color: 'text-blue-600', label: 'Timeline Updated' },
       'project_deleted': { icon: '🗑️', color: 'text-red-800', label: 'Project Deleted' },
       'member_added': { icon: '👥', color: 'text-blue-600', label: 'Member Added' },
       'member_removed': { icon: '👋', color: 'text-gray-600', label: 'Member Removed' },

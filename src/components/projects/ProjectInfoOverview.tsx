@@ -7,6 +7,7 @@ import {
   formatProjectDateTime,
   getDeadlineTimerReminder,
   getProjectStatusLabel,
+  latestTimelineChange,
   parseProjectPlatforms,
   Project,
   PROJECT_PLATFORM_OPTIONS,
@@ -37,6 +38,7 @@ import { useNavigate } from 'react-router-dom';
 import { UserAvatar } from '@/components/users/UserAvatar';
 import { ProjectDeadlineReminders } from '@/components/projects/ProjectDeadlineReminders';
 import { ProjectWorkActivityOverview } from '@/components/projects/ProjectWorkActivityOverview';
+import { ProjectTimelineChangeHistory } from '@/components/projects/ProjectTimelineChangeHistory';
 
 interface ProjectInfoOverviewProps {
   project: Project;
@@ -283,11 +285,13 @@ function TimelineItem({
   value,
   deadlineHint,
   deadlineTone,
+  lastChange,
 }: {
   label: string;
   value: string;
   deadlineHint?: string;
   deadlineTone?: ReturnType<typeof getDeadlineTimerReminder>['tone'];
+  lastChange?: { username: string; changedAt: string } | null;
 }) {
   const isUnset = value === 'Not set';
   const isDeadline = label === 'Deadline' && deadlineHint;
@@ -328,6 +332,11 @@ function TimelineItem({
             <Timer className="h-3 w-3 shrink-0" aria-hidden />
             {deadlineHint}
           </span>
+        ) : null}
+        {lastChange ? (
+          <p className="text-[11px] text-muted-foreground leading-snug">
+            Last changed by {lastChange.username} · {formatProjectDateTime(lastChange.changedAt)}
+          </p>
         ) : null}
       </div>
     </div>
@@ -419,26 +428,37 @@ export function ProjectInfoOverview({ project, createdByName }: ProjectInfoOverv
   const isActiveClient = project.client_account_status !== 'inactive';
   const deadlineReminder = getDeadlineTimerReminder(project.deadline_date, project.status);
 
+  const history = project.timeline_history || [];
+  const lastFor = (fieldKey: string) => {
+    const entry = latestTimelineChange(history, fieldKey);
+    return entry
+      ? { username: entry.changed_by_username, changedAt: entry.changed_at }
+      : null;
+  };
+
   const timelineItems = [
-    { label: 'Start Date', value: formatProjectDateTime(project.start_date) },
+    { label: 'Start Date', value: formatProjectDateTime(project.start_date), fieldKey: 'start_date' },
     {
       label: 'Deadline',
       value: formatProjectDateTime(project.deadline_date),
+      fieldKey: 'deadline_date',
       deadlineHint: project.deadline_date ? deadlineReminder.label : undefined,
       deadlineTone: project.deadline_date ? deadlineReminder.tone : undefined,
     },
-    { label: 'Expected Publish', value: formatProjectDateTime(project.expected_publish_date) },
-    { label: 'Testing Start', value: formatProjectDateTime(project.testing_start_date) },
-    { label: 'Testing End', value: formatProjectDateTime(project.testing_end_date) },
-    { label: 'Frontend Finish', value: formatProjectDateTime(project.frontend_finish_date) },
-    { label: 'Backend Finish', value: formatProjectDateTime(project.backend_finish_date) },
+    { label: 'Expected Publish', value: formatProjectDateTime(project.expected_publish_date), fieldKey: 'expected_publish_date' },
+    { label: 'Testing Start', value: formatProjectDateTime(project.testing_start_date), fieldKey: 'testing_start_date' },
+    { label: 'Testing End', value: formatProjectDateTime(project.testing_end_date), fieldKey: 'testing_end_date' },
+    { label: 'Frontend Finish', value: formatProjectDateTime(project.frontend_finish_date), fieldKey: 'frontend_finish_date' },
+    { label: 'Backend Finish', value: formatProjectDateTime(project.backend_finish_date), fieldKey: 'backend_finish_date' },
     {
       label: 'Tester Compliance Complete',
       value: formatProjectDateTime(project.tester_compliance_complete_date),
+      fieldKey: 'tester_compliance_complete_date',
     },
     {
       label: 'Developer Compliance Complete',
       value: formatProjectDateTime(project.developer_compliance_complete_date),
+      fieldKey: 'developer_compliance_complete_date',
     },
     { label: 'Duration', value: `${duration} days` },
   ];
@@ -565,8 +585,12 @@ export function ProjectInfoOverview({ project, createdByName }: ProjectInfoOverv
                 value={item.value}
                 deadlineHint={item.deadlineHint}
                 deadlineTone={item.deadlineTone}
+                lastChange={item.fieldKey ? lastFor(item.fieldKey) : null}
               />
             ))}
+          </div>
+          <div className="mt-5 sm:mt-6 border-t border-border/40 pt-4 sm:pt-5">
+            <ProjectTimelineChangeHistory history={history} />
           </div>
         </SectionShell>
       </div>

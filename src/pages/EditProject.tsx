@@ -340,6 +340,7 @@ const EditProject = () => {
           attachmentFiles={attachmentFiles}
           onAttachmentFilesChange={setAttachmentFiles}
           currentProjectId={projectId}
+          timelineHistory={project.timeline_history}
           availableBugDocs={allBugDocs.map((doc) => ({
             id: doc.id,
             title: doc.doc_title,

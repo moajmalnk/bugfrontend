@@ -223,6 +223,32 @@ export interface ProjectAttachment {
   created_at?: string;
 }
 
+export interface ProjectTimelineHistoryEntry {
+  id: string;
+  project_id: string;
+  field_key: string;
+  field_label: string;
+  old_value: string | null;
+  new_value: string | null;
+  changed_by: string;
+  changed_by_username: string;
+  changed_by_role?: string | null;
+  changed_by_avatar?: string | null;
+  changed_at: string;
+}
+
+export const PROJECT_TIMELINE_FIELD_LABELS: Record<string, string> = {
+  start_date: 'Start Date',
+  deadline_date: 'Deadline Date',
+  expected_publish_date: 'Expected Publish',
+  testing_start_date: 'Testing Start',
+  testing_end_date: 'Testing End',
+  frontend_finish_date: 'Frontend Finish',
+  backend_finish_date: 'Backend Finish',
+  tester_compliance_complete_date: 'Tester Compliance Complete',
+  developer_compliance_complete_date: 'Developer Compliance Complete',
+};
+
 export interface ProjectBugStatsLite {
   total: number;
   open: number;
@@ -287,6 +313,7 @@ export interface Project {
   backend_finish_date?: string | null;
   tester_compliance_complete_date?: string | null;
   developer_compliance_complete_date?: string | null;
+  timeline_history?: ProjectTimelineHistoryEntry[];
   members?: string[];
   members_detail?: ProjectMemberDetail[];
   bug_stats?: ProjectBugStatsLite;
@@ -836,6 +863,13 @@ export function formatProjectDateTime(value?: string | null): string {
     hour12: true,
     timeZone: 'Asia/Kolkata',
   });
+}
+
+export function latestTimelineChange(
+  history: ProjectTimelineHistoryEntry[] | undefined,
+  fieldKey: string
+): ProjectTimelineHistoryEntry | undefined {
+  return (history || []).find((entry) => entry.field_key === fieldKey);
 }
 
 export function formatProjectTime(value?: string | null): string {

@@ -45,7 +45,10 @@ import {
   ProjectComplianceSummaryLite,
   ProjectFormValues,
   type ProjectPlatform,
+  type ProjectTimelineHistoryEntry,
   type TaggedProjectFile,
+  formatProjectDateTime,
+  latestTimelineChange,
 } from '@/lib/utils/projectUtils';
 import { User } from '@/types';
 import type { Client } from '@/types';
@@ -108,6 +111,7 @@ interface ProjectFormProps {
   currentProjectId?: string;
   error?: string | null;
   complianceSummary?: ProjectComplianceSummaryLite | null;
+  timelineHistory?: ProjectTimelineHistoryEntry[];
 }
 
 const NAME_MAX = 100;
@@ -385,6 +389,7 @@ export function ProjectForm({
   currentProjectId,
   error,
   complianceSummary,
+  timelineHistory = [],
 }: ProjectFormProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [techInput, setTechInput] = useState('');
@@ -1092,7 +1097,9 @@ export function ProjectForm({
                     { key: 'backend_finish_date' as const, label: 'Backend Finish', dot: 'from-emerald-500 to-teal-600' },
                     { key: 'tester_compliance_complete_date' as const, label: 'Tester Compliance Complete', dot: 'from-cyan-500 to-sky-600' },
                     { key: 'developer_compliance_complete_date' as const, label: 'Developer Compliance Complete', dot: 'from-indigo-500 to-blue-600' },
-                  ].map(({ key, label, dot }) => (
+                  ].map(({ key, label, dot }) => {
+                    const lastChange = latestTimelineChange(timelineHistory, key);
+                    return (
                     <div key={key} className="space-y-3">
                       <FieldLabel dotClass={dot}>{label}</FieldLabel>
                       <div className="grid grid-cols-12 gap-2">
@@ -1121,8 +1128,15 @@ export function ProjectForm({
                           />
                         </div>
                       </div>
+                      {mode === 'edit' && lastChange ? (
+                        <p className="text-[11px] sm:text-xs text-muted-foreground leading-snug">
+                          Last changed by {lastChange.changed_by_username} on{' '}
+                          {formatProjectDateTime(lastChange.changed_at)}
+                        </p>
+                      ) : null}
                     </div>
-                  ))}
+                    );
+                  })}
                   <div className="space-y-3">
                     <FieldLabel dotClass="from-blue-500 to-indigo-600">Duration</FieldLabel>
                     <div className="flex h-12 items-center rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 px-4 text-sm font-semibold text-gray-900 dark:text-white shadow-sm">
