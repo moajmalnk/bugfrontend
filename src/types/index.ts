@@ -61,6 +61,10 @@ export type Bug = {
   }>;
   fixed_by?: string | null;
   fixed_by_name?: string | null;
+  /** Ingestion channel: 'web' | 'whatsapp' | 'api' | 'bugbot' */
+  source?: string | null;
+  /** Relative path of primary WhatsApp audio/voice note (served via audio.php) */
+  audio_note_url?: string | null;
 };
 
 export type BugPriority = 'low' | 'medium' | 'high';

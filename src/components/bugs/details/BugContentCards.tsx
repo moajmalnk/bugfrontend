@@ -562,6 +562,32 @@ export function BugContentCards({ bug, onBugUpdated }: BugContentCardsProps) {
         </Card>
       )}
 
+      {/* WhatsApp primary audio note fallback player
+          Shown only when bug.audio_note_url is set AND no voice-note attachments
+          already cover it — avoids duplicate players. */}
+      {bug.audio_note_url && voiceNotes.length === 0 && (
+        <Card className="relative min-w-0 overflow-hidden rounded-2xl border border-green-200/60 dark:border-green-800/40 bg-white/80 dark:bg-gray-900/80 backdrop-blur-sm">
+          <div className="pointer-events-none absolute inset-0 bg-gradient-to-br from-green-50/30 via-transparent to-emerald-50/30 dark:from-green-950/10 dark:via-transparent dark:to-emerald-950/10" />
+          <CardHeader className="relative">
+            <CardTitle className="flex items-center gap-2 text-green-700 dark:text-green-400">
+              <Volume2 className="w-5 h-5" />
+              WhatsApp Voice Note
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="relative p-4 sm:p-6">
+            {/* HTML5 native player — simple, reliable, no extra dependencies */}
+            <audio
+              controls
+              src={buildAudioUrl(bug.audio_note_url)}
+              className="w-full rounded-xl"
+              preload="metadata"
+            >
+              Your browser does not support the audio element.
+            </audio>
+          </CardContent>
+        </Card>
+      )}
+
       {/* Other Files Card */}
       {otherFiles.length > 0 && (
         <Card className="relative overflow-hidden rounded-2xl border border-gray-200/60 dark:border-gray-800/60 bg-white/80 dark:bg-gray-900/80 backdrop-blur-sm">

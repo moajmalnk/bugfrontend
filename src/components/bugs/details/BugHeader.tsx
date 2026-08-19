@@ -15,7 +15,7 @@ import { useUndoDelete } from "@/hooks/useUndoDelete";
 import { UndoDeleteNotificationPortal } from "@/components/ui/UndoDeleteNotification";
 import { prefetchFixBugPage } from "@/utils/prefetchFixBug";
 import { AskDoubtDialog } from "@/components/bugs/details/AskDoubtDialog";
-import { ArrowRightLeft, CheckSquare, ChevronLeft, CircleHelp, Edit2, Share2, Trash2 } from "lucide-react";
+import { ArrowRightLeft, CheckSquare, ChevronLeft, CircleHelp, Edit2, MessageCircle, Share2, Trash2 } from "lucide-react";
 import { useMemo, useState } from "react";
 import { createPortal } from "react-dom";
 import { useLocation, useNavigate } from "react-router-dom";
@@ -520,6 +520,15 @@ export const BugHeader = ({
           <Badge variant="outline" className={getStatusColor(bug.status)}>
             {bug.status.replace(/_/g, " ").toUpperCase()}
           </Badge>
+          {bug.source === "whatsapp" && (
+            <Badge
+              variant="outline"
+              className="text-xs gap-1 bg-green-50 text-green-700 border-green-300 dark:bg-green-950/30 dark:text-green-400 dark:border-green-800"
+            >
+              <MessageCircle className="h-3 w-3" />
+              Channel: WhatsApp
+            </Badge>
+          )}
         </div>
       </div>
 

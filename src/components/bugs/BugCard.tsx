@@ -13,7 +13,7 @@ import {
 } from "@/lib/bugMetaUtils";
 import { formatLocalDate } from "@/lib/utils/dateUtils";
 import { CommonBug, Bug as BugType } from "@/types";
-import { ArrowRightLeft, Copy } from "lucide-react";
+import { ArrowRightLeft, Copy, MessageCircle } from "lucide-react";
 import { useState } from "react";
 import { Link, useLocation } from "react-router-dom";
 
@@ -36,6 +36,7 @@ interface Bug {
   bug_types?: { id: string; name: string; slug: string }[];
   common_reasons?: string[];
   duplicate_count?: number;
+  source?: string | null;
 }
 
 interface BugCardProps {
@@ -132,6 +133,15 @@ export function BugCard({
           >
             {(bug.status || "pending").replace("_", " ")}
           </Badge>
+          {bug.source === "whatsapp" && (
+            <Badge
+              variant="outline"
+              className="text-xs gap-1 bg-green-50 text-green-700 border-green-300 dark:bg-green-950/30 dark:text-green-400 dark:border-green-800"
+            >
+              <MessageCircle className="h-3 w-3" />
+              WhatsApp
+            </Badge>
+          )}
         </div>
 
         <div className="flex flex-col gap-1">
