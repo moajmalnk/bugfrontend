@@ -557,8 +557,8 @@ export function ProjectInfoOverview({ project, createdByName }: ProjectInfoOverv
 
       <ProjectWorkActivityOverview projectId={project.id} />
 
-      <div className="grid grid-cols-1 xl:grid-cols-3 gap-4 sm:gap-6">
-        <SectionShell title="Technology Stack" icon={Layers} accent="amber" className="xl:col-span-1">
+      <div className="flex flex-col gap-4 sm:gap-6">
+        <SectionShell title="Technology Stack" icon={Layers} accent="amber">
           {techStack.length > 0 ? (
             <div className="flex flex-wrap gap-2">
               {techStack.map((item) => (
@@ -576,7 +576,7 @@ export function ProjectInfoOverview({ project, createdByName }: ProjectInfoOverv
           )}
         </SectionShell>
 
-        <SectionShell title="Project Timeline" icon={Calendar} accent="blue" className="xl:col-span-2">
+        <SectionShell title="Project Timeline" icon={Calendar} accent="blue">
           <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4 sm:gap-5">
             {timelineItems.map((item) => (
               <TimelineItem
