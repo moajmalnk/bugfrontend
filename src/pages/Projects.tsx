@@ -48,6 +48,8 @@ import {
 import { formatLocalDate } from "@/lib/utils/dateUtils";
 import { canReportBug, cn } from "@/lib/utils";
 import {
+  deadlineTimerToneClass,
+  getDeadlineTimerReminder,
   getProjectStatusLabel,
   parseProjectPlatforms,
   PROJECT_PLATFORM_OPTIONS,
@@ -126,78 +128,6 @@ function isDeadlineOverdue(
   const today = new Date();
   today.setHours(0, 0, 0, 0);
   return d.getTime() < today.getTime();
-}
-
-type DeadlineTimerTone = "ok" | "soon" | "today" | "overdue" | "done" | "none";
-
-/** Full deadline countdown reminder for project cards (not a cryptic day count). */
-function getDeadlineTimerReminder(
-  deadline?: string | null,
-  status?: string | null
-): { label: string; tone: DeadlineTimerTone; daysUntil: number | null } {
-  if (!deadline) {
-    return { label: "No deadline set", tone: "none", daysUntil: null };
-  }
-  if (status === "completed" || status === "archived") {
-    return { label: "Project closed", tone: "done", daysUntil: null };
-  }
-  const ymd = deadline.slice(0, 10);
-  const end = new Date(
-    /^\d{4}-\d{2}-\d{2}$/.test(ymd) ? `${ymd}T00:00:00` : deadline
-  );
-  if (Number.isNaN(end.getTime())) {
-    return { label: "No deadline set", tone: "none", daysUntil: null };
-  }
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  end.setHours(0, 0, 0, 0);
-  const daysUntil = Math.round(
-    (end.getTime() - today.getTime()) / (1000 * 60 * 60 * 24)
-  );
-
-  if (daysUntil < 0) {
-    const overdue = Math.abs(daysUntil);
-    return {
-      label: `${overdue} day${overdue === 1 ? "" : "s"} overdue`,
-      tone: "overdue",
-      daysUntil,
-    };
-  }
-  if (daysUntil === 0) {
-    return { label: "Due today — act now", tone: "today", daysUntil: 0 };
-  }
-  if (daysUntil === 1) {
-    return { label: "1 day left", tone: "soon", daysUntil: 1 };
-  }
-  if (daysUntil <= 7) {
-    return {
-      label: `${daysUntil} days left — due soon`,
-      tone: "soon",
-      daysUntil,
-    };
-  }
-  return {
-    label: `${daysUntil} days left`,
-    tone: "ok",
-    daysUntil,
-  };
-}
-
-function deadlineTimerToneClass(tone: DeadlineTimerTone): string {
-  switch (tone) {
-    case "overdue":
-      return "border-red-300/80 bg-red-50 text-red-800 dark:border-red-800/60 dark:bg-red-950/40 dark:text-red-200";
-    case "today":
-      return "border-amber-300/80 bg-amber-50 text-amber-900 dark:border-amber-800/60 dark:bg-amber-950/40 dark:text-amber-200";
-    case "soon":
-      return "border-orange-300/80 bg-orange-50 text-orange-900 dark:border-orange-800/60 dark:bg-orange-950/40 dark:text-orange-200";
-    case "done":
-      return "border-slate-300/70 bg-slate-50 text-slate-700 dark:border-slate-700/60 dark:bg-slate-900/40 dark:text-slate-300";
-    case "none":
-      return "border-border/60 bg-muted/40 text-muted-foreground";
-    default:
-      return "border-cyan-200/80 bg-cyan-50 text-cyan-800 dark:border-cyan-800/50 dark:bg-cyan-950/30 dark:text-cyan-200";
-  }
 }
 
 // Enhanced Professional Project Card Skeleton with animations
@@ -678,9 +608,26 @@ const Projects = () => {
       // For "all-projects" tab, show all projects for admins, but for developers show all projects (read-only)
     }
 
-    // Apply custom status filter
-    if (statusFilter !== "all") {
-      filtered = filtered.filter(project => project.status === statusFilter);
+    // Apply custom status / deadline filter
+    if (statusFilter === "archived") {
+      filtered = filtered.filter((project) => project.status === "archived");
+    } else if (statusFilter === "overdue") {
+      filtered = filtered.filter(
+        (project) =>
+          getDeadlineTimerReminder(project.deadline_date, project.status).tone ===
+          "overdue"
+      );
+    } else if (statusFilter === "due_today") {
+      filtered = filtered.filter(
+        (project) =>
+          getDeadlineTimerReminder(project.deadline_date, project.status).tone ===
+          "today"
+      );
+    } else if (statusFilter !== "all") {
+      filtered = filtered.filter((project) => project.status === statusFilter);
+    } else if (!searchQuery.trim()) {
+      // All Status = active directory; use Archived filter or search to find archived projects
+      filtered = filtered.filter((project) => project.status !== "archived");
     }
 
     if (clientFilter !== "all") {
@@ -1039,7 +986,17 @@ const Projects = () => {
       cancelled = true;
     };
   }, [pageProjectIds]);
-  const userProjectsCount = (currentUser?.role === "admin") ? projects.length : projects.filter((p) => userProjectMemberships[p.id]).length;
+  const activeProjectsCount = useMemo(
+    () => projects.filter((project) => project.status !== "archived").length,
+    [projects]
+  );
+  const userProjectsCount =
+    currentUser?.role === "admin"
+      ? activeProjectsCount
+      : projects.filter(
+          (project) =>
+            userProjectMemberships[project.id] && project.status !== "archived"
+        ).length;
 
   // NOTE: The component's actual return is defined after helper functions below.
   // This placeholder was removed to avoid duplicate returns preventing dialogs from rendering.
@@ -1117,6 +1074,8 @@ const Projects = () => {
                     <SelectContent position="popper" className="z-[60]">
                       <SelectItem value="all">All Status</SelectItem>
                       <SelectItem value="active">Active</SelectItem>
+                      <SelectItem value="overdue">Overdue</SelectItem>
+                      <SelectItem value="due_today">Due today</SelectItem>
                       <SelectItem value="completed">Completed</SelectItem>
                       <SelectItem value="release_ready">Release Ready</SelectItem>
                       <SelectItem value="archived">Archived</SelectItem>
@@ -2095,7 +2054,7 @@ const Projects = () => {
                     <span className="hidden sm:inline truncate">All Projects</span>
                     <span className="sm:hidden truncate">All</span>
                     <span className="ml-1 sm:ml-2 px-1.5 sm:px-2 py-0.5 sm:py-1 bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 rounded-full text-[10px] sm:text-xs font-bold shrink-0">
-                      {projects.length}
+                      {activeProjectsCount}
                     </span>
                   </ListPageTabTrigger>
                   <ListPageTabTrigger value="my-projects">

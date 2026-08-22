@@ -466,3 +466,10 @@ export function isCompliancePipelineSatisfied(
 export function isClosedProjectStatus(status: string): boolean {
   return status === 'completed' || status === 'release_ready' || status === 'archived';
 }
+
+/** Why: Admins may archive inactive projects without waiting on the full CODO pipeline. */
+export function requiresComplianceToClose(status: string, role?: string | null): boolean {
+  if (!isClosedProjectStatus(status)) return false;
+  if (role === 'admin' && status === 'archived') return false;
+  return true;
+}

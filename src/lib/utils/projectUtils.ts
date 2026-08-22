@@ -618,7 +618,10 @@ export function getDeadlineTimerReminder(
   if (!deadline) {
     return { label: 'No deadline set', tone: 'none', daysUntil: null };
   }
-  if (status === 'completed' || status === 'archived') {
+  if (status === 'archived') {
+    return { label: 'Archived', tone: 'done', daysUntil: null };
+  }
+  if (status === 'completed' || status === 'release_ready') {
     return { label: 'Project closed', tone: 'done', daysUntil: null };
   }
   const ymd = projectDatePart(deadline);

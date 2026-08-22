@@ -26,11 +26,15 @@ export function ListPageTabsShell({
       <div className="relative bg-white/60 dark:bg-gray-900/60 backdrop-blur-sm border border-gray-200/50 dark:border-gray-700/50 rounded-2xl p-1.5 sm:p-2 min-w-0">
         <TabsList
           className={cn(
-            "grid w-full h-auto min-h-12 sm:min-h-14 bg-transparent p-1 gap-1",
-            columns === 2 && "grid-cols-2",
-            columns === 3 && "grid-cols-3",
-            columns === 4 && "grid-cols-2 sm:grid-cols-4",
-            columns === 6 && "grid-cols-2 sm:grid-cols-3 xl:grid-cols-6"
+            "w-full h-auto min-h-12 sm:min-h-14 bg-transparent p-1 gap-1",
+            columns === 4
+              ? "flex flex-nowrap items-stretch overflow-x-auto hide-scrollbar"
+              : cn(
+                  "grid",
+                  columns === 2 && "grid-cols-2",
+                  columns === 3 && "grid-cols-3",
+                  columns === 6 && "grid-cols-2 sm:grid-cols-3 xl:grid-cols-6"
+                )
           )}
         >
           {children}
@@ -41,7 +45,7 @@ export function ListPageTabsShell({
 }
 
 export const listTabTriggerClass =
-  "text-xs sm:text-sm md:text-base font-semibold data-[state=active]:bg-white data-[state=active]:shadow-lg data-[state=active]:border data-[state=active]:border-gray-200 dark:data-[state=active]:bg-gray-800 dark:data-[state=active]:border-gray-700 rounded-xl transition-all duration-300 px-2 py-2.5 sm:px-3";
+  "inline-flex flex-1 items-center justify-center gap-1 sm:gap-1.5 min-w-0 whitespace-nowrap text-xs sm:text-sm font-semibold data-[state=active]:bg-white data-[state=active]:shadow-lg data-[state=active]:border data-[state=active]:border-gray-200 dark:data-[state=active]:bg-gray-800 dark:data-[state=active]:border-gray-700 rounded-xl transition-all duration-300 px-2 py-2.5 sm:px-3 h-11 sm:h-12";
 
 export function ListPageTabTrigger({
   className,

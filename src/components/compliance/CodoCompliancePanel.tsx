@@ -18,6 +18,7 @@ import {
 } from '@/lib/codo/complianceRules';
 import { getEffectiveRole } from '@/lib/utils';
 import { getProjectStatusLabel, type ProjectStatus } from '@/lib/utils/projectUtils';
+import { notifyAdminNavCountsChanged } from '@/services/adminNavCountsService';
 import { complianceService, ProjectComplianceData } from '@/services/complianceService';
 import { ComplianceCheckItem } from '@/lib/codo/complianceRules';
 import { cn } from '@/lib/utils';
@@ -150,6 +151,7 @@ export function CodoCompliancePanel({
     try {
       const result = await complianceService.toggleCheck(projectId, phase, ruleKey, next);
       setData(result);
+      notifyAdminNavCountsChanged();
     } catch (err) {
       await loadCompliance();
       toast({
@@ -167,6 +169,7 @@ export function CodoCompliancePanel({
       const result = await complianceService.authorizeEmergencyBypass(projectId, reason);
       setData(result);
       setBypassChecked(true);
+      notifyAdminNavCountsChanged();
       toast({
         title: 'Emergency bypass authorized',
         description: 'Admin may now finalize project status.',
@@ -188,6 +191,7 @@ export function CodoCompliancePanel({
   }) => {
     const result = await complianceService.addCustomRule(projectId, addRulePhase, payload);
     setData(result);
+    notifyAdminNavCountsChanged();
     toast({
       title: 'Rule added',
       description: 'Your custom compliance rule has been added to this project.',
@@ -202,6 +206,7 @@ export function CodoCompliancePanel({
       setData(result);
       const nextStatus = result.project?.status || finalizeStatus;
       onStatusFinalized?.(nextStatus);
+      notifyAdminNavCountsChanged();
       toast({
         title: 'Project status updated',
         description: `Project marked as ${getProjectStatusLabel(nextStatus as 'completed' | 'release_ready')}.`,

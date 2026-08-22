@@ -1,3 +1,9 @@
+import { filterAssignedProjects } from '@/components/dashboard/roleDashboardShared';
+import {
+  buildProjectComplianceOverview,
+  matchesComplianceFilter,
+} from '@/lib/codo/complianceStatus';
+import type { Project } from '@/lib/utils/projectUtils';
 import { ENV } from '@/lib/env';
 import { userService } from '@/services/userService';
 import { clientService } from '@/services/clientService';
@@ -26,6 +32,7 @@ import { listWeeklyReports } from '@/services/weeklyReportService';
 export type AdminNavCounts = {
   dashboard: number;
   projects: number;
+  compliance: number;
   bugs: number;
   retests: number;
   fixes: number;
@@ -59,6 +66,7 @@ export type AdminNavCounts = {
 export const EMPTY_ADMIN_NAV_COUNTS: AdminNavCounts = {
   dashboard: 0,
   projects: 0,
+  compliance: 0,
   bugs: 0,
   retests: 0,
   fixes: 0,
@@ -137,6 +145,50 @@ function isDevOrTesterRole(role: string): boolean {
   return normalized === 'developer' || normalized === 'tester';
 }
 
+function complianceRoleKey(
+  role: string
+): 'admin' | 'developer' | 'tester' | null {
+  const normalized = role.toLowerCase();
+  if (normalized === 'admin') return 'admin';
+  if (normalized === 'developer') return 'developer';
+  if (normalized === 'tester') return 'tester';
+  return null;
+}
+
+/**
+ * Why: Compliance sidebar badge must match Compliance overview "Pending" tab counts.
+ */
+function countPendingComplianceProjects(
+  projects: Project[],
+  roleKey: 'admin' | 'developer' | 'tester'
+): number {
+  return projects
+    .map((project) => buildProjectComplianceOverview(project))
+    .filter((item) => matchesComplianceFilter(item, 'pending', roleKey)).length;
+}
+
+/**
+ * Why: Pending compliance is derived from project payloads — same source as Compliance overview.
+ */
+async function applyComplianceNavCount(counts: AdminNavCounts): Promise<void> {
+  const payload = currentTokenPayload();
+  const userId = payload?.user_id ? String(payload.user_id) : '';
+  const role = String(payload?.role || '').toLowerCase();
+  const roleKey = complianceRoleKey(role);
+  if (!userId || !roleKey) {
+    return;
+  }
+
+  try {
+    const projects = await projectService.getProjects();
+    const scoped =
+      roleKey === 'admin' ? projects : filterAssignedProjects(projects, userId);
+    counts.compliance = countPendingComplianceProjects(scoped, roleKey);
+  } catch {
+    // Keep API/fallback compliance count when project list is unavailable.
+  }
+}
+
 /**
  * Why: Non-admin sidebar badges should mirror each page's default tab —
  * assigned projects, shared docs/sheets, and the user's shared tasks.
@@ -198,6 +250,7 @@ function normalizeCounts(payload: Partial<AdminNavCounts>): AdminNavCounts {
   return {
     dashboard: asCount(payload.dashboard ?? payload.bugs),
     projects: asCount(payload.projects),
+    compliance: asCount(payload.compliance),
     bugs: asCount(payload.bugs),
     retests: asCount(payload.retests),
     fixes: asCount(payload.fixes),
@@ -414,6 +467,7 @@ async function fetchAdminNavCountsFallback(): Promise<AdminNavCounts> {
       .catch(() => {}),
   ]);
 
+  await applyComplianceNavCount(counts);
   return counts;
 }
 
@@ -453,7 +507,7 @@ export async function fetchAdminNavCounts(): Promise<AdminNavCounts> {
 
     dedicatedCountsAvailable = true;
     const counts = normalizeCounts(payload as Partial<AdminNavCounts>);
-    await applyRoleScopedNavOverrides(counts);
+    await Promise.all([applyRoleScopedNavOverrides(counts), applyComplianceNavCount(counts)]);
     return counts;
   } catch {
     if (dedicatedCountsAvailable !== true) {

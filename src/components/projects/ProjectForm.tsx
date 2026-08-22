@@ -1,4 +1,4 @@
-import { isClosedProjectStatus, isCompliancePipelineSatisfied, getPipelineStageLabel } from '@/lib/codo/complianceRules';
+import { isCompliancePipelineSatisfied, getPipelineStageLabel, requiresComplianceToClose } from '@/lib/codo/complianceRules';
 import { Button } from '@/components/ui/button';
 import { toast } from '@/components/ui/use-toast';
 import { useAuth } from '@/context/AuthContext';
@@ -401,7 +401,7 @@ export function ProjectForm({
     if (
       key === 'status' &&
       typeof value === 'string' &&
-      isClosedProjectStatus(value) &&
+      requiresComplianceToClose(value, effectiveRole) &&
       mode === 'edit' &&
       !isCompliancePipelineSatisfied(complianceSummary)
     ) {

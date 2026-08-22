@@ -28,6 +28,7 @@ import {
   Database,
   Timer,
   Repeat,
+  ShieldCheck,
   Search,
   LifeBuoy,
   Signal,
@@ -223,6 +224,16 @@ export const Sidebar = ({ className, closeSidebar }: SidebarProps) => {
                   : `${navCounts.projects} assigned project${navCounts.projects === 1 ? "" : "s"}`
               }
             />
+            {(role === "admin" || role === "developer" || role === "tester") && (
+              <NavLink
+                to="/compliance"
+                icon={<ShieldCheck className="h-5 w-5" />}
+                label="Compliance"
+                badge={formatNavCount(navCounts.compliance)}
+                badgeTone={navCounts.compliance > 0 ? "alert" : "default"}
+                badgeTitle={`${navCounts.compliance} pending compliance item${navCounts.compliance === 1 ? "" : "s"}`}
+              />
+            )}
             <NavLink
               to="/bugs"
               icon={<Bug className="h-5 w-5" />}

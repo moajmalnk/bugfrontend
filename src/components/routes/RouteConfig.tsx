@@ -70,6 +70,7 @@ const ProjectDetails = lazy(() => import("@/pages/ProjectDetails"));
 const NewProject = lazy(() => import("@/pages/NewProject"));
 const EditProject = lazy(() => import("@/pages/EditProject"));
 const ProjectCompliance = lazy(() => import("@/pages/ProjectCompliance"));
+const ComplianceOverview = lazy(() => import("@/pages/ComplianceOverview"));
 const Bugs = lazy(() => import("@/pages/Bugs"));
 const BugDetails = lazy(() => import("@/pages/BugDetails"));
 const BugDetailsDiagnostic = lazy(() => 
@@ -398,6 +399,7 @@ const RouteConfig = () => {
       <Route path="/recycle-bin" element={<RolePathRedirect suffix="recycle-bin" />} />
       <Route path="/updates" element={<RolePathRedirect suffix="updates" />} />
       <Route path="/projects" element={<RolePathRedirect suffix="projects" />} />
+      <Route path="/compliance" element={<RolePathRedirect suffix="compliance" />} />
       <Route path="/document" element={<RolePathRedirect suffix="document" />} />
       <Route path="/help/:articleId" element={<RolePathRedirect suffix="help/:articleId" />} />
       <Route path="/help" element={<RolePathRedirect suffix="help" />} />
@@ -406,6 +408,7 @@ const RouteConfig = () => {
       <Route path="/:role" element={<ProtectedRoleLayout />}>
           <Route path="dashboard" element={<RoleDashboard />} />
           <Route path="projects" element={<Projects />} />
+          <Route path="compliance" element={<ComplianceOverview />} />
           <Route path="projects/new" element={<NewProject />} />
           <Route path="projects/:projectId/compliance" element={<ProjectCompliance />} />
           <Route path="projects/:projectId/edit" element={<EditProject />} />

@@ -55,6 +55,22 @@ const PAGE_ENTRIES: PageSearchEntry[] = [
     keywords: ["projects", "project", "team", "portfolio"],
   },
   {
+    id: "page-compliance",
+    label: "Compliance",
+    path: "/compliance",
+    keywords: [
+      "compliance",
+      "codo",
+      "developer matrix",
+      "tester matrix",
+      "qa inspection",
+      "verification pipeline",
+      "admin lock",
+    ],
+    roles: ["admin", "developer", "tester"],
+    subtitle: "Project compliance overview",
+  },
+  {
     id: "page-bugs",
     label: "Bugs",
     path: "/bugs",
