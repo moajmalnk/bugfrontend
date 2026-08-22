@@ -2,6 +2,8 @@ import { useEffect, useMemo, useState, useCallback, useRef, type ReactNode } fro
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { submitWork, WorkSubmission, listMyTasks, UserTask, updateTask, listMySubmissions, checkIn, notifyWorkActivity, parseSubmissionsListResponse } from '@/services/todoService';
 import { CheckoutProjectUpdatesCard } from '@/components/daily-work/CheckoutProjectUpdatesCard';
+import { WeeklyReportStep } from '@/components/daily-work/WeeklyReportStep';
+import { isSaturdayYmd } from '@/services/weeklyReportService';
 import {
   formatProjectUpdatesForText,
   parseProjectUpdatesFromRow,
@@ -13,7 +15,7 @@ import { toast } from '@/components/ui/use-toast';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
-import { ClipboardCopy, Clock, FileText, Share2, FolderKanban, PauseCircle, PlayCircle, Search, X, LogOut, Calendar, ListTodo, AlertTriangle, Building2, Home, MapPin, Loader2, LocateFixed, RefreshCw, ShieldAlert, CheckCircle2 } from 'lucide-react';
+import { ClipboardCopy, Clock, FileText, Share2, FolderKanban, PauseCircle, PlayCircle, Search, X, LogOut, Calendar, ListTodo, AlertTriangle, Building2, Home, MapPin, Loader2, LocateFixed, RefreshCw, ShieldAlert, CheckCircle2, ClipboardList } from 'lucide-react';
 import { projectService, Project } from '@/services/projectService';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
@@ -316,7 +318,8 @@ export function DailyWorkFlowPanel({
   const [breakEntries, setBreakEntries] = useState<string[]>([]);
   const [draftHydrationEpoch, setDraftHydrationEpoch] = useState(0);
   const [isCheckoutWizardOpen, setIsCheckoutWizardOpen] = useState(false);
-  const [checkoutWizardStep, setCheckoutWizardStep] = useState<'form' | 'preview'>('form');
+  const [checkoutWizardStep, setCheckoutWizardStep] = useState<'weekly_report' | 'form' | 'preview'>('form');
+  const [weeklyReportDirty, setWeeklyReportDirty] = useState(false);
   const [todaySubmissionComplete, setTodaySubmissionComplete] = useState(false);
   const [projectUpdates, setProjectUpdates] = useState<Record<string, ProjectWorkUpdate>>({});
   const [attendanceGate, setAttendanceGate] = useState<AttendanceStatus | null>(null);
@@ -1138,6 +1141,25 @@ export function DailyWorkFlowPanel({
     setProjectUpdates((prev) => clearProjectUpdateNotes(prev));
   }
 
+  const handleWeeklyReportDirty = useCallback((dirty: boolean) => {
+    setWeeklyReportDirty(dirty);
+  }, []);
+
+  const skipWeeklyReportToCheckout = useCallback(() => {
+    setWeeklyReportDirty(false);
+    setCheckoutWizardStep('form');
+  }, []);
+
+  const handleWeeklyReportContinue = useCallback(() => {
+    setWeeklyReportDirty(false);
+    setCheckoutWizardStep('form');
+  }, []);
+
+  function confirmLeaveWeeklyReport(): boolean {
+    if (checkoutWizardStep !== 'weekly_report' || !weeklyReportDirty) return true;
+    return window.confirm('You have unsaved changes.');
+  }
+
   function openCheckoutWizard() {
     if (verificationRejected) {
       toast({
@@ -1149,7 +1171,6 @@ export function DailyWorkFlowPanel({
       return;
     }
     syncFlowAction('checkout');
-    setCheckoutWizardStep('form');
     if (!isEditing) {
       resetCheckoutFormDefaults();
       setForm((prev) => ({
@@ -1157,17 +1178,27 @@ export function DailyWorkFlowPanel({
         submission_date: prev.check_in_time ? prev.submission_date : serverToday,
       }));
     }
+    const workDate = isEditing
+      ? form.submission_date
+      : form.check_in_time
+        ? form.submission_date
+        : serverToday;
+    setWeeklyReportDirty(false);
+    setCheckoutWizardStep(!isEditing && isSaturdayYmd(workDate) ? 'weekly_report' : 'form');
     setIsCheckoutWizardOpen(true);
   }
 
-  function dismissCheckoutWizard() {
+  function dismissCheckoutWizard(): boolean {
+    if (!confirmLeaveWeeklyReport()) return false;
     setIsCheckoutWizardOpen(false);
     setCheckoutWizardStep('form');
+    setWeeklyReportDirty(false);
     clearWorkFlowUrl();
+    return true;
   }
 
   function closeCheckoutWizard() {
-    dismissCheckoutWizard();
+    if (!dismissCheckoutWizard()) return;
     if (isEmbedded) {
       onSaved?.();
     } else {
@@ -2091,7 +2122,9 @@ export function DailyWorkFlowPanel({
       }
       didAutoOpenFlowRef.current = flowKey;
       resetCheckoutFormDefaults();
-      setCheckoutWizardStep('form');
+      const workDate = form.check_in_time ? form.submission_date : serverToday;
+      setWeeklyReportDirty(false);
+      setCheckoutWizardStep(isSaturdayYmd(workDate) ? 'weekly_report' : 'form');
       setIsCheckoutWizardOpen(true);
     }
   }, [
@@ -2950,13 +2983,17 @@ export function DailyWorkFlowPanel({
       <Dialog
         open={isCheckoutWizardOpen}
         onOpenChange={(open) => {
-          if (!open && checkoutWizardStep === 'preview') {
-            closeCheckoutWizard();
-            return;
-          }
-          setIsCheckoutWizardOpen(open);
           if (!open) {
+            if (checkoutWizardStep === 'weekly_report' && weeklyReportDirty) {
+              if (!window.confirm('You have unsaved changes.')) return;
+            }
+            if (checkoutWizardStep === 'preview') {
+              closeCheckoutWizard();
+              return;
+            }
+            setIsCheckoutWizardOpen(false);
             setCheckoutWizardStep('form');
+            setWeeklyReportDirty(false);
             clearWorkFlowUrl();
           }
         }}
@@ -2965,9 +3002,11 @@ export function DailyWorkFlowPanel({
           {/* Header */}
           <div
             className={`relative overflow-visible p-6 text-white ${
-              checkoutWizardStep === 'form'
-                ? 'bg-gradient-to-br from-amber-500 via-orange-600 to-red-600'
-                : 'bg-gradient-to-br from-blue-600 via-indigo-600 to-purple-600'
+              checkoutWizardStep === 'weekly_report'
+                ? 'bg-gradient-to-br from-indigo-600 via-violet-600 to-purple-700'
+                : checkoutWizardStep === 'form'
+                  ? 'bg-gradient-to-br from-amber-500 via-orange-600 to-red-600'
+                  : 'bg-gradient-to-br from-blue-600 via-indigo-600 to-purple-600'
             }`}
           >
             <div className="absolute inset-0 bg-black/10" />
@@ -2991,30 +3030,45 @@ export function DailyWorkFlowPanel({
               <DialogHeader className="space-y-2 pr-14 text-left">
                 <DialogTitle className="flex items-center gap-3 text-2xl font-bold">
                   <div className="rounded-xl bg-white/20 p-2 backdrop-blur-sm">
-                    {checkoutWizardStep === 'form' ? (
+                    {checkoutWizardStep === 'weekly_report' ? (
+                      <ClipboardList className="h-6 w-6" />
+                    ) : checkoutWizardStep === 'form' ? (
                       <LogOut className="h-6 w-6" />
                     ) : (
                       <FileText className="h-6 w-6" />
                     )}
                   </div>
-                  {checkoutWizardStep === 'form'
-                    ? isEditing
-                      ? 'Update Work Submission'
-                      : 'Complete Checkout'
-                    : 'Daily Work Preview'}
+                  {checkoutWizardStep === 'weekly_report'
+                    ? 'Weekly Report'
+                    : checkoutWizardStep === 'form'
+                      ? isEditing
+                        ? 'Update Work Submission'
+                        : 'Complete Checkout'
+                      : 'Daily Work Preview'}
                 </DialogTitle>
                 <DialogDescription className="text-base text-white/90">
-                  {checkoutWizardStep === 'form'
-                    ? isEditing
-                      ? 'Review and update your daily work submission.'
-                      : 'Log hours to check out. Tasks and project notes are optional — Office/WFH was already set at check-in.'
-                    : 'Copy or share your daily work update.'}
+                  {checkoutWizardStep === 'weekly_report'
+                    ? 'Fill this short weekly summary, then you can log hours and check out.'
+                    : checkoutWizardStep === 'form'
+                      ? isEditing
+                        ? 'Review and update your daily work submission.'
+                        : 'Log hours to check out. Tasks and project notes are optional — Office/WFH was already set at check-in.'
+                      : 'Copy or share your daily work update.'}
                 </DialogDescription>
               </DialogHeader>
             </div>
           </div>
 
-          {checkoutWizardStep === 'form' ? (
+          {checkoutWizardStep === 'weekly_report' ? (
+            <WeeklyReportStep
+              active={isCheckoutWizardOpen && checkoutWizardStep === 'weekly_report'}
+              workDate={form.submission_date || serverToday}
+              fallbackName={currentUser?.name || currentUser?.username || 'User'}
+              onContinue={handleWeeklyReportContinue}
+              onSkipToCheckout={skipWeeklyReportToCheckout}
+              onDirtyChange={handleWeeklyReportDirty}
+            />
+          ) : checkoutWizardStep === 'form' ? (
             <>
               <div className="flex-1 overflow-y-auto bg-gray-50/50 p-5 dark:bg-gray-900/50 sm:p-6">
                 <div className="space-y-6">
