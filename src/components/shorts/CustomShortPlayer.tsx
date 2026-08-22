@@ -496,7 +496,7 @@ export function CustomShortPlayer({
             src={posterUrl}
             alt=""
             decoding="async"
-            fetchpriority="high"
+            fetchPriority="high"
             className="pointer-events-none absolute inset-0 z-[1] h-full w-full object-cover"
           />
         ) : (

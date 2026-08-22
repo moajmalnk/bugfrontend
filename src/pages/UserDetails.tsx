@@ -204,9 +204,23 @@ export default function UserDetails() {
   };
 
   const handleUserDelete = async (id: string, force?: boolean) => {
-    await userService.deleteUser(id, Boolean(force));
-    toast({ title: "Deleted", description: "User deleted successfully" });
-    navigate(usersBackPath);
+    try {
+      await userService.deleteUser(id, Boolean(force));
+      toast({
+        title: force ? "Permanently deleted" : "Moved to recycle bin",
+        description: force
+          ? "The user account was permanently removed."
+          : "The user was moved to the recycle bin. You can restore them within 30 days.",
+      });
+      navigate(usersBackPath);
+    } catch (err) {
+      toast({
+        title: "Delete failed",
+        description: err instanceof Error ? err.message : "Could not delete user",
+        variant: "destructive",
+      });
+      throw err;
+    }
   };
 
   const handleGenerateDashboardLink = async () => {
@@ -260,8 +274,7 @@ export default function UserDetails() {
   }, [effectiveRole, user?.name, user?.username, userId]);
 
   return (
-    <div className="min-h-[calc(100vh-1rem)] px-4 md:px-6 lg:px-8 py-6">
-      <div className="max-w-7xl mx-auto space-y-6">
+    <div className="min-w-0 w-full space-y-6 sm:space-y-8">
         {/* Header (matches Users page style) */}
         <div className="relative overflow-hidden">
           <div className="absolute inset-0 bg-gradient-to-r from-blue-50/50 via-transparent to-emerald-50/50 dark:from-blue-950/20 dark:via-transparent dark:to-emerald-950/20" />
@@ -908,7 +921,6 @@ export default function UserDetails() {
             </div>
           </div>
         )}
-      </div>
     </div>
   );
 }

@@ -242,7 +242,7 @@ export default function AdminLeaveRequests() {
 
   if (!isAdmin) {
     return (
-      <main className="min-h-[calc(100vh-4rem)] bg-background px-3 py-6 sm:px-6">
+      <div className="min-w-0 w-full space-y-6 sm:space-y-8">
         <div className="max-w-lg mx-auto rounded-xl border border-border bg-card p-5 shadow-sm">
           <p className="text-sm text-muted-foreground">Admin access required.</p>
           <Button
@@ -253,13 +253,12 @@ export default function AdminLeaveRequests() {
             Back
           </Button>
         </div>
-      </main>
+      </div>
     );
   }
 
   return (
-    <main className="min-h-[calc(100vh-4rem)] bg-background px-3 py-4 sm:px-6 sm:py-6 md:px-8 lg:px-10 lg:py-8 overflow-x-hidden">
-      <section className="max-w-7xl mx-auto min-w-0 space-y-6 sm:space-y-8">
+    <div className="min-w-0 w-full space-y-6 sm:space-y-8 overflow-x-hidden">
         {/* Hero */}
         <div className="relative overflow-hidden">
           <div className="absolute inset-0 bg-gradient-to-r from-teal-50/50 via-transparent to-cyan-50/50 dark:from-teal-950/20 dark:via-transparent dark:to-cyan-950/20" />
@@ -454,7 +453,6 @@ export default function AdminLeaveRequests() {
             )}
           </div>
         </div>
-      </section>
-    </main>
+    </div>
   );
 }

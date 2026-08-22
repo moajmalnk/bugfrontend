@@ -450,7 +450,13 @@ export function getPipelineStageLabel(stage: CompliancePipelineStage): string {
 }
 
 export function isCompliancePipelineSatisfied(
-  summary: Pick<ProjectComplianceSummary, 'pipeline_stage' | 'emergency_bypass'> | null | undefined
+  summary:
+    | Pick<
+        { pipeline_stage: CompliancePipelineStage | string; emergency_bypass: boolean },
+        'pipeline_stage' | 'emergency_bypass'
+      >
+    | null
+    | undefined
 ): boolean {
   if (!summary) return false;
   if (summary.emergency_bypass) return true;

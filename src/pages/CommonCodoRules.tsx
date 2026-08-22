@@ -674,8 +674,7 @@ export default function CommonCodoRules() {
 
   if (!canAccess) {
     return (
-      <main className="min-h-[calc(100vh-4rem)] min-w-0 w-full overflow-x-hidden bg-background py-2 sm:py-4">
-        <section className="w-full min-w-0 max-w-7xl mx-auto">
+      <div className="min-w-0 w-full space-y-4 sm:space-y-6 md:space-y-8 overflow-x-hidden">
           <div className="relative overflow-hidden rounded-2xl">
             <div className="absolute inset-0 bg-gradient-to-br from-cyan-50/50 via-blue-50/30 to-indigo-50/50 dark:from-cyan-950/20 dark:via-blue-950/10 dark:to-indigo-950/20 rounded-2xl" />
             <div className="relative bg-white/80 dark:bg-gray-900/80 backdrop-blur-sm border border-gray-200/50 dark:border-gray-700/50 rounded-2xl p-6 sm:p-12 text-center">
@@ -690,8 +689,7 @@ export default function CommonCodoRules() {
               </p>
             </div>
           </div>
-        </section>
-      </main>
+      </div>
     );
   }
 
@@ -1078,8 +1076,7 @@ export default function CommonCodoRules() {
   };
 
   return (
-    <main className="min-h-[calc(100vh-4rem)] min-w-0 w-full overflow-x-hidden bg-background py-2 sm:py-4">
-      <section className="w-full min-w-0 max-w-7xl mx-auto space-y-4 sm:space-y-6 md:space-y-8">
+    <div className="min-w-0 w-full space-y-4 sm:space-y-6 md:space-y-8 overflow-x-hidden">
         <div className="relative min-w-0 overflow-hidden rounded-2xl">
           <div className="absolute inset-0 bg-gradient-to-r from-cyan-50/50 via-transparent to-blue-50/50 dark:from-cyan-950/20 dark:via-transparent dark:to-blue-950/20" />
           <div className="relative min-w-0 bg-white/80 dark:bg-gray-900/80 backdrop-blur-sm border border-gray-200/50 dark:border-gray-700/50 rounded-2xl p-4 sm:p-6 md:p-8">
@@ -1506,7 +1503,6 @@ export default function CommonCodoRules() {
             )}
           </TabsContent>
         </Tabs>
-      </section>
 
       <CodoRuleDialog
         open={dialogOpen}
@@ -1613,6 +1609,6 @@ export default function CommonCodoRules() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-    </main>
+    </div>
   );
 }

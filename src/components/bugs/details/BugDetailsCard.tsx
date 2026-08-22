@@ -438,7 +438,7 @@ export const BugDetailsCard = ({
                   <span
                     className={cn(
                       "font-medium text-right",
-                      formatRetestSummary(bugState).toneClass
+                      formatRetestSummary(bugState).className
                     )}
                   >
                     {formatRetestSummary(bugState).label}
@@ -448,7 +448,7 @@ export const BugDetailsCard = ({
             </div>
           </div>
 
-          <GoogleDocsButton bug={bugState} project={project} />
+          <GoogleDocsButton bugId={String(bugState.id)} />
         </CardContent>
       </Card>
 

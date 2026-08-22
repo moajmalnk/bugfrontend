@@ -120,6 +120,10 @@ export const BugHeader = ({
     Boolean(pathFromState?.includes("/fixes")) ||
     fromState === "fixes" ||
     fromParam === "fixes";
+  const isFromRetests =
+    Boolean(pathFromState?.includes("/retests")) ||
+    fromState === "retests" ||
+    fromParam === "retests";
   const isFromCommonBugs =
     Boolean(pathFromState?.includes("/common-bugs")) ||
     fromState === "common-bugs" ||
@@ -132,11 +136,13 @@ export const BugHeader = ({
     pathFromState ||
     (isFromProject
       ? `/${role}/projects/${bug.project_id}?tab=bugs`
-      : isFromFixes
-        ? `/${role}/fixes`
-        : isFromCommonBugs
-          ? `/${role}/common-bugs`
-          : `/${role}/bugs`);
+      : isFromRetests
+        ? `/${role}/retests`
+        : isFromFixes
+          ? `/${role}/fixes`
+          : isFromCommonBugs
+            ? `/${role}/common-bugs`
+            : `/${role}/bugs`);
 
   const backText = isFromProject
     ? "Back to Project Bugs"
@@ -703,7 +709,7 @@ export function BugHeaderSkeletonDetailed() {
 // Loading state skeleton for the entire bug details page header
 export function BugDetailsHeaderSkeleton() {
   return (
-    <div className="w-full max-w-7xl mx-auto space-y-6 px-4 py-6 md:px-6 lg:px-8">
+    <div className="min-w-0 w-full space-y-6">
       {/* Main Header Skeleton */}
       <BugHeaderSkeletonDetailed />
 

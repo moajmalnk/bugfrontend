@@ -40,8 +40,7 @@ const DocumentPreviewPage = () => {
   };
 
   return (
-    <main className="min-h-[calc(100vh-4rem)] bg-background px-3 py-4 sm:px-6 sm:py-6 md:px-8 lg:px-10 lg:py-8">
-      <section className="mx-auto flex max-w-7xl flex-col gap-4 sm:gap-6">
+    <div className="min-w-0 w-full space-y-4 sm:space-y-6">
         <div className="relative overflow-hidden rounded-2xl border border-gray-200/60 bg-white/80 backdrop-blur-sm dark:border-gray-800/60 dark:bg-gray-900/80">
           <div className="pointer-events-none absolute inset-0 bg-gradient-to-r from-blue-50/40 via-transparent to-indigo-50/40 dark:from-blue-950/15 dark:via-transparent dark:to-indigo-950/15" />
           <div className="relative flex flex-col gap-4 p-4 sm:flex-row sm:items-center sm:justify-between sm:p-6">
@@ -90,8 +89,7 @@ const DocumentPreviewPage = () => {
         <div className="overflow-hidden rounded-2xl border border-gray-200/60 bg-white/80 dark:border-gray-800/60 dark:bg-gray-900/80">
           <DocumentPreviewBody url={url} fileName={fileName} />
         </div>
-      </section>
-    </main>
+    </div>
   );
 };
 

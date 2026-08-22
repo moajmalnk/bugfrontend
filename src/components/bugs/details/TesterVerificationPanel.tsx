@@ -13,6 +13,7 @@ import { Bug, BugLevel } from "@/types";
 import { apiClient } from "@/lib/axios";
 import { ENV } from "@/lib/env";
 import { cn } from "@/lib/utils";
+import { notifyAdminNavCountsChanged } from "@/services/adminNavCountsService";
 import { formatDetailedDate } from "@/lib/dateUtils";
 import {
   WhatsAppVoiceMessage,
@@ -419,6 +420,7 @@ export function TesterVerificationPanel({ bug, onUpdated }: TesterVerificationPa
 
       await queryClient.invalidateQueries({ queryKey: ["bugs"] });
       await queryClient.invalidateQueries({ queryKey: ["bugLifecycle", bug.id] });
+      notifyAdminNavCountsChanged();
 
       if (didReopen && reopen) {
         toast({

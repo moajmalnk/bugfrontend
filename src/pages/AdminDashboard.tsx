@@ -8,7 +8,7 @@ import {
   ChartTooltipContent,
   type ChartConfig,
 } from "@/components/ui/chart";
-import { DateRangePicker } from "@/components/ui/DateRangePicker";
+import { DashboardPeriodFilter } from "@/components/dashboard/DashboardPeriodFilter";
 import {
   Drawer,
   DrawerContent,
@@ -62,7 +62,9 @@ import { projectService } from "@/services/projectService";
 import { updateService, type Update } from "@/services/updateService";
 import { userService } from "@/services/userService";
 import { RecentDeadlineRemindersPanel } from "@/components/dashboard/RecentDeadlineRemindersPanel";
+import { RetestsHistoryPanel } from "@/components/dashboard/RetestsHistoryPanel";
 import { MonthlyOpsTimelinePanel } from "@/components/dashboard/MonthlyOpsTimelinePanel";
+import { UserAvatar } from "@/components/users/UserAvatar";
 import { TeamBirthdayBanner } from "@/components/dashboard/TeamBirthdayBanner";
 import { Bug, User } from "@/types";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
@@ -77,6 +79,7 @@ import {
   Check,
   CheckCircle2,
   ChevronDown,
+  ClipboardCheck,
   Clock,
   FolderKanban,
   Hourglass,
@@ -1479,117 +1482,6 @@ function updateTouchesPeriod(
   );
 }
 
-function DashboardPeriodFilter({
-  preset,
-  customFrom,
-  customTo,
-  period,
-  onPresetChange,
-  onCustomFromChange,
-  onCustomToChange,
-  isFetching,
-}: {
-  preset: WorkPeriodPreset;
-  customFrom: string;
-  customTo: string;
-  period: DashboardPeriod;
-  onPresetChange: (value: WorkPeriodPreset) => void;
-  onCustomFromChange: (value: string) => void;
-  onCustomToChange: (value: string) => void;
-  isFetching?: boolean;
-}) {
-  const activePreset =
-    WORK_PERIOD_PRESETS.find((p) => p.value === preset) ??
-    WORK_PERIOD_PRESETS.find((p) => p.value === "month") ??
-    WORK_PERIOD_PRESETS[0];
-  const ActivePresetIcon = activePreset.icon;
-
-  const selectPreset = (value: WorkPeriodPreset) => {
-    onPresetChange(value);
-    if (value === "custom" && !customFrom) {
-      const today = toLocalCalendarDateString(new Date());
-      onCustomFromChange(shiftCalendarDate(today, -6));
-      onCustomToChange(today);
-    }
-  };
-
-  return (
-    <div className="flex flex-col sm:flex-row sm:flex-wrap items-stretch sm:items-center gap-2 min-w-0 w-full">
-      <DropdownMenu>
-        <DropdownMenuTrigger asChild>
-          <Button
-            type="button"
-            variant="outline"
-            size="lg"
-            className="h-12 w-full sm:w-auto px-4 sm:px-5 bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 font-semibold shadow-sm hover:shadow-md transition-all duration-300 rounded-xl min-w-0 max-w-full justify-between sm:justify-center"
-          >
-            <span className="inline-flex items-center gap-2 min-w-0">
-              <ActivePresetIcon className="h-5 w-5 shrink-0 text-indigo-600 dark:text-indigo-300" />
-              <span className="truncate">{activePreset.label}</span>
-              {/* Custom range lives in DateRangePicker — avoid duplicating / truncating it here */}
-              {preset !== "custom" ? (
-                <>
-                  <span className="text-muted-foreground font-normal shrink-0">·</span>
-                  <span className="truncate text-xs sm:text-sm font-medium text-muted-foreground max-w-[9rem] md:max-w-[14rem]">
-                    {period.rangeLabel}
-                  </span>
-                </>
-              ) : null}
-              {isFetching ? (
-                <span className="text-[10px] font-medium text-muted-foreground shrink-0">
-                  …
-                </span>
-              ) : null}
-            </span>
-            <ChevronDown className="ml-2 h-4 w-4 shrink-0 opacity-70" />
-          </Button>
-        </DropdownMenuTrigger>
-        <DropdownMenuContent
-          align="end"
-          className="z-[80] w-[min(100vw-2rem,18rem)] rounded-2xl p-1.5"
-        >
-          <DropdownMenuLabel className="px-2.5 py-1.5 text-[11px] uppercase tracking-wider text-muted-foreground">
-            Period filter
-          </DropdownMenuLabel>
-          <DropdownMenuSeparator />
-          {WORK_PERIOD_PRESETS.map((item) => {
-            const Icon = item.icon;
-            const isActive = preset === item.value;
-            return (
-              <DropdownMenuItem
-                key={item.value}
-                onSelect={() => selectPreset(item.value)}
-                className={cn(
-                  "rounded-xl gap-2 cursor-pointer",
-                  isActive && "bg-indigo-50 text-indigo-900 dark:bg-indigo-950/50 dark:text-indigo-100"
-                )}
-              >
-                <Icon className="h-4 w-4 shrink-0 opacity-80" />
-                <span className="flex-1 font-medium">{item.label}</span>
-                {isActive ? <Check className="h-4 w-4 shrink-0" /> : null}
-              </DropdownMenuItem>
-            );
-          })}
-        </DropdownMenuContent>
-      </DropdownMenu>
-
-      {preset === "custom" ? (
-        <DateRangePicker
-          from={customFrom}
-          to={customTo}
-          onChange={(nextFrom, nextTo) => {
-            onCustomFromChange(nextFrom);
-            onCustomToChange(nextTo);
-          }}
-          placeholder="From – To"
-          disableFuture
-          className="w-full sm:flex-1 sm:min-w-[14rem] sm:max-w-[22rem]"
-        />
-      ) : null}
-    </div>
-  );
-}
-
 function WorkRetentionTab({
   trackableUsers,
   role,
@@ -1876,9 +1768,6 @@ function WorkRetentionTab({
               <TableBody>
                 {rows.map((row) => {
                   const name = row.user.username || row.user.name || "User";
-                  const avatar =
-                    row.user.avatar ||
-                    `https://ui-avatars.com/api/?name=${encodeURIComponent(name)}&background=6366f1&color=fff`;
                   const todayH =
                     typeof row.user.today_hours_worked === "number"
                       ? row.user.today_hours_worked
@@ -1890,7 +1779,7 @@ function WorkRetentionTab({
                           to={`/${role}/users/${row.user.id}/work-stats/${encodeURIComponent(periodStartForLink)}`}
                           className="flex items-center gap-2.5 min-w-0 hover:text-indigo-600 dark:hover:text-indigo-400"
                         >
-                          <img src={avatar} alt="" className="h-8 w-8 rounded-lg object-cover shrink-0" />
+                          <UserAvatar name={name} avatar={row.user.avatar} size="sm" />
                           <span className="font-semibold truncate">{name}</span>
                         </Link>
                       </TableCell>
@@ -1934,16 +1823,6 @@ function TrackingUserRow({
   accent?: "emerald" | "amber";
 }) {
   const name = user.username || user.name || "User";
-  const initials = name
-    .split(/[\s._-]+/)
-    .filter(Boolean)
-    .slice(0, 2)
-    .map((p) => p[0]?.toUpperCase() || "")
-    .join("") || "U";
-  const avatarBg = accent === "emerald" ? "10b981" : "f59e0b";
-  const avatar =
-    user.avatar ||
-    `https://ui-avatars.com/api/?name=${encodeURIComponent(name)}&background=${avatarBg}&color=fff&bold=true`;
   const hours =
     typeof user.today_hours_worked === "number" ? user.today_hours_worked.toFixed(1) : null;
   const presence =
@@ -1952,6 +1831,8 @@ function TrackingUserRow({
       : user.status === "idle"
         ? { label: "Idle", dot: "bg-amber-400", ring: "ring-amber-400/40" }
         : { label: "Offline", dot: "bg-slate-400", ring: "ring-slate-400/30" };
+  const avatarStatus =
+    user.status === "active" || user.status === "idle" ? user.status : null;
 
   return (
     <li>
@@ -1960,22 +1841,22 @@ function TrackingUserRow({
         className="group flex items-center gap-3 rounded-2xl px-2.5 py-2.5 -mx-0.5 transition-all duration-200 hover:bg-white/70 dark:hover:bg-white/[0.04]"
       >
         <div className="relative shrink-0">
-          <img
-            src={avatar}
-            alt=""
-            className={cn(
-              "h-10 w-10 rounded-2xl object-cover ring-2 ring-offset-2 ring-offset-transparent dark:ring-offset-gray-900/80 shadow-sm",
-              presence.ring
-            )}
+          <UserAvatar
+            name={name}
+            avatar={user.avatar}
+            size="md"
+            status={avatarStatus}
+            className={cn("ring-2 ring-offset-2 ring-offset-transparent dark:ring-offset-gray-900/80", presence.ring)}
           />
-          <span
-            className={cn(
-              "absolute -bottom-0.5 -right-0.5 h-2.5 w-2.5 rounded-full border-2 border-white dark:border-gray-900",
-              presence.dot
-            )}
-            title={presence.label}
-          />
-          <span className="sr-only">{initials}</span>
+          {!avatarStatus ? (
+            <span
+              className={cn(
+                "absolute -bottom-0.5 -right-0.5 h-2.5 w-2.5 rounded-full border-2 border-white dark:border-gray-900 pointer-events-none",
+                presence.dot
+              )}
+              title={presence.label}
+            />
+          ) : null}
         </div>
         <div className="min-w-0 flex-1">
           <p className="text-sm font-semibold truncate text-gray-900 dark:text-white group-hover:text-blue-600 dark:group-hover:text-blue-300 transition-colors">
@@ -2390,8 +2271,7 @@ export default function AdminDashboard() {
     updatesProjectFilter !== "all" || updatesStatusFilter !== "all";
   if (!isAdmin) {
     return (
-      <main className="min-h-[calc(100vh-4rem)] bg-background px-3 py-4 sm:px-6 sm:py-6 md:px-8 lg:px-10 lg:py-8">
-        <section className="max-w-7xl mx-auto">
+      <div className="min-w-0 w-full">
           <div className="relative overflow-hidden">
             <div className="absolute inset-0 bg-gradient-to-br from-blue-50/50 via-indigo-50/30 to-purple-50/50 dark:from-blue-950/20 dark:via-indigo-950/10 dark:to-purple-950/20 rounded-2xl" />
             <div className="relative bg-white/80 dark:bg-gray-900/80 backdrop-blur-sm border border-gray-200/50 dark:border-gray-700/50 rounded-2xl p-12 text-center">
@@ -2404,8 +2284,7 @@ export default function AdminDashboard() {
               </p>
             </div>
           </div>
-        </section>
-      </main>
+      </div>
     );
   }
 
@@ -2462,6 +2341,19 @@ export default function AdminDashboard() {
           tab: "bugs-fixes" as DashboardTab,
         },
         {
+          title: "Retests",
+          value: periodBugStats?.retests?.pending ?? 0,
+          hint:
+            (periodBugStats?.retests?.total ?? 0) > 0
+              ? `${periodBugStats?.retests?.total ?? 0} verified in ${period.title.toLowerCase()}`
+              : "Awaiting tester verification",
+          icon: ClipboardCheck,
+          gradient: "from-violet-500 to-purple-600",
+          chip: "from-violet-50 to-purple-50 dark:from-violet-950/30 dark:to-purple-950/30 border-violet-200 dark:border-violet-800",
+          valueClass: "text-violet-700 dark:text-violet-300",
+          tab: "bugs-fixes" as DashboardTab,
+        },
+        {
           title: "Checked in",
           value: data.checkedIn.length,
           hint: `${data.notCheckedIn.length} not in`,
@@ -2475,8 +2367,7 @@ export default function AdminDashboard() {
     : [];
 
   return (
-    <main className="min-h-[calc(100vh-4rem)] bg-background px-3 py-4 sm:px-6 sm:py-6 md:px-8 lg:px-10 lg:py-8">
-      <section className="max-w-7xl mx-auto space-y-6 sm:space-y-8 min-w-0 w-full">
+    <div className="min-w-0 w-full space-y-6 sm:space-y-8">
         <TeamBirthdayBanner />
         {/* Professional Header — matches Bugs / Fixes */}
         <div className="relative overflow-hidden rounded-2xl">
@@ -2500,7 +2391,7 @@ export default function AdminDashboard() {
                 </p>
               </div>
 
-              <div className="min-w-0 w-full lg:w-auto shrink-0">
+              <div className="min-w-0 w-full lg:w-auto lg:max-w-md xl:max-w-lg lg:ml-auto">
                 <DashboardPeriodFilter
                   preset={periodPreset}
                   customFrom={customFrom}
@@ -2518,11 +2409,11 @@ export default function AdminDashboard() {
 
         {isLoading ? (
           <div className="space-y-6">
-            <div className="grid grid-cols-12 gap-3 sm:gap-4">
-              {Array.from({ length: 6 }).map((_, i) => (
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-7 gap-3 sm:gap-4">
+              {Array.from({ length: 7 }).map((_, i) => (
                 <div
                   key={i}
-                  className="col-span-6 sm:col-span-4 xl:col-span-2 rounded-2xl border border-gray-200/50 dark:border-gray-700/50 bg-white/80 dark:bg-gray-900/80 p-4 space-y-3"
+                  className="rounded-2xl border border-gray-200/50 dark:border-gray-700/50 bg-white/80 dark:bg-gray-900/80 p-4 space-y-3"
                 >
                   <Skeleton className="h-8 w-8 rounded-lg" />
                   <Skeleton className="h-3 w-20" />
@@ -2547,14 +2438,14 @@ export default function AdminDashboard() {
         ) : (
           <>
             {/* KPI cards */}
-            <div className="grid grid-cols-12 gap-3 sm:gap-4">
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-7 gap-3 sm:gap-4">
               {kpiCards.map((card) => (
                 <button
                   key={card.title}
                   type="button"
                   onClick={() => setActiveTab(card.tab)}
                   className={cn(
-                    "col-span-6 sm:col-span-4 xl:col-span-2 group relative overflow-hidden rounded-2xl border bg-gradient-to-br p-4 sm:p-5 shadow-sm transition-all duration-300 hover:shadow-lg hover:-translate-y-0.5 text-left w-full min-w-0",
+                    "group relative overflow-hidden rounded-2xl border bg-gradient-to-br p-4 sm:p-5 shadow-sm transition-all duration-300 hover:shadow-lg hover:-translate-y-0.5 text-left w-full min-w-0",
                     card.chip
                   )}
                 >
@@ -2660,6 +2551,13 @@ export default function AdminDashboard() {
 
               <TabsContent value="overview" className="space-y-6 sm:space-y-8 mt-0">
                 <BugPipelineCard bugCounts={view.bugCounts} role={role} />
+
+                <RetestsHistoryPanel
+                  role={role}
+                  from={period.from}
+                  to={period.to}
+                  stats={periodBugStats?.retests}
+                />
 
                 <MonthlyOpsTimelinePanel enabled={isAdmin} />
 
@@ -3593,6 +3491,13 @@ export default function AdminDashboard() {
 
                 <BugPipelineCard bugCounts={view.bugCounts} role={role} />
 
+                <RetestsHistoryPanel
+                  role={role}
+                  from={period.from}
+                  to={period.to}
+                  stats={periodBugStats?.retests}
+                />
+
                 <div className={cn(PANEL, "p-5 sm:p-6 space-y-5")}>
                   <SectionTitle
                     icon={BugIcon}
@@ -3805,7 +3710,6 @@ export default function AdminDashboard() {
             </Tabs>
           </>
         )}
-      </section>
-    </main>
+    </div>
   );
 }

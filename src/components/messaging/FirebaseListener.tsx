@@ -33,7 +33,7 @@ function showSystemNotification(
   }
 
   try {
-    const options: NotificationOptions & { image?: string } = {
+    const options: NotificationOptions & { image?: string; renotify?: boolean } = {
       body,
       icon: "/notification-icon.png",
       badge: "/notification-badge-96.png",

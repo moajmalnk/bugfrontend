@@ -255,8 +255,8 @@ export const MainLayout = ({ children }: MainLayoutProps) => {
                 {children}
               </div>
             ) : (
-              <div className="min-w-0 w-full px-3 py-4 sm:p-4 md:p-6 lg:p-8">
-                <div className="max-w-7xl mx-auto w-full min-w-0">{children}</div>
+              <div className="min-w-0 w-full px-3 py-4 sm:px-4 md:px-6 lg:px-8">
+                <div className="mx-auto w-full min-w-0 max-w-7xl">{children}</div>
                 <LayoutFooter role={currentUser.role} />
               </div>
             )}

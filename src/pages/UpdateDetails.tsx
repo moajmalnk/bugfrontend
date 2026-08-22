@@ -144,45 +144,39 @@ const UpdateDetailsSkeleton = () => (
 );
 
 const UpdateDetailsMainSkeleton = () => (
-  <main
-    className="min-h-[60vh] bg-background px-4 py-6 md:px-6 lg:px-8"
+  <div
+    className="min-w-0 w-full space-y-8"
     aria-busy="true"
     aria-label="Loading update details"
   >
-    <section className="max-w-7xl mx-auto space-y-8">
-      <header>
-        <UpdateHeaderSkeleton />
-      </header>
+    <header>
+      <UpdateHeaderSkeleton />
+    </header>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-        {/* Main Content - Description Skeleton */}
-        <section className="lg:col-span-2 space-y-8">
-          <UpdateDescriptionSkeleton />
-        </section>
+    <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+      <section className="lg:col-span-2 space-y-8">
+        <UpdateDescriptionSkeleton />
+      </section>
 
-        {/* Sidebar - Update Details Skeleton */}
-        <aside className="space-y-8">
-          <UpdateDetailsSkeleton />
-        </aside>
-      </div>
-    </section>
-  </main>
+      <aside className="space-y-8">
+        <UpdateDetailsSkeleton />
+      </aside>
+    </div>
+  </div>
 );
 
 // Component to display access error
 const AccessError = () => (
-  <main className="min-h-[60vh] bg-background px-4 py-6 md:px-6 lg:px-8">
-    <section className="max-w-7xl mx-auto space-y-8 flex flex-col items-center justify-center text-center py-12 relative overflow-hidden rounded-2xl">
-      <div className="pointer-events-none absolute inset-0 bg-gradient-to-br from-red-50/50 via-orange-50/30 to-yellow-50/50 dark:from-red-950/20 dark:via-orange-950/10 dark:to-yellow-950/20" />
-      <div className="relative mx-auto w-24 h-24 rounded-full bg-gradient-to-br from-red-500 to-orange-600 flex items-center justify-center shadow-2xl">
-        <Lock className="h-12 w-12 text-white" />
-      </div>
-      <h1 className="relative text-2xl font-bold tracking-tight">Access Denied</h1>
-      <p className="relative text-muted-foreground max-w-md">
-        You don't have permission to view this update. You need to be a member of the project this update belongs to.
-      </p>
-    </section>
-  </main>
+  <div className="min-w-0 w-full space-y-8 flex flex-col items-center justify-center text-center py-12 relative overflow-hidden rounded-2xl">
+    <div className="pointer-events-none absolute inset-0 bg-gradient-to-br from-red-50/50 via-orange-50/30 to-yellow-50/50 dark:from-red-950/20 dark:via-orange-950/10 dark:to-yellow-950/20" />
+    <div className="relative mx-auto w-24 h-24 rounded-full bg-gradient-to-br from-red-500 to-orange-600 flex items-center justify-center shadow-2xl">
+      <Lock className="h-12 w-12 text-white" />
+    </div>
+    <h1 className="relative text-2xl font-bold tracking-tight">Access Denied</h1>
+    <p className="relative text-muted-foreground max-w-md">
+      You don't have permission to view this update. You need to be a member of the project this update belongs to.
+    </p>
+  </div>
 );
 
 const UpdateDetails = () => {
@@ -586,7 +580,7 @@ const UpdateDetails = () => {
   if (shouldShowSkeleton) return renderSkeleton();
   if (isAccessError) return <AccessError />;
   if (isError || !update) return (
-    <main className="min-h-[calc(100vh-10rem)] flex items-center justify-center p-4">
+    <div className="min-h-[40vh] flex items-center justify-center">
       <Card className="w-full max-w-md text-center">
         <CardHeader>
           <AlertCircle className="mx-auto h-12 w-12 text-destructive" />
@@ -597,7 +591,7 @@ const UpdateDetails = () => {
           <Button onClick={() => navigate(currentUser?.role ? `/${currentUser.role}/updates` : '/updates')}>Go to Updates</Button>
         </CardContent>
       </Card>
-    </main>
+    </div>
   );
   
   const canPerformActions = currentUser?.role === "admin" || (currentUser?.role === "developer" && update?.created_by === currentUser?.username) || (currentUser?.role === "tester" && update?.created_by === currentUser?.username)
@@ -690,7 +684,7 @@ const UpdateDetails = () => {
   const role = currentUser?.role || "admin";
 
   return (
-    <main className="min-h-[60vh] bg-background px-4 py-6 md:px-6 lg:px-8 flex flex-col">
+    <div className="min-w-0 w-full space-y-8 flex flex-col">
       {/* Background refetch indicator */}
       {isFetching && update && (
         <div className="fixed top-4 right-4 z-50">
@@ -700,8 +694,7 @@ const UpdateDetails = () => {
         </div>
       )}
       
-      {/* Main content */}
-      <section className="max-w-7xl mx-auto space-y-8 flex-1 w-full">
+      <div className="flex-1 w-full space-y-8">
         <header className="relative overflow-hidden rounded-2xl border border-gray-200/60 dark:border-gray-800/60 bg-white/80 dark:bg-gray-900/80 backdrop-blur-sm">
           <div className="pointer-events-none absolute inset-0 bg-gradient-to-r from-blue-50/50 via-transparent to-emerald-50/50 dark:from-blue-950/20 dark:via-transparent dark:to-emerald-950/20" />
           <div className="relative p-4 sm:p-6 space-y-3 sm:space-y-4">
@@ -1226,7 +1219,7 @@ const UpdateDetails = () => {
             <UpdateLifecycleCard update={update} />
           </section>
         </div>
-      </section>
+      </div>
       
       {/* Professional navigation bar at the bottom */}
       <nav className="w-full mt-8">
@@ -1602,7 +1595,7 @@ const UpdateDetails = () => {
         onUndo={undoDelete.cancelCountdown}
         onConfirmNow={undoDelete.confirmDelete}
       />
-    </main>
+    </div>
   );
 };
 

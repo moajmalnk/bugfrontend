@@ -5,6 +5,10 @@
 
 type LoadingErrorModalControls = {
   showModal: () => void;
+  hideModal: () => void;
+  handleRetry: () => void;
+  handleRefresh: () => void;
+  handleCancel: () => void;
 };
 
 type LoadingErrorTestWindow = Window & {
@@ -26,9 +30,6 @@ export function setGlobalLoadingErrorModal(modal: LoadingErrorModalControls) {
 export function triggerLoadingErrorModal() {
   if (import.meta.env.DEV && globalLoadingErrorModal) {
     globalLoadingErrorModal.showModal();
-    console.log('Loading error modal triggered for testing');
-  } else {
-    console.warn('triggerLoadingErrorModal can only be used in development mode');
   }
 }
 
@@ -50,10 +51,6 @@ export function simulateChunkLoadingError() {
         error: error,
       })
     );
-
-    console.log('Simulated chunk loading error for testing');
-  } else {
-    console.warn('simulateChunkLoadingError can only be used in development mode');
   }
 }
 

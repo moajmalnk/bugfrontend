@@ -399,8 +399,7 @@ const CommonBugs = () => {
 
   if (!canAccessCommonBugs) {
     return (
-      <main className="min-h-[calc(100vh-4rem)] bg-background px-3 py-4 sm:px-6 sm:py-6 md:px-8 lg:px-10 lg:py-8">
-        <section className="max-w-7xl mx-auto">
+      <div className="min-w-0 w-full space-y-6 sm:space-y-8">
           <div className="relative overflow-hidden">
             <div className="absolute inset-0 bg-gradient-to-br from-blue-50/50 via-indigo-50/30 to-purple-50/50 dark:from-blue-950/20 dark:via-indigo-950/10 dark:to-purple-950/20 rounded-2xl"></div>
             <div className="relative bg-white/80 dark:bg-gray-900/80 backdrop-blur-sm border border-gray-200/50 dark:border-gray-700/50 rounded-2xl p-12 text-center">
@@ -415,14 +414,12 @@ const CommonBugs = () => {
               </p>
             </div>
           </div>
-        </section>
-      </main>
+      </div>
     );
   }
 
   return (
-    <main className="min-h-[calc(100vh-4rem)] bg-background px-3 py-4 sm:px-6 sm:py-6 md:px-8 lg:px-10 lg:py-8">
-      <section className="max-w-7xl mx-auto space-y-6 sm:space-y-8">
+    <div className="min-w-0 w-full space-y-6 sm:space-y-8">
         {/* Header — same structure as Bugs page */}
         <div className="relative overflow-hidden">
           <div className="absolute inset-0 bg-gradient-to-r from-orange-50/50 via-transparent to-red-50/50 dark:from-orange-950/20 dark:via-transparent dark:to-red-950/20"></div>
@@ -757,8 +754,7 @@ const CommonBugs = () => {
             )}
           </TabsContent>
         </Tabs>
-      </section>
-    </main>
+    </div>
   );
 };
 

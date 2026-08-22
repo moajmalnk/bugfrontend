@@ -130,7 +130,7 @@ export function formatBugJourneyMessage(steps: BugJourneyStep[]): string {
   if (steps.length === 0) return "";
   const lines = steps.map((step, index) => {
     const parts = [`${index + 1}. ${formatJourneyHeadline(step)}`];
-    if (step.kind === "status" && step.status && step.kind !== "conversion") {
+    if (step.kind === "status" && step.status) {
       const status = formatStatusWords(step.status);
       if (!parts[0].toLowerCase().includes(status.toLowerCase())) {
         parts[0] += ` (${status})`;

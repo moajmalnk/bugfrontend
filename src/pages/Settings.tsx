@@ -181,31 +181,27 @@ const Settings = () => {
   // Check for SETTINGS_EDIT permission
   if (isLoading) {
     return (
-      <main className="min-h-0 w-full min-w-0 bg-background py-2 sm:py-4 md:py-6">
-        <section className="w-full min-w-0 max-w-7xl mx-auto space-y-4 sm:space-y-6">
-          <Skeleton className="h-28 sm:h-40 w-full rounded-2xl" />
-          <Skeleton className="h-12 sm:h-16 w-full rounded-2xl" />
-          <Skeleton className="h-64 sm:h-80 w-full rounded-2xl" />
-        </section>
-      </main>
+      <div className="min-w-0 w-full space-y-4 sm:space-y-6">
+        <Skeleton className="h-28 sm:h-40 w-full rounded-2xl" />
+        <Skeleton className="h-12 sm:h-16 w-full rounded-2xl" />
+        <Skeleton className="h-64 sm:h-80 w-full rounded-2xl" />
+      </div>
     );
   }
 
   if (!hasPermission('SETTINGS_EDIT')) {
     return (
-      <main className="min-h-0 w-full min-w-0 bg-background py-2 sm:py-4 md:py-6">
-        <section className="w-full min-w-0 max-w-7xl mx-auto">
-          <div className="rounded-2xl border border-gray-200/60 dark:border-gray-800/60 bg-white/80 dark:bg-gray-900/80 p-6 sm:p-12 text-center min-w-0">
-            <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-muted mb-4">
-              <Shield className="h-8 w-8 text-muted-foreground" />
-            </div>
-            <h1 className="text-xl sm:text-2xl font-bold mb-2">Access Denied</h1>
-            <p className="text-muted-foreground max-w-md mx-auto text-sm sm:text-base">
-              You do not have permission to access the settings page.
-            </p>
+      <div className="min-w-0 w-full">
+        <div className="rounded-2xl border border-gray-200/60 dark:border-gray-800/60 bg-white/80 dark:bg-gray-900/80 p-6 sm:p-12 text-center min-w-0">
+          <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-muted mb-4">
+            <Shield className="h-8 w-8 text-muted-foreground" />
           </div>
-        </section>
-      </main>
+          <h1 className="text-xl sm:text-2xl font-bold mb-2">Access Denied</h1>
+          <p className="text-muted-foreground max-w-md mx-auto text-sm sm:text-base">
+            You do not have permission to access the settings page.
+          </p>
+        </div>
+      </div>
     );
   }
 
@@ -336,8 +332,7 @@ const Settings = () => {
   })();
 
   return (
-    <main className="min-h-0 w-full min-w-0 bg-background py-2 sm:py-4 md:py-6">
-      <section className="w-full min-w-0 max-w-7xl mx-auto space-y-4 sm:space-y-6 md:space-y-8">
+    <div className="min-w-0 w-full space-y-4 sm:space-y-6 md:space-y-8">
         {/* Professional Header */}
         <div className="relative overflow-hidden rounded-2xl min-w-0">
           <div className="absolute inset-0 bg-gradient-to-r from-blue-50/50 via-transparent to-green-50/50 dark:from-blue-950/20 dark:via-transparent dark:to-green-950/20 pointer-events-none" />
@@ -890,8 +885,7 @@ const Settings = () => {
             </div>
           </TabsContent>
         </Tabs>
-      </section>
-    </main>
+    </div>
   );
 };
 

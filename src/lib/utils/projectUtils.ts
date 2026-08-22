@@ -7,6 +7,7 @@ export type ProjectPlatform = 'web' | 'ios' | 'android';
 export type ProjectCategory = 'WEB' | 'PWA' | 'APP' | 'SEO' | 'CREATIVE';
 
 import type { ClientSummary } from '@/types';
+import type { CompliancePipelineStage } from '@/lib/codo/complianceRules';
 
 export const PROJECT_PLATFORM_OPTIONS: { value: ProjectPlatform; label: string }[] = [
   { value: 'web', label: 'Web' },
@@ -193,7 +194,7 @@ export function validateWebCategoryFiles(
 }
 
 export interface ProjectComplianceSummaryLite {
-  pipeline_stage: string;
+  pipeline_stage: CompliancePipelineStage;
   developer_verified: number;
   developer_total: number;
   tester_verified: number;

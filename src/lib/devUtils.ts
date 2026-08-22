@@ -122,59 +122,12 @@ export const devUtils = {
   /**
    * Show help message
    */
-  help: () => {
-    console.log(`
-🔧 BUGRICER DEVELOPMENT UTILITIES
-
-Service Worker Commands:
-- __DEV_UTILS__.enableServiceWorker()     Enable SW in development
-- __DEV_UTILS__.disableServiceWorker()    Disable SW in development
-- __DEV_UTILS__.clearCaches()             Clear all caches
-- __DEV_UTILS__.getVersion()              Get SW version
-- __DEV_UTILS__.forceUpdate()             Force SW update
-- __DEV_UTILS__.getCacheNames()           List all cache names
-
-Simulation Commands:
-- __DEV_UTILS__.simulateChunkError()      Simulate chunk loading error
-- __DEV_UTILS__.goOffline()               Simulate offline mode
-- __DEV_UTILS__.goOnline()                Simulate online mode
-
-Debug Commands:
-- __DEV_UTILS__.enableSWDebug()           Enable SW debugging
-- __DEV_UTILS__.disableSWDebug()          Disable SW debugging
-- __DEV_UTILS__.help()                    Show this help
-
-Examples:
-  // Enable service worker for testing
-  __DEV_UTILS__.enableServiceWorker()
-  
-  // Clear caches when having issues
-  await __DEV_UTILS__.clearCaches()
-  
-  // Test error handling
-  __DEV_UTILS__.simulateChunkError()
-    `);
-  }
+  help: () => undefined,
 };
 
-/**
- * Initialize development utilities
- * Only available in development mode
- */
 export function initDevUtils(): void {
-  if (process.env.NODE_ENV === 'development') {
+  if (import.meta.env.DEV) {
     window.__DEV_UTILS__ = devUtils;
     window.__SW_DEBUG__ = false;
-    
-    console.log(`
-🚀 BugRicer Development Mode
-
-Type __DEV_UTILS__.help() in the // console for available commands.
-
-Quick Start:
-- Enable SW: __DEV_UTILS__.enableServiceWorker()
-- Clear caches: __DEV_UTILS__.clearCaches()
-- Get help: __DEV_UTILS__.help()
-    `);
   }
 } 

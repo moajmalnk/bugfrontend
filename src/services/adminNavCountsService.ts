@@ -27,6 +27,7 @@ export type AdminNavCounts = {
   dashboard: number;
   projects: number;
   bugs: number;
+  retests: number;
   fixes: number;
   updates: number;
   docs: number;
@@ -52,12 +53,14 @@ export type AdminNavCounts = {
   shorts: number;
   settings: number;
   backup: number;
+  recycleBin: number;
 };
 
 export const EMPTY_ADMIN_NAV_COUNTS: AdminNavCounts = {
   dashboard: 0,
   projects: 0,
   bugs: 0,
+  retests: 0,
   fixes: 0,
   updates: 0,
   docs: 0,
@@ -83,6 +86,7 @@ export const EMPTY_ADMIN_NAV_COUNTS: AdminNavCounts = {
   shorts: 0,
   settings: 0,
   backup: 0,
+  recycleBin: 0,
 };
 
 export const ADMIN_NAV_COUNTS_QUERY_KEY = ['admin-nav-counts'] as const;
@@ -195,6 +199,7 @@ function normalizeCounts(payload: Partial<AdminNavCounts>): AdminNavCounts {
     dashboard: asCount(payload.dashboard ?? payload.bugs),
     projects: asCount(payload.projects),
     bugs: asCount(payload.bugs),
+    retests: asCount(payload.retests),
     fixes: asCount(payload.fixes),
     updates: asCount(payload.updates),
     docs: asCount(payload.docs),
@@ -220,6 +225,7 @@ function normalizeCounts(payload: Partial<AdminNavCounts>): AdminNavCounts {
     shorts: asCount(payload.shorts),
     settings: asCount(payload.settings),
     backup: asCount(payload.backup),
+    recycleBin: asCount(payload.recycleBin),
   };
 }
 
@@ -255,7 +261,13 @@ async function fetchAdminNavCountsFallback(): Promise<AdminNavCounts> {
       })
       .catch(() => {}),
     bugService
-      .getBugs({ page: 1, limit: 1, status: 'fixed,rejected' })
+      .getBugs({ page: 1, limit: 1, status: 'fixed', verificationFilter: 'retest_pending' })
+      .then((result) => {
+        counts.retests = paginationTotal(result.pagination);
+      })
+      .catch(() => {}),
+    bugService
+      .getBugs({ page: 1, limit: 1, status: 'fixed', verificationFilter: 'verified_fixed' })
       .then((result) => {
         counts.fixes = paginationTotal(result.pagination);
       })

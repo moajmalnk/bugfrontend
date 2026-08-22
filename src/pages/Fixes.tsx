@@ -1,6 +1,12 @@
 import { ConvertBugDialog } from "@/components/bugs/ConvertBugDialog";
-import { ItemsPerPageSelect } from "@/components/pagination/ItemsPerPageSelect";
-import { PageJumpSelect } from "@/components/pagination/PageJumpSelect";
+import {
+  ListPageHeader,
+  ListPageShell,
+  ListPageTabTrigger,
+  ListPageTabsShell,
+  LIST_TABS_CONTENT,
+} from "@/components/layout/list-page";
+import { ListPagination } from "@/components/pagination/ListPagination";
 import {
   BugTypeFilterSelect,
 } from "@/components/bugs/BugTypeFilterSelect";
@@ -22,7 +28,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Tabs, TabsContent } from "@/components/ui/tabs";
 import { useAuth } from "@/context/AuthContext";
 import { formatLocalDate } from "@/lib/utils/dateUtils";
 import { bugService, Bug as BugType } from "@/services/bugService";
@@ -34,7 +40,7 @@ import {
   Bug,
   Calendar,
   CheckCircle,
-  ClipboardCheck,
+  ShieldCheck,
   Code,
   Filter,
   FolderOpen,
@@ -53,16 +59,17 @@ import {
   useResetUrlPageOnChange,
   listReturnState,
 } from "@/hooks/useUrlPagination";
-import {
-  formatRetestSummary,
-  getVerificationFilterKey,
-  VERIFICATION_FILTER_OPTIONS,
-} from "@/components/bugs/details/TesterVerificationPanel";
-import { cn } from "@/lib/utils";
 import { userService } from "@/services/userService";
 import { sortNamedUsersActiveFirst } from "@/lib/utils/userSort";
 
-const RESOLVED_BUG_STATUSES = "fixed,rejected";
+const FIXES_STATUS = "fixed";
+/** Why: Fixes catalog is only bugs testers confirmed as resolved — pending retests live on Retests. */
+const FIXES_VERIFICATION = "verified_fixed";
+
+function formatFixCount(count: number): string {
+  const n = Number.isFinite(count) ? Math.max(0, count) : 0;
+  return n === 1 ? "1 verified fix" : `${n.toLocaleString()} verified fixes`;
+}
 
 // Enhanced table row skeleton component for loading state
 const TableRowSkeleton = () => (
@@ -244,23 +251,22 @@ const BugCard = ({ bug, projects }: { bug: BugType; projects: Project[] }) => {
             </div>
           </div>
 
-          {(() => {
-            const retest = formatRetestSummary(bug);
-            return (
-              <div className="flex items-center gap-3 p-3 bg-sky-50/50 dark:bg-sky-900/20 rounded-xl">
-                <div className="flex-1 min-w-0">
-                  <span className="text-xs text-gray-500 dark:text-gray-400 font-medium">
-                    Tester verification
-                  </span>
-                  <div className="mt-1.5">
-                    <Badge variant="outline" className={cn("rounded-full font-medium", retest.className)}>
-                      {retest.label}
-                    </Badge>
-                  </div>
-                </div>
+          <div className="flex items-center gap-3 p-3 bg-emerald-50/50 dark:bg-emerald-900/20 rounded-xl">
+            <ShieldCheck className="h-4 w-4 text-emerald-600 dark:text-emerald-400 shrink-0" />
+            <div className="flex-1 min-w-0">
+              <span className="text-xs text-gray-500 dark:text-gray-400 font-medium">
+                Verification
+              </span>
+              <div className="mt-1">
+                <Badge
+                  variant="outline"
+                  className="rounded-full font-medium border-emerald-200 bg-emerald-50 text-emerald-800 dark:border-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-300"
+                >
+                  Verified fixed
+                </Badge>
               </div>
-            );
-          })()}
+            </div>
+          </div>
         </div>
 
         {/* Action Button */}
@@ -326,25 +332,21 @@ const Fixes = () => {
     projectFilter: "all",
     bugTypeFilter: "all",
     fixedByFilter: "all",
-    verificationFilter: "all",
   });
   const searchTerm = filters.searchTerm || "";
   const priorityFilter = filters.priorityFilter || "all";
   const projectFilter = filters.projectFilter || "all";
   const bugTypeFilter = filters.bugTypeFilter || "all";
   const fixedByFilter = filters.fixedByFilter || "all";
-  const verificationFilter = filters.verificationFilter || "all";
   
   const setSearchTerm = (value: string) => setFilter("searchTerm", value);
   const setPriorityFilter = (value: string) => setFilter("priorityFilter", value);
   const setProjectFilter = (value: string) => setFilter("projectFilter", value);
   const setBugTypeFilter = (value: string) => setFilter("bugTypeFilter", value);
   const setFixedByFilter = (value: string) => setFilter("fixedByFilter", value);
-  const setVerificationFilter = (value: string) => setFilter("verificationFilter", value);
   const [searchParams, setSearchParams] = useSearchParams();
   const initialTab = searchParams.get("tab") || "all-fixes";
   const [activeTab, setActiveTab] = useState(initialTab);
-  const [isFilterSheetOpen, setIsFilterSheetOpen] = useState(false);
   const {
     page: currentPage,
     pageSize: itemsPerPage,
@@ -398,18 +400,20 @@ const Fixes = () => {
       debouncedSearch,
       priorityFilter,
       bugTypeFilter,
+      FIXES_VERIFICATION,
       activeTab,
     ],
     queryFn: () =>
       bugService.getBugs({
         page: currentPage,
         limit: itemsPerPage,
-        status: RESOLVED_BUG_STATUSES,
+        status: FIXES_STATUS,
         projectId: projectFilter !== "all" ? projectFilter : undefined,
         search: debouncedSearch || undefined,
         priority: priorityFilter !== "all" ? priorityFilter : undefined,
         fixedBy: fixerIdForQuery,
         bugTypeId: bugTypeFilter !== "all" ? bugTypeFilter : undefined,
+        verificationFilter: FIXES_VERIFICATION,
       }),
     placeholderData: (prev) => prev,
   });
@@ -459,8 +463,7 @@ const Fixes = () => {
     priorityFilter !== "all" ||
     projectFilter !== "all" ||
     bugTypeFilter !== "all" ||
-    fixedByFilter !== "all" ||
-    verificationFilter !== "all";
+    (activeTab === "all-fixes" && fixedByFilter !== "all");
 
   // If current selected project becomes invisible (e.g., role change or data refresh), reset it
   React.useEffect(() => {
@@ -481,13 +484,8 @@ const Fixes = () => {
     }
   }, [uniqueFixers, fixedByFilter, setFilter]);
 
-  // Verification is derived client-side; keep as a page-level refine when set
-  const filteredBugs = useMemo(() => {
-    if (verificationFilter === "all") return bugs;
-    return bugs.filter(
-      (bug) => getVerificationFilterKey(bug) === verificationFilter
-    );
-  }, [bugs, verificationFilter]);
+  // Verification is filtered server-side for accurate totals and pagination.
+  const filteredBugs = bugs;
 
   useResetUrlPageOnChange(setCurrentPage, [
     activeTab,
@@ -496,30 +494,18 @@ const Fixes = () => {
     projectFilter,
     bugTypeFilter,
     fixedByFilter,
-    verificationFilter,
   ]);
 
-  const totalFiltered =
-    verificationFilter === "all"
-      ? data?.pagination?.totalBugs ?? 0
-      : filteredBugs.length;
+  const totalFiltered = data?.pagination?.totalBugs ?? filteredBugs.length;
   const listTotalPages = Math.max(
     1,
-    verificationFilter === "all"
-      ? data?.pagination?.totalPages ||
-          Math.ceil(totalFiltered / itemsPerPage) ||
-          1
-      : Math.ceil(filteredBugs.length / itemsPerPage) || 1
+    data?.pagination?.totalPages ||
+      Math.ceil(totalFiltered / itemsPerPage) ||
+      1
   );
   useClampUrlPage(clampToTotalPages, listTotalPages);
 
-  const paginatedBugs =
-    verificationFilter === "all"
-      ? filteredBugs
-      : filteredBugs.slice(
-          (currentPage - 1) * itemsPerPage,
-          currentPage * itemsPerPage
-        );
+  const paginatedBugs = filteredBugs;
 
   const showTabs =
     currentUser?.role === "admin" || currentUser?.role === "developer";
@@ -529,97 +515,76 @@ const Fixes = () => {
   const hasAnyFixed = allFixesCount > 0;
 
   const filterTriggerClass =
-    "w-full min-w-0 max-w-full h-11 overflow-hidden bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 rounded-xl shadow-sm hover:shadow-md transition-all duration-300 focus:ring-2 focus:ring-blue-500/40 focus:ring-offset-0 data-[state=open]:ring-2 data-[state=open]:ring-blue-500/40";
+    "w-full min-w-0 h-11 bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 rounded-xl shadow-sm hover:shadow-md transition-all duration-300 focus:ring-2 focus:ring-emerald-500/40 focus:ring-offset-0 data-[state=open]:ring-2 data-[state=open]:ring-emerald-500/40";
 
-  const filterFieldClass =
-    "flex items-center gap-2 min-w-0 w-full";
+  const filterFieldClass = "flex items-center gap-2 min-w-0 w-full";
 
   const searchFilterBar = (
     <div className="relative w-full min-w-0">
-      <div className="absolute inset-0 bg-gradient-to-r from-gray-50/30 to-blue-50/30 dark:from-gray-800/30 dark:to-blue-900/30 rounded-2xl pointer-events-none" />
+      <div className="absolute inset-0 bg-gradient-to-r from-gray-50/30 to-emerald-50/30 dark:from-gray-800/30 dark:to-emerald-900/30 rounded-2xl pointer-events-none" />
       <div className="relative bg-white/70 dark:bg-gray-900/70 backdrop-blur-sm border border-gray-200/50 dark:border-gray-700/50 rounded-2xl p-4 sm:p-5 md:p-6">
         <div className="space-y-3 sm:space-y-4 min-w-0">
-          <div className="flex items-center gap-2">
-            <div className="p-1.5 bg-blue-500 rounded-lg shrink-0">
-              <Search className="h-4 w-4 text-white" />
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+            <div className="flex items-center gap-2 min-w-0">
+              <div className="p-1.5 bg-emerald-500 rounded-lg shrink-0">
+                <Search className="h-4 w-4 text-white" />
+              </div>
+              <h3 className="text-base sm:text-lg font-semibold text-gray-900 dark:text-white truncate">
+                Search &amp; Filter
+              </h3>
             </div>
-            <h3 className="text-base sm:text-lg font-semibold text-gray-900 dark:text-white truncate">
-              Search & Filter
-            </h3>
+            {hasActiveFilters ? (
+              <p className="text-sm text-muted-foreground">
+                <span className="font-semibold text-primary">{totalFiltered}</span>{" "}
+                matching verified fix{totalFiltered === 1 ? "" : "es"}
+              </p>
+            ) : null}
           </div>
 
           <div className="relative group w-full min-w-0">
-            <Search className="absolute left-3 sm:left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400 group-focus-within:text-blue-500 transition-colors pointer-events-none" />
+            <Search className="absolute left-3 sm:left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400 group-focus-within:text-emerald-500 transition-colors pointer-events-none" />
             <input
               type="text"
-              placeholder="Search by title, description, or ID…"
+              placeholder="Search by title, description, or bug ID…"
               value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full min-w-0 pl-10 sm:pl-12 pr-3 sm:pr-4 py-2.5 sm:py-3 border border-gray-200 dark:border-gray-700 rounded-xl bg-white dark:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500 text-sm font-medium transition-all duration-300 shadow-sm hover:shadow-md"
+              maxLength={200}
+              onChange={(e) => setSearchTerm(e.target.value.slice(0, 200))}
+              className="w-full min-w-0 pl-10 sm:pl-12 pr-3 sm:pr-4 py-2.5 sm:py-3 border border-gray-200 dark:border-gray-700 rounded-xl bg-white dark:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-emerald-500/50 focus:border-emerald-500 text-sm font-medium transition-all duration-300 shadow-sm hover:shadow-md"
+              aria-label="Search verified fixes"
             />
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3 min-w-0">
+          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-3 min-w-0">
             <div className={filterFieldClass}>
-              <div className="p-1.5 bg-orange-500 rounded-lg shrink-0">
+              <div className="p-1.5 bg-orange-500 rounded-lg shrink-0" aria-hidden>
                 <Filter className="h-4 w-4 text-white" />
               </div>
               <div className="min-w-0 flex-1">
                 <Select value={priorityFilter} onValueChange={setPriorityFilter}>
-                  <SelectTrigger className={filterTriggerClass}>
+                  <SelectTrigger id="fixes-priority-filter" className={filterTriggerClass}>
                     <SelectValue placeholder="Priority" />
                   </SelectTrigger>
-                  <SelectContent position="popper" className="z-[60]" searchPlaceholder="Search priorities...">
-                    <SelectItem value="all">All Priorities</SelectItem>
-                    <SelectItem value="high">High Priority</SelectItem>
-                    <SelectItem value="medium">Medium Priority</SelectItem>
-                    <SelectItem value="low">Low Priority</SelectItem>
+                  <SelectContent position="popper" className="z-[60]">
+                    <SelectItem value="all">All priorities</SelectItem>
+                    <SelectItem value="high">High priority</SelectItem>
+                    <SelectItem value="medium">Medium priority</SelectItem>
+                    <SelectItem value="low">Low priority</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
             </div>
 
             <div className={filterFieldClass}>
-              <div className="p-1.5 bg-sky-500 rounded-lg shrink-0">
-                <ClipboardCheck className="h-4 w-4 text-white" />
-              </div>
-              <div className="min-w-0 flex-1">
-                <Select value={verificationFilter} onValueChange={setVerificationFilter}>
-                  <SelectTrigger className={filterTriggerClass}>
-                    <SelectValue placeholder="Verification" />
-                  </SelectTrigger>
-                  <SelectContent
-                    position="popper"
-                    className="z-[60] min-w-[16rem] max-w-[min(100vw-2rem,22rem)]"
-                    searchPlaceholder="Search verification..."
-                  >
-                    <SelectItem value="all">All verification</SelectItem>
-                    {VERIFICATION_FILTER_OPTIONS.map((opt) => (
-                      <SelectItem
-                        key={opt.value}
-                        value={opt.value}
-                        textValue={`${opt.label} ${opt.hint}`}
-                        description={opt.hint}
-                      >
-                        {opt.label}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
-
-            <div className={filterFieldClass}>
-              <div className="p-1.5 bg-purple-500 rounded-lg shrink-0">
+              <div className="p-1.5 bg-amber-500 rounded-lg shrink-0" aria-hidden>
                 <FolderOpen className="h-4 w-4 text-white" />
               </div>
               <div className="min-w-0 flex-1">
                 <Select value={projectFilter} onValueChange={setProjectFilter}>
-                  <SelectTrigger className={filterTriggerClass}>
+                  <SelectTrigger id="fixes-project-filter" className={filterTriggerClass}>
                     <SelectValue placeholder="Project" />
                   </SelectTrigger>
-                  <SelectContent position="popper" className="z-[60]" searchPlaceholder="Search projects...">
-                    <SelectItem value="all">All Projects</SelectItem>
+                  <SelectContent position="popper" className="z-[60]" searchPlaceholder="Search projects…">
+                    <SelectItem value="all">All projects</SelectItem>
                     {visibleProjects.map((project) => (
                       <SelectItem key={project.id} value={project.id}>
                         {project.name}
@@ -638,26 +603,42 @@ const Fixes = () => {
               triggerClassName={filterTriggerClass}
             />
 
-            <div className={filterFieldClass}>
-              <div className="p-1.5 bg-cyan-500 rounded-lg shrink-0">
-                <UserCheck className="h-4 w-4 text-white" />
+            {activeTab === "all-fixes" ? (
+              <div className={filterFieldClass}>
+                <div className="p-1.5 bg-cyan-500 rounded-lg shrink-0" aria-hidden>
+                  <UserCheck className="h-4 w-4 text-white" />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <Select value={fixedByFilter} onValueChange={setFixedByFilter}>
+                    <SelectTrigger id="fixes-fixer-filter" className={filterTriggerClass}>
+                      <SelectValue placeholder="Fixed by" />
+                    </SelectTrigger>
+                    <SelectContent position="popper" className="z-[60]" searchPlaceholder="Search fixers…">
+                      <SelectItem value="all">All fixers</SelectItem>
+                      {uniqueFixers.map((fixer) => (
+                        <SelectItem key={fixer.id} value={fixer.id}>
+                          {fixer.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
               </div>
-              <div className="min-w-0 flex-1">
-                <Select value={fixedByFilter} onValueChange={setFixedByFilter}>
-                  <SelectTrigger className={filterTriggerClass}>
-                    <SelectValue placeholder="Fixed by" />
-                  </SelectTrigger>
-                  <SelectContent position="popper" className="z-[60]" searchPlaceholder="Search fixers...">
-                    <SelectItem value="all">All Fixers</SelectItem>
-                    {uniqueFixers.map((fixer) => (
-                      <SelectItem key={fixer.id} value={fixer.id}>
-                        {fixer.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+            ) : (
+              <div className={filterFieldClass}>
+                <div className="p-1.5 bg-emerald-500 rounded-lg shrink-0" aria-hidden>
+                  <User className="h-4 w-4 text-white" />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <div
+                    className={`${filterTriggerClass} flex items-center px-3 text-sm font-medium text-foreground`}
+                    title="My verified fixes only"
+                  >
+                    You ({currentUser?.username || "you"})
+                  </div>
+                </div>
               </div>
-            </div>
+            )}
 
             <div className={filterFieldClass}>
               <Button
@@ -696,11 +677,8 @@ const Fixes = () => {
                   <TableHead className="hidden xl:table-cell">
                     Fixed By
                   </TableHead>
-                  <TableHead className="hidden xl:table-cell">
-                    Verification
-                  </TableHead>
                   <TableHead className="hidden 2xl:table-cell">
-                    Fixed Date
+                    Verified on
                   </TableHead>
                   <TableHead className="text-right">Actions</TableHead>
                 </TableRow>
@@ -748,12 +726,20 @@ const Fixes = () => {
               <div className="mx-auto w-20 h-20 bg-gradient-to-br from-green-500 to-emerald-600 rounded-full flex items-center justify-center shadow-2xl mb-6">
                 <CheckCircle className="h-10 w-10 text-white" />
               </div>
-              <h3 className="text-2xl font-bold text-gray-900 dark:text-white mb-3">All Clear!</h3>
+              <h3 className="text-2xl font-bold text-gray-900 dark:text-white mb-3">No verified fixes yet</h3>
               <p className="text-lg text-gray-600 dark:text-gray-400 mb-8 max-w-md mx-auto">
-                There are no fixed bugs to display. Great job on keeping your projects bug-free!
+                Fixes appear here after a tester confirms the issue is resolved. Check Retests for items awaiting verification.
               </p>
               <div className="flex flex-col sm:flex-row gap-4 justify-center">
                 <Button asChild size="lg" className="h-12 px-6 bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white font-semibold shadow-lg hover:shadow-xl transition-all duration-300">
+                  <Link
+                    to={currentUser?.role ? `/${currentUser.role}/retests` : "/retests"}
+                  >
+                    <ShieldCheck className="mr-2 h-5 w-5" />
+                    View Retests
+                  </Link>
+                </Button>
+                <Button asChild variant="outline" size="lg" className="h-12 px-6 rounded-xl font-semibold">
                   <Link
                     to={currentUser?.role ? `/${currentUser.role}/bugs` : "/bugs"}
                   >
@@ -782,20 +768,17 @@ const Fixes = () => {
               </div>
               <h3 className="text-2xl font-bold text-gray-900 dark:text-white mb-3">No Results Found</h3>
               <p className="text-lg text-gray-600 dark:text-gray-400 mb-8 max-w-md mx-auto">
-                No fixes match your current filters. Try adjusting your search criteria or clearing the filters.
+                No verified fixes match your search or filters. Try different keywords or clear filters to reset.
               </p>
               <Button
-                asChild
+                type="button"
                 variant="outline"
                 size="lg"
-                className="h-12 px-6 bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 hover:bg-orange-50 dark:hover:bg-orange-900/20 hover:border-orange-300 dark:hover:border-orange-700 text-gray-700 dark:text-gray-300 hover:text-orange-700 dark:hover:text-orange-300 font-semibold shadow-sm hover:shadow-md transition-all duration-300"
-                onClick={() => {
-                  clearFilters();
-                }}
+                onClick={() => clearFilters()}
+                className="h-12 px-6 rounded-xl font-semibold"
               >
-                <Link to={currentUser?.role ? `/${currentUser.role}/bugs/new` : "/bugs/new"}>
-                  Fix a Bug
-                </Link>
+                <RotateCcw className="mr-2 h-5 w-5" />
+                Clear filters
               </Button>
             </div>
           </div>
@@ -803,231 +786,20 @@ const Fixes = () => {
       );
     }
 
-    const totalPages = listTotalPages;
-
     return (
       <div className="space-y-6 sm:space-y-8">
         {searchFilterBar}
 
-        {/* Enhanced Pagination Controls */}
-        {totalPages > 1 && (
-          <div className="flex flex-col gap-4 sm:gap-5 mb-6 w-full min-w-0 overflow-x-hidden bg-gradient-to-r from-background via-background to-muted/10 rounded-xl shadow-sm border border-border/50 backdrop-blur-sm hover:shadow-md transition-all duration-300">
-            {/* Top Row - Results Info and Items Per Page */}
-            <div className="flex flex-col xl:flex-row xl:items-center justify-between gap-3 xl:gap-4 p-4 sm:p-5">
-              <div className="flex items-center gap-2">
-                <div className="w-2 h-2 bg-gradient-to-r from-primary to-primary/70 rounded-full animate-pulse"></div>
-                <span className="text-sm sm:text-base text-foreground font-semibold">
-                  Showing{" "}
-                  <span className="text-primary font-bold bg-gradient-to-r from-primary to-primary/80 bg-clip-text text-transparent">
-                    {(currentPage - 1) * itemsPerPage + 1}
-                  </span>
-                  -
-                  <span className="text-primary font-bold bg-gradient-to-r from-primary to-primary/80 bg-clip-text text-transparent">
-                    {Math.min(currentPage * itemsPerPage, totalFiltered)}
-                  </span>{" "}
-                  of{" "}
-                  <span className="text-primary font-bold bg-gradient-to-r from-primary to-primary/80 bg-clip-text text-transparent">
-                    {totalFiltered}
-                  </span>{" "}
-                  fixes
-                </span>
-              </div>
-              <div className="flex items-center justify-center sm:justify-end gap-3">
-                <span className="text-sm text-muted-foreground font-medium whitespace-nowrap">
-                  Items per page:
-                </span>
-                <ItemsPerPageSelect
-                  id="items-per-page"
-                  value={itemsPerPage}
-                  onChange={setItemsPerPage}
-                />
-              </div>
-            </div>
-
-            {/* Bottom Row - Pagination Navigation */}
-            <div className="flex flex-col xl:flex-row xl:items-center justify-between gap-4 p-4 sm:p-5 pt-0 xl:pt-0 border-t border-border/30">
-              {/* Page Info for Mobile/Tablet */}
-              <div className="xl:hidden flex items-center gap-2 text-sm text-muted-foreground font-medium w-full justify-center">
-                <div className="w-1.5 h-1.5 bg-gradient-to-r from-muted-foreground/40 to-muted-foreground/60 rounded-full animate-pulse"></div>
-                Page{" "}
-                <span className="text-primary font-semibold bg-gradient-to-r from-primary to-primary/80 bg-clip-text text-transparent">
-                  {currentPage}
-                </span>{" "}
-                of{" "}
-                <span className="text-primary font-semibold bg-gradient-to-r from-primary to-primary/80 bg-clip-text text-transparent">
-                  {totalPages}
-                </span>
-              </div>
-
-              {/* Pagination Controls */}
-              <div className="flex items-center justify-center gap-2 w-full xl:w-auto flex-wrap">
-                {/* Previous Button */}
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
-                  disabled={currentPage === 1}
-                  className="h-10 px-3 sm:px-4 min-w-[80px] sm:min-w-[90px] font-medium transition-all duration-200 hover:shadow-md hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100 border-border/60 hover:border-primary/50 hover:bg-primary/5"
-                >
-                  <svg
-                    className="w-4 h-4 mr-1 sm:mr-2 hidden sm:inline transition-transform duration-200 group-hover:-translate-x-0.5"
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M15 19l-7-7 7-7"
-                    />
-                  </svg>
-                  <span className="hidden sm:inline">Previous</span>
-                  <span className="sm:hidden text-lg">‹</span>
-                </Button>
-
-                {/* Page Numbers - Responsive Display */}
-                <div className="flex items-center gap-1.5">
-                  {/* Always show first page on larger screens */}
-                  <Button
-                    variant={currentPage === 1 ? "default" : "outline"}
-                    size="sm"
-                    onClick={() => setCurrentPage(1)}
-                    className="h-10 w-10 p-0 hidden xl:flex font-medium transition-all duration-200 hover:shadow-md hover:scale-105 border-border/60 hover:border-primary/50 hover:bg-primary/5"
-                  >
-                    1
-                  </Button>
-
-                  {/* Show ellipsis if needed on larger screens */}
-                  {currentPage > 4 && (
-                    <span className="hidden xl:inline-flex items-center justify-center h-10 w-10 text-sm text-muted-foreground/60 font-medium">
-                      •••
-                    </span>
-                  )}
-
-                  {/* Dynamic page numbers based on current page - show more on larger screens */}
-                  {(() => {
-                    const pages = [];
-                    const start = Math.max(2, currentPage - 1);
-                    const end = Math.min(totalPages - 1, currentPage + 1);
-
-                    for (let i = start; i <= end; i++) {
-                      if (i > 1 && i < totalPages) {
-                        pages.push(i);
-                      }
-                    }
-
-                    return pages.map((page) => (
-                      <Button
-                        key={page}
-                        variant={currentPage === page ? "default" : "outline"}
-                        size="sm"
-                        onClick={() => setCurrentPage(page)}
-                        className="h-10 w-10 p-0 hidden xl:flex font-medium transition-all duration-200 hover:shadow-md hover:scale-105 border-border/60 hover:border-primary/50 hover:bg-primary/5"
-                      >
-                        {page}
-                      </Button>
-                    ));
-                  })()}
-
-                  {/* Show ellipsis if needed on larger screens */}
-                  {currentPage < totalPages - 3 && (
-                    <span className="hidden xl:inline-flex items-center justify-center h-10 w-10 text-sm text-muted-foreground/60 font-medium">
-                      •••
-                    </span>
-                  )}
-
-                  {/* Always show last page if more than 1 page on larger screens */}
-                  {totalPages > 1 && (
-                    <Button
-                      variant={
-                        currentPage === totalPages ? "default" : "outline"
-                      }
-                      size="sm"
-                      onClick={() => setCurrentPage(totalPages)}
-                      className="h-10 w-10 p-0 hidden xl:flex font-medium transition-all duration-200 hover:shadow-md hover:scale-105 border-border/60 hover:border-primary/50 hover:bg-primary/5"
-                    >
-                      {totalPages}
-                    </Button>
-                  )}
-
-                  {/* Mobile-friendly page selector */}
-                  <PageJumpSelect
-                    className="xl:hidden"
-                    currentPage={currentPage}
-                    totalPages={totalPages}
-                    onPageChange={setCurrentPage}
-                  />
-                </div>
-
-                {/* Next Button */}
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() =>
-                    setCurrentPage((p) => Math.min(totalPages, p + 1))
-                  }
-                  disabled={currentPage === totalPages}
-                  className="h-10 px-3 sm:px-4 min-w-[80px] sm:min-w-[90px] font-medium transition-all duration-200 hover:shadow-md hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100 border-border/60 hover:border-primary/50 hover:bg-primary/5"
-                >
-                  <span className="hidden sm:inline">Next</span>
-                  <span className="sm:hidden text-lg">›</span>
-                  <svg
-                    className="w-4 h-4 ml-1 sm:ml-2 hidden sm:inline transition-transform duration-200 group-hover:translate-x-0.5"
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M9 5l7 7-7 7"
-                    />
-                  </svg>
-                </Button>
-              </div>
-
-              {/* Page Info for Desktop */}
-              <div className="hidden xl:flex items-center gap-2 text-sm text-muted-foreground font-medium shrink-0">
-                <div className="w-1.5 h-1.5 bg-gradient-to-r from-muted-foreground/40 to-muted-foreground/60 rounded-full animate-pulse"></div>
-                Page{" "}
-                <span className="text-primary font-semibold bg-gradient-to-r from-primary to-primary/80 bg-clip-text text-transparent">
-                  {currentPage}
-                </span>{" "}
-                of{" "}
-                <span className="text-primary font-semibold bg-gradient-to-r from-primary to-primary/80 bg-clip-text text-transparent">
-                  {totalPages}
-                </span>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* Simple results info when no pagination needed */}
-        {totalPages <= 1 && (
-          <div className="flex flex-col xl:flex-row xl:items-center justify-between gap-3 xl:gap-4 mb-6 p-4 sm:p-5 bg-gradient-to-r from-background via-background to-muted/10 rounded-xl border border-border/50 backdrop-blur-sm hover:shadow-md transition-all duration-300">
-            <div className="flex items-center gap-2">
-              <div className="w-2 h-2 bg-gradient-to-r from-primary to-primary/70 rounded-full animate-pulse"></div>
-              <span className="text-sm sm:text-base text-foreground font-semibold">
-                Showing{" "}
-                <span className="text-primary font-bold bg-gradient-to-r from-primary to-primary/80 bg-clip-text text-transparent">
-                  {totalFiltered}
-                </span>{" "}
-                fixes
-              </span>
-            </div>
-            <div className="flex items-center justify-center sm:justify-end gap-3">
-              <span className="text-sm text-muted-foreground font-medium whitespace-nowrap">
-                Items per page:
-              </span>
-              <ItemsPerPageSelect
-                id="items-per-page-simple"
-                value={itemsPerPage}
-                onChange={setItemsPerPage}
-              />
-            </div>
-          </div>
+        {totalFiltered > 0 && (
+          <ListPagination
+            currentPage={currentPage}
+            totalPages={listTotalPages}
+            totalItems={totalFiltered}
+            itemsPerPage={itemsPerPage}
+            onPageChange={setCurrentPage}
+            onPageSizeChange={setItemsPerPage}
+            itemLabel="verified fixes"
+          />
         )}
 
         {/* Professional Desktop & Tablet View */}
@@ -1050,11 +822,8 @@ const Fixes = () => {
                   <TableHead className="hidden xl:table-cell font-bold text-sm sm:text-base text-gray-900 dark:text-white py-4">
                     Fixed By
                   </TableHead>
-                  <TableHead className="hidden xl:table-cell font-bold text-sm sm:text-base text-gray-900 dark:text-white py-4">
-                    Verification
-                  </TableHead>
                   <TableHead className="hidden 2xl:table-cell font-bold text-sm sm:text-base text-gray-900 dark:text-white py-4">
-                    Fixed Date
+                    Verified on
                   </TableHead>
                   <TableHead className="w-[100px] pr-4 text-right font-bold text-sm sm:text-base text-gray-900 dark:text-white py-4">
                     Actions
@@ -1099,19 +868,6 @@ const Fixes = () => {
                     </TableCell>
                     <TableCell className="hidden xl:table-cell text-sm sm:text-base text-gray-700 dark:text-gray-300 py-4 font-medium">
                       {bug.fixed_by_name || bug.updated_by_name || "Unknown"}
-                    </TableCell>
-                    <TableCell className="hidden xl:table-cell py-4">
-                      {(() => {
-                        const retest = formatRetestSummary(bug);
-                        return (
-                          <Badge
-                            variant="outline"
-                            className={cn("rounded-full text-xs font-medium whitespace-nowrap", retest.className)}
-                          >
-                            {retest.label}
-                          </Badge>
-                        );
-                      })()}
                     </TableCell>
                     <TableCell className="hidden 2xl:table-cell text-sm sm:text-base text-gray-600 dark:text-gray-400 py-4 font-medium">
                       {formatDate(bug.updated_at)}
@@ -1163,123 +919,84 @@ const Fixes = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchParams]);
 
-  return (
-    <main className="min-h-[calc(100vh-4rem)] bg-background px-3 py-4 sm:px-6 sm:py-6 md:px-8 lg:px-10 lg:py-8">
-      <section className="max-w-7xl mx-auto space-y-6 sm:space-y-8 min-w-0 w-full">
-        {/* Professional Header */}
-        <div className="relative overflow-hidden">
-          <div className="absolute inset-0 bg-gradient-to-r from-blue-50/50 via-transparent to-green-50/50 dark:from-blue-950/20 dark:via-transparent dark:to-green-950/20"></div>
-          <div className="relative bg-white/80 dark:bg-gray-900/80 backdrop-blur-sm border border-gray-200/50 dark:border-gray-700/50 rounded-2xl p-6 sm:p-8">
-            <div className="flex flex-col xl:flex-row justify-between xl:items-center gap-6">
-              <div className="space-y-3 min-w-0 flex-1">
-                <div className="flex items-center gap-3">
-                  <div className="p-2 bg-gradient-to-br from-green-500 to-emerald-600 rounded-xl shadow-lg shrink-0">
-                    <CheckCircle className="h-6 w-6 text-white" />
-                  </div>
-                  <div className="min-w-0">
-                    <h1 className="text-3xl sm:text-4xl lg:text-5xl font-bold bg-gradient-to-r from-gray-900 via-gray-800 to-gray-700 dark:from-white dark:via-gray-100 dark:to-gray-300 bg-clip-text text-transparent tracking-tight">
-                      Fixes
-                    </h1>
-                    <div className="h-1 w-20 bg-gradient-to-r from-green-500 to-emerald-600 rounded-full mt-2"></div>
-                  </div>
-                </div>
-                <p className="text-gray-600 dark:text-gray-400 text-base lg:text-lg font-medium max-w-2xl break-words">
-                  Overview of all resolved issues across your projects
-                </p>
-              </div>
-              
-              <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-4 shrink-0">
-                {showTabs && (
-                  <Link
-                    to={currentUser?.role ? `/${currentUser.role}/bugs` : "/bugs"}
-                    className="group"
-                  >
-                    <Button
-                      variant="default"
-                      size="lg"
-                      className="h-12 px-6 bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white font-semibold shadow-lg hover:shadow-xl transition-all duration-300 transform hover:scale-105 group-hover:scale-105"
-                    >
-                      <Plus className="mr-2 h-5 w-5" />
-                      Fix a Bug
-                    </Button>
-                  </Link>
-                )}
-                
-                <div className="flex items-center gap-4">
-                  <div className="flex items-center gap-3 px-4 py-3 bg-gradient-to-r from-green-50 to-emerald-50 dark:from-green-950/30 dark:to-emerald-950/30 border border-green-200 dark:border-green-800 rounded-xl shadow-sm">
-                    <div className="p-1.5 bg-green-500 rounded-lg">
-                      <CheckCircle className="h-5 w-5 text-white" />
-                    </div>
-                    <div>
-                      <div className="text-2xl font-bold text-green-700 dark:text-green-300">
-                        {allFixesCount}
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Professional Tabs - always show for users who can view them */}
-        {showTabs ? (
-          <Tabs
-            value={activeTab}
-            onValueChange={(val) => {
-              setActiveTab(val);
-              setSearchParams((prev) => {
-                const p = new URLSearchParams(prev);
-                p.set("tab", val);
-                p.delete("page");
-                return p;
-              });
-            }}
-            className="w-full"
+  const fixHeader = (
+    <ListPageHeader
+      icon={<CheckCircle className="h-5 w-5 sm:h-6 sm:w-6" />}
+      title="Fixes"
+      description="Tester-confirmed fixes across your projects — only issues verified after retest"
+      accentBarClassName="from-green-500 to-emerald-600"
+      underlayClassName="from-green-50/50 via-transparent to-emerald-50/50 dark:from-green-950/20 dark:via-transparent dark:to-emerald-950/20"
+      count={allFixesCount}
+      countIcon={<CheckCircle className="h-5 w-5" />}
+      countClassName="from-green-50 to-emerald-50 dark:from-green-950/30 dark:to-emerald-950/30 border-green-200 dark:border-green-800 text-green-700 dark:text-green-300"
+      actions={
+        showTabs ? (
+          <Link
+            to={currentUser?.role ? `/${currentUser.role}/bugs` : "/bugs"}
+            className="group w-full sm:w-auto"
           >
-            <div className="relative">
-              <div className="absolute inset-0 bg-gradient-to-r from-gray-50/50 to-blue-50/50 dark:from-gray-800/50 dark:to-blue-900/50 rounded-2xl"></div>
-              <div className="relative bg-white/60 dark:bg-gray-900/60 backdrop-blur-sm border border-gray-200/50 dark:border-gray-700/50 rounded-2xl p-2">
-                <TabsList className="grid w-full grid-cols-2 h-14 bg-transparent p-1">
-                  <TabsTrigger
-                    value="all-fixes"
-                    className="text-sm sm:text-base font-semibold data-[state=active]:bg-white data-[state=active]:shadow-lg data-[state=active]:border data-[state=active]:border-gray-200 dark:data-[state=active]:bg-gray-800 dark:data-[state=active]:border-gray-700 rounded-xl transition-all duration-300"
-                  >
-                    <Code className="h-4 w-4 sm:h-5 sm:w-5 mr-2" />
-                    <span className="hidden sm:inline">All Fixes</span>
-                    <span className="sm:hidden">All</span>
-                    <span className="ml-2 px-2 py-1 bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 rounded-full text-xs font-bold">
-                      {allFixesCount}
-                    </span>
-                  </TabsTrigger>
-                  <TabsTrigger
-                    value="my-fixes"
-                    className="text-sm sm:text-base font-semibold data-[state=active]:bg-white data-[state=active]:shadow-lg data-[state=active]:border data-[state=active]:border-gray-200 dark:data-[state=active]:bg-gray-800 dark:data-[state=active]:border-gray-700 rounded-xl transition-all duration-300"
-                  >
-                    <User className="h-4 w-4 sm:h-5 sm:w-5 mr-2" />
-                    <span className="hidden sm:inline">My Fixes</span>
-                    <span className="sm:hidden">My</span>
-                    <span className="ml-2 px-2 py-1 bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300 rounded-full text-xs font-bold">
-                      {myFixesCount}
-                    </span>
-                  </TabsTrigger>
-                </TabsList>
-              </div>
-            </div>
-            <TabsContent value="all-fixes" className="space-y-6 sm:space-y-8">
-              {renderContent()}
-            </TabsContent>
-            <TabsContent value="my-fixes" className="space-y-6 sm:space-y-8">
-              {renderContent()}
-            </TabsContent>
-          </Tabs>
-        ) : (
-          <div className="space-y-6 sm:space-y-8">
-            {renderContent()}
-          </div>
-        )}
-      </section>
-    </main>
+            <Button
+              variant="default"
+              size="lg"
+              className="h-11 sm:h-12 w-full sm:w-auto px-6 bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white font-semibold shadow-lg"
+            >
+              <Plus className="mr-2 h-5 w-5" />
+              Fix a Bug
+            </Button>
+          </Link>
+        ) : undefined
+      }
+    />
+  );
+
+  const tabControls = showTabs ? (
+    <Tabs
+      value={activeTab}
+      onValueChange={(val) => {
+        setActiveTab(val);
+        setSearchParams((prev) => {
+          const p = new URLSearchParams(prev);
+          p.set("tab", val);
+          p.delete("page");
+          return p;
+        });
+      }}
+      className="w-full"
+    >
+      <ListPageTabsShell underlayClassName="from-gray-50/50 to-emerald-50/50 dark:from-gray-800/50 dark:to-emerald-900/50">
+        <ListPageTabTrigger value="all-fixes">
+          <Code className="h-4 w-4 sm:h-5 sm:w-5 mr-1.5 sm:mr-2 shrink-0" />
+          <span className="hidden sm:inline truncate">All verified</span>
+          <span className="sm:hidden truncate">All</span>
+          <span className="ml-1 sm:ml-2 px-1.5 sm:px-2 py-0.5 sm:py-1 bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 rounded-full text-[10px] sm:text-xs font-bold shrink-0">
+            {allFixesCount}
+          </span>
+        </ListPageTabTrigger>
+        <ListPageTabTrigger value="my-fixes">
+          <User className="h-4 w-4 sm:h-5 sm:w-5 mr-1.5 sm:mr-2 shrink-0" />
+          <span className="hidden sm:inline truncate">My verified</span>
+          <span className="sm:hidden truncate">My</span>
+          <span className="ml-1 sm:ml-2 px-1.5 sm:px-2 py-0.5 sm:py-1 bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300 rounded-full text-[10px] sm:text-xs font-bold shrink-0">
+            {myFixesCount}
+          </span>
+        </ListPageTabTrigger>
+      </ListPageTabsShell>
+      <TabsContent value="all-fixes" className={LIST_TABS_CONTENT}>
+        {renderContent()}
+      </TabsContent>
+      <TabsContent value="my-fixes" className={LIST_TABS_CONTENT}>
+        {renderContent()}
+      </TabsContent>
+    </Tabs>
+  ) : (
+    renderContent()
+  );
+
+  return (
+    <ListPageShell>
+      {fixHeader}
+      {tabControls}
+    </ListPageShell>
   );
 };
 

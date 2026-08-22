@@ -10,6 +10,7 @@ import {
 } from "@/components/bugs/BugTypeFilterSelect";
 import { ProjectInfoOverview } from "@/components/projects/ProjectInfoOverview";
 import { ProjectAnalytics } from "@/components/projects/ProjectAnalytics";
+import { ProjectRetestsTab } from "@/components/projects/ProjectRetestsTab";
 import { UpdateTimingInfo, UpdateReviewStatusCell } from "@/components/updates/UpdateTimingInfo";
 import Bugs from "@/pages/Bugs";
 import Fixes from "@/pages/Fixes";
@@ -417,6 +418,7 @@ const ProjectSummaryStat = ({
 
 const PROJECT_TAB_COUNT_STYLES: Record<string, string> = {
   bugs: "bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-300",
+  retests: "bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-300",
   fixes: "bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300",
   updates: "bg-indigo-100 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-300",
   tasks: "bg-orange-100 dark:bg-orange-900/30 text-orange-700 dark:text-orange-300",
@@ -626,6 +628,21 @@ const BugsWrapper = () => {
   
   // Create a custom Bugs component that accepts initial parameters
   return <BugsWithInitialParams projectId={projectId} initialTab={internalTab} initialStatus={status} />;
+};
+
+// Wrapper component to handle Retests tab with URL parameters
+const RetestsWrapper = () => {
+  const { projectId } = useParams();
+  const [searchParams] = useSearchParams();
+  const urlTab = searchParams.get("tab");
+
+  let internalTab = urlTab;
+  if (urlTab === "retests") {
+    internalTab = "all-retests";
+  }
+
+  if (!projectId) return null;
+  return <ProjectRetestsTab projectId={projectId} initialTab={internalTab} />;
 };
 
 // Wrapper component to handle Fixes component with URL parameters
@@ -3054,6 +3071,105 @@ const UpdatesWithInitialParams = ({ projectId, initialTab, initialStatus }: { pr
   const canViewTabs = currentUser?.role === "admin" || currentUser?.role === "tester";
   const isDeveloper = currentUser?.role === "developer";
   const noUpdates = !loading && filteredUpdates.length === 0;
+  const hasUpdateFilters =
+    !!searchTerm || typeFilter !== "all" || createdByFilter !== "all";
+
+  const updatesSearchFilter =
+    !skeletonLoading && !loading ? (
+      <div className="relative w-full min-w-0">
+        <div className="absolute inset-0 bg-gradient-to-r from-gray-50/30 to-blue-50/30 dark:from-gray-800/30 dark:to-blue-900/30 rounded-2xl pointer-events-none" />
+        <div className="relative bg-white/70 dark:bg-gray-900/70 backdrop-blur-sm border border-gray-200/50 dark:border-gray-700/50 rounded-2xl p-4 sm:p-5 md:p-6">
+          <div className="space-y-3 sm:space-y-4 min-w-0">
+            <div className="flex items-center gap-2">
+              <div className="p-1.5 bg-blue-500 rounded-lg shrink-0">
+                <Search className="h-4 w-4 text-white" />
+              </div>
+              <h3 className="text-base sm:text-lg font-semibold text-gray-900 dark:text-white truncate">
+                Search & Filter
+              </h3>
+            </div>
+
+            <div className="relative group w-full min-w-0">
+              <Search className="absolute left-3 sm:left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400 group-focus-within:text-blue-500 transition-colors pointer-events-none" />
+              <input
+                type="text"
+                placeholder="Search by title, description, or ID…"
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="w-full min-w-0 pl-10 sm:pl-12 pr-3 sm:pr-4 py-2.5 sm:py-3 border border-gray-200 dark:border-gray-700 rounded-xl bg-white dark:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500 text-sm font-medium transition-all duration-300 shadow-sm hover:shadow-md"
+              />
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5 sm:gap-3 min-w-0">
+              <div className="flex items-center gap-2 min-w-0">
+                <div className="p-1.5 bg-orange-500 rounded-lg shrink-0">
+                  <Filter className="h-4 w-4 text-white" />
+                </div>
+                <Select
+                  open={typeOpen}
+                  onOpenChange={setTypeOpen}
+                  value={typeFilter}
+                  onValueChange={(v) => {
+                    setTypeFilter(v);
+                    setTypeOpen(false);
+                  }}
+                >
+                  <SelectTrigger className="w-full min-w-0 h-11 bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 rounded-xl shadow-sm hover:shadow-md transition-all duration-300">
+                    <SelectValue placeholder="Type" />
+                  </SelectTrigger>
+                  <SelectContent position="popper" className="z-[60]">
+                    <SelectItem value="all">All Types</SelectItem>
+                    <SelectItem value="feature">Feature</SelectItem>
+                    <SelectItem value="updation">Updation</SelectItem>
+                    <SelectItem value="maintenance">Maintenance</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="flex items-center gap-2 min-w-0">
+                <div className="p-1.5 bg-purple-500 rounded-lg shrink-0">
+                  <User className="h-4 w-4 text-white" />
+                </div>
+                <Select
+                  open={creatorOpen}
+                  onOpenChange={setCreatorOpen}
+                  value={createdByFilter}
+                  onValueChange={(v) => {
+                    setCreatedByFilter(v);
+                    setCreatorOpen(false);
+                  }}
+                >
+                  <SelectTrigger className="w-full min-w-0 h-11 bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 rounded-xl shadow-sm hover:shadow-md transition-all duration-300">
+                    <SelectValue placeholder="Created By" />
+                  </SelectTrigger>
+                  <SelectContent position="popper" className="z-[60]">
+                    <SelectItem value="all">All Creators</SelectItem>
+                    {uniqueCreators.map((creator) => (
+                      <SelectItem key={creator} value={creator}>
+                        {creator}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+
+            {hasUpdateFilters ? (
+              <div className="flex justify-end">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => clearFilters()}
+                  className="h-10 sm:h-11 w-full sm:w-auto px-4 bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 rounded-xl shadow-sm hover:shadow-md transition-all duration-300 font-medium"
+                >
+                  Clear filters
+                </Button>
+              </div>
+            ) : null}
+          </div>
+        </div>
+      </div>
+    ) : null;
   
   if (loading) {
     return (
@@ -3176,107 +3292,7 @@ const UpdatesWithInitialParams = ({ projectId, initialTab, initialStatus }: { pr
           </div>
 
           <TabsContent value={activeTab} className="space-y-6 sm:space-y-8">
-            {/* Search and Filter */}
-            {!skeletonLoading && !loading && (
-              <div className="relative">
-                <div className="absolute inset-0 bg-gradient-to-r from-gray-50/30 to-blue-50/30 dark:from-gray-800/30 dark:to-blue-900/30 rounded-2xl"></div>
-                <div className="relative bg-white/70 dark:bg-gray-900/70 backdrop-blur-sm border border-gray-200/50 dark:border-gray-700/50 rounded-2xl p-6">
-                  <div className="space-y-4">
-                    <div className="flex items-center gap-2 mb-4">
-                      <div className="p-1.5 bg-blue-500 rounded-lg">
-                        <Search className="h-4 w-4 text-white" />
-                      </div>
-                      <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Search & Filter</h3>
-                    </div>
-                    
-                    <div className="flex flex-col md:flex-row gap-4">
-                      {/* Search Bar */}
-                      <div className="flex-1 relative group">
-                        <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400 group-focus-within:text-blue-500 transition-colors" />
-                        <input
-                          type="text"
-                          placeholder="Search updates by title, description, or update ID..."
-                          value={searchTerm}
-                          onChange={(e) => setSearchTerm(e.target.value)}
-                          className="w-full pl-12 pr-4 py-3 border border-gray-200 dark:border-gray-700 rounded-xl bg-white dark:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500 text-sm font-medium transition-all duration-300 shadow-sm hover:shadow-md"
-                        />
-                      </div>
-
-                      {/* Filter Controls */}
-                      <div className="flex flex-col sm:flex-row lg:flex-row gap-3">
-                        {/* Type Filter */}
-                        <div className="flex items-center gap-2 min-w-0">
-                          <div className="p-1.5 bg-orange-500 rounded-lg shrink-0">
-                            <Filter className="h-4 w-4 text-white" />
-                          </div>
-                          <Select
-                            open={typeOpen}
-                            onOpenChange={setTypeOpen}
-                            value={typeFilter}
-                            onValueChange={(v) => {
-                              setTypeFilter(v);
-                              setTypeOpen(false);
-                            }}
-                          >
-                            <SelectTrigger className="w-full sm:w-[140px] md:w-[160px] h-11 bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 rounded-xl shadow-sm hover:shadow-md transition-all duration-300">
-                              <SelectValue placeholder="Type" />
-                            </SelectTrigger>
-                            <SelectContent position="popper" className="z-[60]">
-                              <SelectItem value="all">All Types</SelectItem>
-                              <SelectItem value="feature">Feature</SelectItem>
-                              <SelectItem value="updation">Updation</SelectItem>
-                              <SelectItem value="maintenance">Maintenance</SelectItem>
-                            </SelectContent>
-                          </Select>
-                        </div>
-
-                        {/* Created By Filter */}
-                        <div className="flex items-center gap-2 min-w-0">
-                          <div className="p-1.5 bg-purple-500 rounded-lg shrink-0">
-                            <User className="h-4 w-4 text-white" />
-                          </div>
-                          <Select
-                            open={creatorOpen}
-                            onOpenChange={setCreatorOpen}
-                            value={createdByFilter}
-                            onValueChange={(v) => {
-                              setCreatedByFilter(v);
-                              setCreatorOpen(false);
-                            }}
-                          >
-                            <SelectTrigger className="w-full sm:w-[140px] md:w-[160px] h-11 bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 rounded-xl shadow-sm hover:shadow-md transition-all duration-300">
-                              <SelectValue placeholder="Created By" />
-                            </SelectTrigger>
-                            <SelectContent position="popper" className="z-[60]">
-                              <SelectItem value="all">All Creators</SelectItem>
-                              {uniqueCreators.map((creator) => (
-                                <SelectItem key={creator} value={creator}>
-                                  {creator}
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
-                        </div>
-
-                        {/* Clear Filters Button */}
-                        {(searchTerm || typeFilter !== "all" || createdByFilter !== "all") && (
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => {
-                              clearFilters();
-                            }}
-                            className="h-11 px-4 bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 rounded-xl shadow-sm hover:shadow-md transition-all duration-300 font-medium"
-                          >
-                            Clear
-                          </Button>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            )}
+            {updatesSearchFilter}
 
             {/* Professional Responsive Pagination Controls - Show when there are updates */}
             {!skeletonLoading && !loading && filteredUpdates.length > 0 && totalPages > 1 && (
@@ -3693,109 +3709,7 @@ const UpdatesWithInitialParams = ({ projectId, initialTab, initialStatus }: { pr
         </Tabs>
       ) : (
         <div className="space-y-6 sm:space-y-8">
-          {/* Search & Filter for Developers */}
-          {!skeletonLoading && !loading && (
-            <div className="relative">
-              <div className="absolute inset-0 bg-gradient-to-r from-gray-50/30 to-blue-50/30 dark:from-gray-800/30 dark:to-blue-900/30 rounded-2xl"></div>
-              <div className="relative bg-white/70 dark:bg-gray-900/70 backdrop-blur-sm border border-gray-200/50 dark:border-gray-700/50 rounded-2xl p-6">
-                <div className="space-y-4">
-                  <div className="flex items-center gap-2 mb-4">
-                    <div className="p-1.5 bg-blue-500 rounded-lg">
-                      <Search className="h-4 w-4 text-white" />
-                    </div>
-                    <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Search & Filter</h3>
-                  </div>
-
-                  <div className="flex flex-col md:flex-row gap-4">
-                    {/* Search Bar */}
-                    <div className="flex-1 relative group">
-                      <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400 group-focus-within:text-blue-500 transition-colors" />
-                      <input
-                        type="text"
-                        placeholder="Search updates by title, description, or update ID..."
-                        value={searchTerm}
-                        onChange={(e) => setSearchTerm(e.target.value)}
-                        className="w-full pl-12 pr-4 py-3 border border-gray-200 dark:border-gray-700 rounded-xl bg-white dark:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500 text-sm font-medium transition-all duration-300 shadow-sm hover:shadow-md"
-                      />
-                    </div>
-
-                    {/* Filter Controls */}
-                    <div className="flex flex-col sm:flex-row lg:flex-row gap-3">
-                      {/* Type Filter */}
-                      <div className="flex items-center gap-2 min-w-0">
-                        <div className="p-1.5 bg-orange-500 rounded-lg shrink-0">
-                          <Filter className="h-4 w-4 text-white" />
-                        </div>
-                        <Select
-                          open={typeOpen}
-                          onOpenChange={setTypeOpen}
-                          value={typeFilter}
-                          onValueChange={(v) => {
-                            setTypeFilter(v);
-                            setTypeOpen(false);
-                          }}
-                        >
-                          <SelectTrigger className="w-full sm:w-[140px] md:w-[160px] h-11 bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 rounded-xl shadow-sm hover:shadow-md transition-all duration-300">
-                            <SelectValue placeholder="Type" />
-                          </SelectTrigger>
-                          <SelectContent position="popper" className="z-[60]">
-                            <SelectItem value="all">All Types</SelectItem>
-                            <SelectItem value="feature">Feature</SelectItem>
-                            <SelectItem value="updation">Updation</SelectItem>
-                            <SelectItem value="maintenance">Maintenance</SelectItem>
-                          </SelectContent>
-                        </Select>
-                      </div>
-
-                      {/* Created By Filter */}
-                      <div className="flex items-center gap-2 min-w-0">
-                        <div className="p-1.5 bg-purple-500 rounded-lg shrink-0">
-                          <User className="h-4 w-4 text-white" />
-                        </div>
-                        <Select
-                          open={creatorOpen}
-                          onOpenChange={setCreatorOpen}
-                          value={createdByFilter}
-                          onValueChange={(v) => {
-                            setCreatedByFilter(v);
-                            setCreatorOpen(false);
-                          }}
-                        >
-                          <SelectTrigger className="w-full sm:w-[140px] md:w-[160px] h-11 bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 rounded-xl shadow-sm hover:shadow-md transition-all duration-300">
-                            <SelectValue placeholder="Created By" />
-                          </SelectTrigger>
-                          <SelectContent position="popper" className="z-[60]">
-                            <SelectItem value="all">All Creators</SelectItem>
-                            {uniqueCreators.map((creator) => (
-                              <SelectItem key={creator} value={creator}>
-                                {creator}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      </div>
-
-                      {/* Clear Filters Button */}
-                      {(searchTerm || typeFilter !== "all" || createdByFilter !== "all") && (
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => {
-                            setSearchTerm("");
-                            setTypeFilter("all");
-                            setCreatedByFilter("all");
-                          }}
-                          className="h-11 px-4 bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 rounded-xl shadow-sm hover:shadow-md transition-all duration-300 font-medium"
-                        >
-                          Clear
-                        </Button>
-                      )}
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-          )}
+          {updatesSearchFilter}
 
           {/* Content for Developers */}
           <div className="space-y-6 sm:space-y-8">
@@ -4011,6 +3925,9 @@ const ProjectDetails = () => {
       if (urlTab === "my-fixes" || urlTab === "all-fixes") {
         return "fixes";
       }
+      if (urlTab === "my-retests" || urlTab === "all-retests") {
+        return "retests";
+      }
       // Handle Updates component internal tabs - keep them as is
       if (urlTab === "my-updates" || urlTab === "all-updates") {
         return "updates";
@@ -4155,6 +4072,8 @@ const ProjectDetails = () => {
     } else if (urlTab === "my-fixes" || urlTab === "all-fixes") {
       // These are internal tabs for the Fixes component, set main tab to "fixes"
       if (activeTab !== "fixes") setActiveTab("fixes");
+    } else if (urlTab === "my-retests" || urlTab === "all-retests") {
+      if (activeTab !== "retests") setActiveTab("retests");
     } else if (urlTab === "my-updates" || urlTab === "all-updates") {
       // These are internal tabs for the Updates component, set main tab to "updates"
       if (activeTab !== "updates") setActiveTab("updates");
@@ -4207,7 +4126,10 @@ const ProjectDetails = () => {
       ...(currentUser?.role === "admin" ||
       currentUser?.role === "developer" ||
       currentUser?.role === "tester"
-        ? [{ value: "bugs", label: "Bugs", icon: Bug }]
+        ? [
+            { value: "bugs", label: "Bugs", icon: Bug },
+            { value: "retests", label: "Retests", icon: ClipboardCheck },
+          ]
         : []),
       ...(currentUser?.role === "tester" || currentUser?.role === "admin"
         ? [{ value: "fixes", label: "Fixes", icon: TestTube }]
@@ -4610,8 +4532,15 @@ const ProjectDetails = () => {
         return true;
       });
     })();
+    const isRetestPending = (bug: BugType) => {
+      if (bug.status !== "fixed") return false;
+      const retested = bug.tester_retested;
+      return retested === null || retested === undefined || String(retested) === "";
+    };
+
     return {
       bugs: uniqueBugs.filter((bug) => openBugStatuses.includes(bug.status)).length,
+      retests: uniqueBugs.filter(isRetestPending).length,
       fixes: uniqueBugs.filter(
         (bug) => bug.status === "fixed" || bug.status === "rejected"
       ).length,
@@ -5220,6 +5149,7 @@ const ProjectDetails = () => {
                   <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-5 gap-2 sm:gap-3 w-full xl:w-auto xl:min-w-[20rem] shrink-0">
                     {[
                       { label: 'Bugs', value: projectTabCounts.bugs, tone: 'text-red-600 dark:text-red-400' },
+                      { label: 'Retests', value: projectTabCounts.retests, tone: 'text-amber-600 dark:text-amber-400' },
                       { label: 'Fixes', value: projectTabCounts.fixes, tone: 'text-green-600 dark:text-green-400' },
                       { label: 'Updates', value: projectTabCounts.updates, tone: 'text-indigo-600 dark:text-indigo-400' },
                       { label: 'Tasks', value: projectTabCounts.tasks, tone: 'text-orange-600 dark:text-orange-400' },
@@ -5282,6 +5212,25 @@ const ProjectDetails = () => {
                         View Bugs
                       </Button>
                     )}
+                    {(currentUser?.role === "admin" ||
+                      currentUser?.role === "developer" ||
+                      currentUser?.role === "tester") && (
+                      <Button
+                        variant="outline"
+                        className="h-11 w-full min-w-0 justify-start gap-3 border-amber-200/80 text-amber-700 hover:bg-amber-50 dark:border-amber-800 dark:text-amber-300 dark:hover:bg-amber-950/30"
+                        onClick={() => {
+                          setActiveTab("retests");
+                          setSearchParams((prev) => {
+                            const p = new URLSearchParams(prev);
+                            p.set("tab", "retests");
+                            return p;
+                          });
+                        }}
+                      >
+                        <ClipboardCheck className="h-4 w-4 shrink-0" />
+                        View Retests
+                      </Button>
+                    )}
                     {(currentUser?.role === "tester" || currentUser?.role === "admin") && (
                       <Button
                         variant="outline"
@@ -5335,6 +5284,17 @@ const ProjectDetails = () => {
             <BugsWrapper />
                 </div>
         </TabsContent>
+
+        {/* Retests Tab */}
+        {(currentUser?.role === "admin" ||
+          currentUser?.role === "developer" ||
+          currentUser?.role === "tester") && (
+          <TabsContent value="retests">
+            <div className="w-full [&_.TabsList]:pointer-events-auto [&_.TabsTrigger]:pointer-events-auto [&_.TabsTrigger]:cursor-pointer">
+              <RetestsWrapper />
+            </div>
+          </TabsContent>
+        )}
 
         {/* Fixes Tab - for Testers and Admins */}
         {(currentUser?.role === "tester" || currentUser?.role === "admin") && (

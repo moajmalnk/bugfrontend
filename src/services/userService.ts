@@ -661,13 +661,9 @@ class UserService {
     if (!response.ok) {
       // Handle specific error cases with detailed messages
       if (response.status === 409) {
-        // Conflict - user has dependencies
         throw new Error(data.message || 'Cannot delete user. User has associated data that must be removed first.');
-      } else if (response.status === 404) {
-        throw new Error('User not found.');
-      } else {
-        throw new Error(data.message || 'Failed to delete user');
       }
+      throw new Error(data.message || 'Failed to delete user');
     }
     
     if (!data.success) {

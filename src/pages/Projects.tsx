@@ -1,3 +1,10 @@
+import {
+  ListPageHeader,
+  ListPageShell,
+  ListPageTabTrigger,
+  ListPageTabsShell,
+  LIST_TABS_CONTENT,
+} from "@/components/layout/list-page";
 import { ItemsPerPageSelect } from "@/components/pagination/ItemsPerPageSelect";
 import { PageJumpSelect } from "@/components/pagination/PageJumpSelect";
 import {
@@ -28,7 +35,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Tabs, TabsContent } from "@/components/ui/tabs";
 import { toast, useToast } from "@/components/ui/use-toast";
 import { useAuth } from "@/context/AuthContext";
 import { useUndoDelete } from "@/hooks/useUndoDelete";
@@ -2049,65 +2056,31 @@ const Projects = () => {
   }
 
   return (
-    <div className="min-w-0 w-full space-y-6 sm:space-y-8">
-        {/* Professional Header */}
-        <div className="relative overflow-hidden min-w-0">
-          <div className="absolute inset-0 bg-gradient-to-r from-blue-50/50 via-transparent to-green-50/50 dark:from-blue-950/20 dark:via-transparent dark:to-green-950/20"></div>
-          <div className="relative bg-white/80 dark:bg-gray-900/80 backdrop-blur-sm border border-gray-200/50 dark:border-gray-700/50 rounded-2xl p-4 sm:p-6 lg:p-8 min-w-0">
-            <div className="flex flex-col gap-4 sm:gap-6 lg:flex-row lg:justify-between lg:items-center">
-              <div className="space-y-2 sm:space-y-3 min-w-0">
-                <div className="flex items-center gap-3 min-w-0">
-                  <div className="p-2 bg-gradient-to-br from-blue-600 to-emerald-600 rounded-xl shadow-lg shrink-0">
-                    <FolderKanban className="h-5 w-5 sm:h-6 sm:w-6 text-white" />
-                  </div>
-                  <div className="min-w-0">
-                    <h1 className="text-2xl sm:text-3xl lg:text-4xl font-bold bg-gradient-to-r from-gray-900 via-gray-800 to-gray-700 dark:from-white dark:via-gray-100 dark:to-gray-300 bg-clip-text text-transparent tracking-tight">
-                      Projects
-                    </h1>
-                    <div className="h-1 w-16 sm:w-20 bg-gradient-to-r from-blue-600 to-emerald-600 rounded-full mt-2"></div>
-                  </div>
-                </div>
-                <p className="text-gray-600 dark:text-gray-400 text-sm sm:text-base lg:text-lg font-medium max-w-2xl">
-                  Manage your projects and track bugs
-                </p>
-              </div>
-
-              <div className="flex flex-col xs:flex-row items-stretch sm:items-center gap-3 sm:gap-4 w-full lg:w-auto shrink-0">
-                {currentUser?.role === "admin" && (
-                  <Button
-                    asChild
-                    className="h-11 sm:h-12 text-sm sm:text-base w-full sm:w-auto"
-                    aria-label="Create a new project"
-                  >
-                    <Link to={`/${currentUser.role}/projects/new`}>
-                      <Plus className="mr-2 h-4 w-4 sm:h-5 sm:w-5" /> New Project
-                    </Link>
-                  </Button>
-                )}
-
-                <div className="flex items-center gap-4 w-full sm:w-auto">
-                  <div className="flex items-center gap-3 px-4 py-3 bg-gradient-to-r from-blue-50 to-emerald-50 dark:from-blue-950/30 dark:to-emerald-950/30 border border-blue-200 dark:border-blue-800 rounded-xl shadow-sm w-full sm:w-auto justify-center sm:justify-start">
-                    <div className="p-1.5 bg-blue-600 rounded-lg shrink-0">
-                      <FolderKanban className="h-5 w-5 text-white" />
-                    </div>
-                    <div>
-                      <div className="text-2xl font-bold text-blue-700 dark:text-blue-300">
-                        {isLoading ? (
-                          <div className="flex items-center gap-2">
-                            <Skeleton className="h-6 w-8" />
-                            <div className="w-2 h-2 bg-blue-500 rounded-full animate-pulse"></div>
-                          </div>
-                        ) : (
-                          userProjectsCount
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
+    <ListPageShell>
+        <ListPageHeader
+          icon={<FolderKanban className="h-5 w-5 sm:h-6 sm:w-6" />}
+          title="Projects"
+          description="Manage your projects and track bugs"
+          accentBarClassName="from-blue-600 to-emerald-600"
+          count={
+            isLoading ? undefined : userProjectsCount
+          }
+          loading={isLoading}
+          countIcon={<FolderKanban className="h-5 w-5" />}
+          actions={
+            currentUser?.role === "admin" ? (
+              <Button
+                asChild
+                className="h-11 sm:h-12 text-sm sm:text-base w-full sm:w-auto"
+                aria-label="Create a new project"
+              >
+                <Link to={`/${currentUser.role}/projects/new`}>
+                  <Plus className="mr-2 h-4 w-4 sm:h-5 sm:w-5" /> New Project
+                </Link>
+              </Button>
+            ) : undefined
+          }
+        />
 
         {/* Admin and Developer Tabs */}
         {(currentUser?.role === "admin" || currentUser?.role === "developer") ? (
@@ -2116,27 +2089,16 @@ const Projects = () => {
             onValueChange={handleTabChange}
             className="w-full"
           >
-            <div className="relative min-w-0">
-              <div className="absolute inset-0 bg-gradient-to-r from-gray-50/50 to-blue-50/50 dark:from-gray-800/50 dark:to-blue-900/50 rounded-2xl"></div>
-              <div className="relative bg-white/60 dark:bg-gray-900/60 backdrop-blur-sm border border-gray-200/50 dark:border-gray-700/50 rounded-2xl p-1.5 sm:p-2 min-w-0 overflow-hidden">
-                <TabsList className="grid w-full grid-cols-2 h-auto min-h-12 sm:h-14 bg-transparent p-1 gap-1">
-                  <TabsTrigger
-                    value="all-projects"
-                    className="text-xs sm:text-sm md:text-base font-semibold data-[state=active]:bg-white data-[state=active]:shadow-lg data-[state=active]:border data-[state=active]:border-gray-200 dark:data-[state=active]:bg-gray-800 dark:data-[state=active]:border-gray-700 rounded-xl transition-all duration-300 px-2 py-2.5 sm:px-3"
-                  >
+            <ListPageTabsShell>
+                <ListPageTabTrigger value="all-projects">
                     <FolderKanban className="h-4 w-4 sm:h-5 sm:w-5 mr-1.5 sm:mr-2 shrink-0" />
-                    <span className="hidden sm:inline truncate">
-                      {currentUser?.role === "admin" ? "All Projects" : "All Projects"}
-                    </span>
+                    <span className="hidden sm:inline truncate">All Projects</span>
                     <span className="sm:hidden truncate">All</span>
                     <span className="ml-1 sm:ml-2 px-1.5 sm:px-2 py-0.5 sm:py-1 bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 rounded-full text-[10px] sm:text-xs font-bold shrink-0">
                       {projects.length}
                     </span>
-                  </TabsTrigger>
-                  <TabsTrigger
-                    value="my-projects"
-                    className="text-xs sm:text-sm md:text-base font-semibold data-[state=active]:bg-white data-[state=active]:shadow-lg data-[state=active]:border data-[state=active]:border-gray-200 dark:data-[state=active]:bg-gray-800 dark:data-[state=active]:border-gray-700 rounded-xl transition-all duration-300 px-2 py-2.5 sm:px-3"
-                  >
+                  </ListPageTabTrigger>
+                  <ListPageTabTrigger value="my-projects">
                     <Users className="h-4 w-4 sm:h-5 sm:w-5 mr-1.5 sm:mr-2 shrink-0" />
                     <span className="hidden sm:inline truncate">
                       {currentUser?.role === "admin" ? "My Projects" : "Assigned Projects"}
@@ -2147,15 +2109,13 @@ const Projects = () => {
                     <span className="ml-1 sm:ml-2 px-1.5 sm:px-2 py-0.5 sm:py-1 bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300 rounded-full text-[10px] sm:text-xs font-bold shrink-0">
                       {projects.filter(p => userProjectMemberships[p.id]).length}
                     </span>
-                  </TabsTrigger>
-                </TabsList>
-              </div>
-            </div>
+                  </ListPageTabTrigger>
+            </ListPageTabsShell>
 
-            <TabsContent value="all-projects" className="space-y-6 sm:space-y-8">
+            <TabsContent value="all-projects" className={LIST_TABS_CONTENT}>
               {renderProjectsContent("all-projects")}
             </TabsContent>
-            <TabsContent value="my-projects" className="space-y-6 sm:space-y-8">
+            <TabsContent value="my-projects" className={LIST_TABS_CONTENT}>
               {renderProjectsContent("my-projects")}
             </TabsContent>
           </Tabs>
@@ -2342,7 +2302,7 @@ const Projects = () => {
         onUndo={handleUndoClick}
         onConfirmNow={confirmDelete}
       />
-    </div>
+    </ListPageShell>
   );
 };
 

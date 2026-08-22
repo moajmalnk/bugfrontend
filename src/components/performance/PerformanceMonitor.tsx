@@ -16,7 +16,7 @@ interface PerformanceMonitorProps {
 }
 
 export const PerformanceMonitor: React.FC<PerformanceMonitorProps> = ({
-  enabled = process.env.NODE_ENV === 'development',
+  enabled = import.meta.env.DEV,
   onMetricsUpdate,
 }) => {
   const [metrics, setMetrics] = useState<PerformanceMetrics>({
@@ -133,8 +133,8 @@ export const PerformanceMonitor: React.FC<PerformanceMonitorProps> = ({
 
       setMetrics(newMetrics);
       onMetricsUpdate?.(newMetrics);
-    } catch (error) {
-      console.warn('Failed to collect initial performance metrics:', error);
+    } catch {
+      /* metrics collection is best-effort */
     }
   }, [onMetricsUpdate]);
 
@@ -182,8 +182,8 @@ export const PerformanceMonitor: React.FC<PerformanceMonitorProps> = ({
         });
         clsObserver.observe({ entryTypes: ['layout-shift'] });
         observersRef.current.push(clsObserver);
-      } catch (error) {
-        console.warn('Failed to set up performance observers:', error);
+      } catch {
+        /* observer setup is best-effort */
       }
     }
 
@@ -193,37 +193,13 @@ export const PerformanceMonitor: React.FC<PerformanceMonitorProps> = ({
       observersRef.current.forEach(observer => {
         try {
           observer.disconnect();
-        } catch (error) {
-          console.warn('Failed to disconnect performance observer:', error);
+        } catch {
+          /* ignore disconnect failures */
         }
       });
       observersRef.current = [];
     };
   }, [enabled, collectInitialMetrics]);
-
-  // Log metrics in development with throttling
-  useEffect(() => {
-    if (enabled && process.env.NODE_ENV === 'development') {
-      // Throttle console logging to avoid spam - only log once per session
-      const hasLogged = sessionStorage.getItem('performance-metrics-logged');
-      if (!hasLogged) {
-        const timeoutId = setTimeout(() => {
-          console.group('🚀 Performance Metrics');
-          console.log('First Contentful Paint (FCP):', metrics.fcp ? `${metrics.fcp.toFixed(2)}ms` : 'Not available');
-          console.log('Largest Contentful Paint (LCP):', metrics.lcp ? `${metrics.lcp.toFixed(2)}ms` : 'Not available');
-          console.log('First Input Delay (FID):', metrics.fid ? `${metrics.fid.toFixed(2)}ms` : 'Not available');
-          console.log('Cumulative Layout Shift (CLS):', metrics.cls !== null ? metrics.cls.toFixed(4) : 'Not available');
-          console.log('Time to First Byte (TTFB):', metrics.ttfb ? `${metrics.ttfb.toFixed(2)}ms` : 'Not available');
-          console.log('First Meaningful Paint (FMP):', metrics.fmp ? `${metrics.fmp.toFixed(2)}ms` : 'Not available');
-          console.log('Time to Interactive (TTI):', metrics.tti ? `${metrics.tti.toFixed(2)}ms` : 'Not available');
-          console.groupEnd();
-          sessionStorage.setItem('performance-metrics-logged', 'true');
-        }, 1000); // Increased delay to 1 second
-
-        return () => clearTimeout(timeoutId);
-      }
-    }
-  }, [metrics, enabled]);
 
   // Helper function to get performance level color
   const getPerformanceColor = (metric: string, value: number | null) => {
@@ -355,8 +331,8 @@ export const usePerformanceMetrics = () => {
         }
 
         setMetrics(newMetrics);
-      } catch (error) {
-        console.warn('Failed to collect performance metrics:', error);
+      } catch {
+        /* metrics collection is best-effort */
       }
     };
 

@@ -160,8 +160,7 @@ export function UserPermissions() {
 
   if (isLoading) {
     return (
-      <main className="min-h-[calc(100vh-4rem)] bg-background px-3 py-4 sm:px-6 sm:py-6 md:px-8 lg:px-10 lg:py-8">
-        <section className="max-w-7xl mx-auto space-y-6 sm:space-y-8">
+      <div className="min-w-0 w-full space-y-6 sm:space-y-8">
           <div className="relative overflow-hidden">
             <div className="absolute inset-0 bg-gradient-to-r from-purple-50/50 via-transparent to-indigo-50/50 dark:from-purple-950/20 dark:via-transparent dark:to-indigo-950/20"></div>
             <div className="relative bg-white/80 dark:bg-gray-900/80 backdrop-blur-sm border border-gray-200/50 dark:border-gray-700/50 rounded-2xl p-6 sm:p-8">
@@ -174,15 +173,13 @@ export function UserPermissions() {
             <Skeleton className="h-64 w-full rounded-2xl" />
             <Skeleton className="h-64 w-full rounded-2xl" />
           </div>
-        </section>
-      </main>
+      </div>
     );
   }
 
   if (!user) {
     return (
-      <main className="min-h-[calc(100vh-4rem)] bg-background px-3 py-4 sm:px-6 sm:py-6 md:px-8 lg:px-10 lg:py-8">
-        <section className="max-w-7xl mx-auto space-y-6 sm:space-y-8">
+      <div className="min-w-0 w-full space-y-6 sm:space-y-8">
           <div className="relative overflow-hidden">
             <div className="absolute inset-0 bg-gradient-to-br from-red-50/50 via-orange-50/30 to-yellow-50/50 dark:from-red-950/20 dark:via-orange-950/10 dark:to-yellow-950/20 rounded-2xl"></div>
             <div className="relative bg-white/80 dark:bg-gray-900/80 backdrop-blur-sm border border-gray-200/50 dark:border-gray-700/50 rounded-2xl p-12 text-center">
@@ -199,8 +196,7 @@ export function UserPermissions() {
               </Button>
             </div>
           </div>
-        </section>
-      </main>
+      </div>
     );
   }
 
@@ -223,8 +219,7 @@ export function UserPermissions() {
   const isCategoryExpanded = (category: string) => expandedCategories.has(category);
 
   return (
-    <main className="min-h-[calc(100vh-4rem)] bg-background px-3 py-4 sm:px-6 sm:py-6 md:px-8 lg:px-10 lg:py-8">
-      <section className="max-w-7xl mx-auto space-y-6 sm:space-y-8">
+    <div className="min-w-0 w-full space-y-6 sm:space-y-8">
         {/* Professional Header */}
         <div className="relative overflow-hidden">
           <div className="absolute inset-0 bg-gradient-to-r from-purple-50/50 via-transparent to-indigo-50/50 dark:from-purple-950/20 dark:via-transparent dark:to-indigo-950/20"></div>
@@ -451,8 +446,7 @@ export function UserPermissions() {
             </div>
           );
         })}
-      </section>
-    </main>
+    </div>
   );
 }
 

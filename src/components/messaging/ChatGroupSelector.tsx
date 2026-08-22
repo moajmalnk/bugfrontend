@@ -33,9 +33,9 @@ import { usePermissions } from "@/hooks/usePermissions";
 import { ENV } from "@/lib/env";
 import { cn, getEffectiveRole } from "@/lib/utils";
 import { MessagingService } from "@/services/messagingService";
-import { projectService } from "@/services/projectService";
+import { projectService, type Project } from "@/services/projectService";
 import { userService } from "@/services/userService";
-import type { ChatGroup, ChatGroupPreviewUpdate, Project } from "@/types";
+import type { ChatGroup, ChatGroupPreviewUpdate } from "@/types";
 import {
   Check,
   ChevronsUpDown,
@@ -325,7 +325,7 @@ export const ChatGroupSelector: React.FC<ChatGroupSelectorProps> = ({
     groupName: string;
   } | null>(null);
   const [deletedGroups, setDeletedGroups] = useState<{
-    [key: string]: { group: ChatGroup; timestamp: number; timeoutId?: NodeJS.Timeout };
+    [key: string]: { group: ChatGroup; timestamp: number; timeoutId?: ReturnType<typeof setTimeout> };
   }>({});
   const [undoCountdown, setUndoCountdown] = useState<{
     [key: string]: number;

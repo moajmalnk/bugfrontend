@@ -53,7 +53,7 @@ export class ModernErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoun
     });
 
     // Log error to console in development
-    if (process.env.NODE_ENV === 'development') {
+    if (import.meta.env.DEV) {
       console.group('🚨 Error Boundary Caught Error');
       console.error('Error:', error);
       console.error('Error Info:', errorInfo);
@@ -111,7 +111,7 @@ export class ModernErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoun
 
   private sendErrorReport = (errorReport: any) => {
     // Placeholder for error reporting service
-    if (process.env.NODE_ENV === 'production') {
+    if (import.meta.env.PROD) {
       // Example: Send to error reporting service
       // fetch('/api/errors', {
       //   method: 'POST',
@@ -202,7 +202,7 @@ export class ModernErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoun
               </p>
             </div>
 
-            {process.env.NODE_ENV === 'development' && error && (
+            {import.meta.env.DEV && error && (
               <details className="mb-4 text-left">
                 <summary className="cursor-pointer text-sm font-medium text-muted-foreground mb-2">
                   Error Details

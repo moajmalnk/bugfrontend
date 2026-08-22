@@ -11,6 +11,7 @@ import {
   Building2,
   Bug,
   CheckCircle,
+  ClipboardCheck,
   FolderKanban,
   MessageCircle,
   MessageSquare,
@@ -31,9 +32,9 @@ import {
   LifeBuoy,
   Signal,
   PlaneTakeoff,
-  ClipboardCheck,
   LayoutDashboard,
   Clapperboard,
+  Trash2,
   CalendarClock,
   ClipboardList,
 } from "lucide-react";
@@ -230,11 +231,18 @@ export const Sidebar = ({ className, closeSidebar }: SidebarProps) => {
               badgeTitle={`${navCounts.bugs} open bug${navCounts.bugs === 1 ? "" : "s"}`}
             />
             <NavLink
+              to="/retests"
+              icon={<ClipboardCheck className="h-5 w-5" />}
+              label="Retests"
+              badge={formatNavCount(navCounts.retests)}
+              badgeTitle={`${navCounts.retests} retest${navCounts.retests === 1 ? "" : "s"} pending`}
+            />
+            <NavLink
               to="/fixes"
               icon={<CheckCircle className="h-5 w-5" />}
               label="Fixes"
               badge={formatNavCount(navCounts.fixes)}
-              badgeTitle={`${navCounts.fixes} fix${navCounts.fixes === 1 ? "" : "es"}`}
+              badgeTitle={`${navCounts.fixes} verified fix${navCounts.fixes === 1 ? "" : "es"}`}
             />
             <NavLink
               to="/updates"
@@ -402,6 +410,7 @@ export const Sidebar = ({ className, closeSidebar }: SidebarProps) => {
             const hasBackupManage = can("BACKUP_MANAGE") || hasSettingsEdit;
             const hasPushCoverage = can("PUSH_COVERAGE_VIEW");
             const hasShortsManage = can("SHORTS_MANAGE");
+            const hasRecycleBinView = can("RECYCLE_BIN_VIEW");
             const messagesInMain =
               showBugMessageInMainNav(role) || can("MESSAGING_VIEW");
 
@@ -419,7 +428,8 @@ export const Sidebar = ({ className, closeSidebar }: SidebarProps) => {
               hasSettingsEdit ||
               hasBackupManage ||
               hasPushCoverage ||
-              hasShortsManage;
+              hasShortsManage ||
+              hasRecycleBinView;
 
             if (!hasAnyAdminLinks) {
               return null;
@@ -573,6 +583,16 @@ export const Sidebar = ({ className, closeSidebar }: SidebarProps) => {
                       label="BugBackup"
                       badge={formatNavCount(navCounts.backup)}
                       badgeTitle={`${navCounts.backup} backup${navCounts.backup === 1 ? "" : "s"}`}
+                    />
+                  )}
+
+                  {hasRecycleBinView && (
+                    <NavLink
+                      to="/recycle-bin"
+                      icon={<Trash2 className="h-5 w-5" />}
+                      label="Recycle Bin"
+                      badge={formatNavCount(navCounts.recycleBin)}
+                      badgeTitle={`${navCounts.recycleBin} deleted item${navCounts.recycleBin === 1 ? "" : "s"}`}
                     />
                   )}
                 </div>

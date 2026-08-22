@@ -119,9 +119,11 @@ const ClientDetails = lazy(() => import("@/pages/ClientDetails"));
 const ClientFormPage = lazy(() => import("@/pages/ClientFormPage"));
 const Settings = lazy(() => import("@/pages/Settings"));
 const BugBackup = lazy(() => import("@/pages/BugBackup"));
+const AdminRecycleBin = lazy(() => import("@/pages/AdminRecycleBin"));
 const Profile = lazy(() => import("@/pages/Profile"));
 const Reports = lazy(() => import("@/pages/Reports"));
 const Fixes = lazy(() => import("@/pages/Fixes"));
+const Retests = lazy(() => import("@/pages/Retests"));
 const Messages = lazy(() => import("@/pages/Messages"));
 const FixBug = lazy(() => import("@/pages/FixBug"));
 const EditBug = lazy(() => import("@/pages/EditBug"));
@@ -358,6 +360,7 @@ const RouteConfig = () => {
       <Route path="/bugs/new" element={<RolePathRedirect suffix="bugs/new" />} />
       <Route path="/bugs/report" element={<RolePathRedirect suffix="bugs/report" />} />
       <Route path="/bugs/:bugId" element={<BugRedirect />} />
+      <Route path="/retests" element={<RolePathRedirect suffix="retests" />} />
       <Route path="/updates/:updateId" element={<UpdateRedirect />} />
       <Route path="/projects/:projectId" element={<ProjectRedirect />} />
       <Route path="/tasks/:taskId" element={<RolePathRedirect suffix="my-tasks" />} />
@@ -392,6 +395,7 @@ const RouteConfig = () => {
       <Route path="/clients/new" element={<RolePathRedirect suffix="clients/new" />} />
       <Route path="/clients/:clientId" element={<RolePathRedirect suffix="clients/:clientId" />} />
       <Route path="/clients" element={<RolePathRedirect suffix="clients" />} />
+      <Route path="/recycle-bin" element={<RolePathRedirect suffix="recycle-bin" />} />
       <Route path="/updates" element={<RolePathRedirect suffix="updates" />} />
       <Route path="/projects" element={<RolePathRedirect suffix="projects" />} />
       <Route path="/document" element={<RolePathRedirect suffix="document" />} />
@@ -408,6 +412,7 @@ const RouteConfig = () => {
           <Route path="projects/:projectId" element={<ProjectDetails />} />
           <Route path="document" element={<DocumentPreviewPage />} />
           <Route path="bugs" element={<Bugs />} />
+          <Route path="retests" element={<Retests />} />
           <Route path="bugs/new" element={<NewBug />} />
           <Route path="bugs/report" element={<TesterReportBug />} />
           {/* More specific routes must come BEFORE the general bugs/:bugId route */}
@@ -428,6 +433,7 @@ const RouteConfig = () => {
           <Route path="fixes" element={<Fixes />} />
           <Route path="settings" element={<Settings />} />
           <Route path="bugbackup" element={<BugBackup />} />
+          <Route path="recycle-bin" element={<AdminRecycleBin />} />
           <Route path="profile" element={<Profile />} />
           <Route path="reports" element={<Reports />} />
           <Route path="messages" element={<Messages />} />

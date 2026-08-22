@@ -247,8 +247,7 @@ export default function Shorts() {
   const ActiveTabIcon = TAB_ICONS[activeTabItem.value] || LayoutGrid;
 
   return (
-    <main className="min-h-[calc(100vh-4rem)] bg-background px-3 py-4 sm:px-6 sm:py-6 md:px-8 lg:px-10 lg:py-8">
-      <section className="mx-auto w-full min-w-0 max-w-7xl space-y-6 sm:space-y-8">
+    <div className="min-w-0 w-full space-y-6 sm:space-y-8">
         {/* Professional Header */}
         <div className="relative overflow-hidden">
           <div className="absolute inset-0 bg-gradient-to-r from-violet-50/50 via-transparent to-fuchsia-50/50 dark:from-violet-950/20 dark:via-transparent dark:to-fuchsia-950/20" />
@@ -626,9 +625,9 @@ export default function Shorts() {
         <ShortPlayerDialog
           short={playerShort}
           open={!!shortId && (!!playerShort || isLoading)}
-        playlist={playlist}
-        shortPath={(item) => buildShortsPath(role, category, item.id)}
-        onNavigate={openShort}
+          playlist={playlist}
+          shortPath={(item) => buildShortsPath(role, category, item.id)}
+          onNavigate={openShort}
           onOpenChange={(open) => {
             if (!open) closePlayer();
           }}
@@ -677,7 +676,6 @@ export default function Shorts() {
         {!isLoading && shortId && !playerShort ? (
           <p className="text-sm text-muted-foreground">Short not found or unavailable.</p>
         ) : null}
-      </section>
-    </main>
+    </div>
   );
 }

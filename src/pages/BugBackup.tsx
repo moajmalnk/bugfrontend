@@ -329,41 +329,36 @@ const BugBackup = () => {
 
   if (permissionsLoading) {
     return (
-      <main className="min-h-[calc(100vh-4rem)] bg-background px-3 py-4 sm:px-6 sm:py-6 md:px-8 lg:px-10 lg:py-8">
-        <section className="mx-auto max-w-7xl space-y-6 sm:space-y-8">
-          <Skeleton className="h-44 w-full rounded-2xl" />
-          <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-            {Array.from({ length: 4 }).map((_, index) => (
-              <Skeleton key={index} className="h-32 rounded-2xl" />
-            ))}
-          </div>
-          <Skeleton className="h-[560px] w-full rounded-2xl" />
-        </section>
-      </main>
+      <div className="min-w-0 w-full space-y-6 sm:space-y-8">
+        <Skeleton className="h-44 w-full rounded-2xl" />
+        <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+          {Array.from({ length: 4 }).map((_, index) => (
+            <Skeleton key={index} className="h-32 rounded-2xl" />
+          ))}
+        </div>
+        <Skeleton className="h-[560px] w-full rounded-2xl" />
+      </div>
     );
   }
 
   if (!canAccess) {
     return (
-      <main className="min-h-[calc(100vh-4rem)] bg-background px-3 py-4 sm:px-6 sm:py-6 md:px-8 lg:px-10 lg:py-8">
-        <section className="mx-auto max-w-7xl">
-          <div className="rounded-2xl border border-gray-200/60 bg-white/80 p-12 text-center dark:border-gray-800/60 dark:bg-gray-900/80">
-            <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-muted">
-              <Database className="h-8 w-8 text-muted-foreground" />
-            </div>
-            <h1 className="mb-2 text-2xl font-bold">Access denied</h1>
-            <p className="mx-auto max-w-md text-muted-foreground">
-              You do not have permission to access the backup console.
-            </p>
+      <div className="min-w-0 w-full space-y-6 sm:space-y-8">
+        <div className="rounded-2xl border border-gray-200/60 bg-white/80 p-12 text-center dark:border-gray-800/60 dark:bg-gray-900/80">
+          <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-muted">
+            <Database className="h-8 w-8 text-muted-foreground" />
           </div>
-        </section>
-      </main>
+          <h1 className="mb-2 text-2xl font-bold">Access denied</h1>
+          <p className="mx-auto max-w-md text-muted-foreground">
+            You do not have permission to access the backup console.
+          </p>
+        </div>
+      </div>
     );
   }
 
   return (
-    <main className="min-h-[calc(100vh-4rem)] bg-background px-3 py-4 sm:px-6 sm:py-6 md:px-8 lg:px-10 lg:py-8">
-      <section className="mx-auto max-w-7xl space-y-6 sm:space-y-8">
+    <div className="min-w-0 w-full space-y-6 sm:space-y-8">
         <div className="relative overflow-hidden">
           <div className="absolute inset-0 bg-gradient-to-r from-blue-50/50 via-transparent to-emerald-50/50 dark:from-blue-950/20 dark:via-transparent dark:to-emerald-950/20" />
           <div className="relative rounded-2xl border border-gray-200/50 bg-white/80 p-4 backdrop-blur-sm dark:border-gray-700/50 dark:bg-gray-900/80 sm:p-6 md:p-8 min-w-0 overflow-hidden">
@@ -839,8 +834,7 @@ const BugBackup = () => {
             );
           })}
         </div>
-      </section>
-    </main>
+    </div>
   );
 };
 

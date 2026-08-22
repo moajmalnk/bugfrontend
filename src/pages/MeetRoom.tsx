@@ -1703,8 +1703,7 @@ export default function MeetRoom() {
 
   return (
     <>
-    <main className="min-h-[calc(100vh-4rem)] bg-background px-3 py-4 sm:px-6 sm:py-6 md:px-8 lg:px-10 lg:py-8">
-      <section className="max-w-7xl mx-auto space-y-6 sm:space-y-8">
+    <div className="min-w-0 w-full space-y-6 sm:space-y-8">
         {/* Header */}
         <div className="relative overflow-hidden">
           <div className="absolute inset-0 bg-gradient-to-r from-blue-50/50 via-transparent to-emerald-50/50 dark:from-blue-950/20 dark:via-transparent dark:to-emerald-950/20"></div>
@@ -1865,7 +1864,7 @@ export default function MeetRoom() {
 
         {/* Video Grid */}
         <div className={`p-0 sm:p-0 transition-all duration-300 ${isChatOpen ? 'pr-0' : ''}`}>
-          <div className="max-w-7xl mx-auto flex gap-6">
+          <div className="w-full mx-auto flex gap-6">
           {/* Main video area */}
           <div className={`flex-1 transition-all duration-300 ${isChatOpen ? 'max-w-4xl' : ''}`}>
             <div className="grid gap-6 [grid-template-columns:repeat(auto-fit,minmax(280px,1fr))] lg:[grid-template-columns:repeat(auto-fit,minmax(320px,1fr))]">
@@ -2120,7 +2119,7 @@ export default function MeetRoom() {
 
         {/* Controls - Center-aligned and Responsive */}
         <div className="sticky bottom-0 left-0 right-0 bg-white/80 dark:bg-gray-900/80 backdrop-blur-sm border border-gray-200/50 dark:border-gray-700/50 rounded-2xl p-3 sm:p-4">
-          <div className="max-w-7xl mx-auto flex flex-col items-center gap-4">
+          <div className="w-full mx-auto flex flex-col items-center gap-4">
             
             {/* Connection Status - Mobile Only */}
             <div className="flex md:hidden items-center gap-2 text-sm">
@@ -2420,8 +2419,7 @@ export default function MeetRoom() {
             </div>
           </div>
         )}
-      </section>
-    </main>
+      </div>
     
     {/* Enhanced Save recording dialog */}
     {showSaveRecording && (

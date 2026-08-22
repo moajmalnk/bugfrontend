@@ -22,6 +22,7 @@ import {
 } from '@/components/ui/select';
 import { Pencil } from 'lucide-react';
 import { Project, UpdateProjectData } from '@/services/projectService';
+import { ProjectStatus } from '@/lib/utils/projectUtils';
 
 interface EditProjectDialogProps {
   project: Project;
@@ -35,7 +36,7 @@ export function EditProjectDialog({ project, onSubmit, children }: EditProjectDi
   const [isLoading, setIsLoading] = useState(false);
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
-  const [status, setStatus] = useState<'active' | 'completed' | 'archived'>('active');
+  const [status, setStatus] = useState<ProjectStatus>('active');
   const [error, setError] = useState<string | null>(null);
 
   // Initialize form with project data when dialog opens
@@ -57,7 +58,7 @@ export function EditProjectDialog({ project, onSubmit, children }: EditProjectDi
     }
   };
 
-  const handleStatusChange = (value: 'active' | 'completed' | 'archived') => {
+  const handleStatusChange = (value: ProjectStatus) => {
     setStatus(value);
   };
 
@@ -167,6 +168,7 @@ export function EditProjectDialog({ project, onSubmit, children }: EditProjectDi
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="active">Active</SelectItem>
+                  <SelectItem value="release_ready">Release Ready</SelectItem>
                   <SelectItem value="completed">Completed</SelectItem>
                   <SelectItem value="archived">Archived</SelectItem>
                 </SelectContent>

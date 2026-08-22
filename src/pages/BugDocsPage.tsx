@@ -252,7 +252,6 @@ const BugDocsPage = () => {
   // Load documents when connection status changes to true
   useEffect(() => {
     if (isConnected && documents.length === 0 && !isLoading) {
-      console.log('🔄 Connection became true, refreshing documents...');
       refreshDocuments();
     }
   }, [isConnected]);
@@ -263,11 +262,6 @@ const BugDocsPage = () => {
       loadDocuments();
     }
   }, [activeTab, isConnected]);
-
-  // Debug document count changes
-  useEffect(() => {
-    console.log('📊 Document count changed:', documents.length);
-  }, [documents.length]);
 
   const isInitialLoading = isCheckingConnection || (isLoading && documents.length === 0);
 
@@ -302,8 +296,7 @@ const BugDocsPage = () => {
       setProjectNameCatalog(
         Array.from(nameById.entries()).map(([id, name]) => ({ id, name }))
       );
-    } catch (error: any) {
-      console.error("Error loading projects:", error);
+    } catch {
       try {
         const projs = await googleDocsService.getProjectsWithDocumentCounts();
         setProjects(
@@ -317,8 +310,8 @@ const BugDocsPage = () => {
               document_count: p.document_count ?? 0,
             }))
         );
-      } catch (fallbackError) {
-        console.error("Error loading projects fallback:", fallbackError);
+      } catch {
+        /* ignore fallback failure */
       }
     } finally {
       setIsLoadingProjects(false);
@@ -326,46 +319,31 @@ const BugDocsPage = () => {
   };
 
   const loadData = async () => {
-    console.log('🔄 Starting loadData...');
     setIsLoading(true);
     setIsCheckingConnection(true);
     try {
-      // Load projects (always load, doesn't require Google connection)
       await loadProjects();
 
-      // Check connection first
       const connected = await checkConnection();
-      console.log('🔗 Connection result:', connected);
-      // Load documents and templates if connected
       if (connected) {
-        console.log('📄 Loading documents and templates...');
-        // Preload all tab counts first for accurate badge numbers
         await preloadAllTabCounts();
-        // Then load documents for the active tab
         await Promise.all([loadDocuments(), loadTemplates()]);
-        console.log('✅ Documents and templates loaded');
-      } else {
-        console.log('❌ Not connected, skipping document load');
       }
-    } catch (error) {
-      console.error("❌ Error loading data:", error);
+    } catch {
+      /* errors surfaced via toasts in child loaders */
     } finally {
       setIsLoading(false);
       setIsCheckingConnection(false);
-      console.log('🏁 loadData completed');
     }
   };
 
   const checkConnection = async () => {
     try {
-      console.log('Checking Google Docs connection...');
       const result = await googleDocsService.checkConnection();
-      console.log('Connection status:', result);
       setIsConnected(result.connected);
       setConnectedEmail(result.email || null);
       return result.connected;
-    } catch (error) {
-      console.error('Failed to check Google Docs connection:', error);
+    } catch {
       setIsConnected(false);
       setConnectedEmail(null);
       return false;
@@ -386,7 +364,6 @@ const BugDocsPage = () => {
       // Refresh documents list to clear any cached data
       await loadDocuments();
     } catch (error: any) {
-      console.error('Failed to disconnect:', error);
       toast({
         title: "Error",
         description: error.message || "Failed to disconnect Google account",
@@ -433,9 +410,8 @@ const BugDocsPage = () => {
         const sharedDocs = await googleDocsService.getSharedDocuments();
         setSharedDocsCount(sharedDocs.length);
       }
-    } catch (error: any) {
-      console.error("Error preloading tab counts:", error);
-      // Don't show toast for preload errors, just log them
+    } catch {
+      /* preload counts are best-effort */
     }
   };
 
@@ -461,9 +437,7 @@ const BugDocsPage = () => {
       }
 
       setDocuments(docs);
-      console.log(`Loaded ${docs.length} documents for tab: ${activeTab}`);
     } catch (error: any) {
-      console.error("Error loading documents:", error);
       toast({
         title: "Error",
         description: error.message || "Failed to load documents",
@@ -486,13 +460,9 @@ const BugDocsPage = () => {
   };
 
   const refreshDocuments = async () => {
-    console.log('🔄 Refreshing documents, isConnected:', isConnected);
     if (isConnected) {
-      // Refresh all tab counts and then load current tab
       await preloadAllTabCounts();
       await loadDocuments();
-    } else {
-      console.log('❌ Not connected, cannot refresh documents');
     }
   };
 
@@ -999,8 +969,7 @@ const BugDocsPage = () => {
   ]);
 
   return (
-    <main className="min-h-[calc(100vh-4rem)] bg-background px-3 py-4 sm:px-6 sm:py-6 md:px-8 lg:px-10 lg:py-8">
-      <section className="max-w-7xl mx-auto space-y-6 sm:space-y-8">
+    <div className="min-w-0 w-full space-y-6 sm:space-y-8">
         {/* Professional Header */}
         <div className="relative overflow-hidden">
           <div className="absolute inset-0 bg-gradient-to-r from-orange-50/50 via-transparent to-red-50/50 dark:from-orange-950/20 dark:via-transparent dark:to-red-950/20"></div>
@@ -2248,8 +2217,7 @@ const BugDocsPage = () => {
             </DialogFooter>
           </DialogContent>
         </Dialog>
-      </section>
-    </main>
+    </div>
   );
 };
 

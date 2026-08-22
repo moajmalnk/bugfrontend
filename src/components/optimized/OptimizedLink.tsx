@@ -96,7 +96,7 @@ export const OptimizedLink: React.FC<OptimizedLinkProps> = ({
   const linkRef = useRef<HTMLAnchorElement>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [isPrefetched, setIsPrefetched] = useState(false);
-  const hoverTimeoutRef = useRef<NodeJS.Timeout>();
+  const hoverTimeoutRef = useRef<ReturnType<typeof setTimeout>>();
   
   const targetPath = typeof to === 'string' ? to : to.pathname || '';
   

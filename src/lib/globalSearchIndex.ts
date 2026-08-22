@@ -73,6 +73,12 @@ const PAGE_ENTRIES: PageSearchEntry[] = [
     keywords: ["fixes", "fixed", "resolved", "verify", "verification"],
   },
   {
+    id: "page-retests",
+    label: "Retests",
+    path: "/retests",
+    keywords: ["retests", "retest", "verification pending", "verify fix", "tester verification"],
+  },
+  {
     id: "page-updates",
     label: "Updates",
     path: "/updates",
@@ -533,6 +539,14 @@ const PAGE_ENTRIES: PageSearchEntry[] = [
       ctx.role === "admin" ||
       ctx.hasPermission("BACKUP_MANAGE") ||
       ctx.hasPermission("SETTINGS_EDIT"),
+    subtitle: "Administration",
+  },
+  {
+    id: "page-recycle-bin",
+    label: "Recycle Bin",
+    path: "/recycle-bin",
+    keywords: ["recycle", "trash", "deleted", "restore", "purge", "bin", "soft delete"],
+    permission: "RECYCLE_BIN_VIEW",
     subtitle: "Administration",
   },
 ];

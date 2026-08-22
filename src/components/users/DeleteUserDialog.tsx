@@ -68,8 +68,8 @@ export function DeleteUserDialog({
           </DialogTitle>
           <DialogDescription>
             {showForceOption 
-              ? "This user has associated data that needs to be handled before deletion."
-              : "Are you sure you want to delete this user? This action cannot be undone."
+              ? "This user has associated data that needs to be handled before permanent deletion."
+              : "Are you sure you want to delete this user?"
             }
           </DialogDescription>
         </DialogHeader>
@@ -108,9 +108,10 @@ export function DeleteUserDialog({
             </div>
           ) : (
             <p className="text-sm text-muted-foreground">
-              This will permanently delete{" "}
-              <span className="font-medium text-foreground">{user.username}</span>'s
-              account and remove their access to the system.
+              This will move{" "}
+              <span className="font-medium text-foreground">{user.username}</span> to the{" "}
+              <span className="font-medium text-foreground">recycle bin</span> for 30 days.
+              Their account access will be removed immediately; you can restore them from Admin → Recycle Bin.
             </p>
           )}
         </div>

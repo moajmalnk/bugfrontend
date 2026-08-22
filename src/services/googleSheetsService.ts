@@ -82,7 +82,6 @@ class GoogleSheetsService {
    */
   async disconnect(): Promise<{ success: boolean; message: string }> {
     try {
-      console.log('🔌 Disconnecting Google account...');
       const response = await apiClient.post<{
         success: boolean;
         message: string;
@@ -92,10 +91,8 @@ class GoogleSheetsService {
         throw new Error(response.data.message || 'Failed to disconnect');
       }
 
-      console.log('✅ Google account disconnected successfully');
       return response.data;
     } catch (error: any) {
-      console.error('❌ Failed to disconnect Google account:', error);
       throw new Error(error.response?.data?.message || 'Failed to disconnect Google account');
     }
   }
@@ -249,7 +246,6 @@ class GoogleSheetsService {
     count: number;
   }> {
     try {
-      console.log('🔍 Fetching sheets for project:', projectId);
       const url = `/sheets/get-by-project.php?project_id=${encodeURIComponent(projectId)}&include_archived=${includeArchived}`;
       const response = await apiClient.get<{
         success: boolean;
@@ -282,7 +278,6 @@ class GoogleSheetsService {
     count: number;
   }> {
     try {
-      console.log('🔍 Fetching all sheets (admin)');
       const url = `/sheets/get-all-sheets.php?include_archived=${includeArchived}`;
       const response = await apiClient.get<{
         success: boolean;
@@ -310,7 +305,6 @@ class GoogleSheetsService {
    */
   async getSharedSheets(includeArchived: boolean = false): Promise<UserSheet[]> {
     try {
-      console.log('🔍 Fetching shared sheets');
       const url = `/sheets/get-shared-sheets.php?include_archived=${includeArchived}`;
       const response = await apiClient.get<{
         success: boolean;
@@ -340,7 +334,6 @@ class GoogleSheetsService {
     sheet_count: number;
   }>> {
     try {
-      console.log('🔍 Fetching projects with sheet counts');
       const response = await apiClient.get<{
         success: boolean;
         projects: Array<{
@@ -368,7 +361,6 @@ class GoogleSheetsService {
    */
   async listGeneralSheets(includeArchived: boolean = false, projectId?: string | null): Promise<UserSheet[]> {
     try {
-      console.log('🔍 Fetching general sheets, includeArchived:', includeArchived, 'projectId:', projectId);
       let url = `/sheets/list-general-sheets.php?include_archived=${includeArchived}`;
       if (projectId) {
         url += `&project_id=${encodeURIComponent(projectId)}`;
@@ -379,15 +371,11 @@ class GoogleSheetsService {
         count: number;
       }>(url);
 
-      console.log('📄 API response:', response.data);
-
       if (!response.data.success) {
         throw new Error('Failed to fetch sheets');
       }
 
-      const sheets = response.data.sheets || [];
-      console.log('📊 Returning sheets:', sheets.length);
-      return sheets;
+      return response.data.sheets || [];
     } catch (error: any) {
       console.error('❌ Failed to list general sheets:', error);
       return [];

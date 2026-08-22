@@ -23,7 +23,8 @@ import {
 } from '@/lib/utils/clientUtils';
 import { ClientAttachment } from '@/types';
 import { buildDocumentPreviewPagePath } from '@/lib/attachmentUtils';
-import { cn } from '@/lib/utils';
+import { cn, getEffectiveRole } from '@/lib/utils';
+import { useAuth } from '@/context/AuthContext';
 import {
   ArrowLeft,
   Building2,
@@ -38,7 +39,7 @@ import {
   X,
 } from 'lucide-react';
 import { ChangeEvent, FormEvent, ReactNode } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useLocation, useParams } from 'react-router-dom';
 
 interface FileWithPreview extends File {
   preview?: string;
@@ -141,6 +142,15 @@ export function ClientForm({
   onDeleteAttachment,
   error,
 }: ClientFormProps) {
+  const { currentUser } = useAuth();
+  const role = getEffectiveRole(currentUser || {});
+  const location = useLocation();
+  const { clientId } = useParams<{ clientId?: string }>();
+  const documentPreviewReturnTo =
+    clientId && clientId !== 'new'
+      ? `/${role}/clients/${clientId}/edit`
+      : location.pathname;
+
   const setField = <K extends keyof ClientFormValues>(key: K, value: ClientFormValues[K]) => {
     onChange({ ...values, [key]: value });
   };
@@ -450,7 +460,11 @@ export function ClientForm({
                         <div className="flex items-center gap-2 min-w-0">
                           <FileText className="h-4 w-4 shrink-0 text-blue-600" />
                           <Link
-                            to={buildDocumentPreviewPagePath(att.file_path)}
+                            to={buildDocumentPreviewPagePath(role, {
+                              filePath: att.file_path,
+                              fileName: att.file_name,
+                              returnTo: documentPreviewReturnTo,
+                            })}
                             className="truncate hover:underline text-blue-600 font-medium"
                           >
                             {att.file_name}

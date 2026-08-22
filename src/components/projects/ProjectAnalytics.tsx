@@ -34,7 +34,7 @@ function AnalyticsSkeleton() {
 export function ProjectAnalytics({ projectId, className }: ProjectAnalyticsProps) {
   const { currentUser } = useAuth();
   const navigate = useNavigate();
-  const rolePath = getEffectiveRole(currentUser?.role);
+  const rolePath = getEffectiveRole(currentUser || {});
 
   const { data, isLoading, isError, error, isFetching, refetch } = useQuery({
     queryKey: ["projectAnalytics", projectId],

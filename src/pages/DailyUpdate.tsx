@@ -599,8 +599,7 @@ export default function DailyUpdate() {
       : null;
 
   return (
-    <main className="min-h-[calc(100vh-4rem)] bg-background px-3 py-4 sm:px-6 sm:py-6 md:px-8 lg:px-10 lg:py-8 overflow-x-hidden">
-      <section className="max-w-7xl mx-auto min-w-0 space-y-6 sm:space-y-8">
+    <div className="min-w-0 w-full space-y-6 sm:space-y-8 overflow-x-hidden">
         {/* Professional Header */}
         <div className="relative min-w-0 overflow-hidden rounded-2xl">
           <div className="absolute inset-0 bg-gradient-to-r from-blue-50/50 via-transparent to-emerald-50/50 dark:from-blue-950/20 dark:via-transparent dark:to-emerald-950/20"></div>
@@ -983,7 +982,6 @@ export default function DailyUpdate() {
         </div>
           </TabsContent>
         </Tabs>
-      </section>
 
       <UndoDeleteNotificationPortal
         open={undoDelete.isCountingDown && !!submissionToDelete}
@@ -994,6 +992,6 @@ export default function DailyUpdate() {
         onUndo={undoDelete.cancelCountdown}
         onConfirmNow={undoDelete.confirmDelete}
       />
-    </main>
+    </div>
   );
 }

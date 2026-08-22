@@ -578,8 +578,7 @@ const BugDetailsDiagnostic = () => {
   };
 
   return (
-    <main className="min-h-screen bg-background p-6">
-      <div className="max-w-7xl mx-auto space-y-6">
+    <div className="min-w-0 w-full space-y-6">
         <Card>
           <CardHeader>
             <div className="flex items-center justify-between">
@@ -830,8 +829,7 @@ const BugDetailsDiagnostic = () => {
             </Card>
           </CardContent>
         </Card>
-      </div>
-    </main>
+    </div>
   );
 };
 

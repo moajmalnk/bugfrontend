@@ -10,8 +10,7 @@ const TesterDashboard = lazy(() => import("@/pages/TesterDashboard"));
 
 function DashboardFallback() {
   return (
-    <main className="min-h-[calc(100vh-4rem)] bg-background px-3 py-4 sm:px-6 sm:py-6">
-      <div className="max-w-7xl mx-auto space-y-6">
+    <div className="min-w-0 w-full space-y-6">
         <Skeleton className="h-36 w-full rounded-2xl" />
         <div className="grid grid-cols-12 gap-3">
           {Array.from({ length: 6 }).map((_, i) => (
@@ -19,8 +18,7 @@ function DashboardFallback() {
           ))}
         </div>
         <Skeleton className="h-72 w-full rounded-2xl" />
-      </div>
-    </main>
+    </div>
   );
 }
 

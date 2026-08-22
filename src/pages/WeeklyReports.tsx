@@ -287,8 +287,7 @@ export default function WeeklyReports() {
   };
 
   return (
-    <main className="min-h-[calc(100vh-4rem)] overflow-x-hidden bg-background px-3 py-4 sm:px-6 sm:py-6 md:px-8 lg:px-10 lg:py-8">
-      <section className="mx-auto max-w-7xl min-w-0 space-y-6 sm:space-y-8">
+    <div className="min-w-0 w-full space-y-6 sm:space-y-8 overflow-x-hidden">
         <div className="relative overflow-hidden rounded-2xl">
           <div className="absolute inset-0 bg-gradient-to-r from-indigo-50/50 via-transparent to-violet-50/50 dark:from-indigo-950/20 dark:via-transparent dark:to-violet-950/20" />
           <div className="relative rounded-2xl border border-gray-200/50 bg-white/80 p-6 backdrop-blur-sm dark:border-gray-700/50 dark:bg-gray-900/80 sm:p-8">
@@ -542,7 +541,6 @@ export default function WeeklyReports() {
             </div>
           </div>
         ) : null}
-      </section>
 
       <Dialog open={!!selected} onOpenChange={(open) => { if (!open) setSelected(null); }}>
         <DialogContent className="flex max-h-[92vh] w-[95vw] max-w-4xl flex-col gap-0 overflow-hidden p-0">
@@ -747,6 +745,6 @@ export default function WeeklyReports() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-    </main>
+    </div>
   );
 }

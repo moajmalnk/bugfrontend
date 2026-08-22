@@ -142,6 +142,35 @@ export type ProjectAnalyticsData = {
   updates: UserPortfolioWorkItem[];
 };
 
+export type ProjectWorkActivityEntry = {
+  submission_date: string;
+  username: string;
+  status: string;
+  progress_percentage: number;
+  notes: string;
+  hours_today: number;
+};
+
+export type ProjectWorkActivityResult = {
+  project_id: string;
+  from: string;
+  to: string;
+  entries: ProjectWorkActivityEntry[];
+};
+
+function isProjectWorkActivityEntry(value: unknown): value is ProjectWorkActivityEntry {
+  if (!value || typeof value !== 'object') return false;
+  const entry = value as Record<string, unknown>;
+  return (
+    typeof entry.submission_date === 'string' &&
+    typeof entry.username === 'string' &&
+    typeof entry.status === 'string' &&
+    typeof entry.progress_percentage === 'number' &&
+    typeof entry.notes === 'string' &&
+    typeof entry.hours_today === 'number'
+  );
+}
+
 class ProjectService {
   async getProjectStats(): Promise<ProjectStatsBundle> {
     const empty: ProjectStatsBundle = { bugs: {}, members: {}, memberships: {} };
@@ -325,13 +354,24 @@ class ProjectService {
   async getProjectWorkActivity(
     projectId: string,
     params: { from?: string; to?: string } = {}
-  ) {
-    const empty = { project_id: projectId, from: '', to: '', entries: [] as unknown[] };
+  ): Promise<ProjectWorkActivityResult> {
+    const empty: ProjectWorkActivityResult = {
+      project_id: projectId,
+      from: '',
+      to: '',
+      entries: [],
+    };
 
-    const parse = (data: { success?: boolean; data?: unknown }) => {
+    const parse = (data: { success?: boolean; data?: unknown }): ProjectWorkActivityResult => {
       const payload = data?.success ? data.data : null;
       if (payload && typeof payload === 'object' && Array.isArray((payload as { entries?: unknown }).entries)) {
-        return payload as typeof empty;
+        const raw = payload as { project_id?: string; from?: string; to?: string; entries: unknown[] };
+        return {
+          project_id: raw.project_id ?? projectId,
+          from: raw.from ?? '',
+          to: raw.to ?? '',
+          entries: raw.entries.filter(isProjectWorkActivityEntry),
+        };
       }
       return empty;
     };

@@ -125,24 +125,22 @@ const AccessError = ({
   backHref?: string;
   backLabel?: string;
 }) => (
-  <main className="min-h-[60vh] bg-background px-4 py-6 md:px-6 lg:px-8">
-    <section className="max-w-7xl mx-auto space-y-8 flex flex-col items-center justify-center text-center py-12 relative overflow-hidden rounded-2xl">
-      <div className="pointer-events-none absolute inset-0 bg-gradient-to-br from-red-50/50 via-orange-50/30 to-yellow-50/50 dark:from-red-950/20 dark:via-orange-950/10 dark:to-yellow-950/20" />
-      <div className="relative mx-auto w-24 h-24 rounded-full bg-gradient-to-br from-red-500 to-orange-600 flex items-center justify-center shadow-2xl">
-        <Lock className="h-12 w-12 text-white" />
-      </div>
-      <h1 className="relative text-2xl font-bold tracking-tight">Access Denied</h1>
-      <p className="relative text-muted-foreground max-w-md">
-        You don&apos;t have permission to view this bug. Project membership is required unless
-        the bug is listed in Common Bugs.
-      </p>
-      {backHref && backLabel ? (
-        <Button asChild variant="outline" className="relative rounded-xl">
-          <Link to={backHref}>{backLabel}</Link>
-        </Button>
-      ) : null}
-    </section>
-  </main>
+  <div className="min-w-0 w-full space-y-8 flex flex-col items-center justify-center text-center py-12 relative overflow-hidden rounded-2xl">
+    <div className="pointer-events-none absolute inset-0 bg-gradient-to-br from-red-50/50 via-orange-50/30 to-yellow-50/50 dark:from-red-950/20 dark:via-orange-950/10 dark:to-yellow-950/20" />
+    <div className="relative mx-auto w-24 h-24 rounded-full bg-gradient-to-br from-red-500 to-orange-600 flex items-center justify-center shadow-2xl">
+      <Lock className="h-12 w-12 text-white" />
+    </div>
+    <h1 className="relative text-2xl font-bold tracking-tight">Access Denied</h1>
+    <p className="relative text-muted-foreground max-w-md">
+      You don&apos;t have permission to view this bug. Project membership is required unless
+      the bug is listed in Common Bugs.
+    </p>
+    {backHref && backLabel ? (
+      <Button asChild variant="outline" className="relative rounded-xl">
+        <Link to={backHref}>{backLabel}</Link>
+      </Button>
+    ) : null}
+  </div>
 );
 
 function CommonBugReadOnlyBanner({
@@ -912,30 +910,26 @@ const BugDetails = () => {
 
   // Function to render skeleton UI
   const renderSkeleton = () => (
-    <main
-      className="min-h-[60vh] bg-background px-4 py-6 md:px-6 lg:px-8"
+    <div
+      className="min-w-0 w-full space-y-8"
       aria-busy="true"
       aria-label="Loading bug details"
     >
-      <section className="max-w-7xl mx-auto space-y-8">
-        <header>
-          <BugHeaderSkeletonDetailed />
-        </header>
+      <header>
+        <BugHeaderSkeletonDetailed />
+      </header>
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-          {/* Main Content - Description and Screenshots Skeletons */}
-          <section className="lg:col-span-2 space-y-8">
-            <BugDescriptionSkeleton />
-            <BugScreenshotsSkeleton />
-          </section>
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+        <section className="lg:col-span-2 space-y-8">
+          <BugDescriptionSkeleton />
+          <BugScreenshotsSkeleton />
+        </section>
 
-          {/* Sidebar - Bug Details Skeleton */}
-          <aside className="space-y-8">
-            <BugDetailsSkeleton />
-          </aside>
-        </div>
-      </section>
-    </main>
+        <aside className="space-y-8">
+          <BugDetailsSkeleton />
+        </aside>
+      </div>
+    </div>
   );
 
   // Early exit if we're no longer on a bug route (component should unmount)
@@ -968,9 +962,9 @@ const BugDetails = () => {
   }
   if (error || !bug)
     return (
-      <main>
+      <div>
         <BugNotFound />
-      </main>
+      </div>
     );
 
   const formattedCreatedDate = formatDetailedDate(bug.created_at);
@@ -1090,9 +1084,8 @@ const BugDetails = () => {
   const role = currentUser?.role || "admin";
 
   return (
-    <main className="min-h-[60vh] bg-background px-4 py-6 md:px-6 lg:px-8 flex flex-col">
-      {/* Main content */}
-      <section className="max-w-7xl mx-auto space-y-8 flex-1 w-full">
+    <div className="min-w-0 w-full space-y-8 flex flex-col">
+      <div className="flex-1 w-full space-y-8">
         {readOnlyCommonBug && (
           <CommonBugReadOnlyBanner bug={bug} role={role} />
         )}
@@ -1109,7 +1102,6 @@ const BugDetails = () => {
           </div>
         </header>
         <div className="grid grid-cols-1 gap-8">
-          {/* Main Content - Description, Screenshots, Voice Notes, Attachments, Bug Information */}
           <section className="space-y-8">
             <BugDoubtClearingCard bugId={bug.id} readOnly={readOnlyCommonBug} />
             <BugContentCards
@@ -1123,7 +1115,6 @@ const BugDetails = () => {
               }}
             />
           </section>
-          {/* Move Bug Details below Bug Information as requested */}
           <section className="space-y-8">
             <BugDetailsCard
               bug={bug}
@@ -1134,7 +1125,7 @@ const BugDetails = () => {
             <BugLifecycleCard bugId={bug.id} bug={bug} />
           </section>
         </div>
-      </section>
+      </div>
       {/* Professional navigation bar at the bottom */}
       <nav className="w-full mt-8" aria-label="Adjacent bug navigation">
         <div className="relative overflow-hidden rounded-2xl border border-border/60 bg-card/90 backdrop-blur-sm shadow-sm">
@@ -1265,7 +1256,7 @@ const BugDetails = () => {
           </div>
         </div>
       </nav>
-    </main>
+    </div>
   );
 };
 

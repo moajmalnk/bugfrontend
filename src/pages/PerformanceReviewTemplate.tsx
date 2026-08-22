@@ -281,17 +281,14 @@ const PerformanceReviewTemplate = () => {
 
   if (!canManage) {
     return (
-      <main className="min-h-[calc(100vh-4rem)] bg-background px-3 py-4 sm:px-6">
-        <section className="max-w-4xl mx-auto rounded-2xl border p-8 text-center text-muted-foreground">
-          Access denied.
-        </section>
-      </main>
+      <div className="min-w-0 w-full space-y-6 sm:space-y-8">
+        <p className="text-muted-foreground">Access denied.</p>
+      </div>
     );
   }
 
   return (
-    <main className="min-h-[calc(100vh-4rem)] bg-background px-3 py-4 sm:px-6 sm:py-6 md:px-8 lg:px-10 lg:py-8 overflow-x-hidden">
-      <section className="max-w-4xl mx-auto space-y-6 sm:space-y-8 min-w-0 w-full">
+    <div className="min-w-0 w-full space-y-6 sm:space-y-8 overflow-x-hidden">
         <div className="relative overflow-hidden">
           <div className="absolute inset-0 bg-gradient-to-r from-violet-50/50 via-transparent to-indigo-50/50 dark:from-violet-950/20 dark:via-transparent dark:to-indigo-950/20" />
           <div className="relative bg-white/80 dark:bg-gray-900/80 backdrop-blur-sm border border-gray-200/50 dark:border-gray-700/50 rounded-2xl p-4 sm:p-6 md:p-8">
@@ -448,7 +445,6 @@ const PerformanceReviewTemplate = () => {
             ))}
           </div>
         )}
-      </section>
 
       <Dialog
         open={dialogOpen}
@@ -631,7 +627,7 @@ const PerformanceReviewTemplate = () => {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-    </main>
+    </div>
   );
 };
 

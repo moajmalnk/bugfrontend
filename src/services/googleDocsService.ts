@@ -82,7 +82,6 @@ class GoogleDocsService {
    */
   async disconnect(): Promise<{ success: boolean; message: string }> {
     try {
-      console.log('🔌 Disconnecting Google account...');
       const response = await apiClient.post<{
         success: boolean;
         message: string;
@@ -92,10 +91,8 @@ class GoogleDocsService {
         throw new Error(response.data.message || 'Failed to disconnect');
       }
 
-      console.log('✅ Google account disconnected successfully');
       return response.data;
     } catch (error: any) {
-      console.error('❌ Failed to disconnect Google account:', error);
       throw new Error(error.response?.data?.message || 'Failed to disconnect Google account');
     }
   }
@@ -249,7 +246,6 @@ class GoogleDocsService {
     count: number;
   }> {
     try {
-      console.log('🔍 Fetching documents for project:', projectId);
       const url = `/docs/get-by-project.php?project_id=${encodeURIComponent(projectId)}&include_archived=${includeArchived}`;
       const response = await apiClient.get<{
         success: boolean;
@@ -282,7 +278,6 @@ class GoogleDocsService {
     count: number;
   }> {
     try {
-      console.log('🔍 Fetching all documents (admin)');
       const url = `/docs/get-all-docs.php?include_archived=${includeArchived}`;
       const response = await apiClient.get<{
         success: boolean;
@@ -310,7 +305,6 @@ class GoogleDocsService {
    */
   async getSharedDocuments(includeArchived: boolean = false): Promise<UserDocument[]> {
     try {
-      console.log('🔍 Fetching shared documents');
       const url = `/docs/get-shared-docs.php?include_archived=${includeArchived}`;
       const response = await apiClient.get<{
         success: boolean;
@@ -340,7 +334,6 @@ class GoogleDocsService {
     document_count: number;
   }>> {
     try {
-      console.log('🔍 Fetching projects with document counts');
       const response = await apiClient.get<{
         success: boolean;
         projects: Array<{
@@ -368,7 +361,6 @@ class GoogleDocsService {
    */
   async listGeneralDocuments(includeArchived: boolean = false, projectId?: string | null): Promise<UserDocument[]> {
     try {
-      console.log('🔍 Fetching general documents, includeArchived:', includeArchived, 'projectId:', projectId);
       let url = `/docs/list-general-docs.php?include_archived=${includeArchived}`;
       if (projectId) {
         url += `&project_id=${encodeURIComponent(projectId)}`;
@@ -379,15 +371,11 @@ class GoogleDocsService {
         count: number;
       }>(url);
 
-      console.log('📄 API response:', response.data);
-
       if (!response.data.success) {
         throw new Error('Failed to fetch documents');
       }
 
-      const documents = response.data.documents || [];
-      console.log('📊 Returning documents:', documents.length);
-      return documents;
+      return response.data.documents || [];
     } catch (error: any) {
       console.error('❌ Failed to list general documents:', error);
       return [];

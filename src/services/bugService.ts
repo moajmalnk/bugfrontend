@@ -147,6 +147,7 @@ export type BugListParams = {
   priority?: string;
   fixedBy?: string | number;
   bugTypeId?: string | number;
+  verificationFilter?: string;
 };
 
 export const bugService = {
@@ -160,6 +161,7 @@ export const bugService = {
     priority,
     fixedBy,
     bugTypeId,
+    verificationFilter,
   }: BugListParams = {}): Promise<{ bugs: Bug[]; pagination: any }> {
     const params = new URLSearchParams();
     params.set("page", String(page));
@@ -178,6 +180,12 @@ export const bugService = {
     }
     if (bugTypeId != null && bugTypeId !== "" && bugTypeId !== "all") {
       params.set("bug_type_id", String(bugTypeId));
+    }
+    if (
+      verificationFilter &&
+      verificationFilter !== "all"
+    ) {
+      params.set("verification", String(verificationFilter));
     }
 
     const response = await apiClient.get<{
@@ -226,6 +234,14 @@ export const bugService = {
     resolved: number;
     total: number;
     open_priority: { high: number; medium: number; low: number };
+    retests?: {
+      pending: number;
+      verified_fixed: number;
+      still_broken: number;
+      not_retested: number;
+      retested: number;
+      total: number;
+    };
   }> {
     const params = new URLSearchParams();
     if (opts.from) params.set("from", opts.from);
@@ -245,6 +261,14 @@ export const bugService = {
         resolved: number;
         total: number;
         open_priority: { high: number; medium: number; low: number };
+        retests?: {
+          pending: number;
+          verified_fixed: number;
+          still_broken: number;
+          not_retested: number;
+          retested: number;
+          total: number;
+        };
       };
       message?: string;
     }>(`/bugs/dashboardStats.php${qs ? `?${qs}` : ""}`);
@@ -252,6 +276,38 @@ export const bugService = {
       return response.data.data;
     }
     throw new Error(response.data.message || "Failed to load dashboard bug stats");
+  },
+
+  /**
+   * Why: Ops dashboard retest history is sorted by verification time, not bug created_at.
+   */
+  async getRetestHistory(opts: {
+    from?: string;
+    to?: string;
+    limit?: number;
+  } = {}): Promise<{ bugs: Bug[]; pagination: { totalBugs: number } }> {
+    const params = new URLSearchParams();
+    params.set("page", "1");
+    params.set("limit", String(opts.limit ?? 10));
+    params.set("status", "fixed");
+    params.set("verification", "retest_history");
+    params.set("sort", "verified_at");
+    if (opts.from) params.set("verified_from", opts.from);
+    if (opts.to) params.set("verified_to", opts.to);
+
+    const response = await apiClient.get<{
+      success: boolean;
+      data: { bugs: Bug[]; pagination: { totalBugs: number } };
+    }>(`/bugs/getAll.php?${params.toString()}`);
+    if (response.data.success && response.data.data?.bugs) {
+      return {
+        bugs: response.data.data.bugs,
+        pagination: {
+          totalBugs: response.data.data.pagination?.totalBugs ?? response.data.data.bugs.length,
+        },
+      };
+    }
+    return { bugs: [], pagination: { totalBugs: 0 } };
   },
 
   /**

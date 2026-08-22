@@ -91,7 +91,7 @@ export default function HelpArticlePage() {
         </aside>
 
         {/* Main content */}
-        <main className="min-w-0 flex-1">
+        <div className="min-w-0 flex-1">
           <Button
             variant="ghost"
             size="sm"
@@ -148,7 +148,7 @@ export default function HelpArticlePage() {
               ))}
             </article>
           </HelpContentCard>
-        </main>
+        </div>
       </div>
 
       {/* Full-width bottom area: related articles + feedback */}

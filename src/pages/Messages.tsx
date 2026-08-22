@@ -142,13 +142,13 @@ const Messages = () => {
 
   if (isLoadingPermissions) {
     return (
-      <main className="flex h-full min-h-0 w-full flex-1 flex-col items-center justify-center bg-background">
+      <div className="flex h-full min-h-0 w-full flex-1 flex-col items-center justify-center bg-background">
         <div className="animate-spin rounded-full h-10 w-10 border-2 border-primary border-t-transparent mb-4" />
         <h1 className="text-xl font-bold mb-2">Loading...</h1>
         <p className="text-muted-foreground text-sm">
           Verifying your access permissions...
         </p>
-      </main>
+      </div>
     );
   }
 
@@ -164,7 +164,7 @@ const Messages = () => {
 
   if (!canOpenMessagesPage(effectiveRole, hasPermission)) {
     return (
-      <main className="flex h-full min-h-0 w-full flex-1 flex-col items-center justify-center bg-background p-6">
+      <div className="flex h-full min-h-0 w-full flex-1 flex-col items-center justify-center bg-background p-6">
         <div className="relative w-full max-w-lg overflow-hidden rounded-2xl border border-gray-200/50 dark:border-gray-700/50 bg-white/80 dark:bg-gray-900/80 p-8 sm:p-12 text-center">
           <div className="mx-auto mb-6 flex h-20 w-20 items-center justify-center rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 shadow-2xl">
             <Lock className="h-10 w-10 text-white" />
@@ -176,7 +176,7 @@ const Messages = () => {
             You do not have permission to view messages.
           </p>
         </div>
-      </main>
+      </div>
     );
   }
 
@@ -184,7 +184,7 @@ const Messages = () => {
   const showChatPane = showSplitLayout || Boolean(selectedGroup);
 
   return (
-    <main className="flex h-full min-h-0 w-full flex-1 flex-col overflow-hidden bg-background">
+    <div className="flex h-full min-h-0 w-full flex-1 flex-col overflow-hidden bg-background">
       <section className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
         {/* Full-bleed chat shell — fills MainLayout content area */}
         <div className="relative flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden border-0 bg-white dark:bg-gray-950 lg:border-l lg:border-gray-200/40 dark:lg:border-gray-800/60">
@@ -302,7 +302,7 @@ const Messages = () => {
           onConfirmNow={undoDelete.confirmDelete}
         />
       </section>
-    </main>
+    </div>
   );
 };
 

@@ -448,19 +448,16 @@ const EditUpdate = () => {
 
   if (isLoading) {
     return (
-      <main className="min-h-[calc(100vh-4rem)] bg-background px-3 py-4 sm:px-6 sm:py-6 md:px-8 lg:px-10 lg:py-8">
-        <section className="max-w mx-auto space-y-6">
-          <Skeleton className="h-40 w-full rounded-2xl" />
-          <Skeleton className="h-[600px] w-full rounded-2xl" />
-        </section>
-      </main>
+      <div className="min-w-0 w-full space-y-6 sm:space-y-8">
+        <Skeleton className="h-40 w-full rounded-2xl" />
+        <Skeleton className="h-[600px] w-full rounded-2xl" />
+      </div>
     );
   }
 
   if (loadError) {
     return (
-      <main className="min-h-[calc(100vh-4rem)] bg-background px-3 py-4 sm:px-6 sm:py-6 md:px-8 lg:px-10 lg:py-8">
-        <section className="max-w mx-auto">
+      <div className="min-w-0 w-full space-y-6 sm:space-y-8">
           <div className="rounded-2xl border border-gray-200/60 dark:border-gray-800/60 bg-white/80 dark:bg-gray-900/80 p-12 text-center">
             <AlertCircle className="h-10 w-10 text-red-500 mx-auto mb-4" />
             <h3 className="text-xl font-bold mb-2">Could not load update</h3>
@@ -470,14 +467,12 @@ const EditUpdate = () => {
               Go Back
             </Button>
           </div>
-        </section>
-      </main>
+      </div>
     );
   }
 
   return (
-    <main className="min-h-[calc(100vh-4rem)] bg-background px-3 py-4 sm:px-6 sm:py-6 md:px-8 lg:px-10 lg:py-8">
-      <section className="max-w mx-auto space-y-6 sm:space-y-8">
+    <div className="min-w-0 w-full space-y-6 sm:space-y-8">
         <div className="relative overflow-hidden">
           <div className="absolute inset-0 pointer-events-none bg-gradient-to-r from-blue-50/50 via-transparent to-indigo-50/50 dark:from-blue-950/20 dark:via-transparent dark:to-indigo-950/20" />
           <div className="relative bg-white/80 dark:bg-gray-900/80 backdrop-blur-sm border border-gray-200/50 dark:border-gray-700/50 rounded-2xl p-6 sm:p-8">
@@ -1074,8 +1069,7 @@ const EditUpdate = () => {
             </Card>
           </div>
         </div>
-      </section>
-    </main>
+    </div>
   );
 };
 

@@ -749,10 +749,10 @@ export function OnboardingProfileSection({
   const employeeIdMissing = useMemo(() => {
     const missing: string[] = [];
     if (!hrForm.joining_date.trim()) missing.push("Join date");
-    const dob = String(details?.date_of_birth || data?.user?.date_of_birth || "").slice(0, 10);
+    const dob = String(details?.date_of_birth || "").slice(0, 10);
     if (!dob) missing.push("Date of birth");
     return missing;
-  }, [hrForm.joining_date, details?.date_of_birth, data?.user]);
+  }, [hrForm.joining_date, details?.date_of_birth]);
 
   const regenerateEmployeeCode = async () => {
     if (!canVerify || hrRegenerating || hrSaving || verifying) return;

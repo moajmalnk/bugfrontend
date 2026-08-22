@@ -586,8 +586,7 @@ export default function Profile() {
 
   if (isLoading) {
     return (
-      <main className="min-h-[calc(100vh-4rem)] bg-background px-3 py-4 sm:px-6 sm:py-6 md:px-8 lg:px-10 lg:py-8">
-        <section className="max-w-7xl mx-auto space-y-6 sm:space-y-8">
+      <div className="min-w-0 w-full space-y-6 sm:space-y-8">
           <Card className="overflow-hidden border-border/60 bg-card/70">
             <CardContent className="p-5 sm:p-6 lg:p-8 space-y-6">
               <div className="flex flex-col lg:flex-row gap-5 lg:gap-8">
@@ -615,8 +614,7 @@ export default function Profile() {
               <RecentActivitySkeleton />
             </CardContent>
           </Card>
-        </section>
-      </main>
+      </div>
     );
   }
 
@@ -860,8 +858,7 @@ export default function Profile() {
         : "col-span-6 sm:col-span-4";
 
   return (
-    <main className="min-h-[calc(100vh-4rem)] bg-background px-3 py-4 sm:px-6 sm:py-6 md:px-8 lg:px-10 lg:py-8">
-      <section className="max-w-7xl mx-auto space-y-6 sm:space-y-8">
+    <div className="min-w-0 w-full space-y-6 sm:space-y-8">
         <TeamBirthdayBanner />
         {/* Identity */}
         <Card className="overflow-hidden border-border/60 bg-card/70 backdrop-blur shadow-sm">
@@ -1876,7 +1873,6 @@ export default function Profile() {
             </DialogFooter>
           </DialogContent>
         </Dialog>
-      </section>
-    </main>
+    </div>
   );
 }

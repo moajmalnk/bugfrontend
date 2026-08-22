@@ -1,3 +1,4 @@
+import { APP_PAGE_SHELL } from "@/components/layout/list-page";
 import { ReactNode } from "react";
 import { LucideIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -18,14 +19,7 @@ interface HelpPageShellProps {
 
 export function HelpPageShell({ children, className }: HelpPageShellProps) {
   return (
-    <main
-      className={cn(
-        "min-h-[calc(100vh-4rem)] bg-background px-3 py-4 sm:px-6 sm:py-6 md:px-8 lg:px-10 lg:py-8",
-        className
-      )}
-    >
-      <section className="max-w-7xl mx-auto space-y-6 sm:space-y-8">{children}</section>
-    </main>
+    <div className={cn(APP_PAGE_SHELL, className)}>{children}</div>
   );
 }
 

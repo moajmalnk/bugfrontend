@@ -53,33 +53,20 @@ export const GoogleDocsButton = ({ bugId }: GoogleDocsButtonProps) => {
   };
 
   const handleCreateBugDoc = async () => {
-    const startTime = Date.now();
-    console.group('🟢 [GoogleDocsButton] Create BugDoc Button Clicked');
-    console.log('Bug ID:', bugId);
-    console.log('Is Creating (before):', isCreating);
-    console.log('Is Connected:', isConnected);
-    
-    if (isCreating) {
-      console.warn('⚠️ [GoogleDocsButton] Already creating, ignoring click');
-      console.groupEnd();
-      return;
-    }
-    
+    if (isCreating) return;
+
     setIsCreating(true);
-    
+
     try {
       const result = await googleDocsService.createBugDocument(bugId);
-      const elapsed = Date.now() - startTime;
-      
+
       toast({
         title: "Success!",
         description: `Document "${result.document_name}" created successfully.`,
       });
 
-      // Open the document in a new tab
       googleDocsService.openDocument(result.document_url);
     } catch (error: any) {
-      
       toast({
         title: "Error",
         description: error.message || "Failed to create document",
@@ -87,10 +74,6 @@ export const GoogleDocsButton = ({ bugId }: GoogleDocsButtonProps) => {
       });
     } finally {
       setIsCreating(false);
-      const totalElapsed = Date.now() - startTime;
-      console.log('🏁 [GoogleDocsButton] Create handler completed, total time:', totalElapsed, 'ms');
-      console.log('✅ [GoogleDocsButton] Set isCreating to false');
-      console.groupEnd();
     }
   };
 

@@ -7,6 +7,14 @@ import { BulkConvertBugsDialog } from "@/components/bugs/BulkConvertBugsDialog";
 import {
   BugTypeFilterSelect,
 } from "@/components/bugs/BugTypeFilterSelect";
+import {
+  ListPageHeader,
+  ListPageShell,
+  ListPageTabTrigger,
+  ListPageTabsShell,
+  LIST_TABS_CONTENT,
+} from "@/components/layout/list-page";
+import { ListPagination } from "@/components/pagination/ListPagination";
 import { ItemsPerPageSelect } from "@/components/pagination/ItemsPerPageSelect";
 import { PageJumpSelect } from "@/components/pagination/PageJumpSelect";
 import { Button } from "@/components/ui/button";
@@ -18,7 +26,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Tabs, TabsContent } from "@/components/ui/tabs";
 import { toast } from "@/components/ui/use-toast";
 import { useAuth } from "@/context/AuthContext";
 import { bugService } from "@/services/bugService";
@@ -283,16 +291,8 @@ const Bugs = () => {
   const fetchProjects = async () => {
     try {
       const projectsData = await projectService.getProjects();
-      if (import.meta.env.DEV) {
-        console.log(
-          "Fetched projects for user:",
-          currentUser?.role,
-          projectsData
-        );
-      }
       setProjects(projectsData);
     } catch (error: any) {
-      console.error("Error fetching projects:", error);
       toast({
         title: "Error",
         description: "Failed to load projects. Please try again.",
@@ -473,68 +473,39 @@ const Bugs = () => {
   ) : null;
 
   return (
-    <main className="min-h-[calc(100vh-4rem)] bg-background px-3 py-4 sm:px-6 sm:py-6 md:px-8 lg:px-10 lg:py-8 overflow-x-hidden">
-      <section className="max-w-7xl mx-auto space-y-6 sm:space-y-8 min-w-0 w-full">
-        {/* Professional Header */}
-        <div className="relative overflow-hidden">
-          <div className="absolute inset-0 bg-gradient-to-r from-orange-50/50 via-transparent to-red-50/50 dark:from-orange-950/20 dark:via-transparent dark:to-red-950/20"></div>
-          <div className="relative bg-white/80 dark:bg-gray-900/80 backdrop-blur-sm border border-gray-200/50 dark:border-gray-700/50 rounded-2xl p-4 sm:p-6 md:p-8">
-            <div className="flex flex-col lg:flex-row justify-between lg:items-center gap-4 sm:gap-6 min-w-0">
-              <div className="space-y-3 min-w-0 flex-1">
-                <div className="flex items-center gap-3 min-w-0">
-                  <div className="p-2 bg-gradient-to-br from-orange-500 to-red-600 rounded-xl shadow-lg shrink-0">
-                    <BugIcon className="h-5 w-5 sm:h-6 sm:w-6 text-white" />
-                  </div>
-                  <div className="min-w-0">
-                    <h1 className="text-2xl sm:text-3xl lg:text-5xl font-bold bg-gradient-to-r from-gray-900 via-gray-800 to-gray-700 dark:from-white dark:via-gray-100 dark:to-gray-300 bg-clip-text text-transparent tracking-tight truncate">
-                      Bugs
-                    </h1>
-                    <div className="h-1 w-16 sm:w-20 bg-gradient-to-r from-orange-500 to-red-600 rounded-full mt-2"></div>
-                  </div>
-                </div>
-                <p className="text-gray-600 dark:text-gray-400 text-sm sm:text-base lg:text-lg font-medium max-w-2xl min-w-0 break-words">
-                  Track pending bugs across your projects
-                </p>
-              </div>
-              
-              <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 sm:gap-4 shrink-0 w-full lg:w-auto">
-                {canReportBug(currentUser?.role) && (
-                  <Link
-                    to={
-                      currentUser?.role
-                        ? `/${currentUser.role}/bugs/new`
-                        : "/bugs/new"
-                    }
-                    state={listFromState}
-                    className="group"
-                  >
-                    <Button
-                      variant="default"
-                      size="lg"
-                      className="h-12 px-6 bg-gradient-to-r from-orange-600 to-red-700 hover:from-orange-700 hover:to-red-800 text-white font-semibold shadow-lg hover:shadow-xl transition-all duration-300 transform hover:scale-105 group-hover:scale-105"
-                    >
-                      <Plus className="mr-2 h-5 w-5" />
-                      Report Bug
-                    </Button>
-                  </Link>
-                )}
-                
-                <div className="flex items-center gap-4">
-                  <div className="flex items-center gap-3 px-4 py-3 bg-gradient-to-r from-orange-50 to-red-50 dark:from-orange-950/30 dark:to-red-950/30 border border-orange-200 dark:border-orange-800 rounded-xl shadow-sm">
-                    <div className="p-1.5 bg-orange-500 rounded-lg">
-                      <BugIcon className="h-5 w-5 text-white" />
-                    </div>
-                    <div>
-                      <div className="text-2xl font-bold text-orange-700 dark:text-orange-300">
-                        {pendingBugsCount}
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
+    <ListPageShell>
+        <ListPageHeader
+          icon={<BugIcon className="h-5 w-5 sm:h-6 sm:w-6" />}
+          title="Bugs"
+          description="Track pending bugs across your projects"
+          accentBarClassName="from-orange-500 to-red-600"
+          underlayClassName="from-orange-50/50 via-transparent to-red-50/50 dark:from-orange-950/20 dark:via-transparent dark:to-red-950/20"
+          count={pendingBugsCount}
+          countIcon={<BugIcon className="h-5 w-5" />}
+          countClassName="from-orange-50 to-red-50 dark:from-orange-950/30 dark:to-red-950/30 border-orange-200 dark:border-orange-800 text-orange-700 dark:text-orange-300"
+          actions={
+            canReportBug(currentUser?.role) ? (
+              <Link
+                to={
+                  currentUser?.role
+                    ? `/${currentUser.role}/bugs/new`
+                    : "/bugs/new"
+                }
+                state={listFromState}
+                className="w-full sm:w-auto"
+              >
+                <Button
+                  variant="default"
+                  size="lg"
+                  className="h-11 sm:h-12 w-full sm:w-auto px-6 bg-gradient-to-r from-orange-600 to-red-700 hover:from-orange-700 hover:to-red-800 text-white font-semibold shadow-lg"
+                >
+                  <Plus className="mr-2 h-5 w-5" />
+                  Report Bug
+                </Button>
+              </Link>
+            ) : undefined
+          }
+        />
 
         {/* Admin Tabs or Regular Content - always show tabs for users who can view them */}
         {canViewTabs && !skeletonLoading && !loading ? (
@@ -551,37 +522,26 @@ const Bugs = () => {
             }}
             className="w-full"
           >
-            <div className="relative">
-              <div className="absolute inset-0 bg-gradient-to-r from-gray-50/50 to-orange-50/50 dark:from-gray-800/50 dark:to-orange-900/50 rounded-2xl"></div>
-              <div className="relative bg-white/60 dark:bg-gray-900/60 backdrop-blur-sm border border-gray-200/50 dark:border-gray-700/50 rounded-2xl p-2">
-                <TabsList className="grid w-full grid-cols-2 h-14 bg-transparent p-1">
-                  <TabsTrigger
-                    value="all-bugs"
-                    className="text-sm sm:text-base font-semibold data-[state=active]:bg-white data-[state=active]:shadow-lg data-[state=active]:border data-[state=active]:border-gray-200 dark:data-[state=active]:bg-gray-800 dark:data-[state=active]:border-gray-700 rounded-xl transition-all duration-300"
-                  >
-                    <BugIcon className="h-4 w-4 sm:h-5 sm:w-5 mr-2" />
-                    <span className="hidden sm:inline">All Bugs</span>
-                    <span className="sm:hidden">All</span>
-                    <span className="ml-2 px-2 py-1 bg-orange-100 dark:bg-orange-900/30 text-orange-700 dark:text-orange-300 rounded-full text-xs font-bold">
+            <ListPageTabsShell underlayClassName="from-gray-50/50 to-orange-50/50 dark:from-gray-800/50 dark:to-orange-900/50">
+                  <ListPageTabTrigger value="all-bugs">
+                    <BugIcon className="h-4 w-4 sm:h-5 sm:w-5 mr-1.5 sm:mr-2 shrink-0" />
+                    <span className="hidden sm:inline truncate">All Bugs</span>
+                    <span className="sm:hidden truncate">All</span>
+                    <span className="ml-1 sm:ml-2 px-1.5 sm:px-2 py-0.5 sm:py-1 bg-orange-100 dark:bg-orange-900/30 text-orange-700 dark:text-orange-300 rounded-full text-[10px] sm:text-xs font-bold shrink-0">
                       {getTabCount("all-bugs")}
                     </span>
-                  </TabsTrigger>
-                  <TabsTrigger
-                    value="my-bugs"
-                    className="text-sm sm:text-base font-semibold data-[state=active]:bg-white data-[state=active]:shadow-lg data-[state=active]:border data-[state=active]:border-gray-200 dark:data-[state=active]:bg-gray-800 dark:data-[state=active]:border-gray-700 rounded-xl transition-all duration-300"
-                  >
-                    <User className="h-4 w-4 sm:h-5 sm:w-5 mr-2" />
-                    <span className="hidden sm:inline">My Bugs</span>
-                    <span className="sm:hidden">My</span>
-                    <span className="ml-2 px-2 py-1 bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-300 rounded-full text-xs font-bold">
+                  </ListPageTabTrigger>
+                  <ListPageTabTrigger value="my-bugs">
+                    <User className="h-4 w-4 sm:h-5 sm:w-5 mr-1.5 sm:mr-2 shrink-0" />
+                    <span className="hidden sm:inline truncate">My Bugs</span>
+                    <span className="sm:hidden truncate">My</span>
+                    <span className="ml-1 sm:ml-2 px-1.5 sm:px-2 py-0.5 sm:py-1 bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-300 rounded-full text-[10px] sm:text-xs font-bold shrink-0">
                       {getTabCount("my-bugs")}
                     </span>
-                  </TabsTrigger>
-                </TabsList>
-              </div>
-            </div>
+                  </ListPageTabTrigger>
+            </ListPageTabsShell>
 
-            <TabsContent value={activeTab} className="space-y-6 sm:space-y-8 min-w-0">
+            <TabsContent value={activeTab} className={LIST_TABS_CONTENT}>
               {searchFilterBar}
 
               {/* Professional Responsive Pagination Controls - Show when there are bugs */}
@@ -1189,8 +1149,7 @@ const Bugs = () => {
             }}
           />
         ) : null}
-      </section>
-    </main>
+      </ListPageShell>
   );
 };
 

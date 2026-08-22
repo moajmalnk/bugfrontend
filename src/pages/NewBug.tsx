@@ -627,8 +627,7 @@ const NewBug = () => {
   }, [voiceNotes]);
 
   return (
-    <main className="min-h-[calc(100vh-4rem)] bg-background px-3 py-4 sm:px-6 sm:py-6 md:px-8 lg:px-10 lg:py-8">
-      <section className="max-w mx-auto space-y-6 sm:space-y-8">
+    <div className="min-w-0 w-full space-y-6 sm:space-y-8">
         {isSharedImport && (
           <div className="rounded-xl border border-blue-500/40 bg-blue-500/10 px-4 py-3 text-sm text-blue-100">
             Attachments imported from share. Review them below before submitting.
@@ -1300,8 +1299,7 @@ const NewBug = () => {
             </Card>
           </div>
         </div>
-      </section>
-    </main>
+    </div>
   );
 };
 

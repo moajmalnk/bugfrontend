@@ -15,7 +15,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useAuth } from "@/context/AuthContext";
 import { useToast } from "@/hooks/use-toast";
 import { cn, getEffectiveRole } from "@/lib/utils";
-import { getProjectStatusLabel } from "@/lib/utils/projectUtils";
+import { getProjectStatusLabel, type ProjectStatus } from "@/lib/utils/projectUtils";
 import {
   projectService,
   type Project,
@@ -417,7 +417,7 @@ export function UserProjectsDialog({
                             <div className="flex items-center gap-2 mt-0.5 min-w-0">
                               {project.status ? (
                                 <span className="text-[11px] text-muted-foreground shrink-0">
-                                  {getProjectStatusLabel(project.status)}
+                                  {getProjectStatusLabel(project.status as ProjectStatus)}
                                 </span>
                               ) : null}
                               {project.description ? (

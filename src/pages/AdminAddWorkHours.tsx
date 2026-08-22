@@ -198,8 +198,7 @@ export default function AdminAddWorkHours() {
   const displayName = userInfo?.username || 'User';
 
   return (
-    <main className="min-h-[calc(100vh-4rem)] bg-background px-3 py-4 sm:px-6 sm:py-6 md:px-8 lg:px-10 lg:py-8 overflow-x-hidden">
-      <section className="max-w mx-auto min-w-0 space-y-6 sm:space-y-8">
+    <div className="min-w-0 w-full space-y-6 sm:space-y-8 overflow-x-hidden">
         <div className="relative min-w-0 overflow-hidden rounded-2xl">
           <div className="absolute inset-0 pointer-events-none bg-gradient-to-r from-orange-50/50 via-transparent to-red-50/50 dark:from-orange-950/20 dark:via-transparent dark:to-red-950/20" />
           <div className="relative bg-white/80 dark:bg-gray-900/80 backdrop-blur-sm border border-gray-200/50 dark:border-gray-700/50 rounded-2xl p-6 sm:p-8">
@@ -385,7 +384,6 @@ export default function AdminAddWorkHours() {
             Clear form for a new date
           </Link>
         </p>
-      </section>
-    </main>
+    </div>
   );
 }

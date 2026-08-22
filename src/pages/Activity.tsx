@@ -464,20 +464,20 @@ const Activity = () => {
 
   if (permissionsLoading) {
     return (
-      <main className="min-h-[calc(100vh-4rem)] bg-background px-3 py-4 sm:px-6 sm:py-6">
+      <div className="min-w-0 w-full space-y-6 sm:space-y-8">
         <p className="text-muted-foreground text-center py-12">Verifying access…</p>
-      </main>
+      </div>
     );
   }
 
   if (!canViewActivity) {
     return (
-      <main className="min-h-[calc(100vh-4rem)] bg-background px-3 py-4 sm:px-6 sm:py-6">
+      <div className="min-w-0 w-full space-y-6 sm:space-y-8">
         <div className="flex flex-col items-center justify-center py-16 text-center">
           <h1 className="text-2xl font-bold mb-2">Access Denied</h1>
           <p className="text-muted-foreground">You do not have permission to view activities.</p>
         </div>
-      </main>
+      </div>
     );
   }
 
@@ -503,8 +503,7 @@ const Activity = () => {
   };
 
   return (
-    <main className="min-h-[calc(100vh-4rem)] bg-background px-3 py-4 sm:px-6 sm:py-6 md:px-8 lg:px-10 lg:py-8">
-      <section className="max-w-7xl mx-auto space-y-6 sm:space-y-8">
+    <div className="min-w-0 w-full space-y-6 sm:space-y-8">
         {/* Professional Header */}
         {isLoading ? (
           <HeaderSkeleton />
@@ -1015,8 +1014,7 @@ const Activity = () => {
           onUndo={cancelCountdown}
           onConfirmNow={confirmDeleteActivity}
         />
-      </section>
-    </main>
+    </div>
   );
 };
 

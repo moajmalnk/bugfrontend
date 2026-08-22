@@ -206,33 +206,32 @@ export default function AdminOvertimeUserDetail() {
 
   if (!isAdmin) {
     return (
-      <main className="min-h-[calc(100vh-4rem)] bg-background px-3 py-6 sm:px-6">
+      <div className="min-w-0 w-full space-y-6 sm:space-y-8">
         <div className="max-w-lg mx-auto rounded-xl border border-border bg-card p-5 shadow-sm">
           <p className="text-sm text-muted-foreground">Admin access required.</p>
           <Button className="mt-4 rounded-lg w-full sm:w-auto" variant="outline" onClick={() => navigate(`/${currentUser?.role}/projects`)}>
             Back
           </Button>
         </div>
-      </main>
+      </div>
     );
   }
 
   if (!routeUserId) {
     return (
-      <main className="min-h-[calc(100vh-4rem)] bg-background px-3 py-4 sm:px-6 sm:py-6 md:px-8 lg:px-10 lg:py-8">
+      <div className="min-w-0 w-full space-y-6 sm:space-y-8">
         <div className="max-w-2xl mx-auto text-center py-12 rounded-2xl border border-gray-200 dark:border-gray-700 bg-white/80 dark:bg-gray-900/80 p-6">
           <p className="text-gray-600 dark:text-gray-400">Missing user.</p>
           <Button className="mt-4 rounded-xl" onClick={backToList}>
             All users
           </Button>
         </div>
-      </main>
+      </div>
     );
   }
 
   return (
-    <main className="min-h-[calc(100vh-4rem)] bg-background px-3 py-4 sm:px-6 sm:py-6 md:px-8 lg:px-10 lg:py-8 overflow-x-hidden">
-      <section className="max-w-7xl mx-auto min-w-0 space-y-6 sm:space-y-8">
+    <div className="min-w-0 w-full space-y-6 sm:space-y-8 overflow-x-hidden">
         <div className="relative min-w-0 overflow-hidden rounded-2xl">
           <div className="absolute inset-0 bg-gradient-to-r from-blue-50/50 via-transparent to-emerald-50/50 dark:from-blue-950/20 dark:via-transparent dark:to-emerald-950/20" />
           <div className="relative bg-white/80 dark:bg-gray-900/80 backdrop-blur-sm border border-gray-200/50 dark:border-gray-700/50 rounded-2xl p-4 sm:p-6 md:p-8">
@@ -582,7 +581,6 @@ export default function AdminOvertimeUserDetail() {
             )}
           </div>
         </div>
-      </section>
 
       <AlertDialog
         open={!!approveRow}
@@ -797,6 +795,6 @@ export default function AdminOvertimeUserDetail() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-    </main>
+    </div>
   );
 }

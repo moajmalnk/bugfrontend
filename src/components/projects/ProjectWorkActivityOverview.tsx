@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { projectWorkStatusLabel } from '@/lib/projectWorkUpdates';
-import { projectService } from '@/services/projectService';
+import { projectService, type ProjectWorkActivityEntry } from '@/services/projectService';
 import { FolderKanban, UserRound } from 'lucide-react';
 
 type Props = {
@@ -11,16 +11,7 @@ type Props = {
 
 export function ProjectWorkActivityOverview({ projectId }: Props) {
   const [loading, setLoading] = useState(true);
-  const [entries, setEntries] = useState<
-    Array<{
-      submission_date: string;
-      username: string;
-      status: string;
-      progress_percentage: number;
-      notes: string;
-      hours_today: number;
-    }>
-  >([]);
+  const [entries, setEntries] = useState<ProjectWorkActivityEntry[]>([]);
 
   useEffect(() => {
     let cancelled = false;

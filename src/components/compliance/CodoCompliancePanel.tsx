@@ -17,7 +17,7 @@ import {
   isCompliancePipelineSatisfied,
 } from '@/lib/codo/complianceRules';
 import { getEffectiveRole } from '@/lib/utils';
-import { getProjectStatusLabel } from '@/lib/utils/projectUtils';
+import { getProjectStatusLabel, type ProjectStatus } from '@/lib/utils/projectUtils';
 import { complianceService, ProjectComplianceData } from '@/services/complianceService';
 import { ComplianceCheckItem } from '@/lib/codo/complianceRules';
 import { cn } from '@/lib/utils';
@@ -30,6 +30,18 @@ interface CodoCompliancePanelProps {
   projectStatus?: string;
   projectsListPath?: string;
   onStatusFinalized?: (status: string) => void;
+}
+
+function asProjectStatus(status: string): ProjectStatus {
+  if (
+    status === 'active' ||
+    status === 'completed' ||
+    status === 'archived' ||
+    status === 'release_ready'
+  ) {
+    return status;
+  }
+  return 'active';
 }
 
 export function CodoCompliancePanel({
@@ -522,7 +534,7 @@ export function CodoCompliancePanel({
                             </div>
                             <div className="min-w-0 flex-1 space-y-2">
                               <p className="text-sm font-semibold text-emerald-900 dark:text-emerald-100">
-                                Project finalized as {getProjectStatusLabel(currentProjectStatus)}
+                                Project finalized as {getProjectStatusLabel(asProjectStatus(currentProjectStatus))}
                               </p>
                               <p className="text-xs text-emerald-800/80 dark:text-emerald-200/80">
                                 Compliance pipeline is complete. This project status is now reflected

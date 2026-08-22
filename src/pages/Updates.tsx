@@ -1,3 +1,4 @@
+import { ListPageHeader, ListPageShell, ListPageTabTrigger, ListPageTabsShell, LIST_TABS_CONTENT } from "@/components/layout/list-page";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -23,7 +24,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Tabs, TabsContent } from "@/components/ui/tabs";
 import { useAuth } from "@/context/AuthContext";
 import { projectService } from "@/services/projectService";
 import { updateService, type Update } from "@/services/updateService";
@@ -470,33 +471,22 @@ const Updates = () => {
       }}
       className="w-full"
     >
-      <div className="relative">
-        <div className="absolute inset-0 bg-gradient-to-r from-gray-50/50 to-blue-50/50 dark:from-gray-800/50 dark:to-blue-900/50 rounded-2xl pointer-events-none"></div>
-        <div className="relative bg-white/60 dark:bg-gray-900/60 backdrop-blur-sm border border-gray-200/50 dark:border-gray-700/50 rounded-2xl p-2">
-          <TabsList className="grid w-full grid-cols-2 h-14 bg-transparent p-1">
-        <TabsTrigger
-          value="all-updates"
-          className="text-sm sm:text-base font-semibold data-[state=active]:bg-white data-[state=active]:shadow-lg data-[state=active]:border data-[state=active]:border-gray-200 dark:data-[state=active]:bg-gray-800 dark:data-[state=active]:border-gray-700 rounded-xl transition-all duration-300"
-        >
-          <Bell className="h-4 w-4 sm:h-5 sm:w-5 mr-2" />
-          <span className="hidden sm:inline">All Updates</span>
-          <span className="sm:hidden">All</span>
-          <span className="ml-2 px-2 py-1 bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 rounded-full text-xs font-bold">{getTabCount("all-updates")}</span>
-        </TabsTrigger>
-        <TabsTrigger
-          value="my-updates"
-          className="text-sm sm:text-base font-semibold data-[state=active]:bg-white data-[state=active]:shadow-lg data-[state=active]:border data-[state=active]:border-gray-200 dark:data-[state=active]:bg-gray-800 dark:data-[state=active]:border-gray-700 rounded-xl transition-all duration-300"
-        >
-          <User className="h-4 w-4 sm:h-5 sm:w-5 mr-2" />
-          <span className="hidden sm:inline">My Updates</span>
-          <span className="sm:hidden">My</span>
-          <span className="ml-2 px-2 py-1 bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-green-300 rounded-full text-xs font-bold">{getTabCount("my-updates")}</span>
-        </TabsTrigger>
-          </TabsList>
-        </div>
-      </div>
+      <ListPageTabsShell underlayClassName="from-gray-50/50 to-blue-50/50 dark:from-gray-800/50 dark:to-blue-900/50">
+        <ListPageTabTrigger value="all-updates">
+          <Bell className="h-4 w-4 sm:h-5 sm:w-5 mr-1.5 sm:mr-2 shrink-0" />
+          <span className="hidden sm:inline truncate">All Updates</span>
+          <span className="sm:hidden truncate">All</span>
+          <span className="ml-1 sm:ml-2 px-1.5 sm:px-2 py-0.5 sm:py-1 bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 rounded-full text-[10px] sm:text-xs font-bold shrink-0">{getTabCount("all-updates")}</span>
+        </ListPageTabTrigger>
+        <ListPageTabTrigger value="my-updates">
+          <User className="h-4 w-4 sm:h-5 sm:w-5 mr-1.5 sm:mr-2 shrink-0" />
+          <span className="hidden sm:inline truncate">My Updates</span>
+          <span className="sm:hidden truncate">My</span>
+          <span className="ml-1 sm:ml-2 px-1.5 sm:px-2 py-0.5 sm:py-1 bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300 rounded-full text-[10px] sm:text-xs font-bold shrink-0">{getTabCount("my-updates")}</span>
+        </ListPageTabTrigger>
+      </ListPageTabsShell>
 
-      <TabsContent value={activeTab} className="space-y-6 sm:space-y-8">
+      <TabsContent value={activeTab} className={LIST_TABS_CONTENT}>
         {/* Enhanced Search and Filter Controls - Always show when tabs are visible */}
         <div className="relative">
           <div className="absolute inset-0 bg-gradient-to-r from-gray-50/30 to-blue-50/30 dark:from-gray-800/30 dark:to-blue-900/30 rounded-2xl pointer-events-none"></div>
@@ -906,64 +896,34 @@ const Updates = () => {
   );
 
   return (
-    <main className="min-h-[calc(100vh-4rem)] bg-background px-3 py-4 sm:px-6 sm:py-6 md:px-8 lg:px-10 lg:py-8">
-      <section className="max-w-7xl mx-auto space-y-6 sm:space-y-8">
+    <ListPageShell>
         {isLoading ? (
           <HeaderSkeleton />
         ) : (
-          <div className="relative overflow-hidden">
-            <div className="absolute inset-0 bg-gradient-to-r from-blue-50/50 via-transparent to-emerald-50/50 dark:from-blue-950/20 dark:via-transparent dark:to-emerald-950/20"></div>
-            <div className="relative bg-white/80 dark:bg-gray-900/80 backdrop-blur-sm border border-gray-200/50 dark:border-gray-700/50 rounded-2xl p-6 sm:p-8">
-              <div className="flex flex-col xl:flex-row justify-between xl:items-center gap-6">
-                <div className="space-y-3 min-w-0 flex-1">
-                  <div className="flex items-center gap-3">
-                    <div className="p-2 bg-gradient-to-br from-blue-600 to-emerald-600 rounded-xl shadow-lg shrink-0">
-                      <Bell className="h-6 w-6 text-white" />
-                    </div>
-                    <div className="min-w-0">
-                      <h1 className="text-3xl sm:text-4xl lg:text-5xl font-bold bg-gradient-to-r from-gray-900 via-gray-800 to-gray-700 dark:from-white dark:via-gray-100 dark:to-gray-300 bg-clip-text text-transparent tracking-tight">
-                        Updates
-                      </h1>
-                      <div className="h-1 w-20 bg-gradient-to-r from-blue-600 to-emerald-600 rounded-full mt-2"></div>
-                    </div>
-                  </div>
-                  <p className="text-gray-600 dark:text-gray-400 text-base lg:text-lg font-medium max-w-2xl break-words">
-                    A log of all features and updations.
-                  </p>
-                </div>
-
-                <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-4 shrink-0">
-                  {projects.length > 0 && (
-                    <Link
-                      to={
-                        currentUser?.role
-                          ? `/${currentUser.role}/new-update`
-                          : "/new-update"
-                      }
-                      className="group"
-                    >
-                      <Button className="h-12 px-6 bg-gradient-to-r from-blue-600 to-emerald-600 hover:from-blue-700 hover:to-emerald-700 text-white font-semibold shadow-lg hover:shadow-xl transition-all duration-300 transform hover:scale-105 group-hover:scale-105">
-                        <Plus className="mr-2 h-5 w-5" /> New Update
-                      </Button>
-                    </Link>
-                  )}
-
-                  <div className="flex items-center gap-4">
-                    <div className="flex items-center gap-3 px-4 py-3 bg-gradient-to-r from-blue-50 to-emerald-50 dark:from-blue-950/30 dark:to-emerald-950/30 border border-blue-200 dark:border-blue-800 rounded-xl shadow-sm">
-                      <div className="p-1.5 bg-blue-600 rounded-lg">
-                        <Bell className="h-5 w-5 text-white" />
-                      </div>
-                      <div>
-                        <div className="text-2xl font-bold text-blue-700 dark:text-blue-300">
-                          {updates.length}
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
+          <ListPageHeader
+            icon={<Bell className="h-5 w-5 sm:h-6 sm:w-6" />}
+            title="Updates"
+            description="A log of all features and updations."
+            accentBarClassName="from-blue-600 to-emerald-600"
+            count={updates.length}
+            countIcon={<Bell className="h-5 w-5" />}
+            actions={
+              projects.length > 0 ? (
+                <Link
+                  to={
+                    currentUser?.role
+                      ? `/${currentUser.role}/new-update`
+                      : "/new-update"
+                  }
+                  className="w-full sm:w-auto"
+                >
+                  <Button className="h-11 sm:h-12 w-full sm:w-auto px-6 bg-gradient-to-r from-blue-600 to-emerald-600 hover:from-blue-700 hover:to-emerald-700 text-white font-semibold shadow-lg">
+                    <Plus className="mr-2 h-5 w-5" /> New Update
+                  </Button>
+                </Link>
+              ) : undefined
+            }
+          />
         )}
 
         {!isLoading ? (
@@ -989,8 +949,6 @@ const Updates = () => {
             </div>
           </div>
         )}
-      </section>
-
       {convertTarget && (
         <ConvertUpdateDialog
           update={convertTarget}
@@ -1000,7 +958,7 @@ const Updates = () => {
           }}
         />
       )}
-    </main>
+    </ListPageShell>
   );
 };
 

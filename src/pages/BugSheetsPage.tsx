@@ -251,7 +251,6 @@ const BugSheetsPage = () => {
   // Load sheets when connection status changes to true
   useEffect(() => {
     if (isConnected && sheets.length === 0 && !isLoading) {
-      console.log('🔄 Connection became true, refreshing sheets...');
       refreshSheets();
     }
   }, [isConnected]);
@@ -262,11 +261,6 @@ const BugSheetsPage = () => {
       loadSheets();
     }
   }, [activeTab, isConnected]);
-
-  // Debug sheet count changes
-  useEffect(() => {
-    console.log('📊 Sheet count changed:', sheets.length);
-  }, [sheets.length]);
 
   const isInitialLoading = isCheckingConnection || (isLoading && sheets.length === 0);
 
@@ -305,8 +299,7 @@ const BugSheetsPage = () => {
       setProjectNameCatalog(
         Array.from(nameById.entries()).map(([id, name]) => ({ id, name }))
       );
-    } catch (error: any) {
-      console.error("Error loading projects:", error);
+    } catch {
       try {
         const projs = await googleSheetsService.getProjectsWithSheetCounts();
         setProjects(
@@ -320,8 +313,8 @@ const BugSheetsPage = () => {
               document_count: p.sheet_count ?? 0,
             }))
         );
-      } catch (fallbackError) {
-        console.error("Error loading projects fallback:", fallbackError);
+      } catch {
+        /* ignore fallback failure */
       }
     } finally {
       setIsLoadingProjects(false);
@@ -329,46 +322,30 @@ const BugSheetsPage = () => {
   };
 
   const loadData = async () => {
-    console.log('🔄 Starting loadData...');
     setIsLoading(true);
     setIsCheckingConnection(true);
     try {
-      // Load projects (always load, doesn't require Google connection)
       await loadProjects();
-
-      // Check connection first
       const connected = await checkConnection();
-      console.log('🔗 Connection result:', connected);
-      // Load sheets and templates if connected
       if (connected) {
-        console.log('📄 Loading sheets and templates...');
-        // Preload all tab counts first for accurate badge numbers
         await preloadAllTabCounts();
-        // Then load sheets for the active tab
         await Promise.all([loadSheets(), loadTemplates()]);
-        console.log('✅ Sheets and templates loaded');
-      } else {
-        console.log('❌ Not connected, skipping sheet load');
       }
-    } catch (error) {
-      console.error("❌ Error loading data:", error);
+    } catch {
+      /* errors surfaced via toasts in child loaders */
     } finally {
       setIsLoading(false);
       setIsCheckingConnection(false);
-      console.log('🏁 loadData completed');
     }
   };
 
   const checkConnection = async () => {
     try {
-      console.log('Checking Google Sheets connection...');
       const result = await googleSheetsService.checkConnection();
-      console.log('Connection status:', result);
       setIsConnected(result.connected);
       setConnectedEmail(result.email || null);
       return result.connected;
-    } catch (error) {
-      console.error('Failed to check Google Sheets connection:', error);
+    } catch {
       setIsConnected(false);
       setConnectedEmail(null);
       return false;
@@ -389,7 +366,6 @@ const BugSheetsPage = () => {
       // Refresh sheets list to clear any cached data
       await loadSheets();
     } catch (error: any) {
-      console.error('Failed to disconnect:', error);
       toast({
         title: "Error",
         description: error.message || "Failed to disconnect Google account",
@@ -436,9 +412,8 @@ const BugSheetsPage = () => {
         const sharedSheets = await googleSheetsService.getSharedSheets();
         setSharedSheetsCount(sharedSheets.length);
       }
-    } catch (error: any) {
-      console.error("Error preloading tab counts:", error);
-      // Don't show toast for preload errors, just log them
+    } catch {
+      /* preload counts are best-effort */
     }
   };
 
@@ -464,9 +439,7 @@ const BugSheetsPage = () => {
       }
 
       setSheets(sheetsList);
-      console.log(`Loaded ${sheetsList.length} sheets for tab: ${activeTab}`);
     } catch (error: any) {
-      console.error("Error loading sheets:", error);
       toast({
         title: "Error",
         description: error.message || "Failed to load sheets",
@@ -489,13 +462,9 @@ const BugSheetsPage = () => {
   };
 
   const refreshSheets = async () => {
-    console.log('🔄 Refreshing sheets, isConnected:', isConnected);
     if (isConnected) {
-      // Refresh all tab counts and then load current tab
       await preloadAllTabCounts();
       await loadSheets();
-    } else {
-      console.log('❌ Not connected, cannot refresh sheets');
     }
   };
 
@@ -1051,8 +1020,7 @@ const BugSheetsPage = () => {
   }, [searchParams, isCreateModalOpen, resetCreateForm]);
 
   return (
-    <main className="min-h-[calc(100vh-4rem)] bg-background px-3 py-4 sm:px-6 sm:py-6 md:px-8 lg:px-10 lg:py-8">
-      <section className="max-w-7xl mx-auto space-y-6 sm:space-y-8">
+    <div className="min-w-0 w-full space-y-6 sm:space-y-8">
         {/* Professional Header */}
         <div className="relative overflow-hidden">
           <div className="absolute inset-0 bg-gradient-to-r from-orange-50/50 via-transparent to-red-50/50 dark:from-orange-950/20 dark:via-transparent dark:to-red-950/20"></div>
@@ -2304,8 +2272,7 @@ const BugSheetsPage = () => {
             </DialogFooter>
           </DialogContent>
         </Dialog>
-      </section>
-    </main>
+    </div>
   );
 };
 

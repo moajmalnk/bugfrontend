@@ -549,8 +549,7 @@ export default function UserWorkStatsPeriod() {
   const filtersActive = isPeriodFiltersActive(filters);
 
   return (
-    <div className="min-h-[calc(100vh-1rem)] px-4 md:px-6 lg:px-8 py-6">
-      <div className="max-w-7xl mx-auto w-full space-y-6">
+    <div className="min-w-0 w-full space-y-6 sm:space-y-8">
         {/* Header (matches Users page style) */}
         <div className="relative overflow-hidden">
           <div className="absolute inset-0 bg-gradient-to-r from-blue-50/50 via-transparent to-emerald-50/50 dark:from-blue-950/20 dark:via-transparent dark:to-emerald-950/20" />
@@ -1169,7 +1168,6 @@ export default function UserWorkStatsPeriod() {
             </div>
           </div>
         )}
-      </div>
     </div>
   );
 }

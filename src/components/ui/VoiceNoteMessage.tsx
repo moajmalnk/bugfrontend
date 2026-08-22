@@ -29,7 +29,7 @@ export function VoiceNoteMessage({
   const [isLoading, setIsLoading] = useState(false);
 
   const audioRef = useRef<HTMLAudioElement | null>(null);
-  const progressIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  const progressIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   useEffect(() => {
     return () => {
@@ -76,8 +76,7 @@ export function VoiceNoteMessage({
           setIsPlaying(true);
           setIsLoading(false);
         })
-        .catch((error) => {
-          console.error("Error playing audio:", error);
+        .catch(() => {
           setIsLoading(false);
           toast({
             title: "Playback Error",

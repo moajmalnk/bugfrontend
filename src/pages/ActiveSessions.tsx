@@ -18,8 +18,7 @@ export default function ActiveSessions() {
   // Check if user is admin
   if (currentUser?.role !== 'admin') {
     return (
-      <main className="min-h-[calc(100vh-4rem)] bg-background px-3 py-4 sm:px-6 sm:py-6 md:px-8 lg:px-10 lg:py-8">
-        <div className="max-w-7xl mx-auto">
+      <div className="min-w-0 w-full space-y-6 sm:space-y-8">
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
@@ -31,14 +30,12 @@ export default function ActiveSessions() {
               <p className="text-muted-foreground">You need admin privileges to view active sessions.</p>
             </CardContent>
           </Card>
-        </div>
-      </main>
+      </div>
     );
   }
 
   return (
-    <main className="min-h-[calc(100vh-4rem)] bg-background px-3 py-4 sm:px-6 sm:py-6 md:px-8 lg:px-10 lg:py-8">
-      <div className="max-w-7xl mx-auto space-y-6">
+    <div className="min-w-0 w-full space-y-6 sm:space-y-8">
         {/* Header */}
         <div className="flex flex-col lg:flex-row justify-between lg:items-center gap-6">
           <div className="space-y-3">
@@ -196,7 +193,6 @@ export default function ActiveSessions() {
             </div>
           </CardContent>
         </Card>
-      </div>
-    </main>
+    </div>
   );
 }

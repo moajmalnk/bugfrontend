@@ -11,6 +11,7 @@ import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { DashboardPeriodFilter } from "@/components/dashboard/DashboardPeriodFilter";
 import { TeamBirthdayBanner } from "@/components/dashboard/TeamBirthdayBanner";
 import type { DashboardPeriod, WorkPeriodPreset } from "@/lib/dashboardPeriod";
+import { APP_PAGE_SHELL } from "@/components/layout/list-page";
 import { cn } from "@/lib/utils";
 import { AlertTriangle, ChevronDown, LayoutDashboard, type LucideIcon } from "lucide-react";
 import { useState, type ReactNode } from "react";
@@ -72,8 +73,7 @@ export function DashboardPageShell({
   const ActiveIcon = activeItem?.icon ?? LayoutDashboard;
 
   return (
-    <main className="min-h-[calc(100vh-4rem)] bg-background px-3 py-4 sm:px-6 sm:py-6 md:px-8 lg:px-10 lg:py-8">
-      <section className="max-w-7xl mx-auto space-y-6 sm:space-y-8 min-w-0 w-full">
+    <div className={APP_PAGE_SHELL}>
         <TeamBirthdayBanner />
         <div className="relative overflow-hidden rounded-2xl">
           <div className="absolute inset-0 bg-gradient-to-r from-blue-50/50 via-transparent to-emerald-50/50 dark:from-blue-950/20 dark:via-transparent dark:to-emerald-950/20" />
@@ -96,7 +96,7 @@ export function DashboardPageShell({
                 </p>
               </div>
 
-              <div className="min-w-0 w-full lg:w-auto shrink-0">
+              <div className="min-w-0 w-full lg:w-auto lg:max-w-md xl:max-w-lg lg:ml-auto">
                 <DashboardPeriodFilter
                   preset={periodPreset}
                   customFrom={customFrom}
@@ -221,7 +221,6 @@ export function DashboardPageShell({
             </Tabs>
           </>
         )}
-      </section>
-    </main>
+    </div>
   );
 }

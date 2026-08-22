@@ -14,7 +14,7 @@ interface BundleAnalyzerProps {
 }
 
 export const BundleAnalyzer: React.FC<BundleAnalyzerProps> = ({
-  enabled = process.env.NODE_ENV === 'development',
+  enabled = import.meta.env.DEV,
   showDetails = false,
 }) => {
   const [bundles, setBundles] = useState<BundleInfo[]>([]);

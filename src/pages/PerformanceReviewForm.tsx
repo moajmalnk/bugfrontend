@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
+import { useNavigate, useParams, Link } from 'react-router-dom';
 import { ArrowLeft, ClipboardList, Loader2, Save } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 import { usePermissions } from '@/hooks/usePermissions';
@@ -260,29 +260,24 @@ const PerformanceReviewForm = () => {
 
   if (!canManage) {
     return (
-      <main className="min-h-[calc(100vh-4rem)] bg-background px-3 py-4 sm:px-6 lg:px-10">
-        <section className="max-w-4xl mx-auto rounded-2xl border p-8 text-center text-muted-foreground">
-          Access denied.
-        </section>
-      </main>
+      <div className="min-w-0 w-full space-y-6 sm:space-y-8">
+        <p className="text-muted-foreground">Access denied.</p>
+      </div>
     );
   }
 
   if (loading) {
     return (
-      <main className="min-h-[calc(100vh-4rem)] bg-background px-3 py-4 sm:px-6 md:px-8 lg:px-10 lg:py-8">
-        <section className="max-w-4xl mx-auto space-y-6">
-          <Skeleton className="h-32 w-full rounded-2xl" />
-          <Skeleton className="h-48 w-full rounded-2xl" />
-          <Skeleton className="h-64 w-full rounded-2xl" />
-        </section>
-      </main>
+      <div className="min-w-0 w-full space-y-6 sm:space-y-8">
+        <Skeleton className="h-32 w-full rounded-2xl" />
+        <Skeleton className="h-48 w-full rounded-2xl" />
+        <Skeleton className="h-64 w-full rounded-2xl" />
+      </div>
     );
   }
 
   return (
-    <main className="min-h-[calc(100vh-4rem)] bg-background px-3 py-4 sm:px-6 sm:py-6 md:px-8 lg:px-10 lg:py-8 overflow-x-hidden">
-      <section className="max-w-4xl mx-auto space-y-6 sm:space-y-8 min-w-0 w-full">
+    <div className="min-w-0 w-full space-y-6 sm:space-y-8 overflow-x-hidden">
         <div className="relative overflow-hidden">
           <div className="absolute inset-0 pointer-events-none bg-gradient-to-r from-violet-50/50 via-transparent to-indigo-50/50 dark:from-violet-950/20 dark:via-transparent dark:to-indigo-950/20" />
           <div className="relative bg-white/80 dark:bg-gray-900/80 backdrop-blur-sm border border-gray-200/50 dark:border-gray-700/50 rounded-2xl p-4 sm:p-6 md:p-8">
@@ -567,7 +562,6 @@ const PerformanceReviewForm = () => {
             Mark as Completed
           </Button>
         </div>
-      </section>
 
       <AlertDialog open={leaveOpen} onOpenChange={setLeaveOpen}>
         <AlertDialogContent className="max-w-[400px] rounded-2xl">
@@ -585,7 +579,7 @@ const PerformanceReviewForm = () => {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-    </main>
+    </div>
   );
 };
 
