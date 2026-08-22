@@ -47,7 +47,9 @@ export function UserLeaveDetails({ userId, username }: Props) {
     setError(null);
     try {
       const bal = await getLeaveTypes(undefined, isAdmin ? userId : undefined);
-      setBalances(Array.isArray(bal?.types) ? bal.types : []);
+      const types = Array.isArray(bal?.types) ? bal.types : [];
+      // Personal Leave retired — show Paid / Sick / Unpaid only.
+      setBalances(types.filter((t) => String(t.code || '').toLowerCase() !== 'personal'));
       setMonth(bal?.month || '');
 
       if (isAdmin) {

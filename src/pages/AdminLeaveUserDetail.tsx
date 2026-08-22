@@ -29,6 +29,11 @@ import { getEffectiveRole, hasPermissionOrAdmin } from '@/lib/utils';
 import { usePermissions } from '@/hooks/usePermissions';
 import { ENV } from '@/lib/env';
 import { notifyAdminNavCountsChanged } from '@/services/adminNavCountsService';
+import { MonthFilterChips } from '@/components/ui/MonthFilterChips';
+import {
+  rangeOverlapsMonthFilter,
+  type MonthFilterValue,
+} from '@/lib/monthFilter';
 
 function LeaveStatusPill({ status }: { status: LeaveStatus | string }) {
   const s = String(status).toLowerCase();
@@ -88,6 +93,7 @@ export default function AdminLeaveUserDetail() {
   const [statusTab, setStatusTab] = useState<
     'all' | 'pending' | 'approved' | 'rejected' | 'cancelled'
   >('all');
+  const [monthFilter, setMonthFilter] = useState<MonthFilterValue>('all');
 
   const load = useCallback(async () => {
     if (!isAdmin || !userId) return;
@@ -129,9 +135,13 @@ export default function AdminLeaveUserDetail() {
   );
 
   const filteredRows = useMemo(() => {
-    if (statusTab === 'all') return rows;
-    return rows.filter((r) => r.status === statusTab);
-  }, [rows, statusTab]);
+    return rows.filter((r) => {
+      if (statusTab !== 'all' && r.status !== statusTab) return false;
+      return rangeOverlapsMonthFilter(r.start_date, r.end_date, monthFilter);
+    });
+  }, [rows, statusTab, monthFilter]);
+
+  const hasActiveFilters = statusTab !== 'all' || monthFilter !== 'all';
 
   const onReview = async (id: number, action: 'approve' | 'reject') => {
     setBusyId(id);
@@ -244,28 +254,51 @@ export default function AdminLeaveUserDetail() {
           <div className="absolute inset-0 bg-gradient-to-r from-gray-50/20 to-teal-50/20 dark:from-gray-800/20 dark:to-teal-900/20 pointer-events-none" />
           <div className="relative bg-white/80 dark:bg-gray-900/80 backdrop-blur-sm border border-gray-200/50 dark:border-gray-700/50 p-4 sm:p-6 md:p-8 lg:p-10 min-w-0 space-y-6">
             {!loading && rows.length > 0 ? (
-              <div className="flex flex-wrap gap-2">
-                {(
-                  [
-                    ['all', 'All'],
-                    ['pending', 'Pending'],
-                    ['approved', 'Approved'],
-                    ['rejected', 'Rejected'],
-                    ['cancelled', 'Cancelled'],
-                  ] as const
-                ).map(([key, label]) => (
+              <div className="space-y-3">
+                <div className="flex flex-wrap gap-2">
+                  {(
+                    [
+                      ['all', 'All'],
+                      ['pending', 'Pending'],
+                      ['approved', 'Approved'],
+                      ['rejected', 'Rejected'],
+                      ['cancelled', 'Cancelled'],
+                    ] as const
+                  ).map(([key, label]) => (
+                    <Button
+                      key={key}
+                      type="button"
+                      size="sm"
+                      variant={statusTab === key ? 'default' : 'outline'}
+                      className="rounded-full"
+                      onClick={() => setStatusTab(key)}
+                    >
+                      {label}
+                      {key === 'pending' && pendingCount > 0 ? ` (${pendingCount})` : ''}
+                    </Button>
+                  ))}
+                </div>
+
+                <MonthFilterChips
+                  value={monthFilter}
+                  onChange={setMonthFilter}
+                  compact
+                />
+
+                {hasActiveFilters ? (
                   <Button
-                    key={key}
                     type="button"
+                    variant="ghost"
                     size="sm"
-                    variant={statusTab === key ? 'default' : 'outline'}
                     className="rounded-full"
-                    onClick={() => setStatusTab(key)}
+                    onClick={() => {
+                      setStatusTab('all');
+                      setMonthFilter('all');
+                    }}
                   >
-                    {label}
-                    {key === 'pending' && pendingCount > 0 ? ` (${pendingCount})` : ''}
+                    Clear filters
                   </Button>
-                ))}
+                ) : null}
               </div>
             ) : null}
 
@@ -281,11 +314,25 @@ export default function AdminLeaveUserDetail() {
                 <p className="text-gray-700 dark:text-gray-300 font-medium">
                   {rows.length === 0
                     ? 'This user has no leave requests yet.'
-                    : 'No requests match this filter.'}
+                    : 'No requests match this status / month filter.'}
                 </p>
-                <Button type="button" variant="outline" className="mt-5 rounded-xl" onClick={backToList}>
-                  Back to users
-                </Button>
+                {hasActiveFilters ? (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="mt-5 rounded-xl"
+                    onClick={() => {
+                      setStatusTab('all');
+                      setMonthFilter('all');
+                    }}
+                  >
+                    Clear filters
+                  </Button>
+                ) : (
+                  <Button type="button" variant="outline" className="mt-5 rounded-xl" onClick={backToList}>
+                    Back to users
+                  </Button>
+                )}
               </div>
             ) : (
               <div className="space-y-4">

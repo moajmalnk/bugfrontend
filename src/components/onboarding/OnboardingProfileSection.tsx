@@ -353,12 +353,36 @@ function WfhMiniMap({ lat, lng }: { lat: number; lng: number }) {
   );
 }
 
+export type OnboardingSectionKey =
+  | "employment"
+  | "address"
+  | "developer"
+  | "statutory"
+  | "banking"
+  | "agreements"
+  | "verification";
+
+const ALL_ONBOARDING_SECTIONS: OnboardingSectionKey[] = [
+  "employment",
+  "address",
+  "developer",
+  "statutory",
+  "banking",
+  "agreements",
+  "verification",
+];
+
 interface OnboardingProfileSectionProps {
   userId: string;
   /** Optional hint; if omitted, loaded from get_onboarding */
   onboardingCompleted?: number | boolean | null;
   /** When true, show admin Verify / Reject actions */
   canVerify?: boolean;
+  /**
+   * Why: User Details tabs split Employment / Address / Banking / etc.
+   * Omit or pass all keys to keep Profile.tsx unchanged (full block).
+   */
+  visibleSections?: OnboardingSectionKey[];
   /** Optional identity enrichment from parent page */
   employeeName?: string;
   employeeUsername?: string;
@@ -383,6 +407,7 @@ export function OnboardingProfileSection({
   userId,
   onboardingCompleted,
   canVerify = false,
+  visibleSections,
   employeeName,
   employeeUsername,
   employeeEmail,
@@ -400,6 +425,14 @@ export function OnboardingProfileSection({
   employeeOfferLetterSharedDate,
   employeeProbationEndDate,
 }: OnboardingProfileSectionProps) {
+  const sectionSet = useMemo(() => {
+    const keys =
+      visibleSections && visibleSections.length > 0
+        ? visibleSections
+        : ALL_ONBOARDING_SECTIONS;
+    return new Set<OnboardingSectionKey>(keys);
+  }, [visibleSections]);
+  const showSection = (key: OnboardingSectionKey) => sectionSet.has(key);
   const queryClient = useQueryClient();
   const [searchParams, setSearchParams] = useSearchParams();
   const reviewFromUrl = searchParams.get(REVIEW_QUERY_KEY) === REVIEW_QUERY_VALUE;
@@ -1092,6 +1125,7 @@ export function OnboardingProfileSection({
 
   return (
     <div className="grid grid-cols-12 gap-4 sm:gap-6">
+      {showSection("verification") ? (
       <Card className="col-span-12 rounded-2xl shadow-sm border-border/60">
         <CardContent className="p-4 sm:p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div className="space-y-2 min-w-0">
@@ -1142,7 +1176,9 @@ export function OnboardingProfileSection({
           ) : null}
         </CardContent>
       </Card>
+      ) : null}
 
+      {showSection("employment") ? (
       <Card className="col-span-12 rounded-2xl shadow-sm">
         <CardHeader className="p-4 sm:p-5">
           <div className="flex items-center gap-2">
@@ -1210,7 +1246,9 @@ export function OnboardingProfileSection({
           />
         </CardContent>
       </Card>
+      ) : null}
 
+      {showSection("address") ? (
       <Card className="col-span-12 rounded-2xl shadow-sm">
         <CardHeader className="p-4 sm:p-5">
           <div className="flex items-center gap-2">
@@ -1272,7 +1310,9 @@ export function OnboardingProfileSection({
           />
         </CardContent>
       </Card>
+      ) : null}
 
+      {showSection("developer") ? (
       <Card className="col-span-12 lg:col-span-6 rounded-2xl shadow-sm">
         <CardHeader className="p-4 sm:p-5">
           <div className="flex items-center gap-2">
@@ -1326,8 +1366,15 @@ export function OnboardingProfileSection({
           </div>
         </CardContent>
       </Card>
+      ) : null}
 
-      <Card className="col-span-12 lg:col-span-6 rounded-2xl shadow-sm">
+      {showSection("address") ? (
+      <Card
+        className={cn(
+          "col-span-12 rounded-2xl shadow-sm",
+          showSection("developer") && "lg:col-span-6"
+        )}
+      >
         <CardHeader className="p-4 sm:p-5">
           <div className="flex flex-wrap items-center justify-between gap-2">
             <div className="flex items-center gap-2 min-w-0">
@@ -1375,7 +1422,9 @@ export function OnboardingProfileSection({
           )}
         </CardContent>
       </Card>
+      ) : null}
 
+      {showSection("statutory") ? (
       <Card className="col-span-12 rounded-2xl shadow-sm">
         <CardHeader className="p-4 sm:p-5">
           <div className="flex items-center gap-2">
@@ -1402,8 +1451,15 @@ export function OnboardingProfileSection({
           />
         </CardContent>
       </Card>
+      ) : null}
 
-      <Card className="col-span-12 lg:col-span-6 rounded-2xl shadow-sm">
+      {showSection("banking") ? (
+      <Card
+        className={cn(
+          "col-span-12 rounded-2xl shadow-sm",
+          showSection("agreements") && "lg:col-span-6"
+        )}
+      >
         <CardHeader className="p-4 sm:p-5">
           <div className="flex items-center gap-2">
             <Building2 className="h-4 w-4 text-primary" />
@@ -1426,8 +1482,15 @@ export function OnboardingProfileSection({
           />
         </CardContent>
       </Card>
+      ) : null}
 
-      <Card className="col-span-12 lg:col-span-6 rounded-2xl shadow-sm">
+      {showSection("agreements") ? (
+      <Card
+        className={cn(
+          "col-span-12 rounded-2xl shadow-sm",
+          showSection("banking") && "lg:col-span-6"
+        )}
+      >
         <CardHeader className="p-4 sm:p-5">
           <div className="flex items-center gap-2">
             <ShieldCheck className="h-4 w-4 text-primary" />
@@ -1457,6 +1520,7 @@ export function OnboardingProfileSection({
           </div>
         </CardContent>
       </Card>
+      ) : null}
 
       {/* Large review workspace — summary + documents, then decide */}
       <Dialog

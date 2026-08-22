@@ -38,6 +38,7 @@ import {
   Trash2,
   CalendarClock,
   ClipboardList,
+  UserRoundSearch,
 } from "lucide-react";
 import { Link, useLocation } from "react-router-dom";
 import { NotificationPopover } from "@/components/notifications/NotificationPopover";
@@ -422,6 +423,7 @@ export const Sidebar = ({ className, closeSidebar }: SidebarProps) => {
             const hasPushCoverage = can("PUSH_COVERAGE_VIEW");
             const hasShortsManage = can("SHORTS_MANAGE");
             const hasRecycleBinView = can("RECYCLE_BIN_VIEW");
+            const hasRecruitmentView = can("RECRUITMENT_VIEW");
             const messagesInMain =
               showBugMessageInMainNav(role) || can("MESSAGING_VIEW");
 
@@ -440,7 +442,8 @@ export const Sidebar = ({ className, closeSidebar }: SidebarProps) => {
               hasBackupManage ||
               hasPushCoverage ||
               hasShortsManage ||
-              hasRecycleBinView;
+              hasRecycleBinView ||
+              hasRecruitmentView;
 
             if (!hasAnyAdminLinks) {
               return null;
@@ -494,6 +497,14 @@ export const Sidebar = ({ className, closeSidebar }: SidebarProps) => {
                       label="Leave requests"
                       badge={formatNavCount(navCounts.leave)}
                       badgeTitle={`${navCounts.leave} pending leave request${navCounts.leave === 1 ? "" : "s"}`}
+                    />
+                  )}
+
+                  {hasRecruitmentView && (
+                    <NavLink
+                      to="/bug-recruitment"
+                      icon={<UserRoundSearch className="h-5 w-5" />}
+                      label="BugRecruitment"
                     />
                   )}
 

@@ -27,12 +27,11 @@ export function ListPageTabsShell({
         <TabsList
           className={cn(
             "w-full h-auto min-h-12 sm:min-h-14 bg-transparent p-1 gap-1",
-            columns === 4
+            columns === 4 || columns === 3
               ? "flex flex-nowrap items-stretch overflow-x-auto hide-scrollbar"
               : cn(
                   "grid",
                   columns === 2 && "grid-cols-2",
-                  columns === 3 && "grid-cols-3",
                   columns === 6 && "grid-cols-2 sm:grid-cols-3 xl:grid-cols-6"
                 )
           )}

@@ -125,7 +125,7 @@ export function PendingsTab({
     isLoading: retestsLoading,
     isError: retestsError,
   } = useQuery({
-    queryKey: ["admin-ops-pending-retests"],
+    queryKey: ["pending-retests", role],
     queryFn: async () => {
       const result = await bugService.getBugs({
         page: 1,

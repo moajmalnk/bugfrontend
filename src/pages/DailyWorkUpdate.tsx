@@ -190,6 +190,15 @@ function projectUpdatesMapFromRow(row: any): Record<string, ProjectWorkUpdate> {
   return map;
 }
 
+/** Why: Unplanned checkout projects are those with updates that were not planned at check-in. */
+function extraProjectIdsFromUpdates(
+  updates: Record<string, ProjectWorkUpdate>,
+  plannedIds: string[]
+): string[] {
+  const planned = new Set(plannedIds);
+  return Object.keys(updates).filter((id) => id && !planned.has(id));
+}
+
 function breakEntriesFromSubmissionRow(existingSubmission: any): string[] {
   const raw = existingSubmission?.break_entries;
   if (Array.isArray(raw)) return raw;
@@ -292,6 +301,7 @@ export function DailyWorkFlowPanel({
   const [isCheckInDialogOpen, setIsCheckInDialogOpen] = useState(false);
   const [isCheckingIn, setIsCheckingIn] = useState(false);
   const [selectedProjects, setSelectedProjects] = useState<string[]>([]);
+  const [extraCheckoutProjectIds, setExtraCheckoutProjectIds] = useState<string[]>([]);
   const [plannedWork, setPlannedWork] = useState<string>('');
   const [plannedWorkStatus, setPlannedWorkStatus] = useState<StatusOption>('not_started');
   const [workMode, setWorkMode] = useState<WorkMode | null>(null);
@@ -712,18 +722,61 @@ export function DailyWorkFlowPanel({
   const checkoutProjects = useMemo(() => {
     const byId = new Map(projects.map((p) => [p.id, p]));
     const orderedIds: string[] = [];
+    // Planned (check-in) projects first
     selectedProjects.forEach((id) => {
-      if (!orderedIds.includes(id)) orderedIds.push(id);
+      if (byId.has(id) && !orderedIds.includes(id)) orderedIds.push(id);
+    });
+    // Explicitly added unplanned assigned projects
+    extraCheckoutProjectIds.forEach((id) => {
+      if (byId.has(id) && !orderedIds.includes(id)) orderedIds.push(id);
     });
     // Keep projects that already have allocated hours / notes from a saved row
     Object.values(projectUpdates).forEach((u) => {
       if (!u?.project_id || orderedIds.includes(u.project_id)) return;
+      if (!byId.has(u.project_id)) return;
       if ((Number(u.hours) || 0) > 0 || (u.notes || '').trim() || (Number(u.progress_percentage) || 0) > 0) {
         orderedIds.push(u.project_id);
       }
     });
     return orderedIds.map((id) => byId.get(id)).filter(Boolean) as Project[];
-  }, [projects, selectedProjects, projectUpdates]);
+  }, [projects, selectedProjects, extraCheckoutProjectIds, projectUpdates]);
+
+  const assignableCheckoutProjects = useMemo(() => {
+    const shown = new Set(checkoutProjects.map((p) => p.id));
+    return [...projects]
+      .filter((p) => !shown.has(p.id))
+      .sort((a, b) => a.name.localeCompare(b.name));
+  }, [projects, checkoutProjects]);
+
+  const addUnplannedCheckoutProject = useCallback((projectId: string) => {
+    if (!projectId) return;
+    setExtraCheckoutProjectIds((prev) =>
+      prev.includes(projectId) ? prev : [...prev, projectId]
+    );
+    setProjectUpdates((prev) => {
+      if (prev[projectId]) return prev;
+      return {
+        ...prev,
+        [projectId]: {
+          project_id: projectId,
+          status: 'in_progress',
+          progress_percentage: 0,
+          notes: '',
+          hours: 0,
+        },
+      };
+    });
+  }, []);
+
+  const removeUnplannedCheckoutProject = useCallback((projectId: string) => {
+    setExtraCheckoutProjectIds((prev) => prev.filter((id) => id !== projectId));
+    setProjectUpdates((prev) => {
+      if (!prev[projectId]) return prev;
+      const next = { ...prev };
+      delete next[projectId];
+      return next;
+    });
+  }, []);
 
   const updateProjectUpdate = useCallback((projectId: string, patch: Partial<ProjectWorkUpdate>) => {
     setProjectUpdates((prev) => {
@@ -1089,6 +1142,7 @@ export function DailyWorkFlowPanel({
       if ((res as any)?.success === false) throw new Error((res as any)?.message || 'Failed');
       
       setSelectedProjects([]);
+      setExtraCheckoutProjectIds([]);
       setPlannedWork('');
 
       if (currentUser?.id && form.submission_date) {
@@ -1188,6 +1242,7 @@ export function DailyWorkFlowPanel({
     setRequestedExtraHours(0);
     setApprovalReason('');
     setProjectUpdates((prev) => clearProjectUpdateNotes(prev));
+    setExtraCheckoutProjectIds([]);
   }
 
   const handleWeeklyReportDirty = useCallback((dirty: boolean) => {
@@ -1864,9 +1919,14 @@ export function DailyWorkFlowPanel({
           setBreakEntries(
             breaksFromRow.length > 0 ? breaksFromRow : parsedBreaks.breakLines
           );
-          setSelectedProjects(parsePlannedProjectsFromRow(existingSubmission));
           setPlannedWork(existingSubmission.planned_work || '');
-          setProjectUpdates(projectUpdatesMapFromRow(existingSubmission));
+          {
+            const planned = parsePlannedProjectsFromRow(existingSubmission);
+            const updatesMap = projectUpdatesMapFromRow(existingSubmission);
+            setSelectedProjects(planned);
+            setProjectUpdates(updatesMap);
+            setExtraCheckoutProjectIds(extraProjectIdsFromUpdates(updatesMap, planned));
+          }
           setTimeAllocation(
             parseTimeAllocationFromRow(
               existingSubmission.time_allocation,
@@ -1922,6 +1982,14 @@ export function DailyWorkFlowPanel({
                 ? draft.projectUpdates
                 : projectUpdatesMapFromRow(existingSubmission);
             setProjectUpdates(clearProjectUpdateNotes(baseProjectUpdates));
+            setExtraCheckoutProjectIds(
+              extraProjectIdsFromUpdates(
+                baseProjectUpdates,
+                draft.selectedProjects?.length
+                  ? draft.selectedProjects
+                  : serverPlannedProjects
+              )
+            );
             setTimeAllocation(
               draft.timeAllocation
                 ? defaultTimeAllocation(attendanceDate, draft.timeAllocation.other_hours || 0)
@@ -1962,6 +2030,12 @@ export function DailyWorkFlowPanel({
               setPlannedWork('');
             }
             setProjectUpdates(clearProjectUpdateNotes(projectUpdatesMapFromRow(existingSubmission)));
+            setExtraCheckoutProjectIds(
+              extraProjectIdsFromUpdates(
+                projectUpdatesMapFromRow(existingSubmission),
+                serverPlannedProjects
+              )
+            );
             setTimeAllocation(
               parseTimeAllocationFromRow(
                 existingSubmission.time_allocation,
@@ -1993,6 +2067,12 @@ export function DailyWorkFlowPanel({
           setRequestedExtraHours(0);
           setApprovalReason('');
           setProjectUpdates(clearProjectUpdateNotes(draft.projectUpdates || {}));
+          setExtraCheckoutProjectIds(
+            extraProjectIdsFromUpdates(
+              draft.projectUpdates || {},
+              draft.selectedProjects || []
+            )
+          );
           setTimeAllocation(
             draft.timeAllocation
               ? defaultTimeAllocation(attendanceDate, draft.timeAllocation.other_hours || 0)
@@ -2008,6 +2088,7 @@ export function DailyWorkFlowPanel({
             check_in_time: undefined,
           }));
           setSelectedProjects([]);
+          setExtraCheckoutProjectIds([]);
           setPlannedWork('');
           setBreakEntries([]);
           setProjectUpdates({});
@@ -2165,6 +2246,12 @@ export function DailyWorkFlowPanel({
             }
 
             setProjectUpdates(projectUpdatesMapFromRow(existingSubmission));
+            setExtraCheckoutProjectIds(
+              extraProjectIdsFromUpdates(
+                projectUpdatesMapFromRow(existingSubmission),
+                parsePlannedProjectsFromRow(existingSubmission)
+              )
+            );
             setTodaySubmissionComplete(isWorkSubmissionRowComplete(existingSubmission));
           }
         }
@@ -3418,6 +3505,10 @@ export function DailyWorkFlowPanel({
 
                   <CheckoutProjectUpdatesCard
                     projects={checkoutProjects}
+                    plannedProjectIds={selectedProjects}
+                    assignableProjects={assignableCheckoutProjects}
+                    onAddProject={addUnplannedCheckoutProject}
+                    onRemoveProject={removeUnplannedCheckoutProject}
                     projectUpdates={projectUpdates}
                     onChange={updateProjectUpdate}
                     hoursToday={Number(form.hours_today) || 0}
@@ -3426,7 +3517,7 @@ export function DailyWorkFlowPanel({
                     onOtherHoursChange={(hours) =>
                       setTimeAllocation((prev) => ({ ...prev, other_hours: hours }))
                     }
-                    loading={loadingProjects && checkoutProjects.length === 0}
+                    loading={loadingProjects && checkoutProjects.length === 0 && assignableCheckoutProjects.length === 0}
                   />
 
                   {/* Work Notes */}

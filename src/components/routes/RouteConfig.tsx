@@ -121,6 +121,7 @@ const ClientFormPage = lazy(() => import("@/pages/ClientFormPage"));
 const Settings = lazy(() => import("@/pages/Settings"));
 const BugBackup = lazy(() => import("@/pages/BugBackup"));
 const AdminRecycleBin = lazy(() => import("@/pages/AdminRecycleBin"));
+const BugRecruitment = lazy(() => import("@/pages/BugRecruitment"));
 const Profile = lazy(() => import("@/pages/Profile"));
 const Reports = lazy(() => import("@/pages/Reports"));
 const Fixes = lazy(() => import("@/pages/Fixes"));
@@ -397,6 +398,7 @@ const RouteConfig = () => {
       <Route path="/clients/:clientId" element={<RolePathRedirect suffix="clients/:clientId" />} />
       <Route path="/clients" element={<RolePathRedirect suffix="clients" />} />
       <Route path="/recycle-bin" element={<RolePathRedirect suffix="recycle-bin" />} />
+      <Route path="/bug-recruitment" element={<RolePathRedirect suffix="bug-recruitment" />} />
       <Route path="/updates" element={<RolePathRedirect suffix="updates" />} />
       <Route path="/projects" element={<RolePathRedirect suffix="projects" />} />
       <Route path="/compliance" element={<RolePathRedirect suffix="compliance" />} />
@@ -437,6 +439,7 @@ const RouteConfig = () => {
           <Route path="settings" element={<Settings />} />
           <Route path="bugbackup" element={<BugBackup />} />
           <Route path="recycle-bin" element={<AdminRecycleBin />} />
+          <Route path="bug-recruitment" element={<BugRecruitment />} />
           <Route path="profile" element={<Profile />} />
           <Route path="reports" element={<Reports />} />
           <Route path="messages" element={<Messages />} />

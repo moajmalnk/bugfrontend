@@ -1,6 +1,8 @@
 import { Button } from "@/components/ui/button";
 import { TabsContent } from "@/components/ui/tabs";
 import { DashboardKpiCard } from "@/components/dashboard/DashboardKpiCard";
+import { PendingsTab } from "@/components/dashboard/PendingsTab";
+import type { ProjectHealth } from "@/components/dashboard/DeadlineTable";
 import {
   DashboardPageShell,
   DASHBOARD_PANEL,
@@ -24,6 +26,7 @@ import { cn, getEffectiveRole } from "@/lib/utils";
 import { bugService } from "@/services/bugService";
 import { projectService } from "@/services/projectService";
 import { sharedTaskService } from "@/services/sharedTaskService";
+import { updateService } from "@/services/updateService";
 import type { Bug } from "@/types";
 import { useQuery } from "@tanstack/react-query";
 import {
@@ -35,27 +38,49 @@ import {
   Code2,
   FolderKanban,
   LayoutDashboard,
+  ListChecks,
   ListTodo,
 } from "lucide-react";
 import { useMemo, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 
-type DevTab = "overview" | "projects" | "fixes" | "tasks";
+type DevTab = "overview" | "pendings" | "projects" | "fixes" | "tasks";
 
 const TABS: DashboardTabItem[] = [
   { value: "overview", label: "Overview", icon: LayoutDashboard },
+  { value: "pendings", label: "Pendings", icon: ListChecks },
   { value: "projects", label: "Projects", icon: FolderKanban },
   { value: "fixes", label: "My fixes", icon: CheckCircle2 },
   { value: "tasks", label: "Tasks", icon: ListTodo },
 ];
 
 function parseTab(value: string | null): DevTab {
-  if (value === "projects" || value === "fixes" || value === "tasks") return value;
+  if (value === "pendings" || value === "projects" || value === "fixes" || value === "tasks") return value;
   return "overview";
 }
 
+/** Why: PendingsTab DeadlineTable expects highBugs/updatesCount; role health rows omit them. */
+function toDeadlineHealth(
+  rows: {
+    project: ProjectHealth["project"];
+    openBugs: number;
+    fixedBugs: number;
+    totalBugs: number;
+    deadline: Date | null;
+    bucket: ProjectHealth["bucket"];
+    daysUntil: number | null;
+  }[]
+): ProjectHealth[] {
+  return rows.map((row) => ({
+    ...row,
+    highBugs: 0,
+    updatesCount: 0,
+  }));
+}
+
+
 async function loadDeveloperDashboard(userId: string) {
-  const [allProjects, lifetimeStats, openBugsResult, myFixesResult, tasks] =
+  const [allProjects, lifetimeStats, openBugsResult, myFixesResult, tasks, updates] =
     await Promise.all([
       projectService.getProjects(),
       bugService.getDashboardStats(),
@@ -67,10 +92,20 @@ async function loadDeveloperDashboard(userId: string) {
         fixedBy: userId,
       }),
       sharedTaskService.getSharedTasks().catch(() => []),
+      updateService.getUpdates().catch(() => []),
     ]);
 
   const projects = filterAssignedProjects(allProjects, userId);
   const health = buildProjectHealth(projects);
+  const projectIds = new Set(projects.map((p) => String(p.id)));
+  const pendingBugs = sortBugsByPriority(
+    (openBugsResult.bugs || []).filter((b) => b.status === "pending")
+  );
+  const pendingUpdates = (updates || []).filter(
+    (u) =>
+      String(u.status || "").toLowerCase() === "pending" &&
+      projectIds.has(String(u.project_id))
+  );
   const myOpenTasks = tasks.filter(
     (t) =>
       (t.status === "pending" || t.status === "in_progress") &&
@@ -83,6 +118,8 @@ async function loadDeveloperDashboard(userId: string) {
     health,
     lifetimeStats,
     openBugs: sortBugsByPriority(openBugsResult.bugs || []),
+    pendingBugs,
+    pendingUpdates,
     myFixes: myFixesResult.bugs || [],
     myOpenTasks,
     myFixesTotal:
@@ -199,7 +236,7 @@ export default function DeveloperDashboard() {
           gradient: "from-red-500 to-orange-600",
           chip: "from-red-50 to-orange-50 dark:from-red-950/30 dark:to-orange-950/30 border-red-200 dark:border-red-800",
           valueClass: "text-red-700 dark:text-red-300",
-          tab: "projects" as DevTab,
+          tab: "pendings" as DevTab,
         },
         {
           title: "Due in 7 days",
@@ -209,7 +246,7 @@ export default function DeveloperDashboard() {
           gradient: "from-amber-500 to-yellow-600",
           chip: "from-amber-50 to-yellow-50 dark:from-amber-950/30 dark:to-yellow-950/30 border-amber-200 dark:border-amber-800",
           valueClass: "text-amber-700 dark:text-amber-300",
-          tab: "projects" as DevTab,
+          tab: "pendings" as DevTab,
         },
         {
           title: "Open bugs",
@@ -314,6 +351,28 @@ export default function DeveloperDashboard() {
                 emptyLabel="No overdue projects"
               />
             </div>
+          </TabsContent>
+
+
+          <TabsContent value="pendings" className="space-y-6 mt-0">
+            <PendingsTab
+              role={role}
+              overdue={toDeadlineHealth(data.health.overdue)}
+              upcoming={toDeadlineHealth(data.health.upcoming)}
+              pendingBugs={data.pendingBugs}
+              pendingBugCount={
+                periodStats?.pending ??
+                data.lifetimeStats.pending ??
+                data.pendingBugs.length
+              }
+              pendingUpdates={data.pendingUpdates}
+              retestsPendingCount={
+                periodStats?.retests?.pending ??
+                data.lifetimeStats.retests?.pending ??
+                0
+              }
+              enabled={activeTab === "pendings"}
+            />
           </TabsContent>
 
           <TabsContent value="projects" className="space-y-4 mt-0">

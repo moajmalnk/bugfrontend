@@ -141,11 +141,15 @@ export default function LeaveRequests() {
         getLeaveTypes(month),
         getMyLeaveRequests(),
       ]);
-      setBalances(typesRes.types || []);
+      // Policy: Paid 1 + Sick 1 + Unpaid max 5. Personal Leave is retired.
+      const activeBalances = (typesRes.types || []).filter(
+        (t) => String(t.code || '').toLowerCase() !== 'personal'
+      );
+      setBalances(activeBalances);
       setRequests(mine);
       setLeaveTypeId((prev) => {
-        if (prev && typesRes.types?.some((t) => String(t.id) === prev)) return prev;
-        return typesRes.types?.length ? String(typesRes.types[0].id) : '';
+        if (prev && activeBalances.some((t) => String(t.id) === prev)) return prev;
+        return activeBalances.length ? String(activeBalances[0].id) : '';
       });
     } catch (e) {
       toast({
@@ -364,19 +368,22 @@ export default function LeaveRequests() {
             </div>
 
             {loading ? (
-              <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 xl:grid-cols-4">
-                {[1, 2, 3, 4].map((i) => (
-                  <Skeleton key={i} className="h-36 rounded-2xl" />
+              <div className="grid grid-cols-12 gap-4">
+                {[1, 2, 3].map((i) => (
+                  <Skeleton
+                    key={i}
+                    className="col-span-12 sm:col-span-6 lg:col-span-4 h-36 rounded-2xl"
+                  />
                 ))}
               </div>
             ) : (
-              <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 xl:grid-cols-4">
+              <div className="grid grid-cols-12 gap-4">
                 {balances.map((b, idx) => {
                   const accent = BALANCE_ACCENTS[idx % BALANCE_ACCENTS.length];
                   return (
                     <div
                       key={b.id}
-                      className={`group relative rounded-2xl border ${accent.border} bg-white/80 dark:bg-gray-900/80 backdrop-blur-sm p-4 sm:p-5 shadow-lg transition-all duration-300 hover:-translate-y-1 hover:shadow-2xl min-w-0`}
+                      className={`col-span-12 sm:col-span-6 lg:col-span-4 group relative rounded-2xl border ${accent.border} bg-white/80 dark:bg-gray-900/80 backdrop-blur-sm p-4 sm:p-5 shadow-lg transition-all duration-300 hover:-translate-y-1 hover:shadow-2xl min-w-0`}
                     >
                       <div
                         className={`absolute inset-0 rounded-2xl bg-gradient-to-br ${accent.wash} opacity-60 group-hover:opacity-100 transition-opacity pointer-events-none`}

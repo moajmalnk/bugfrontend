@@ -12,6 +12,7 @@ import { UserProjectPortfolio } from "@/components/users/UserProjectPortfolio";
 import { UserAvatar } from "@/components/users/UserAvatar";
 import { OnboardingProfileSection } from "@/components/onboarding/OnboardingProfileSection";
 import { OnboardingVerificationBadge } from "@/components/onboarding/OnboardingVerificationBanner";
+import { ADMIN_ONBOARDING_URL_PARAM } from "@/lib/onboardingPersistence";
 import { Button } from "@/components/ui/button";
 import {
   AlertDialog,
@@ -26,6 +27,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useAuth } from "@/context/AuthContext";
 import { ENV } from "@/lib/env";
 import { userRequiresOnboarding } from "@/lib/utils";
@@ -60,12 +62,49 @@ import {
   UserX,
   X,
 } from "lucide-react";
-import { useMemo, useState } from "react";
-import { Link, useNavigate, useParams, useLocation } from "react-router-dom";
+import { useEffect, useMemo, useState } from "react";
+import {
+  Link,
+  useNavigate,
+  useParams,
+  useLocation,
+  useSearchParams,
+} from "react-router-dom";
 import { getReturnPathFromState } from "@/hooks/useUrlPagination";
 import { buildAdminAddHoursPath } from "@/pages/adminOvertimeShared";
 
 type UserStatus = "active" | "idle" | "offline";
+
+type UserDetailsTab =
+  | "personal"
+  | "professional"
+  | "payments"
+  | "attendance"
+  | "leaves"
+  | "projects"
+  | "work-statistics"
+  | "active-hours";
+
+const USER_DETAILS_TABS: { value: UserDetailsTab; label: string; adminOnly?: boolean }[] = [
+  { value: "personal", label: "Personal" },
+  { value: "professional", label: "Professional" },
+  { value: "payments", label: "Payments" },
+  { value: "attendance", label: "Attendance", adminOnly: true },
+  { value: "leaves", label: "Leaves" },
+  { value: "projects", label: "Projects" },
+  { value: "work-statistics", label: "Work Statistics" },
+  { value: "active-hours", label: "Active Hours" },
+];
+
+function parseUserDetailsTab(
+  raw: string | null,
+  isAdmin: boolean
+): UserDetailsTab {
+  const match = USER_DETAILS_TABS.find((t) => t.value === raw);
+  if (!match) return "personal";
+  if (match.adminOnly && !isAdmin) return "personal";
+  return match.value;
+}
 
 function getRoleIcon(role: string) {
   switch (role) {
@@ -146,14 +185,52 @@ export default function UserDetails() {
   const { userId } = useParams();
   const navigate = useNavigate();
   const location = useLocation();
+  const [searchParams, setSearchParams] = useSearchParams();
   const { toast } = useToast();
   const { currentUser } = useAuth();
   const effectiveRole = getEffectiveRole(currentUser || {});
+  const isAdmin = effectiveRole === "admin";
   const { hasPermission } = usePermissions(null);
   const usersBackPath = getReturnPathFromState(
     location.state,
     `/${effectiveRole}/users`
   );
+
+  const activeTab = parseUserDetailsTab(searchParams.get("tab"), isAdmin);
+  const visibleTabs = USER_DETAILS_TABS.filter((t) => !t.adminOnly || isAdmin);
+
+  const setActiveTab = (tab: string) => {
+    const next = parseUserDetailsTab(tab, isAdmin);
+    setSearchParams(
+      (prev) => {
+        const params = new URLSearchParams(prev);
+        if (next === "personal") {
+          params.delete("tab");
+        } else {
+          params.set("tab", next);
+        }
+        return params;
+      },
+      { replace: true }
+    );
+  };
+
+  // Why: Review / admin fill wizard live on Professional — deep-links must land there.
+  useEffect(() => {
+    if (!isAdmin) return;
+    const needsProfessional =
+      searchParams.get("review") === "onboarding" ||
+      Boolean(searchParams.get(ADMIN_ONBOARDING_URL_PARAM));
+    if (!needsProfessional || activeTab === "professional") return;
+    setSearchParams(
+      (prev) => {
+        const params = new URLSearchParams(prev);
+        params.set("tab", "professional");
+        return params;
+      },
+      { replace: true }
+    );
+  }, [activeTab, isAdmin, searchParams, setSearchParams]);
 
   const [isGeneratingLink, setIsGeneratingLink] = useState(false);
   const [isAccountToggleLoading, setIsAccountToggleLoading] = useState(false);
@@ -851,74 +928,225 @@ export default function UserDetails() {
               </div>
             </Card>
 
-            {/* Stats */}
-            <div className="grid grid-cols-1 xl:grid-cols-12 gap-6">
-              {userRequiresOnboarding(user) ? (
-                <div className="xl:col-span-12">
-                  <OnboardingProfileSection
-                    userId={user.id}
-                    onboardingCompleted={user.onboarding_completed}
-                    canVerify={effectiveRole === "admin"}
-                    employeeName={user.name || user.username}
-                    employeeUsername={user.username}
-                    employeeEmail={user.email}
-                    employeePhone={user.phone}
-                    employeeRole={user.role}
-                    employeeAvatar={user.avatar}
-                    employeeJoiningDate={user.joining_date}
-                    employeeCode={employeeCodeDisplay}
-                    employeeJobTitle={user.job_title}
-                    employeeJobLevel={user.job_level}
-                    employeeDepartment={user.department}
-                    employeeReportsTo={user.reports_to_username}
-                    employeeContractType={user.contract_type}
-                    employeeOfferLetterIssued={user.offer_letter_issued}
-                    employeeOfferLetterSharedDate={user.offer_letter_shared_date}
-                    employeeProbationEndDate={user.probation_end_date}
-                  />
-                </div>
-              ) : null}
-              <Card className="xl:col-span-12 border-border/60 bg-card/60 backdrop-blur">
-                <CardContent className="p-5 sm:p-6 space-y-6">
-                  <UserLeaveDetails
-                    userId={user.id}
-                    username={user.username || undefined}
-                  />
-                </CardContent>
-              </Card>
-              {effectiveRole === "admin" ? (
-                <Card className="xl:col-span-12 border-border/60 bg-card/60 backdrop-blur">
-                  <CardContent className="p-5 sm:p-6">
-                    <UserOfficeWfhCalendar userId={user.id} />
-                  </CardContent>
-                </Card>
-              ) : null}
-              {effectiveRole === "admin" ? (
-                <Card className="xl:col-span-12 border-border/60 bg-card/60 backdrop-blur">
-                  <CardContent className="p-5 sm:p-6 space-y-6">
-                    <UserAttendanceExceptions
-                      userId={user.id}
-                      username={user.username || undefined}
-                    />
-                  </CardContent>
-                </Card>
-              ) : null}
-              <Card className="xl:col-span-12 border-border/60 bg-card/60 backdrop-blur">
-                <CardContent className="p-5 sm:p-6 space-y-6">
-                  <h3 className="text-lg font-semibold">Work Statistics</h3>
-                  <UserWorkStats userId={user.id} />
-                </CardContent>
-              </Card>
-              <div className="xl:col-span-12">
-                <UserProjectPortfolio userId={user.id} />
+            {/* Detail tabs — under action buttons */}
+            <Tabs
+              value={activeTab}
+              onValueChange={setActiveTab}
+              className="space-y-4 sm:space-y-6"
+            >
+              <div
+                className="overflow-x-auto rounded-2xl border border-border/60 bg-muted/20 p-1"
+                style={{ scrollbarWidth: "thin" }}
+              >
+                <TabsList className="inline-flex h-auto min-h-12 w-max min-w-full gap-1.5 bg-transparent p-0 sm:flex sm:flex-wrap sm:w-full">
+                  {visibleTabs.map((tab) => (
+                    <TabsTrigger
+                      key={tab.value}
+                      value={tab.value}
+                      className="h-10 shrink-0 rounded-xl px-3 text-sm font-semibold transition-all data-[state=active]:border data-[state=active]:border-border data-[state=active]:bg-background data-[state=active]:shadow-sm sm:flex-1 sm:min-w-[7rem]"
+                    >
+                      {tab.label}
+                    </TabsTrigger>
+                  ))}
+                </TabsList>
               </div>
-              <Card className="xl:col-span-12 border-border/60 bg-card/60 backdrop-blur">
-                <CardContent className="p-5 sm:p-6 space-y-6">
-                  <h3 className="text-lg font-semibold">Active Hours</h3>
-                  <ActiveHours userId={user.id} userName={user.username || user.name || ""} />
-                </CardContent>
-              </Card>
-            </div>
+
+              <TabsContent value="personal" className="mt-0 focus-visible:outline-none">
+                {activeTab === "personal" ? (
+                  userRequiresOnboarding(user) ? (
+                    <OnboardingProfileSection
+                      userId={user.id}
+                      onboardingCompleted={user.onboarding_completed}
+                      canVerify={isAdmin}
+                      visibleSections={[
+                        "address",
+                        "developer",
+                        "statutory",
+                        "agreements",
+                      ]}
+                      employeeName={user.name || user.username}
+                      employeeUsername={user.username}
+                      employeeEmail={user.email}
+                      employeePhone={user.phone}
+                      employeeRole={user.role}
+                      employeeAvatar={user.avatar}
+                      employeeJoiningDate={user.joining_date}
+                      employeeCode={employeeCodeDisplay}
+                      employeeJobTitle={user.job_title}
+                      employeeJobLevel={user.job_level}
+                      employeeDepartment={user.department}
+                      employeeReportsTo={user.reports_to_username}
+                      employeeContractType={user.contract_type}
+                      employeeOfferLetterIssued={user.offer_letter_issued}
+                      employeeOfferLetterSharedDate={user.offer_letter_shared_date}
+                      employeeProbationEndDate={user.probation_end_date}
+                    />
+                  ) : (
+                    <Card className="rounded-2xl shadow-sm border-border/60">
+                      <CardContent className="p-5 sm:p-6">
+                        <p className="text-sm text-muted-foreground">
+                          Personal onboarding details apply to developer accounts. Contact
+                          basics are shown in the profile card above.
+                        </p>
+                      </CardContent>
+                    </Card>
+                  )
+                ) : null}
+              </TabsContent>
+
+              <TabsContent
+                value="professional"
+                className="mt-0 focus-visible:outline-none"
+              >
+                {activeTab === "professional" ? (
+                  userRequiresOnboarding(user) ? (
+                    <OnboardingProfileSection
+                      userId={user.id}
+                      onboardingCompleted={user.onboarding_completed}
+                      canVerify={isAdmin}
+                      visibleSections={["verification", "employment"]}
+                      employeeName={user.name || user.username}
+                      employeeUsername={user.username}
+                      employeeEmail={user.email}
+                      employeePhone={user.phone}
+                      employeeRole={user.role}
+                      employeeAvatar={user.avatar}
+                      employeeJoiningDate={user.joining_date}
+                      employeeCode={employeeCodeDisplay}
+                      employeeJobTitle={user.job_title}
+                      employeeJobLevel={user.job_level}
+                      employeeDepartment={user.department}
+                      employeeReportsTo={user.reports_to_username}
+                      employeeContractType={user.contract_type}
+                      employeeOfferLetterIssued={user.offer_letter_issued}
+                      employeeOfferLetterSharedDate={user.offer_letter_shared_date}
+                      employeeProbationEndDate={user.probation_end_date}
+                    />
+                  ) : (
+                    <Card className="rounded-2xl shadow-sm border-border/60">
+                      <CardContent className="p-5 sm:p-6">
+                        <p className="text-sm text-muted-foreground">
+                          Employment and document verification apply to developer onboarding.
+                          Job summary fields remain in the profile card above.
+                        </p>
+                      </CardContent>
+                    </Card>
+                  )
+                ) : null}
+              </TabsContent>
+
+              <TabsContent value="payments" className="mt-0 focus-visible:outline-none">
+                {activeTab === "payments" ? (
+                  userRequiresOnboarding(user) ? (
+                    <OnboardingProfileSection
+                      userId={user.id}
+                      onboardingCompleted={user.onboarding_completed}
+                      canVerify={isAdmin}
+                      visibleSections={["banking"]}
+                      employeeName={user.name || user.username}
+                      employeeUsername={user.username}
+                      employeeEmail={user.email}
+                      employeePhone={user.phone}
+                      employeeRole={user.role}
+                      employeeAvatar={user.avatar}
+                      employeeJoiningDate={user.joining_date}
+                      employeeCode={employeeCodeDisplay}
+                      employeeJobTitle={user.job_title}
+                      employeeJobLevel={user.job_level}
+                      employeeDepartment={user.department}
+                      employeeReportsTo={user.reports_to_username}
+                      employeeContractType={user.contract_type}
+                      employeeOfferLetterIssued={user.offer_letter_issued}
+                      employeeOfferLetterSharedDate={user.offer_letter_shared_date}
+                      employeeProbationEndDate={user.probation_end_date}
+                    />
+                  ) : (
+                    <Card className="rounded-2xl shadow-sm border-border/60">
+                      <CardContent className="p-5 sm:p-6">
+                        <p className="text-sm text-muted-foreground">
+                          Banking details appear after developer onboarding is completed.
+                        </p>
+                      </CardContent>
+                    </Card>
+                  )
+                ) : null}
+              </TabsContent>
+
+              {isAdmin ? (
+                <TabsContent
+                  value="attendance"
+                  className="mt-0 focus-visible:outline-none"
+                >
+                  {activeTab === "attendance" ? (
+                    <div className="grid grid-cols-12 gap-4 sm:gap-6">
+                      <Card className="col-span-12 border-border/60 bg-card/60 backdrop-blur rounded-2xl">
+                        <CardContent className="p-5 sm:p-6">
+                          <UserOfficeWfhCalendar userId={user.id} />
+                        </CardContent>
+                      </Card>
+                      <Card className="col-span-12 border-border/60 bg-card/60 backdrop-blur rounded-2xl">
+                        <CardContent className="p-5 sm:p-6 space-y-6">
+                          <UserAttendanceExceptions
+                            userId={user.id}
+                            username={user.username || undefined}
+                          />
+                        </CardContent>
+                      </Card>
+                    </div>
+                  ) : null}
+                </TabsContent>
+              ) : null}
+
+              <TabsContent value="leaves" className="mt-0 focus-visible:outline-none">
+                {activeTab === "leaves" ? (
+                  <Card className="border-border/60 bg-card/60 backdrop-blur rounded-2xl">
+                    <CardContent className="p-5 sm:p-6 space-y-6">
+                      <UserLeaveDetails
+                        userId={user.id}
+                        username={user.username || undefined}
+                      />
+                    </CardContent>
+                  </Card>
+                ) : null}
+              </TabsContent>
+
+              <TabsContent value="projects" className="mt-0 focus-visible:outline-none">
+                {activeTab === "projects" ? (
+                  <UserProjectPortfolio userId={user.id} />
+                ) : null}
+              </TabsContent>
+
+              <TabsContent
+                value="work-statistics"
+                className="mt-0 focus-visible:outline-none"
+              >
+                {activeTab === "work-statistics" ? (
+                  <Card className="border-border/60 bg-card/60 backdrop-blur rounded-2xl">
+                    <CardContent className="p-5 sm:p-6 space-y-6">
+                      <h2 className="text-lg font-semibold">Work Statistics</h2>
+                      <UserWorkStats userId={user.id} />
+                    </CardContent>
+                  </Card>
+                ) : null}
+              </TabsContent>
+
+              <TabsContent
+                value="active-hours"
+                className="mt-0 focus-visible:outline-none"
+              >
+                {activeTab === "active-hours" ? (
+                  <Card className="border-border/60 bg-card/60 backdrop-blur rounded-2xl">
+                    <CardContent className="p-5 sm:p-6 space-y-6">
+                      <h2 className="text-lg font-semibold">Active Hours</h2>
+                      <ActiveHours
+                        userId={user.id}
+                        userName={user.username || user.name || ""}
+                      />
+                    </CardContent>
+                  </Card>
+                ) : null}
+              </TabsContent>
+            </Tabs>
           </div>
         )}
     </div>
