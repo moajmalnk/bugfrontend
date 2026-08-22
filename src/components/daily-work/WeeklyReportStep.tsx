@@ -4,9 +4,11 @@ import { Textarea } from '@/components/ui/textarea';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { extractApiErrorMessage } from '@/lib/apiError';
+import { notifyAdminNavCountsChanged } from '@/services/adminNavCountsService';
 import {
   clampWeeklyReportField,
   emptyWeeklyReportFields,
+  formatWeeklyReportAttendanceBlock,
   getWeeklyReport,
   isWeeklyReportValid,
   saveWeeklyReport,
@@ -67,6 +69,7 @@ export function WeeklyReportStep({
   const [userName, setUserName] = useState(fallbackName);
   const [dateLabel, setDateLabel] = useState('');
   const [weekLabel, setWeekLabel] = useState('');
+  const [attendancePreview, setAttendancePreview] = useState('');
   const [fields, setFields] = useState<WeeklyReportFields>(INITIAL_FIELDS);
   const [baseline, setBaseline] = useState<WeeklyReportFields>(INITIAL_FIELDS);
 
@@ -117,6 +120,10 @@ export function WeeklyReportStep({
         setUserName(data.user_name || fallbackName);
         setDateLabel(data.date_label);
         setWeekLabel(data.week_label);
+        setAttendancePreview(
+          String(data.attendance_text || '').trim() ||
+            formatWeeklyReportAttendanceBlock(data.attendance)
+        );
         setFields(next);
         setBaseline(next);
         setRevealed(true);
@@ -138,6 +145,7 @@ export function WeeklyReportStep({
     return () => {
       setFields(INITIAL_FIELDS);
       setBaseline(INITIAL_FIELDS);
+      setAttendancePreview('');
       onDirtyChange(false);
     };
   }, [onDirtyChange]);
@@ -154,6 +162,7 @@ export function WeeklyReportStep({
     setError('');
     try {
       await saveWeeklyReport(fields, workDate);
+      notifyAdminNavCountsChanged();
       onDirtyChange(false);
       onContinue();
     } catch (err) {
@@ -202,6 +211,15 @@ export function WeeklyReportStep({
                 </div>
               </div>
             </div>
+
+            {attendancePreview ? (
+              <div className="rounded-xl border border-gray-200 bg-white p-5 shadow-sm dark:border-gray-700 dark:bg-gray-800">
+                <h3 className="mb-3 text-sm font-semibold text-foreground">Weekly Attendance Summary</h3>
+                <pre className="m-0 whitespace-pre-wrap font-sans text-sm leading-relaxed text-muted-foreground">
+                  {attendancePreview}
+                </pre>
+              </div>
+            ) : null}
 
             <div className="grid grid-cols-12 gap-4">
               <div className="col-span-12 flex flex-col gap-2 md:col-span-6">

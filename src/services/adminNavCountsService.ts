@@ -21,6 +21,7 @@ import { performanceReviewService } from '@/services/performanceReviewService';
 import { activityService } from '@/services/activityService';
 import { shortsService } from '@/services/shortsService';
 import { backupService } from '@/services/backupService';
+import { listWeeklyReports } from '@/services/weeklyReportService';
 
 export type AdminNavCounts = {
   dashboard: number;
@@ -33,6 +34,7 @@ export type AdminNavCounts = {
   meetings: number;
   tasks: number;
   bugupdate: number;
+  weeklyReport: number;
   myleave: number;
   messages: number;
   commonBugs: number;
@@ -63,6 +65,7 @@ export const EMPTY_ADMIN_NAV_COUNTS: AdminNavCounts = {
   meetings: 0,
   tasks: 0,
   bugupdate: 0,
+  weeklyReport: 0,
   myleave: 0,
   messages: 0,
   commonBugs: 0,
@@ -199,6 +202,7 @@ function normalizeCounts(payload: Partial<AdminNavCounts>): AdminNavCounts {
     meetings: asCount(payload.meetings),
     tasks: asCount(payload.tasks),
     bugupdate: asCount(payload.bugupdate),
+    weeklyReport: asCount(payload.weeklyReport),
     myleave: asCount(payload.myleave),
     messages: asCount(payload.messages),
     commonBugs: asCount(payload.commonBugs),
@@ -296,6 +300,15 @@ async function fetchAdminNavCountsFallback(): Promise<AdminNavCounts> {
       .getSharedTasks()
       .then((tasks) => {
         counts.tasks = tasks.length;
+      })
+      .catch(() => {}),
+    listWeeklyReports({
+      scope: isAdmin ? 'team' : 'mine',
+      page: 1,
+      limit: 1,
+    })
+      .then((result) => {
+        counts.weeklyReport = asCount(result.total);
       })
       .catch(() => {}),
     getMyLeaveRequests()

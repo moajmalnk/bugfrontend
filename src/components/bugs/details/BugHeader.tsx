@@ -10,6 +10,7 @@ import { useAuth } from "@/context/AuthContext";
 import { generateShareableUrl, getEffectiveRole } from "@/lib/utils";
 import { buildFullBugJourney, formatBugJourneyMessage } from "@/lib/bugJourney";
 import { bugService } from "@/services/bugService";
+import { syncBugListAfterDelete } from "@/lib/bugListQueryCache";
 import { Bug } from "@/types";
 import { useUndoDelete } from "@/hooks/useUndoDelete";
 import { UndoDeleteNotificationPortal } from "@/components/ui/UndoDeleteNotification";
@@ -209,6 +210,10 @@ export const BugHeader = ({
       setIsDeleting(true);
       try {
         await bugService.deleteBug(bug.id);
+        await syncBugListAfterDelete(queryClient, bug.id, {
+          status: bug.status,
+          reported_by: bug.reported_by,
+        });
 
         toast({
           title: "Bug Deleted",

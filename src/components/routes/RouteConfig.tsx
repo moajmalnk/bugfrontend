@@ -9,6 +9,42 @@ import { lazy, Suspense } from "react";
 import { Navigate, Outlet, Route, Routes, useParams, useLocation } from "react-router-dom";
 import { HelpSupportRoute, HelpArticleRoute } from "@/pages/help/HelpRoutes";
 
+const APP_ROLES = new Set(["admin", "developer", "tester", "user"]);
+
+/**
+ * Why: Role-prefixed routes must exist while logged out so ProtectedRoute can
+ * store the deep link and send users to /login instead of showing 404.
+ */
+function RoleAlignedLayout() {
+  const { role: urlRole } = useParams<{ role: string }>();
+  const { currentUser } = useAuth();
+  const location = useLocation();
+
+  if (!urlRole || !APP_ROLES.has(urlRole)) {
+    return (
+      <Suspense fallback={<SkeletonFallback />}>
+        <NotFound />
+      </Suspense>
+    );
+  }
+
+  if (currentUser?.role && currentUser.role !== urlRole) {
+    const suffix = location.pathname.replace(`/${urlRole}`, "") || "/dashboard";
+    return (
+      <Navigate
+        to={`/${currentUser.role}${suffix}${location.search}`}
+        replace
+      />
+    );
+  }
+
+  return (
+    <Suspense fallback={<SkeletonFallback />}>
+      <Outlet />
+    </Suspense>
+  );
+}
+
 // Shared page skeleton (mirrors real page geometry — header, toolbar, stats, cards)
 const SkeletonFallback = () => <PageSkeleton />;
 
@@ -24,9 +60,7 @@ const TermsOfUse = lazy(() => import("@/pages/TermsOfUse"));
 // New layout for role-based routes
 const ProtectedRoleLayout = () => (
   <ProtectedRoute>
-    <Suspense fallback={<SkeletonFallback />}>
-      <Outlet />
-    </Suspense>
+    <RoleAlignedLayout />
   </ProtectedRoute>
 );
 
@@ -147,6 +181,7 @@ const MyTasks = lazy(() =>
   })
 );
 const DailyUpdate = lazy(() => import("@/pages/DailyUpdate"));
+const WeeklyReports = lazy(() => import("@/pages/WeeklyReports"));
 const AdminOvertimeRequests = lazy(() => import("@/pages/AdminOvertimeRequests"));
 const AdminOvertimeUserDetail = lazy(() => import("@/pages/AdminOvertimeUserDetail"));
 const AdminAddWorkHours = lazy(() => import("@/pages/AdminAddWorkHours"));
@@ -246,8 +281,7 @@ const RolePathRedirect = ({ suffix }: { suffix: string }) => {
 };
 
 const RouteConfig = () => {
-  const { isLoading, isAuthenticated, currentUser } = useAuth();
-  const role = currentUser?.role;
+  const { isLoading } = useAuth();
 
   if (isLoading) {
     return <SkeletonFallback />;
@@ -337,6 +371,7 @@ const RouteConfig = () => {
       <Route path="/messages" element={<RolePathRedirect suffix="messages" />} />
       <Route path="/notifications" element={<RolePathRedirect suffix="notifications" />} />
       <Route path="/daily-work-update" element={<RolePathRedirect suffix="daily-work-update" />} />
+      <Route path="/weekly-report" element={<RolePathRedirect suffix="weekly-report" />} />
       <Route path="/overtime-requests" element={<RolePathRedirect suffix="overtime-requests" />} />
       <Route path="/leave" element={<RolePathRedirect suffix="leave" />} />
       <Route path="/leave-requests" element={<RolePathRedirect suffix="leave-requests" />} />
@@ -363,9 +398,8 @@ const RouteConfig = () => {
       <Route path="/help/:articleId" element={<RolePathRedirect suffix="help/:articleId" />} />
       <Route path="/help" element={<RolePathRedirect suffix="help" />} />
 
-      {/* Protected Routes with role prefix */}
-      {isAuthenticated && role && (
-        <Route path={`/${role}`} element={<ProtectedRoleLayout />}>
+      {/* Protected Routes with role prefix — always registered so logout deep links redirect to login */}
+      <Route path="/:role" element={<ProtectedRoleLayout />}>
           <Route path="dashboard" element={<RoleDashboard />} />
           <Route path="projects" element={<Projects />} />
           <Route path="projects/new" element={<NewProject />} />
@@ -406,6 +440,7 @@ const RouteConfig = () => {
           <Route path="meet/:code" element={<MeetRoom />} />
           <Route path="my-tasks" element={<MyTasks />} />
           <Route path="daily-update" element={<DailyUpdate />} />
+          <Route path="weekly-report" element={<WeeklyReports />} />
           <Route path="daily-work-update" element={<DailyWorkUpdate />} />
           <Route path="leave" element={<LeaveRequests />} />
           <Route path="overtime-requests/:userId/add-hours" element={<AdminAddWorkHours />} />
@@ -434,8 +469,7 @@ const RouteConfig = () => {
           <Route path="help/:articleId" element={<HelpArticleRoute />} />
           {/* Admin → ops dashboard; others → projects */}
           <Route index element={<RoleHomeRedirect />} />
-        </Route>
-      )}
+      </Route>
 
       <Route
         path="*"

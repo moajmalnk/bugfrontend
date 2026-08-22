@@ -176,6 +176,27 @@ const PAGE_ENTRIES: PageSearchEntry[] = [
       ctx.hasPermission("UPDATES_CREATE"),
   },
   {
+    id: "page-weekly-report",
+    label: "Weekly Report",
+    path: "/weekly-report",
+    keywords: [
+      "weekly report",
+      "week report",
+      "saturday report",
+      "status report",
+      "blockers",
+      "work completed",
+    ],
+    excludeRoles: ["tester"],
+    showWhen: (ctx) =>
+      ctx.hasPermission("DAILY_UPDATE_CREATE") ||
+      ctx.hasPermission("DAILY_UPDATE_VIEW") ||
+      ctx.hasPermission("UPDATES_VIEW") ||
+      ctx.hasPermission("UPDATES_CREATE") ||
+      ctx.role === "developer" ||
+      ctx.role === "admin",
+  },
+  {
     id: "page-meet",
     label: "BugMeet",
     path: "/meet?tab=shared-meets",

@@ -209,8 +209,6 @@ export const Sidebar = ({ className, closeSidebar }: SidebarProps) => {
                 to="/dashboard"
                 icon={<LayoutDashboard className="h-5 w-5" />}
                 label="Dashboard"
-                badge={formatNavCount(navCounts.dashboard)}
-                badgeTitle={`${navCounts.dashboard} open bug${navCounts.dashboard === 1 ? "" : "s"}`}
               />
             )}
             <NavLink
@@ -312,6 +310,26 @@ export const Sidebar = ({ className, closeSidebar }: SidebarProps) => {
                 label="BugUpdate"
                 badge={formatNavCount(navCounts.bugupdate)}
                 badgeTitle={`${navCounts.bugupdate} work update${navCounts.bugupdate === 1 ? "" : "s"}`}
+              />
+            )}
+
+            {role !== "tester" &&
+              (role === "admin" ||
+                role === "developer" ||
+                can("DAILY_UPDATE_CREATE") ||
+                can("DAILY_UPDATE_VIEW") ||
+                can("UPDATES_VIEW") ||
+                can("UPDATES_CREATE")) && (
+              <NavLink
+                to="/weekly-report"
+                icon={<ClipboardList className="h-5 w-5" />}
+                label="Weekly Report"
+                badge={formatNavCount(navCounts.weeklyReport)}
+                badgeTitle={
+                  role === "admin"
+                    ? `${navCounts.weeklyReport} team weekly report${navCounts.weeklyReport === 1 ? "" : "s"}`
+                    : `${navCounts.weeklyReport} weekly report${navCounts.weeklyReport === 1 ? "" : "s"}`
+                }
               />
             )}
 

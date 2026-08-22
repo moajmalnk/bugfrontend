@@ -1,11 +1,23 @@
 import React from 'react';
-import { Link } from 'react-router-dom';
+import { Link, Navigate, useLocation } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/context/AuthContext';
 import { BugIcon, HomeIcon, ArrowLeftIcon } from 'lucide-react';
 
+const APP_ROLE_PREFIX = /^\/(admin|developer|tester|user)(\/|$)/;
+
 const NotFound = () => {
-  const { currentUser } = useAuth();
+  const { currentUser, isAuthenticated, isLoading, storeIntendedDestination } = useAuth();
+  const location = useLocation();
+
+  if (
+    !isLoading &&
+    !isAuthenticated &&
+    APP_ROLE_PREFIX.test(location.pathname)
+  ) {
+    storeIntendedDestination(location.pathname + location.search);
+    return <Navigate to="/login" replace />;
+  }
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-100 via-white to-indigo-100 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900 px-4">
