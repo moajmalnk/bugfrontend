@@ -53,6 +53,7 @@ import {
   reviewWfhRequest,
   type WfhRequest,
 } from '@/services/wfhRequestService';
+import { notifyAdminNavCountsChanged } from '@/services/adminNavCountsService';
 import { userService } from '@/services/userService';
 import type { User } from '@/types';
 import {
@@ -345,6 +346,7 @@ export default function AdminAttendanceExceptions() {
       }
 
       setWfhReview(null);
+      notifyAdminNavCountsChanged();
       await loadOverview();
     } catch (e) {
       toast({

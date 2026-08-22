@@ -1,9 +1,8 @@
 import { ScreenshotDropZone } from "@/components/attachments/ScreenshotDropZone";
 import {
   PROJECT_PICKER_POPOVER_CLASS,
-  ProjectPickerListItemContent,
+  ProjectPickerSelectPanel,
   ProjectPickerTriggerMeta,
-  projectPickerSearchValue,
 } from "@/components/bugs/ProjectPickerMeta";
 import { filterAssignedProjects } from "@/components/dashboard/roleDashboardShared";
 import {
@@ -17,19 +16,12 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
-import {
-  Command,
-  CommandEmpty,
-  CommandGroup,
-  CommandInput,
-  CommandItem,
-  CommandList,
-} from "@/components/ui/command";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Skeleton } from "@/components/ui/skeleton";
 import { toast } from "@/components/ui/use-toast";
+import { useIsMobile } from "@/hooks/use-mobile";
 import {
   RecordedVoiceNote,
   WhatsAppVoiceRecorder,
@@ -126,6 +118,8 @@ const TesterReportBug = () => {
   const preSelectedProjectId = searchParams.get("projectId") || "";
   const { currentUser } = useAuth();
   const role = getEffectiveRole(currentUser || {});
+
+  const isMobile = useIsMobile();
 
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [title, setTitle] = useState("");
@@ -568,13 +562,21 @@ const TesterReportBug = () => {
             <Label htmlFor="tester-project" className="text-sm font-semibold">
               Project
             </Label>
-            <Popover open={projectPickerOpen} onOpenChange={setProjectPickerOpen}>
+            <Popover
+              open={projectPickerOpen}
+              onOpenChange={(open) => {
+                setProjectPickerOpen(open);
+                if (open && isMobile) {
+                  (document.activeElement as HTMLElement | null)?.blur?.();
+                }
+              }}
+            >
               <PopoverTrigger asChild>
                 <Button
                   id="tester-project"
                   type="button"
                   variant="outline"
-                  role="combobox"
+                  role={isMobile ? undefined : "combobox"}
                   aria-expanded={projectPickerOpen}
                   disabled={isSubmitting}
                   className="h-12 w-full justify-between rounded-xl"
@@ -602,39 +604,30 @@ const TesterReportBug = () => {
                 className={PROJECT_PICKER_POPOVER_CLASS}
                 align="start"
                 collisionPadding={16}
+                onOpenAutoFocus={(event) => {
+                  if (isMobile) {
+                    event.preventDefault();
+                  }
+                }}
               >
-                <Command>
-                  <CommandInput placeholder="Search assigned projects..." />
-                  <CommandList>
-                    <CommandEmpty>No assigned project found.</CommandEmpty>
-                    <CommandGroup>
-                      {assignedProjects.map((project) => {
-                        const stats = {
-                          status: project.status,
-                          bug_stats: project.bug_stats,
-                          update_stats: project.update_stats,
-                        };
-                        return (
-                          <CommandItem
-                            key={project.id}
-                            value={projectPickerSearchValue(project.name, project.id, stats)}
-                            onSelect={() => {
-                              setProjectId(project.id);
-                              setProjectPickerOpen(false);
-                            }}
-                            className="items-start gap-2 py-2.5"
-                          >
-                            <ProjectPickerListItemContent
-                              name={project.name}
-                              selected={projectId === project.id}
-                              stats={stats}
-                            />
-                          </CommandItem>
-                        );
-                      })}
-                    </CommandGroup>
-                  </CommandList>
-                </Command>
+                <ProjectPickerSelectPanel
+                  projects={assignedProjects.map((project) => ({
+                    id: project.id,
+                    name: project.name,
+                    stats: {
+                      status: project.status,
+                      bug_stats: project.bug_stats,
+                      update_stats: project.update_stats,
+                    },
+                  }))}
+                  selectedId={projectId}
+                  onSelect={(id) => {
+                    setProjectId(id);
+                    setProjectPickerOpen(false);
+                  }}
+                  searchPlaceholder="Search assigned projects..."
+                  emptyMessage="No assigned project found."
+                />
               </PopoverContent>
             </Popover>
           </div>

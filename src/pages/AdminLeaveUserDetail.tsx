@@ -28,6 +28,7 @@ import {
 import { getEffectiveRole, hasPermissionOrAdmin } from '@/lib/utils';
 import { usePermissions } from '@/hooks/usePermissions';
 import { ENV } from '@/lib/env';
+import { notifyAdminNavCountsChanged } from '@/services/adminNavCountsService';
 
 function LeaveStatusPill({ status }: { status: LeaveStatus | string }) {
   const s = String(status).toLowerCase();
@@ -141,6 +142,7 @@ export default function AdminLeaveUserDetail() {
         admin_note: notes[id]?.trim() || undefined,
       });
       toast({ title: action === 'approve' ? 'Leave approved' : 'Leave rejected' });
+      notifyAdminNavCountsChanged();
       await load();
     } catch (e) {
       toast({

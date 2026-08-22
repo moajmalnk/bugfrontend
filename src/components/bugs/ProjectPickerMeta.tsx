@@ -1,4 +1,13 @@
+import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from "@/components/ui/command";
 import { Badge } from "@/components/ui/badge";
+import { useIsMobile } from "@/hooks/use-mobile";
 import { cn } from "@/lib/utils";
 import {
   getProjectStatusLabel,
@@ -192,5 +201,101 @@ export function ProjectPickerListItemContent({
         <ProjectPickerListMeta stats={stats} />
       </div>
     </>
+  );
+}
+
+export type ProjectPickerOption = {
+  id: string;
+  name: string;
+  stats?: ProjectPickerStats | null;
+};
+
+/**
+ * Why: Mobile project pickers must not auto-focus a search field — that opens
+ * the OS keyboard and blocks the tap-to-select list (tester Report Bug flow).
+ */
+export function ProjectPickerSelectPanel({
+  projects,
+  selectedId,
+  onSelect,
+  searchPlaceholder = "Search projects...",
+  emptyMessage = "No project found.",
+}: {
+  projects: ProjectPickerOption[];
+  selectedId: string;
+  onSelect: (id: string) => void;
+  searchPlaceholder?: string;
+  emptyMessage?: string;
+}) {
+  const isMobile = useIsMobile();
+
+  if (isMobile) {
+    return (
+      <div
+        className="max-h-[min(60vh,22rem)] overflow-y-auto flex flex-col gap-1 p-1"
+        role="listbox"
+        aria-label="Projects"
+      >
+        {projects.length === 0 ? (
+          <p className="py-6 text-center text-sm text-muted-foreground">{emptyMessage}</p>
+        ) : (
+          projects.map((project) => {
+            const stats = project.stats ?? {};
+            return (
+              <button
+                key={project.id}
+                type="button"
+                role="option"
+                aria-selected={selectedId === project.id}
+                onClick={() => onSelect(project.id)}
+                className={cn(
+                  "flex w-full items-start gap-2 rounded-xl px-2 py-2.5 text-left transition-colors",
+                  "active:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+                  selectedId === project.id && "bg-accent"
+                )}
+              >
+                <ProjectPickerListItemContent
+                  name={project.name}
+                  selected={selectedId === project.id}
+                  stats={stats}
+                />
+              </button>
+            );
+          })
+        )}
+      </div>
+    );
+  }
+
+  return (
+    <Command>
+      <CommandInput placeholder={searchPlaceholder} />
+      <CommandList>
+        <CommandEmpty>{emptyMessage}</CommandEmpty>
+        <CommandGroup>
+          {projects.map((project) => {
+            const stats = {
+              status: project.stats?.status,
+              bug_stats: project.stats?.bug_stats,
+              update_stats: project.stats?.update_stats,
+            };
+            return (
+              <CommandItem
+                key={project.id}
+                value={projectPickerSearchValue(project.name, project.id, stats)}
+                onSelect={() => onSelect(project.id)}
+                className="items-start gap-2 rounded-xl py-2.5"
+              >
+                <ProjectPickerListItemContent
+                  name={project.name}
+                  selected={selectedId === project.id}
+                  stats={stats}
+                />
+              </CommandItem>
+            );
+          })}
+        </CommandGroup>
+      </CommandList>
+    </Command>
   );
 }

@@ -40,6 +40,17 @@ import {
 import { Link, useLocation } from "react-router-dom";
 import { NotificationPopover } from "@/components/notifications/NotificationPopover";
 import { useGlobalSearchModal } from "@/context/GlobalSearchContext";
+import { useAdminNavCounts } from "@/hooks/useAdminNavCounts";
+import {
+  getArticleCountForRole,
+  getHelpRoleFilterForUser,
+} from "@/lib/help";
+
+/** Why: Every sidebar row shows a count, matching Users/Clients. 99+ keeps long labels readable. */
+function formatNavCount(count: number | undefined): string | number {
+  const n = Number(count) || 0;
+  return n > 99 ? "99+" : n;
+}
 
 interface SidebarProps {
   className?: string;
@@ -72,16 +83,24 @@ export const Sidebar = ({ className, closeSidebar }: SidebarProps) => {
     );
   };
 
+  const wantsNavCounts = Boolean(currentUser);
+  const navCounts = useAdminNavCounts(wantsNavCounts);
+  const helpCount = getArticleCountForRole(getHelpRoleFilterForUser(role || "admin"));
+
   const NavLink = ({
     to,
     icon,
     label,
     badge,
+    badgeTone = "default",
+    badgeTitle,
   }: {
     to: string;
     icon: JSX.Element;
     label: string;
     badge?: string | number;
+    badgeTone?: "default" | "alert";
+    badgeTitle?: string;
   }) => {
     const destination = role ? `/${role}${to}` : to;
     const active = isActive(to);
@@ -101,7 +120,12 @@ export const Sidebar = ({ className, closeSidebar }: SidebarProps) => {
     };
     
     return (
-      <Link to={destination} onClick={handleClick} className="block">
+      <Link
+        to={destination}
+        onClick={handleClick}
+        className="block"
+        aria-label={badge != null && badge !== "" ? `${label}, ${badge}` : label}
+      >
         <Button
           variant="ghost"
           className={cn(
@@ -123,13 +147,18 @@ export const Sidebar = ({ className, closeSidebar }: SidebarProps) => {
             {icon}
           </span>
           <span className="min-w-0 flex-1 truncate text-left leading-none pl-3">{label}</span>
-          {badge && (
+          {badge != null && badge !== "" && (
             <span
+              title={badgeTitle}
               className={cn(
-                "ml-1 shrink-0 px-2 py-0.5 text-xs font-medium leading-none rounded-full",
-                active
-                  ? "bg-accent-foreground/20 text-accent-foreground"
-                  : "bg-muted text-muted-foreground group-hover:bg-accent-foreground/20 group-hover:text-accent-foreground"
+                "ml-1 shrink-0 min-w-5 h-5 px-1.5 text-[11px] font-semibold leading-none rounded-full tabular-nums inline-flex items-center justify-center",
+                badgeTone === "alert"
+                  ? active
+                    ? "bg-amber-500/25 text-amber-950 dark:text-amber-100"
+                    : "bg-amber-500/15 text-amber-800 dark:text-amber-200 group-hover:bg-amber-500/25"
+                  : active
+                    ? "bg-accent-foreground/20 text-accent-foreground"
+                    : "bg-muted text-muted-foreground group-hover:bg-accent-foreground/20 group-hover:text-accent-foreground"
               )}
             >
               {badge}
@@ -180,27 +209,37 @@ export const Sidebar = ({ className, closeSidebar }: SidebarProps) => {
                 to="/dashboard"
                 icon={<LayoutDashboard className="h-5 w-5" />}
                 label="Dashboard"
+                badge={formatNavCount(navCounts.dashboard)}
+                badgeTitle={`${navCounts.dashboard} open bug${navCounts.dashboard === 1 ? "" : "s"}`}
               />
             )}
             <NavLink
               to="/projects"
               icon={<FolderKanban className="h-5 w-5" />}
               label="Projects"
+              badge={formatNavCount(navCounts.projects)}
+              badgeTitle={`${navCounts.projects} project${navCounts.projects === 1 ? "" : "s"}`}
             />
             <NavLink
               to="/bugs"
               icon={<Bug className="h-5 w-5" />}
               label="Bugs"
+              badge={formatNavCount(navCounts.bugs)}
+              badgeTitle={`${navCounts.bugs} open bug${navCounts.bugs === 1 ? "" : "s"}`}
             />
             <NavLink
               to="/fixes"
               icon={<CheckCircle className="h-5 w-5" />}
               label="Fixes"
+              badge={formatNavCount(navCounts.fixes)}
+              badgeTitle={`${navCounts.fixes} fix${navCounts.fixes === 1 ? "" : "es"}`}
             />
             <NavLink
               to="/updates"
               icon={<Bell className="h-5 w-5" />}
               label="Updates"
+              badge={formatNavCount(navCounts.updates)}
+              badgeTitle={`${navCounts.updates} update${navCounts.updates === 1 ? "" : "s"}`}
             />
             {/* Why: Testers focus on bugs/fixes — hide docs/sheets/meet/daily-update/leave from their nav. */}
             {role !== "tester" && (can("DOCS_VIEW") || can("DOCS_CREATE")) && (
@@ -208,6 +247,8 @@ export const Sidebar = ({ className, closeSidebar }: SidebarProps) => {
                 to="/bugdocs"
                 icon={<FileText className="h-5 w-5" />}
                 label="BugDocs"
+                badge={formatNavCount(navCounts.docs)}
+                badgeTitle={`${navCounts.docs} document${navCounts.docs === 1 ? "" : "s"}`}
               />
             )}
             {role !== "tester" &&
@@ -216,6 +257,8 @@ export const Sidebar = ({ className, closeSidebar }: SidebarProps) => {
                 to="/bugsheets"
                 icon={<FileSpreadsheet className="h-5 w-5" />}
                 label="BugSheets"
+                badge={formatNavCount(navCounts.sheets)}
+                badgeTitle={`${navCounts.sheets} sheet${navCounts.sheets === 1 ? "" : "s"}`}
               />
             )}
             {role !== "tester" &&
@@ -227,6 +270,8 @@ export const Sidebar = ({ className, closeSidebar }: SidebarProps) => {
                 to="/meet?tab=shared-meets"
                 icon={<Video className="h-5 w-5" />}
                 label="BugMeet"
+                badge={formatNavCount(navCounts.meetings)}
+                badgeTitle={`${navCounts.meetings} meeting${navCounts.meetings === 1 ? "" : "s"}`}
               />
             )}
 
@@ -235,6 +280,8 @@ export const Sidebar = ({ className, closeSidebar }: SidebarProps) => {
                 to="/my-tasks?tab=shared-tasks"
                 icon={<ListTodo className="h-5 w-5" />}
                 label="BugToDo"
+                badge={formatNavCount(navCounts.tasks)}
+                badgeTitle={`${navCounts.tasks} task${navCounts.tasks === 1 ? "" : "s"}`}
               />
             )}
 
@@ -247,6 +294,8 @@ export const Sidebar = ({ className, closeSidebar }: SidebarProps) => {
                 to="/daily-update"
                 icon={<Calendar className="h-5 w-5" />}
                 label="BugUpdate"
+                badge={formatNavCount(navCounts.bugupdate)}
+                badgeTitle={`${navCounts.bugupdate} work update${navCounts.bugupdate === 1 ? "" : "s"}`}
               />
             )}
 
@@ -256,6 +305,8 @@ export const Sidebar = ({ className, closeSidebar }: SidebarProps) => {
                 to="/leave"
                 icon={<PlaneTakeoff className="h-5 w-5" />}
                 label="My Leave"
+                badge={formatNavCount(navCounts.myleave)}
+                badgeTitle={`${navCounts.myleave} leave request${navCounts.myleave === 1 ? "" : "s"}`}
               />
             )}
 
@@ -264,6 +315,8 @@ export const Sidebar = ({ className, closeSidebar }: SidebarProps) => {
                 to="/messages"
                 icon={<MessageSquare className="h-5 w-5" />}
                 label="BugMessage"
+                badge={formatNavCount(navCounts.messages)}
+                badgeTitle={`${navCounts.messages} chat${navCounts.messages === 1 ? "" : "s"}`}
               />
             )}
 
@@ -272,6 +325,8 @@ export const Sidebar = ({ className, closeSidebar }: SidebarProps) => {
                 to="/common-bugs"
                 icon={<Repeat className="h-5 w-5" />}
                 label="Common Bugs"
+                badge={formatNavCount(navCounts.commonBugs)}
+                badgeTitle={`${navCounts.commonBugs} common bug${navCounts.commonBugs === 1 ? "" : "s"}`}
               />
             )}
 
@@ -280,6 +335,8 @@ export const Sidebar = ({ className, closeSidebar }: SidebarProps) => {
                 to="/common-codo"
                 icon={<ClipboardCheck className="h-5 w-5" />}
                 label="CODO Rules"
+                badge={formatNavCount(navCounts.codo)}
+                badgeTitle={`${navCounts.codo} rule${navCounts.codo === 1 ? "" : "s"}`}
               />
             )}
 
@@ -287,6 +344,8 @@ export const Sidebar = ({ className, closeSidebar }: SidebarProps) => {
               to="/help"
               icon={<LifeBuoy className="h-5 w-5" />}
               label="Help & Support"
+              badge={formatNavCount(helpCount)}
+              badgeTitle={`${helpCount} article${helpCount === 1 ? "" : "s"}`}
             />
             
           </div>
@@ -348,6 +407,8 @@ export const Sidebar = ({ className, closeSidebar }: SidebarProps) => {
                       to="/users"
                       icon={<Users className="h-5 w-5" />}
                       label="Users"
+                      badge={formatNavCount(navCounts.users)}
+                      badgeTitle={`${navCounts.users} user${navCounts.users === 1 ? "" : "s"}`}
                     />
                   )}
 
@@ -356,6 +417,8 @@ export const Sidebar = ({ className, closeSidebar }: SidebarProps) => {
                       to="/clients"
                       icon={<Building2 className="h-5 w-5" />}
                       label="Clients"
+                      badge={formatNavCount(navCounts.clients)}
+                      badgeTitle={`${navCounts.clients} client${navCounts.clients === 1 ? "" : "s"}`}
                     />
                   )}
 
@@ -364,6 +427,8 @@ export const Sidebar = ({ className, closeSidebar }: SidebarProps) => {
                       to="/overtime-requests"
                       icon={<Timer className="h-5 w-5" />}
                       label="OT requests"
+                      badge={formatNavCount(navCounts.ot)}
+                      badgeTitle={`${navCounts.ot} pending OT request${navCounts.ot === 1 ? "" : "s"}`}
                     />
                   )}
 
@@ -372,6 +437,8 @@ export const Sidebar = ({ className, closeSidebar }: SidebarProps) => {
                       to="/leave-requests"
                       icon={<PlaneTakeoff className="h-5 w-5" />}
                       label="Leave requests"
+                      badge={formatNavCount(navCounts.leave)}
+                      badgeTitle={`${navCounts.leave} pending leave request${navCounts.leave === 1 ? "" : "s"}`}
                     />
                   )}
 
@@ -380,6 +447,8 @@ export const Sidebar = ({ className, closeSidebar }: SidebarProps) => {
                       to="/attendance-exceptions"
                       icon={<CalendarClock className="h-5 w-5" />}
                       label="Attendance exceptions"
+                      badge={formatNavCount(navCounts.attendance)}
+                      badgeTitle={`${navCounts.attendance} pending WFH request${navCounts.attendance === 1 ? "" : "s"}`}
                     />
                   )}
 
@@ -388,6 +457,8 @@ export const Sidebar = ({ className, closeSidebar }: SidebarProps) => {
                       to="/messages"
                       icon={<MessageSquare className="h-5 w-5" />}
                       label="BugMessage"
+                      badge={formatNavCount(navCounts.messages)}
+                      badgeTitle={`${navCounts.messages} chat${navCounts.messages === 1 ? "" : "s"}`}
                     />
                   )}
 
@@ -396,6 +467,8 @@ export const Sidebar = ({ className, closeSidebar }: SidebarProps) => {
                       to="/whatsapp-messages"
                       icon={<MessageCircle className="h-5 w-5" />}
                       label="WhatsApp"
+                      badge={formatNavCount(navCounts.whatsapp)}
+                      badgeTitle={`${navCounts.whatsapp} user${navCounts.whatsapp === 1 ? "" : "s"} with a phone number`}
                     />
                   )}
 
@@ -404,6 +477,8 @@ export const Sidebar = ({ className, closeSidebar }: SidebarProps) => {
                       to="/feedback-stats"
                       icon={<BarChart3 className="h-5 w-5" />}
                       label="Feedbacks"
+                      badge={formatNavCount(navCounts.feedbacks)}
+                      badgeTitle={`${navCounts.feedbacks} feedback${navCounts.feedbacks === 1 ? "" : "s"}`}
                     />
                   )}
 
@@ -412,6 +487,8 @@ export const Sidebar = ({ className, closeSidebar }: SidebarProps) => {
                       to="/performance-reviews"
                       icon={<ClipboardList className="h-5 w-5" />}
                       label="Performance Reviews"
+                      badge={formatNavCount(navCounts.reviews)}
+                      badgeTitle={`${navCounts.reviews} review${navCounts.reviews === 1 ? "" : "s"}`}
                     />
                   )}
 
@@ -420,6 +497,8 @@ export const Sidebar = ({ className, closeSidebar }: SidebarProps) => {
                       to="/activity"
                       icon={<Activity className="h-5 w-5" />}
                       label="Activities"
+                      badge={formatNavCount(navCounts.activities)}
+                      badgeTitle={`${navCounts.activities} activit${navCounts.activities === 1 ? "y" : "ies"}`}
                     />
                   )}
 
@@ -428,6 +507,8 @@ export const Sidebar = ({ className, closeSidebar }: SidebarProps) => {
                       to="/push-coverage"
                       icon={<Signal className="h-5 w-5" />}
                       label="Push Coverage"
+                      badge={formatNavCount(navCounts.push)}
+                      badgeTitle={`${navCounts.push} user${navCounts.push === 1 ? "" : "s"}`}
                     />
                   )}
 
@@ -436,6 +517,8 @@ export const Sidebar = ({ className, closeSidebar }: SidebarProps) => {
                       to="/shorts"
                       icon={<Clapperboard className="h-5 w-5" />}
                       label="Shorts"
+                      badge={formatNavCount(navCounts.shorts)}
+                      badgeTitle={`${navCounts.shorts} short${navCounts.shorts === 1 ? "" : "s"}`}
                     />
                   )}
 
@@ -444,6 +527,8 @@ export const Sidebar = ({ className, closeSidebar }: SidebarProps) => {
                       to="/settings"
                       icon={<Settings className="h-5 w-5" />}
                       label="Settings"
+                      badge={formatNavCount(navCounts.settings)}
+                      badgeTitle={`${navCounts.settings} setting${navCounts.settings === 1 ? "" : "s"}`}
                     />
                   )}
 
@@ -452,6 +537,8 @@ export const Sidebar = ({ className, closeSidebar }: SidebarProps) => {
                       to="/bugbackup"
                       icon={<Database className="h-5 w-5" />}
                       label="BugBackup"
+                      badge={formatNavCount(navCounts.backup)}
+                      badgeTitle={`${navCounts.backup} backup${navCounts.backup === 1 ? "" : "s"}`}
                     />
                   )}
                 </div>

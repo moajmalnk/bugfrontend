@@ -27,6 +27,7 @@ import { ENV } from "@/lib/env";
 import { resolveAvatarUrl } from "@/lib/avatarUrl";
 import { getEffectiveRole } from "@/lib/utils";
 import { userService } from "@/services/userService";
+import { notifyAdminNavCountsChanged } from "@/services/adminNavCountsService";
 import { User, UserRole } from "@/types";
 import { BarChart3, Bug, ClipboardList, Code2, Shield, UserCheck, UserRound } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
@@ -425,6 +426,7 @@ const Users = () => {
         variant: result.emailSent === false ? "destructive" : "default",
       });
       fetchUsers(); // Refresh user list after adding
+      notifyAdminNavCountsChanged();
       return true;
     } catch (error: any) {
       toast({
@@ -480,6 +482,7 @@ const Users = () => {
 
       if (data.success) {
         setUsers(users.filter((user) => user.id !== userId));
+        notifyAdminNavCountsChanged();
         toast({
           title: "Success",
           description: data.message || "User has been deleted successfully.",

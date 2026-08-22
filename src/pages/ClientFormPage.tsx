@@ -10,6 +10,7 @@ import {
 } from '@/lib/utils/clientUtils';
 import { getEffectiveRole } from '@/lib/utils';
 import { clientService } from '@/services/clientService';
+import { notifyAdminNavCountsChanged } from '@/services/adminNavCountsService';
 import { ClientAttachment } from '@/types';
 import { ArrowLeft, Building2, Pencil, Plus } from 'lucide-react';
 import { FormEvent, useEffect, useState } from 'react';
@@ -79,6 +80,9 @@ const ClientFormPage = () => {
         title: 'Success',
         description: isEdit ? 'Client updated successfully' : 'Client created successfully',
       });
+      if (!isEdit) {
+        notifyAdminNavCountsChanged();
+      }
       navigate(`/${role}/clients/${savedId}`);
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Failed to save client';

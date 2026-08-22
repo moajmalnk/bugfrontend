@@ -9,6 +9,7 @@ import {
 } from '@/components/ui/dialog';
 import { toast } from '@/components/ui/use-toast';
 import { clientService } from '@/services/clientService';
+import { notifyAdminNavCountsChanged } from '@/services/adminNavCountsService';
 import { useState } from 'react';
 
 interface DeleteClientDialogProps {
@@ -34,6 +35,7 @@ export function DeleteClientDialog({
     setLoading(true);
     try {
       await clientService.deleteClient(clientId, projectCount > 0);
+      notifyAdminNavCountsChanged();
       toast({ title: 'Client deleted' });
       onOpenChange(false);
       onDeleted();

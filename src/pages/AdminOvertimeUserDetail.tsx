@@ -9,6 +9,7 @@ import {
   normalizeAllRequestSubmissionsResponse,
   reviewOvertimeRequest,
 } from '@/services/todoService';
+import { notifyAdminNavCountsChanged } from '@/services/adminNavCountsService';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -182,6 +183,7 @@ export default function AdminOvertimeUserDetail() {
         body.admin_note = (options?.adminNote ?? '').trim();
       }
       await reviewOvertimeRequest(body);
+      notifyAdminNavCountsChanged();
       toast({
         title: action === 'approve' ? 'Approved' : action === 'reject' ? 'Rejected' : 'Updated',
         description: `Submission ${row.submission_date}`,
