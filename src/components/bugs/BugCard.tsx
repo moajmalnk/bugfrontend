@@ -323,10 +323,10 @@ export function CommonBugCard({ bug }: CommonBugCardProps) {
             className="text-xs sm:text-sm h-9 px-3 bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 hover:bg-orange-50 dark:hover:bg-orange-900/20 hover:border-orange-300 dark:hover:border-orange-700 text-gray-700 dark:text-gray-300 hover:text-orange-700 dark:hover:text-orange-300 font-semibold shadow-sm transition-all duration-300"
           >
             <Link
-              to={`/${currentUser?.role || "admin"}/bugs/${bug.id}`}
-              state={{ from: `${location.pathname}${location.search}` }}
+              to={`/${currentUser?.role || "admin"}/bugs/${bug.id}?from=common-bugs`}
+              state={{ from: "common-bugs" }}
             >
-              View
+              View Details
             </Link>
           </Button>
         </div>

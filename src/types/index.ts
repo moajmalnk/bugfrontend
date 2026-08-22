@@ -23,6 +23,9 @@ export type Bug = {
   updated_at: string;
   fix_description?: string | null;
   already_raised?: boolean;
+  /** Read-only detail opened from Common Bugs without project membership */
+  common_bug_read_only?: boolean;
+  common_reasons?: Array<'already_raised' | 'duplicate' | string>;
   bug_level?: BugLevel;
   /** Multi-select classification (UI / Functional / Logical / custom) */
   bug_types?: BugTypeRef[];

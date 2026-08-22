@@ -218,7 +218,11 @@ export const Sidebar = ({ className, closeSidebar }: SidebarProps) => {
               icon={<FolderKanban className="h-5 w-5" />}
               label="Projects"
               badge={formatNavCount(navCounts.projects)}
-              badgeTitle={`${navCounts.projects} project${navCounts.projects === 1 ? "" : "s"}`}
+              badgeTitle={
+                role === "admin"
+                  ? `${navCounts.projects} project${navCounts.projects === 1 ? "" : "s"}`
+                  : `${navCounts.projects} assigned project${navCounts.projects === 1 ? "" : "s"}`
+              }
             />
             <NavLink
               to="/bugs"
@@ -248,7 +252,11 @@ export const Sidebar = ({ className, closeSidebar }: SidebarProps) => {
                 icon={<FileText className="h-5 w-5" />}
                 label="BugDocs"
                 badge={formatNavCount(navCounts.docs)}
-                badgeTitle={`${navCounts.docs} document${navCounts.docs === 1 ? "" : "s"}`}
+                badgeTitle={
+                  role === "admin"
+                    ? `${navCounts.docs} document${navCounts.docs === 1 ? "" : "s"}`
+                    : `${navCounts.docs} shared document${navCounts.docs === 1 ? "" : "s"}`
+                }
               />
             )}
             {role !== "tester" &&
@@ -258,7 +266,11 @@ export const Sidebar = ({ className, closeSidebar }: SidebarProps) => {
                 icon={<FileSpreadsheet className="h-5 w-5" />}
                 label="BugSheets"
                 badge={formatNavCount(navCounts.sheets)}
-                badgeTitle={`${navCounts.sheets} sheet${navCounts.sheets === 1 ? "" : "s"}`}
+                badgeTitle={
+                  role === "admin"
+                    ? `${navCounts.sheets} sheet${navCounts.sheets === 1 ? "" : "s"}`
+                    : `${navCounts.sheets} shared sheet${navCounts.sheets === 1 ? "" : "s"}`
+                }
               />
             )}
             {role !== "tester" &&
@@ -281,7 +293,11 @@ export const Sidebar = ({ className, closeSidebar }: SidebarProps) => {
                 icon={<ListTodo className="h-5 w-5" />}
                 label="BugToDo"
                 badge={formatNavCount(navCounts.tasks)}
-                badgeTitle={`${navCounts.tasks} task${navCounts.tasks === 1 ? "" : "s"}`}
+                badgeTitle={
+                  role === "admin"
+                    ? `${navCounts.tasks} task${navCounts.tasks === 1 ? "" : "s"}`
+                    : `${navCounts.tasks} shared task${navCounts.tasks === 1 ? "" : "s"}`
+                }
               />
             )}
 

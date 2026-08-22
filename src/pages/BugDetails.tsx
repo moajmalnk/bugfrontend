@@ -21,9 +21,12 @@ import { Bug, BugStatus } from "@/types";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { apiClient } from "@/lib/axios";
 import { prefetchFixBugPage } from "@/utils/prefetchFixBug";
-import { ArrowLeft, ArrowRight, Lock } from "lucide-react";
+import { ArrowLeft, ArrowRight, Info, Lock } from "lucide-react";
 import { useEffect, useState, useRef, useCallback, useMemo } from "react";
-import { useNavigate, useParams, useSearchParams, useLocation } from "react-router-dom";
+import { useNavigate, useParams, useSearchParams, useLocation, Link } from "react-router-dom";
+import { getEffectiveRole } from "@/lib/utils";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 
 interface ApiResponse<T> {
   success: boolean;
@@ -115,7 +118,13 @@ const BugDetailsSkeleton = () => (
 );
 
 // Component to display access error
-const AccessError = () => (
+const AccessError = ({
+  backHref,
+  backLabel,
+}: {
+  backHref?: string;
+  backLabel?: string;
+}) => (
   <main className="min-h-[60vh] bg-background px-4 py-6 md:px-6 lg:px-8">
     <section className="max-w-7xl mx-auto space-y-8 flex flex-col items-center justify-center text-center py-12 relative overflow-hidden rounded-2xl">
       <div className="pointer-events-none absolute inset-0 bg-gradient-to-br from-red-50/50 via-orange-50/30 to-yellow-50/50 dark:from-red-950/20 dark:via-orange-950/10 dark:to-yellow-950/20" />
@@ -124,12 +133,65 @@ const AccessError = () => (
       </div>
       <h1 className="relative text-2xl font-bold tracking-tight">Access Denied</h1>
       <p className="relative text-muted-foreground max-w-md">
-        You don't have permission to view this bug. You need to be a member of the project this bug belongs to.
+        You don&apos;t have permission to view this bug. Project membership is required unless
+        the bug is listed in Common Bugs.
       </p>
-      
+      {backHref && backLabel ? (
+        <Button asChild variant="outline" className="relative rounded-xl">
+          <Link to={backHref}>{backLabel}</Link>
+        </Button>
+      ) : null}
     </section>
   </main>
 );
+
+function CommonBugReadOnlyBanner({
+  bug,
+  role,
+}: {
+  bug: Bug;
+  role: string;
+}) {
+  const reasons = bug.common_reasons ?? [];
+  return (
+    <div className="rounded-2xl border border-amber-200/70 bg-amber-50/90 dark:border-amber-900/50 dark:bg-amber-950/20 p-4 sm:p-5">
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+        <div className="flex gap-3 min-w-0">
+          <div className="mt-0.5 flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-amber-500 text-white shadow-sm">
+            <Info className="h-5 w-5" />
+          </div>
+          <div className="space-y-2 min-w-0">
+            <p className="text-sm font-semibold text-amber-950 dark:text-amber-100">
+              Read-only reference from Common Bugs
+            </p>
+            <p className="text-sm text-amber-900/80 dark:text-amber-200/80">
+              You can review this report to avoid duplicates. Editing, fixing, or changing status
+              requires membership on{" "}
+              <span className="font-medium">{bug.project_name || "this project"}</span>.
+            </p>
+            {reasons.length > 0 && (
+              <div className="flex flex-wrap gap-2">
+                {reasons.includes("already_raised") && (
+                  <Badge variant="outline" className="rounded-xl bg-white/70 dark:bg-gray-900/40">
+                    Already Raised
+                  </Badge>
+                )}
+                {reasons.includes("duplicate") && (
+                  <Badge variant="outline" className="rounded-xl bg-white/70 dark:bg-gray-900/40">
+                    Duplicate Title
+                  </Badge>
+                )}
+              </div>
+            )}
+          </div>
+        </div>
+        <Button asChild variant="outline" className="rounded-xl shrink-0">
+          <Link to={`/${role}/common-bugs`}>Back to Common Bugs</Link>
+        </Button>
+      </div>
+    </div>
+  );
+}
 
 // Enhanced logging for production debugging
 const createDiagnosticLogger = (componentName: string) => {
@@ -410,6 +472,7 @@ const BugDetails = () => {
   // Check if user came from project / fixes page
   const fromProject = searchParams.get("from") === "project";
   const fromFixes = searchParams.get("from") === "fixes";
+  const fromCommonBugs = searchParams.get("from") === "common-bugs";
   const projectIdFromQuery = searchParams.get("projectId");
 
   const {
@@ -894,7 +957,15 @@ const BugDetails = () => {
 
   // Now you can do your early returns
   if (shouldShowSkeleton) return renderSkeleton();
-  if (isAccessError) return <AccessError />;
+  if (isAccessError) {
+    const role = getEffectiveRole(currentUser || {});
+    return (
+      <AccessError
+        backHref={fromCommonBugs ? `/${role}/common-bugs` : `/${role}/bugs`}
+        backLabel={fromCommonBugs ? "Back to Common Bugs" : "Back to Bugs"}
+      />
+    );
+  }
   if (error || !bug)
     return (
       <main>
@@ -905,9 +976,13 @@ const BugDetails = () => {
   const formattedCreatedDate = formatDetailedDate(bug.created_at);
   const formattedUpdatedDate = formatDetailedDate(bug.updated_at);
 
+  const readOnlyCommonBug = Boolean(bug.common_bug_read_only);
   const canUpdateStatus =
-    currentUser?.role === "admin" || currentUser?.role === "developer";
-  const canEditBug = currentUser?.role === "admin" || String(currentUser?.id) === String(bug.reported_by);
+    !readOnlyCommonBug &&
+    (currentUser?.role === "admin" || currentUser?.role === "developer");
+  const canEditBug =
+    !readOnlyCommonBug &&
+    (currentUser?.role === "admin" || String(currentUser?.id) === String(bug.reported_by));
 
   const handleStatusUpdate = async (newStatus: BugStatus) => {
     try {
@@ -1018,6 +1093,9 @@ const BugDetails = () => {
     <main className="min-h-[60vh] bg-background px-4 py-6 md:px-6 lg:px-8 flex flex-col">
       {/* Main content */}
       <section className="max-w-7xl mx-auto space-y-8 flex-1 w-full">
+        {readOnlyCommonBug && (
+          <CommonBugReadOnlyBanner bug={bug} role={role} />
+        )}
         <header className="relative overflow-hidden rounded-2xl border border-gray-200/60 dark:border-gray-800/60 bg-white/80 dark:bg-gray-900/80 backdrop-blur-sm">
           <div className="pointer-events-none absolute inset-0 bg-gradient-to-r from-orange-50/50 via-transparent to-red-50/50 dark:from-orange-950/20 dark:via-transparent dark:to-red-950/20"></div>
           <div className="relative p-4 sm:p-6">
@@ -1026,13 +1104,14 @@ const BugDetails = () => {
               formattedCreatedDate={formattedCreatedDate}
               canEditBug={canEditBug}
               currentUser={currentUser}
+              readOnlyCommonBug={readOnlyCommonBug}
             />
           </div>
         </header>
         <div className="grid grid-cols-1 gap-8">
           {/* Main Content - Description, Screenshots, Voice Notes, Attachments, Bug Information */}
           <section className="space-y-8">
-            <BugDoubtClearingCard bugId={bug.id} />
+            <BugDoubtClearingCard bugId={bug.id} readOnly={readOnlyCommonBug} />
             <BugContentCards
               bug={bug}
               onBugUpdated={(updated) => {

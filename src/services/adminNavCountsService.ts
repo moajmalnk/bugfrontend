@@ -103,6 +103,77 @@ export function subscribeAdminNavCountsChanged(onChange: () => void): () => void
   return () => window.removeEventListener(ADMIN_NAV_COUNTS_EVENT, onChange);
 }
 
+function currentTokenPayload(): { user_id?: string; role?: string } | null {
+  const token = sessionStorage.getItem('token') || localStorage.getItem('token');
+  if (!token) return null;
+  try {
+    return JSON.parse(atob(token.split('.')[1]));
+  } catch {
+    return null;
+  }
+}
+
+function assignedProjectCount(projects: Array<{ members?: unknown[] }>, userId: string): number {
+  return projects.filter((project) =>
+    (project.members || []).some((member) => {
+      if (member && typeof member === 'object') {
+        const rec = member as { user_id?: unknown; id?: unknown };
+        return String(rec.user_id ?? rec.id ?? '') === userId;
+      }
+      return String(member) === userId;
+    })
+  ).length;
+}
+
+function isDevOrTesterRole(role: string): boolean {
+  const normalized = role.toLowerCase();
+  return normalized === 'developer' || normalized === 'tester';
+}
+
+/**
+ * Why: Non-admin sidebar badges should mirror each page's default tab —
+ * assigned projects, shared docs/sheets, and the user's shared tasks.
+ */
+async function applyRoleScopedNavOverrides(counts: AdminNavCounts): Promise<void> {
+  const payload = currentTokenPayload();
+  const userId = payload?.user_id ? String(payload.user_id) : '';
+  const role = String(payload?.role || '').toLowerCase();
+  if (!userId || role === 'admin') {
+    return;
+  }
+
+  await Promise.all([
+    projectService
+      .getProjects()
+      .then((projects) => {
+        counts.projects = assignedProjectCount(projects, userId);
+      })
+      .catch(() => {}),
+    isDevOrTesterRole(role)
+      ? googleDocsService
+          .getSharedDocuments()
+          .then((docs) => {
+            counts.docs = docs.length;
+          })
+          .catch(() => {})
+      : Promise.resolve(),
+    isDevOrTesterRole(role)
+      ? googleSheetsService
+          .getSharedSheets()
+          .then((sheets) => {
+            counts.sheets = sheets.length;
+          })
+          .catch(() => {})
+      : Promise.resolve(),
+    sharedTaskService
+      .getSharedTasks()
+      .then((tasks) => {
+        counts.tasks = tasks.length;
+      })
+      .catch(() => {}),
+  ]);
+}
+
 function authHeaders(): HeadersInit {
   const token = sessionStorage.getItem('token') || localStorage.getItem('token');
   return {
@@ -158,12 +229,18 @@ function paginationTotal(pagination: { total?: number; totalBugs?: number } | un
  */
 async function fetchAdminNavCountsFallback(): Promise<AdminNavCounts> {
   const counts: AdminNavCounts = { ...EMPTY_ADMIN_NAV_COUNTS };
+  const payload = currentTokenPayload();
+  const userId = payload?.user_id ? String(payload.user_id) : '';
+  const role = String(payload?.role || '').toLowerCase();
+  const isAdmin = role === 'admin';
 
   await Promise.all([
     projectService
       .getProjects()
       .then((projects) => {
-        counts.projects = projects.length;
+        counts.projects = isAdmin
+          ? projects.length
+          : assignedProjectCount(projects, userId);
       })
       .catch(() => {}),
     bugService
@@ -185,18 +262,36 @@ async function fetchAdminNavCountsFallback(): Promise<AdminNavCounts> {
         counts.updates = updates.length;
       })
       .catch(() => {}),
-    googleDocsService
-      .getAllDocuments(false)
-      .then((payload) => {
-        counts.docs = asCount(payload.count);
-      })
-      .catch(() => {}),
-    googleSheetsService
-      .getAllSheets(false)
-      .then((payload) => {
-        counts.sheets = asCount(payload.count);
-      })
-      .catch(() => {}),
+    isAdmin
+      ? googleDocsService
+          .getAllDocuments(false)
+          .then((result) => {
+            counts.docs = asCount(result.count);
+          })
+          .catch(() => {})
+      : isDevOrTesterRole(role)
+        ? googleDocsService
+            .getSharedDocuments()
+            .then((docs) => {
+              counts.docs = docs.length;
+            })
+            .catch(() => {})
+        : Promise.resolve(),
+    isAdmin
+      ? googleSheetsService
+          .getAllSheets(false)
+          .then((result) => {
+            counts.sheets = asCount(result.count);
+          })
+          .catch(() => {})
+      : isDevOrTesterRole(role)
+        ? googleSheetsService
+            .getSharedSheets()
+            .then((sheets) => {
+              counts.sheets = sheets.length;
+            })
+            .catch(() => {})
+        : Promise.resolve(),
     sharedTaskService
       .getSharedTasks()
       .then((tasks) => {
@@ -332,7 +427,9 @@ export async function fetchAdminNavCounts(): Promise<AdminNavCounts> {
     }
 
     dedicatedCountsAvailable = true;
-    return normalizeCounts(payload as Partial<AdminNavCounts>);
+    const counts = normalizeCounts(payload as Partial<AdminNavCounts>);
+    await applyRoleScopedNavOverrides(counts);
+    return counts;
   } catch {
     if (dedicatedCountsAvailable !== true) {
       dedicatedCountsAvailable = false;

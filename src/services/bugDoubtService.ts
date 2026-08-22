@@ -55,10 +55,16 @@ function appendVoice(formData: FormData, voice: { blob: Blob; duration: number }
 }
 
 export const bugDoubtService = {
-  async list(bugId: string): Promise<BugDoubt[]> {
+  async list(
+    bugId: string,
+    options?: { skipErrorHandler?: boolean }
+  ): Promise<BugDoubt[]> {
     const response = await apiClient.get<ApiResponse<{ doubts: BugDoubt[] }>>(
       "/bugs/doubts.php",
-      { params: { bug_id: bugId } }
+      {
+        params: { bug_id: bugId },
+        skipErrorHandler: Boolean(options?.skipErrorHandler),
+      } as Record<string, unknown>
     );
     if (!response.data.success) {
       throw new Error(response.data.message || "Failed to load doubts");

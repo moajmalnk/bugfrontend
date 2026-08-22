@@ -43,6 +43,7 @@ interface BugHeaderProps {
   formattedCreatedDate: string;
   canEditBug: boolean;
   currentUser: any;
+  readOnlyCommonBug?: boolean;
 }
 
 export const BugHeader = ({
@@ -50,6 +51,7 @@ export const BugHeader = ({
   formattedCreatedDate,
   canEditBug,
   currentUser,
+  readOnlyCommonBug = false,
 }: BugHeaderProps) => {
   const location = useLocation();
   const navigate = useNavigate();
@@ -60,12 +62,18 @@ export const BugHeader = ({
   const [convertOpen, setConvertOpen] = useState(false);
   const [askDoubtOpen, setAskDoubtOpen] = useState(false);
   const canAskDoubt =
-    !!currentUser?.id && String(currentUser.id) !== String(bug.reported_by);
+    !readOnlyCommonBug &&
+    !bug.common_bug_read_only &&
+    !!currentUser?.id &&
+    String(currentUser.id) !== String(bug.reported_by);
   const canConvert =
+    !readOnlyCommonBug &&
+    !bug.common_bug_read_only &&
     (currentUser?.role === "admin" ||
       currentUser?.role === "developer" ||
       currentUser?.role === "tester") &&
     bug.status !== "declined";
+  const canEditActions = canEditBug && !readOnlyCommonBug && !bug.common_bug_read_only;
 
   const { data: lifecycle } = useQuery({
     queryKey: ["bugLifecycle", bug.id],
@@ -113,7 +121,10 @@ export const BugHeader = ({
     fromParam === "fixes";
   const isFromCommonBugs =
     Boolean(pathFromState?.includes("/common-bugs")) ||
-    fromState === "common-bugs";
+    fromState === "common-bugs" ||
+    fromParam === "common-bugs" ||
+    readOnlyCommonBug ||
+    Boolean(bug.common_bug_read_only);
 
   const role = getEffectiveRole(authUser || {});
   const backLink =
@@ -155,8 +166,10 @@ export const BugHeader = ({
 
   // Permission check: admin can delete any bug, or user can delete their own bug
   const canDelete =
-    currentUser?.role === "admin" ||
-    String(currentUser?.id) === String(bug.reported_by);
+    !readOnlyCommonBug &&
+    !bug.common_bug_read_only &&
+    (currentUser?.role === "admin" ||
+      String(currentUser?.id) === String(bug.reported_by));
 
   // Generate a role-neutral URL that works for all users
   const generateRoleNeutralUrl = () => {
@@ -401,7 +414,7 @@ export const BugHeader = ({
               className="h-9 w-9 shrink-0"
             />
 
-            {canEditBug && (
+            {canEditActions && (
               <Button
                 variant="outline"
                 size="sm"
@@ -466,7 +479,9 @@ export const BugHeader = ({
               showLabel={false}
             />
 
-            {(currentUser?.role === "admin" || currentUser?.role === "developer") &&
+            {!readOnlyCommonBug &&
+              !bug.common_bug_read_only &&
+              (currentUser?.role === "admin" || currentUser?.role === "developer") &&
               bug.status !== "fixed" && (
                 <Button
                   variant="default"

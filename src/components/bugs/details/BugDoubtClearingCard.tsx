@@ -276,9 +276,11 @@ function toChatMessages(doubt: BugDoubt): ChatMessage[] {
 function DoubtThread({
   doubt,
   currentUserId,
+  readOnly = false,
 }: {
   doubt: BugDoubt;
   currentUserId?: string;
+  readOnly?: boolean;
 }) {
   const [replyOpen, setReplyOpen] = useState(false);
   const messages = toChatMessages(doubt);
@@ -300,9 +302,9 @@ function DoubtThread({
         ))}
       </div>
 
-      {replyOpen ? (
+      {replyOpen && !readOnly ? (
         <ReplyComposer doubtId={doubt.id} onDone={() => setReplyOpen(false)} />
-      ) : (
+      ) : !readOnly ? (
         <div className="flex justify-end">
           <Button
             type="button"
@@ -314,18 +316,26 @@ function DoubtThread({
             Reply
           </Button>
         </div>
-      )}
+      ) : null}
     </article>
   );
 }
 
-export function BugDoubtClearingCard({ bugId }: { bugId: string }) {
+export function BugDoubtClearingCard({
+  bugId,
+  readOnly = false,
+}: {
+  bugId: string;
+  readOnly?: boolean;
+}) {
   const { currentUser } = useAuth();
   const { data: doubts = [], isLoading, isError } = useQuery({
-    queryKey: ["bug-doubts", bugId],
-    queryFn: () => bugDoubtService.list(bugId),
+    queryKey: ["bug-doubts", bugId, readOnly],
+    queryFn: () =>
+      bugDoubtService.list(bugId, { skipErrorHandler: readOnly }),
     enabled: !!bugId,
     staleTime: 15_000,
+    retry: readOnly ? false : 2,
   });
 
   if (isLoading) {
@@ -342,7 +352,11 @@ export function BugDoubtClearingCard({ bugId }: { bugId: string }) {
     );
   }
 
-  if (isError || doubts.length === 0) {
+  if (isError) {
+    return null;
+  }
+
+  if (doubts.length === 0) {
     return null;
   }
 
@@ -350,9 +364,14 @@ export function BugDoubtClearingCard({ bugId }: { bugId: string }) {
     <Card className="relative overflow-hidden rounded-2xl border border-gray-200/60 bg-white/80 backdrop-blur-sm dark:border-gray-800/60 dark:bg-gray-900/80">
       <div className="pointer-events-none absolute inset-0 bg-gradient-to-br from-violet-50/40 via-transparent to-indigo-50/30 dark:from-violet-950/20 dark:via-transparent dark:to-indigo-950/10" />
       <CardHeader className="relative">
-        <CardTitle className="flex items-center gap-2">
+        <CardTitle className="flex flex-wrap items-center gap-2">
           <CircleHelp className="h-5 w-5" />
           Doubt clearing ({doubts.length})
+          {readOnly ? (
+            <span className="text-xs font-medium text-muted-foreground">
+              · Read-only
+            </span>
+          ) : null}
         </CardTitle>
       </CardHeader>
       <CardContent className="relative grid grid-cols-12 gap-4">
@@ -362,6 +381,7 @@ export function BugDoubtClearingCard({ bugId }: { bugId: string }) {
               key={doubt.id}
               doubt={doubt}
               currentUserId={currentUser?.id}
+              readOnly={readOnly}
             />
           ))}
         </div>
