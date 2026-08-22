@@ -123,7 +123,12 @@ export function useUrlPagination(
 
   const clampToTotalPages = useCallback(
     (totalPages: number) => {
-      const max = Math.max(1, Math.floor(totalPages) || 1);
+      // Why: Ignore unknown/empty totals — callers often pass Math.max(1, ceil(0/n))
+      // while data is still loading, which would wipe deep links like ?page=6.
+      if (!Number.isFinite(totalPages) || totalPages < 1) {
+        return;
+      }
+      const max = Math.floor(totalPages);
       if (pageRef.current > max) {
         setPage(max);
       }
@@ -198,15 +203,18 @@ export function listReturnState(pathname: string, search: string) {
 }
 
 /**
- * Optional clamp effect helper for list pages.
+ * Clamp the URL page once the list total is known.
+ * Pass ready=false while loading so refresh keeps deep links like ?page=6.
  */
 export function useClampUrlPage(
   clampToTotalPages: (totalPages: number) => void,
-  totalPages: number
+  totalPages: number,
+  ready = true
 ) {
   useEffect(() => {
+    if (!ready) return;
     clampToTotalPages(totalPages);
-  }, [clampToTotalPages, totalPages]);
+  }, [clampToTotalPages, totalPages, ready]);
 }
 
 /**

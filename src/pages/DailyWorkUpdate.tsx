@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState, useCallback, useRef, type ReactNode } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { submitWork, WorkSubmission, listMyTasks, UserTask, updateTask, listMySubmissions, checkIn, notifyWorkActivity, parseSubmissionsListResponse } from '@/services/todoService';
-import { CheckoutProjectUpdatesCard } from '@/components/daily-work/CheckoutProjectUpdatesCard';
+import { CheckoutProjectUpdatesCard, checkoutHoursAllocationOk } from '@/components/daily-work/CheckoutProjectUpdatesCard';
 import { WeeklyReportStep } from '@/components/daily-work/WeeklyReportStep';
 import { isSaturdayYmd, getWeeklyReport } from '@/services/weeklyReportService';
 import {
@@ -10,6 +10,12 @@ import {
   projectUpdatesToPayload,
   type ProjectWorkUpdate,
 } from '@/lib/projectWorkUpdates';
+import {
+  defaultTimeAllocation,
+  formatHoursShort,
+  parseTimeAllocationFromRow,
+  type TimeAllocation,
+} from '@/lib/checkoutTimeAllocation';
 import { Button } from '@/components/ui/button';
 import { toast } from '@/components/ui/use-toast';
 import { Input } from '@/components/ui/input';
@@ -82,6 +88,7 @@ type DailyWorkDraftStored = {
   isOnBreak: boolean;
   breakStartedAtIso: string | null;
   projectUpdates: Record<string, ProjectWorkUpdate>;
+  timeAllocation?: TimeAllocation;
 };
 
 function clearDailyWorkDraft(userId: string | number, date: string) {
@@ -322,6 +329,9 @@ export function DailyWorkFlowPanel({
   const [weeklyReportDirty, setWeeklyReportDirty] = useState(false);
   const [todaySubmissionComplete, setTodaySubmissionComplete] = useState(false);
   const [projectUpdates, setProjectUpdates] = useState<Record<string, ProjectWorkUpdate>>({});
+  const [timeAllocation, setTimeAllocation] = useState<TimeAllocation>(() =>
+    defaultTimeAllocation(todayYMD(), 0)
+  );
   const [attendanceGate, setAttendanceGate] = useState<AttendanceStatus | null>(null);
   const [wfhRequestDialogOpen, setWfhRequestDialogOpen] = useState(false);
   const [wfhRequestNote, setWfhRequestNote] = useState('');
@@ -705,11 +715,15 @@ export function DailyWorkFlowPanel({
     selectedProjects.forEach((id) => {
       if (!orderedIds.includes(id)) orderedIds.push(id);
     });
-    projects.forEach((p) => {
-      if (!orderedIds.includes(p.id)) orderedIds.push(p.id);
+    // Keep projects that already have allocated hours / notes from a saved row
+    Object.values(projectUpdates).forEach((u) => {
+      if (!u?.project_id || orderedIds.includes(u.project_id)) return;
+      if ((Number(u.hours) || 0) > 0 || (u.notes || '').trim() || (Number(u.progress_percentage) || 0) > 0) {
+        orderedIds.push(u.project_id);
+      }
     });
     return orderedIds.map((id) => byId.get(id)).filter(Boolean) as Project[];
-  }, [projects, selectedProjects]);
+  }, [projects, selectedProjects, projectUpdates]);
 
   const updateProjectUpdate = useCallback((projectId: string, patch: Partial<ProjectWorkUpdate>) => {
     setProjectUpdates((prev) => {
@@ -718,6 +732,7 @@ export function DailyWorkFlowPanel({
         status: 'in_progress' as const,
         progress_percentage: 0,
         notes: '',
+        hours: 0,
       };
       const next = { ...current, ...patch, project_id: projectId };
       if (patch.status === 'completed') {
@@ -823,10 +838,24 @@ export function DailyWorkFlowPanel({
     const overtimeRequestValid = !requestAdminApproval
       ? true
       : requestedExtraHours > 0 && requestedExtraHours <= 16 && approvalReason.trim().length > 0;
+    const allocationOk = checkoutHoursAllocationOk(
+      hrs,
+      timeAllocation,
+      projectUpdates,
+      checkoutProjects.map((p) => p.id)
+    );
 
     // Why: Checkout must not require tasks or Office/WFH — those apply at check-in only.
-    return hasDate && hasHours && overtimeRequestValid;
-  }, [form, requestAdminApproval, requestedExtraHours, approvalReason]);
+    return hasDate && hasHours && overtimeRequestValid && allocationOk;
+  }, [
+    form,
+    requestAdminApproval,
+    requestedExtraHours,
+    approvalReason,
+    timeAllocation,
+    projectUpdates,
+    checkoutProjects,
+  ]);
 
   const taskCounts = useMemo(() => {
     const completed = countTaskLines(form.completed_tasks);
@@ -992,6 +1021,18 @@ export function DailyWorkFlowPanel({
         }
       }
 
+      const allocationOk = checkoutHoursAllocationOk(
+        hoursNum,
+        timeAllocation,
+        projectUpdates,
+        checkoutProjects.map((p) => p.id)
+      );
+      if (!allocationOk) {
+        throw new Error(
+          `Hours must tally to ${formatHoursShort(hoursNum)}h (lunch, breaks, Growth Glimpse, projects, and other).`
+        );
+      }
+
       // Tasks / project notes are optional at checkout (Office/WFH is check-in only).
       
       toast({ 
@@ -1036,6 +1077,12 @@ export function DailyWorkFlowPanel({
         planned_work_status: form.planned_work_status,
         planned_work_notes: form.planned_work_notes || undefined,
         project_updates: projectUpdatesToPayload(projectUpdates),
+        time_allocation: {
+          lunch_hours: timeAllocation.lunch_hours,
+          break_hours: timeAllocation.break_hours,
+          growth_glimpse_hours: timeAllocation.growth_glimpse_hours,
+          other_hours: timeAllocation.other_hours,
+        },
       };
       
       const res = await submitWork(payload);
@@ -1513,9 +1560,21 @@ export function DailyWorkFlowPanel({
       sec.push(`📂 Project Progress\n\n${projectUpdatesText}`);
     }
 
+    const allocLines = [
+      `Lunch: ${formatHoursShort(timeAllocation.lunch_hours)}h`,
+      `Breaks: ${formatHoursShort(timeAllocation.break_hours)}h`,
+    ];
+    if (timeAllocation.growth_glimpse_hours > 0) {
+      allocLines.push(`Growth Glimpse: ${formatHoursShort(timeAllocation.growth_glimpse_hours)}h`);
+    }
+    if (timeAllocation.other_hours > 0) {
+      allocLines.push(`Other: ${formatHoursShort(timeAllocation.other_hours)}h`);
+    }
+    sec.push(`⏱ Time allocation\n\n${allocLines.join('\n')}`);
+
     const text = sec.length ? header + `\n\n` + sec.join(`\n\n`) : header;
     setTemplate(text);
-  }, [form.submission_date, form.check_in_time, form.hours_today, form.completed_tasks, form.pending_tasks, form.ongoing_tasks, form.notes, form.planned_work_notes, form.planned_work_status, selectedProjects, plannedWork, projects, requestAdminApproval, requestedExtraHours, approvalReason, overtimeHours, regularHours, breakEntries, monthSubmissions, projectUpdates]);
+  }, [form.submission_date, form.check_in_time, form.hours_today, form.completed_tasks, form.pending_tasks, form.ongoing_tasks, form.notes, form.planned_work_notes, form.planned_work_status, selectedProjects, plannedWork, projects, requestAdminApproval, requestedExtraHours, approvalReason, overtimeHours, regularHours, breakEntries, monthSubmissions, projectUpdates, timeAllocation]);
 
   // Load projects when check-in or checkout dialog opens (not on each project toggle)
   useEffect(() => {
@@ -1669,12 +1728,21 @@ export function DailyWorkFlowPanel({
             status: 'in_progress',
             progress_percentage: 0,
             notes: '',
+            hours: 0,
           };
+        } else if (typeof next[project.id].hours !== 'number') {
+          next[project.id] = { ...next[project.id], hours: 0 };
         }
       });
       return next;
     });
   }, [isCheckoutWizardOpen, checkoutProjects]);
+
+  // Keep fixed lunch/breaks/glimpse in sync when the work date changes
+  useEffect(() => {
+    const date = form.submission_date || todayYMD();
+    setTimeAllocation((prev) => defaultTimeAllocation(date, prev.other_hours || 0));
+  }, [form.submission_date]);
 
   useEffect(() => {
     if ((!isCheckInDialogOpen && !isCheckoutWizardOpen) || projects.length === 0) return;
@@ -1799,6 +1867,12 @@ export function DailyWorkFlowPanel({
           setSelectedProjects(parsePlannedProjectsFromRow(existingSubmission));
           setPlannedWork(existingSubmission.planned_work || '');
           setProjectUpdates(projectUpdatesMapFromRow(existingSubmission));
+          setTimeAllocation(
+            parseTimeAllocationFromRow(
+              existingSubmission.time_allocation,
+              attendanceDate
+            )
+          );
           clearDailyWorkDraft(userId, attendanceDate);
           setIsOnBreak(false);
           setBreakStartedAt(null);
@@ -1848,6 +1922,14 @@ export function DailyWorkFlowPanel({
                 ? draft.projectUpdates
                 : projectUpdatesMapFromRow(existingSubmission);
             setProjectUpdates(clearProjectUpdateNotes(baseProjectUpdates));
+            setTimeAllocation(
+              draft.timeAllocation
+                ? defaultTimeAllocation(attendanceDate, draft.timeAllocation.other_hours || 0)
+                : parseTimeAllocationFromRow(
+                    existingSubmission.time_allocation,
+                    attendanceDate
+                  )
+            );
             if (
               hasOpenServerSession &&
               draft.isOnBreak &&
@@ -1880,6 +1962,12 @@ export function DailyWorkFlowPanel({
               setPlannedWork('');
             }
             setProjectUpdates(clearProjectUpdateNotes(projectUpdatesMapFromRow(existingSubmission)));
+            setTimeAllocation(
+              parseTimeAllocationFromRow(
+                existingSubmission.time_allocation,
+                attendanceDate
+              )
+            );
             setRequestAdminApproval(false);
             setRequestedExtraHours(0);
             setApprovalReason('');
@@ -1905,6 +1993,11 @@ export function DailyWorkFlowPanel({
           setRequestedExtraHours(0);
           setApprovalReason('');
           setProjectUpdates(clearProjectUpdateNotes(draft.projectUpdates || {}));
+          setTimeAllocation(
+            draft.timeAllocation
+              ? defaultTimeAllocation(attendanceDate, draft.timeAllocation.other_hours || 0)
+              : defaultTimeAllocation(attendanceDate, 0)
+          );
           setIsOnBreak(false);
           setBreakStartedAt(null);
           setTodaySubmissionComplete(false);
@@ -1917,6 +2010,8 @@ export function DailyWorkFlowPanel({
           setSelectedProjects([]);
           setPlannedWork('');
           setBreakEntries([]);
+          setProjectUpdates({});
+          setTimeAllocation(defaultTimeAllocation(attendanceDate, 0));
           setIsOnBreak(false);
           setBreakStartedAt(null);
           setTodaySubmissionComplete(false);
@@ -1954,6 +2049,7 @@ export function DailyWorkFlowPanel({
       isOnBreak,
       breakStartedAtIso: breakStartedAt ? breakStartedAt.toISOString() : null,
       projectUpdates,
+      timeAllocation,
     };
 
     const t = window.setTimeout(() => {
@@ -1981,6 +2077,7 @@ export function DailyWorkFlowPanel({
     isOnBreak,
     breakStartedAt,
     projectUpdates,
+    timeAllocation,
     form.submission_date,
   ]);
 
@@ -3323,6 +3420,12 @@ export function DailyWorkFlowPanel({
                     projects={checkoutProjects}
                     projectUpdates={projectUpdates}
                     onChange={updateProjectUpdate}
+                    hoursToday={Number(form.hours_today) || 0}
+                    submissionDate={form.submission_date || serverToday}
+                    timeAllocation={timeAllocation}
+                    onOtherHoursChange={(hours) =>
+                      setTimeAllocation((prev) => ({ ...prev, other_hours: hours }))
+                    }
                     loading={loadingProjects && checkoutProjects.length === 0}
                   />
 
@@ -3354,7 +3457,10 @@ export function DailyWorkFlowPanel({
                         <AlertTriangle className="h-4 w-4 text-white" />
                       </div>
                       <p className="text-sm leading-relaxed text-red-700 dark:text-red-300">
-                        Set hours worked (1–8) to complete checkout. Tasks and Office/WFH are not required here.
+                        Set hours worked (1–8) and allocate them across projects so the total matches
+                        (lunch 0.5h, breaks 0.5h
+                        {timeAllocation.growth_glimpse_hours > 0 ? ', Growth Glimpse 0.5h' : ''}
+                        ). Tasks and Office/WFH are not required here.
                       </p>
                     </div>
                   ) : null}

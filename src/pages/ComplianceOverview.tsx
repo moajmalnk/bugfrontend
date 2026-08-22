@@ -231,7 +231,7 @@ const ComplianceOverview = () => {
   }, [overviewItems, activeTab, roleKey, searchTerm, sortBy]);
 
   const totalPages = Math.max(1, Math.ceil(filteredItems.length / itemsPerPage));
-  useClampUrlPage(clampToTotalPages, totalPages);
+  useClampUrlPage(clampToTotalPages, totalPages, !isLoading);
 
   useResetUrlPageOnChange(setCurrentPage, [activeTab, searchTerm, sortBy]);
 

@@ -5,12 +5,13 @@ import {
   deadlineTimerToneClass,
   formatProjectDate,
   formatProjectDateTime,
+  formatProjectHoursDisplay,
   getDeadlineTimerReminder,
   getProjectStatusLabel,
   latestTimelineChange,
   parseProjectPlatforms,
-  Project,
   PROJECT_PLATFORM_OPTIONS,
+  Project,
   projectStatusBadgeClass,
 } from '@/lib/utils/projectUtils';
 import { useAuth } from '@/context/AuthContext';
@@ -461,13 +462,36 @@ export function ProjectInfoOverview({ project, createdByName }: ProjectInfoOverv
       fieldKey: 'developer_compliance_complete_date',
     },
     { label: 'Duration', value: `${duration} days` },
+    { label: 'Hours Needed', value: formatProjectHoursDisplay(project.estimated_hours) },
+    {
+      label: 'Developer Hours Taken',
+      value: formatProjectHoursDisplay(project.developer_hours_taken),
+    },
   ];
+
+  const hoursNeededDisplay = formatProjectHoursDisplay(project.estimated_hours);
+  const developerHoursDisplay = formatProjectHoursDisplay(project.developer_hours_taken);
+  const showHoursNeeded = hoursNeededDisplay !== 'Not set';
+  const showDeveloperHours = developerHoursDisplay !== 'Not set';
+  const metricCols =
+    5 + (showHoursNeeded ? 1 : 0) + (showDeveloperHours ? 1 : 0);
 
   return (
     <div className="space-y-4 sm:space-y-6">
       {/* Key metrics strip */}
-      <div className="grid grid-cols-2 xl:grid-cols-5 gap-2 sm:gap-3">
+      <div
+        className={cn(
+          'grid grid-cols-2 gap-2 sm:gap-3',
+          metricCols <= 5 ? 'xl:grid-cols-5' : metricCols === 6 ? 'xl:grid-cols-6' : 'xl:grid-cols-7'
+        )}
+      >
         <StatPill label="Duration" value={`${duration} days`} highlight />
+        {showHoursNeeded ? (
+          <StatPill label="Hours Needed" value={hoursNeededDisplay} highlight />
+        ) : null}
+        {showDeveloperHours ? (
+          <StatPill label="Dev Hours" value={developerHoursDisplay} highlight />
+        ) : null}
         <StatusStatPill label="Status" status={project.status} value={statusLabel} />
         <DeadlineStatPill deadline={project.deadline_date} status={project.status} />
         <StatPill label="Created" value={formatProjectDate(project.created_at)} />

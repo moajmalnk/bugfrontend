@@ -1,25 +1,58 @@
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { StatusDropdown, type StatusOption } from '@/components/ui/StatusDropdown';
+import { StatusDropdown } from '@/components/ui/StatusDropdown';
 import { Skeleton } from '@/components/ui/skeleton';
+import {
+  allocationTotal,
+  formatHoursShort,
+  hoursTallyMatches,
+  isGrowthGlimpseDay,
+  type TimeAllocation,
+} from '@/lib/checkoutTimeAllocation';
 import type { ProjectWorkUpdate } from '@/lib/projectWorkUpdates';
 import { projectWorkStatusLabel } from '@/lib/projectWorkUpdates';
 import type { Project } from '@/services/projectService';
+import { cn } from '@/lib/utils';
 import { FolderKanban } from 'lucide-react';
 
 type Props = {
   projects: Project[];
   projectUpdates: Record<string, ProjectWorkUpdate>;
   onChange: (projectId: string, patch: Partial<ProjectWorkUpdate>) => void;
+  hoursToday: number;
+  submissionDate: string;
+  timeAllocation: TimeAllocation;
+  onOtherHoursChange: (hours: number) => void;
   loading?: boolean;
 };
+
+function emptyUpdate(projectId: string): ProjectWorkUpdate {
+  return {
+    project_id: projectId,
+    status: 'in_progress',
+    progress_percentage: 0,
+    notes: '',
+    hours: 0,
+  };
+}
 
 export function CheckoutProjectUpdatesCard({
   projects,
   projectUpdates,
   onChange,
+  hoursToday,
+  submissionDate,
+  timeAllocation,
+  onOtherHoursChange,
   loading = false,
 }: Props) {
+  const projectHours = projects.map((p) => projectUpdates[p.id]?.hours ?? 0);
+  const allocated = allocationTotal(timeAllocation, projectHours);
+  const target = Math.max(0, Number(hoursToday) || 0);
+  const matched = hoursTallyMatches(target, timeAllocation, projectHours);
+  const remaining = Math.round((target - allocated) * 10) / 10;
+  const showGlimpse = isGrowthGlimpseDay(submissionDate);
+
   if (loading) {
     return (
       <div className="rounded-xl border border-gray-200 bg-white p-5 shadow-sm dark:border-gray-700 dark:bg-gray-800">
@@ -40,7 +73,7 @@ export function CheckoutProjectUpdatesCard({
       <div className="rounded-xl border border-dashed border-gray-300 bg-white p-5 shadow-sm dark:border-gray-600 dark:bg-gray-800">
         <div className="flex items-center gap-3 text-sm text-gray-500 dark:text-gray-400">
           <FolderKanban className="h-5 w-5 shrink-0" />
-          No projects available. Check in with projects selected to update progress here.
+          No projects selected. Check in with projects selected to allocate hours here.
         </div>
       </div>
     );
@@ -48,27 +81,79 @@ export function CheckoutProjectUpdatesCard({
 
   return (
     <div className="rounded-xl border border-gray-200 bg-white p-5 shadow-sm dark:border-gray-700 dark:bg-gray-800">
-      <div className="mb-5 flex items-center gap-3">
-        <div className="rounded-lg bg-indigo-100 p-1.5 dark:bg-indigo-900/30">
-          <FolderKanban className="h-5 w-5 text-indigo-600 dark:text-indigo-400" />
+      <div className="mb-5 flex flex-wrap items-start justify-between gap-3">
+        <div className="flex items-center gap-3 min-w-0">
+          <div className="rounded-lg bg-indigo-100 p-1.5 dark:bg-indigo-900/30">
+            <FolderKanban className="h-5 w-5 text-indigo-600 dark:text-indigo-400" />
+          </div>
+          <div className="min-w-0">
+            <h3 className="text-base font-semibold text-gray-900 dark:text-white">
+              Hours &amp; Project Progress
+            </h3>
+            <p className="text-xs text-gray-500 dark:text-gray-400">
+              Allocate today’s hours across projects. Totals must match {formatHoursShort(target)}h.
+            </p>
+          </div>
         </div>
-        <div className="min-w-0">
-          <h3 className="text-base font-semibold text-gray-900 dark:text-white">Project Progress</h3>
-          <p className="text-xs text-gray-500 dark:text-gray-400">
-            Optional — status, progress, and notes for projects you worked on today
+        <div
+          className={cn(
+            'rounded-xl border px-3 py-2 text-right tabular-nums',
+            matched
+              ? 'border-emerald-200 bg-emerald-50 text-emerald-800 dark:border-emerald-800/60 dark:bg-emerald-950/40 dark:text-emerald-200'
+              : 'border-amber-200 bg-amber-50 text-amber-900 dark:border-amber-800/60 dark:bg-amber-950/40 dark:text-amber-200'
+          )}
+        >
+          <p className="text-xs font-medium opacity-80">Allocated</p>
+          <p className="text-sm font-semibold">
+            {formatHoursShort(allocated)} / {formatHoursShort(target)}h
+            {!matched ? (
+              <span className="ms-1 font-normal">
+                ({remaining > 0 ? `${formatHoursShort(remaining)}h left` : `${formatHoursShort(Math.abs(remaining))}h over`})
+              </span>
+            ) : null}
           </p>
         </div>
       </div>
 
-      <div className="space-y-4">
+      <div className="mb-5 grid grid-cols-2 gap-2 sm:grid-cols-4">
+        <FixedSlot label="Lunch" hours={timeAllocation.lunch_hours} />
+        <FixedSlot label="Breaks" hours={timeAllocation.break_hours} />
+        {showGlimpse ? (
+          <FixedSlot label="Growth Glimpse" hours={timeAllocation.growth_glimpse_hours} />
+        ) : (
+          <FixedSlot label="Growth Glimpse" hours={0} muted="Not today" />
+        )}
+        <div className="rounded-xl border border-gray-200 bg-gray-50/80 px-3 py-2.5 dark:border-gray-700 dark:bg-gray-900/50">
+          <Label
+            htmlFor="checkout-other-hours"
+            className="text-[11px] font-medium text-muted-foreground"
+          >
+            Other
+          </Label>
+          <div className="mt-1 flex items-center gap-1.5">
+            <Input
+              id="checkout-other-hours"
+              type="number"
+              min={0}
+              max={24}
+              step={0.5}
+              value={timeAllocation.other_hours}
+              onChange={(e) => {
+                const next = Math.max(0, Math.min(24, Number(e.target.value || 0)));
+                onOtherHoursChange(Math.round(next * 10) / 10);
+              }}
+              className="h-9 border-gray-200 bg-white tabular-nums dark:border-gray-700 dark:bg-gray-900"
+            />
+            <span className="text-xs text-muted-foreground shrink-0">h</span>
+          </div>
+        </div>
+      </div>
+
+      <div className="flex flex-col gap-4">
         {projects.map((project) => {
-          const update = projectUpdates[project.id] || {
-            project_id: project.id,
-            status: 'in_progress' as StatusOption,
-            progress_percentage: 0,
-            notes: '',
-          };
+          const update = projectUpdates[project.id] || emptyUpdate(project.id);
           const progress = Math.max(0, Math.min(100, Number(update.progress_percentage) || 0));
+          const hours = Math.max(0, Math.min(24, Number(update.hours) || 0));
 
           return (
             <div
@@ -77,9 +162,12 @@ export function CheckoutProjectUpdatesCard({
             >
               <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
                 <div className="min-w-0">
-                  <p className="truncate text-sm font-semibold text-gray-900 dark:text-white">{project.name}</p>
+                  <p className="truncate text-sm font-semibold text-gray-900 dark:text-white">
+                    {project.name}
+                  </p>
                   <p className="text-xs text-gray-500 dark:text-gray-400">
                     {projectWorkStatusLabel(update.status)} · {progress}%
+                    {hours > 0 ? ` · ${formatHoursShort(hours)}h` : ''}
                   </p>
                 </div>
                 <div className="h-2 w-full max-w-[140px] overflow-hidden rounded-full bg-gray-200 dark:bg-gray-700 sm:w-[140px]">
@@ -90,8 +178,8 @@ export function CheckoutProjectUpdatesCard({
                 </div>
               </div>
 
-              <div className="grid grid-cols-1 gap-4 md:grid-cols-3 md:items-stretch">
-                <div className="flex flex-col gap-2">
+              <div className="grid grid-cols-12 gap-4 md:items-stretch">
+                <div className="col-span-12 flex flex-col gap-2 md:col-span-3">
                   <Label className="text-sm font-medium leading-5 text-gray-700 dark:text-gray-300">
                     Current Status
                   </Label>
@@ -102,7 +190,28 @@ export function CheckoutProjectUpdatesCard({
                     className="h-11 w-full"
                   />
                 </div>
-                <div className="flex flex-col gap-2">
+                <div className="col-span-6 flex flex-col gap-2 md:col-span-2">
+                  <Label
+                    htmlFor={`project-hours-${project.id}`}
+                    className="text-sm font-medium leading-5 text-gray-700 dark:text-gray-300"
+                  >
+                    Hours
+                  </Label>
+                  <Input
+                    id={`project-hours-${project.id}`}
+                    type="number"
+                    min={0}
+                    max={24}
+                    step={0.5}
+                    value={hours}
+                    onChange={(e) => {
+                      const next = Math.max(0, Math.min(24, Number(e.target.value || 0)));
+                      onChange(project.id, { hours: Math.round(next * 10) / 10 });
+                    }}
+                    className="h-11 border-2 border-gray-200 bg-white tabular-nums dark:border-gray-700 dark:bg-gray-900"
+                  />
+                </div>
+                <div className="col-span-6 flex flex-col gap-2 md:col-span-2">
                   <Label
                     htmlFor={`project-progress-${project.id}`}
                     className="text-sm font-medium leading-5 text-gray-700 dark:text-gray-300"
@@ -123,7 +232,7 @@ export function CheckoutProjectUpdatesCard({
                     className="h-11 border-2 border-gray-200 bg-white dark:border-gray-700 dark:bg-gray-900"
                   />
                 </div>
-                <div className="flex flex-col gap-2">
+                <div className="col-span-12 flex flex-col gap-2 md:col-span-5">
                   <Label
                     htmlFor={`project-notes-${project.id}`}
                     className="text-sm font-medium leading-5 text-gray-700 dark:text-gray-300"
@@ -145,4 +254,40 @@ export function CheckoutProjectUpdatesCard({
       </div>
     </div>
   );
+}
+
+function FixedSlot({
+  label,
+  hours,
+  muted,
+}: {
+  label: string;
+  hours: number;
+  muted?: string;
+}) {
+  return (
+    <div className="rounded-xl border border-gray-200 bg-gray-50/80 px-3 py-2.5 dark:border-gray-700 dark:bg-gray-900/50">
+      <p className="text-[11px] font-medium text-muted-foreground">{label}</p>
+      <p className="mt-1 text-sm font-semibold tabular-nums text-gray-900 dark:text-white">
+        {muted && hours <= 0 ? (
+          <span className="font-normal text-muted-foreground">{muted}</span>
+        ) : (
+          <>{formatHoursShort(hours)}h</>
+        )}
+      </p>
+    </div>
+  );
+}
+
+/** Exported for DailyWorkUpdate submit gating */
+export function checkoutHoursAllocationOk(
+  hoursToday: number,
+  timeAllocation: TimeAllocation,
+  projectUpdates: Record<string, ProjectWorkUpdate>,
+  projectIds: string[]
+): boolean {
+  const projectHours = projectIds.map((id) => projectUpdates[id]?.hours ?? 0);
+  const hasProjectHours = projectHours.some((h) => (Number(h) || 0) > 0);
+  if (projectIds.length > 0 && !hasProjectHours) return false;
+  return hoursTallyMatches(hoursToday, timeAllocation, projectHours);
 }

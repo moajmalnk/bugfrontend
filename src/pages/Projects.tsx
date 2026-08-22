@@ -213,7 +213,6 @@ interface ProjectMemberCounts {
 
 const Projects = () => {
   const [projects, setProjects] = useState<Project[]>([]);
-  const [filteredProjects, setFilteredProjects] = useState<Project[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [statsLoading, setStatsLoading] = useState(false);
   
@@ -504,7 +503,6 @@ const Projects = () => {
       setStatsLoading(true);
       const data = await projectService.getProjects();
       setProjects(data);
-      setFilteredProjects(data);
 
       const stats = await projectService.resolveProjectStats(data);
       const totalCounts: Record<string, number> = {};
@@ -562,13 +560,6 @@ const Projects = () => {
     }
   };
 
-  // Apply filtering whenever search query, memberships, tab, or filters change
-  useEffect(() => {
-    if (projects.length > 0) {
-      applyFilters();
-    }
-  }, [searchQuery, userProjectMemberships, projects, tabFromUrl, statusFilter, developerFilter, testerFilter, clientFilter]);
-
   // Reset page when filters change (not on initial mount — preserves ?page=N)
   useResetUrlPageOnChange(setCurrentPage, [
     searchQuery,
@@ -578,16 +569,17 @@ const Projects = () => {
     clientFilter,
   ]);
 
-  // Apply all filters (search, membership, status, and custom filters)
-  const applyFilters = () => {
+  /**
+   * Why: Derive the filtered list synchronously from projects + filters.
+   * Async setState filtering left totalPages=1 on refresh and wiped ?page=N.
+   */
+  const filteredProjects = useMemo(() => {
     if (projects.length === 0) {
-      setFilteredProjects([]);
-      return;
+      return [];
     }
 
     let filtered = projects;
 
-    // Filter by search query
     if (searchQuery) {
       const q = searchQuery.toLowerCase();
       filtered = filtered.filter(
@@ -599,16 +591,12 @@ const Projects = () => {
       );
     }
 
-    // Filter by tab for admin and developer tabs
     if (currentUser?.role === "admin" || currentUser?.role === "developer") {
       if (tabFromUrl === "my-projects") {
-        // For "My Projects" or "Assigned Projects" tab, only show projects where the user is a member
-        filtered = filtered.filter(project => userProjectMemberships[project.id]);
+        filtered = filtered.filter((project) => userProjectMemberships[project.id]);
       }
-      // For "all-projects" tab, show all projects for admins, but for developers show all projects (read-only)
     }
 
-    // Apply custom status / deadline filter
     if (statusFilter === "archived") {
       filtered = filtered.filter((project) => project.status === "archived");
     } else if (statusFilter === "overdue") {
@@ -626,7 +614,6 @@ const Projects = () => {
     } else if (statusFilter !== "all") {
       filtered = filtered.filter((project) => project.status === statusFilter);
     } else if (!searchQuery.trim()) {
-      // All Status = active directory; use Archived filter or search to find archived projects
       filtered = filtered.filter((project) => project.status !== "archived");
     }
 
@@ -654,15 +641,22 @@ const Projects = () => {
       );
     }
 
-    // For non-admin, non-developer users, only show assigned projects
     if (currentUser?.role !== "admin" && currentUser?.role !== "developer") {
-      filtered = filtered.filter(
-        (project) => userProjectMemberships[project.id]
-      );
+      filtered = filtered.filter((project) => userProjectMemberships[project.id]);
     }
 
-    setFilteredProjects(filtered);
-  };
+    return filtered;
+  }, [
+    projects,
+    searchQuery,
+    userProjectMemberships,
+    tabFromUrl,
+    statusFilter,
+    developerFilter,
+    testerFilter,
+    clientFilter,
+    currentUser?.role,
+  ]);
 
   const renderStatCount = (value: number | undefined) => {
     if (statsLoading) {
@@ -750,9 +744,6 @@ const Projects = () => {
         if (data.success) {
           // Update both project arrays
           setProjects((prevProjects) =>
-            prevProjects.filter((p) => p.id !== projectToUndo.id)
-          );
-          setFilteredProjects((prevProjects) =>
             prevProjects.filter((p) => p.id !== projectToUndo.id)
           );
 
@@ -867,9 +858,6 @@ const Projects = () => {
           setProjects((prevProjects) =>
             prevProjects.filter((p) => p.id !== projectId)
           );
-          setFilteredProjects((prevProjects) =>
-            prevProjects.filter((p) => p.id !== projectId)
-          );
 
           // Clear the project to delete state
           setProjectToDelete(null);
@@ -936,7 +924,8 @@ const Projects = () => {
   );
   const pageProjectIds = paginatedProjects.map((project) => project.id).join(",");
   const totalPages = Math.max(1, Math.ceil(totalFiltered / itemsPerPage) || 1);
-  useClampUrlPage(clampToTotalPages, totalPages);
+  // Why: Skip clamp while loading — empty list reports 1 page and would wipe ?page=N on refresh.
+  useClampUrlPage(clampToTotalPages, totalPages, !isLoading);
 
   /**
    * Why: getAll.php historically omitted compliance. Hydrate the visible page
@@ -990,13 +979,16 @@ const Projects = () => {
     () => projects.filter((project) => project.status !== "archived").length,
     [projects]
   );
+  const myProjectsCount = useMemo(
+    () =>
+      projects.filter(
+        (project) =>
+          userProjectMemberships[project.id] && project.status !== "archived"
+      ).length,
+    [projects, userProjectMemberships]
+  );
   const userProjectsCount =
-    currentUser?.role === "admin"
-      ? activeProjectsCount
-      : projects.filter(
-          (project) =>
-            userProjectMemberships[project.id] && project.status !== "archived"
-        ).length;
+    currentUser?.role === "admin" ? activeProjectsCount : myProjectsCount;
 
   // NOTE: The component's actual return is defined after helper functions below.
   // This placeholder was removed to avoid duplicate returns preventing dialogs from rendering.
@@ -2066,7 +2058,7 @@ const Projects = () => {
                       {currentUser?.role === "admin" ? "My" : "Assigned"}
                     </span>
                     <span className="ml-1 sm:ml-2 px-1.5 sm:px-2 py-0.5 sm:py-1 bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300 rounded-full text-[10px] sm:text-xs font-bold shrink-0">
-                      {projects.filter(p => userProjectMemberships[p.id]).length}
+                      {myProjectsCount}
                     </span>
                   </ListPageTabTrigger>
             </ListPageTabsShell>

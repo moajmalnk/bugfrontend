@@ -245,7 +245,7 @@ const Clients = () => {
 
   const totalFiltered = filteredClients.length;
   const totalPages = Math.max(1, Math.ceil(totalFiltered / itemsPerPage) || 1);
-  useClampUrlPage(clampToTotalPages, totalPages);
+  useClampUrlPage(clampToTotalPages, totalPages, !isLoading);
   const activePage = Math.min(currentPage, totalPages);
   const paginatedClients = filteredClients.slice(
     (activePage - 1) * itemsPerPage,

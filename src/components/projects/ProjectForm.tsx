@@ -29,14 +29,17 @@ import { buildDocumentPreviewPagePath } from '@/lib/attachmentUtils';
 import { cn, getEffectiveRole } from '@/lib/utils';
 import { sortUsersActiveFirst } from '@/lib/utils/userSort';
 import { ProjectCategoryAssets, cnCategoryChip } from '@/components/projects/ProjectCategoryAssets';
+import { TechnologyStackSelect } from '@/components/projects/TechnologyStackSelect';
 import {
   computeProjectDurationDays,
-  formatProjectDate,
-  joinProjectDateTime,
-  projectDatePart,
-  projectTimePart,
   DEFAULT_COMPLIANCE_TIME,
+  formatProjectDate,
+  formatProjectDateTime,
+  formatProjectHoursDisplay,
   getProjectStatusLabel,
+  joinProjectDateTime,
+  latestTimelineChange,
+  parseHoursPayload,
   PROJECT_CATEGORY_OPTIONS,
   PROJECT_PLATFORM_OPTIONS,
   Project,
@@ -44,11 +47,12 @@ import {
   ProjectCategory,
   ProjectComplianceSummaryLite,
   ProjectFormValues,
+  projectDatePart,
+  projectTimePart,
+  sanitizeHoursInput,
   type ProjectPlatform,
   type ProjectTimelineHistoryEntry,
   type TaggedProjectFile,
-  formatProjectDateTime,
-  latestTimelineChange,
 } from '@/lib/utils/projectUtils';
 import { User } from '@/types';
 import type { Client } from '@/types';
@@ -392,7 +396,6 @@ export function ProjectForm({
   timelineHistory = [],
 }: ProjectFormProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const [techInput, setTechInput] = useState('');
   const navigate = useNavigate();
   const { currentUser } = useAuth();
   const effectiveRole = getEffectiveRole(currentUser || {});
@@ -430,19 +433,32 @@ export function ProjectForm({
         status: values.status,
       });
 
+  const hoursNeededNum = parseHoursPayload(values.estimated_hours);
+  const developerHoursNum = parseHoursPayload(values.developer_hours_taken);
+  const hoursOverEstimate =
+    hoursNeededNum !== null &&
+    developerHoursNum !== null &&
+    developerHoursNum > hoursNeededNum
+      ? Math.round((developerHoursNum - hoursNeededNum) * 10) / 10
+      : null;
+
+  const timelineSectionDescription = [
+    `Duration: ${durationDays} days (from start date)`,
+    hoursNeededNum !== null ? `${formatProjectHoursDisplay(hoursNeededNum).replace(' hrs', '')} hrs needed` : null,
+  ]
+    .filter(Boolean)
+    .join(' · ');
+
+  const setHoursField = (key: 'estimated_hours' | 'developer_hours_taken', raw: string) => {
+    setField(key, sanitizeHoursInput(raw));
+  };
+
   const techStackItems = values.technology_stack
     ? values.technology_stack.split(',').map((s) => s.trim()).filter(Boolean)
     : [];
 
-  const addTechItem = () => {
-    const item = techInput.trim();
-    if (!item) return;
-    setField('technology_stack', [...techStackItems, item].join(', '));
-    setTechInput('');
-  };
-
-  const removeTechItem = (index: number) => {
-    setField('technology_stack', techStackItems.filter((_, i) => i !== index).join(', '));
+  const setTechStackItems = (items: string[]) => {
+    setField('technology_stack', items.join(', '));
   };
 
   const handleFileSelect = (e: ChangeEvent<HTMLInputElement>) => {
@@ -829,44 +845,15 @@ export function ProjectForm({
 
               <SectionBlock
                 title="Technology Stack"
-                description="Languages, frameworks, tools, and design references"
+                description="Languages, frameworks, tools — pick from the list or create a custom entry for all projects"
                 icon={Layers}
                 iconClass="bg-gradient-to-br from-cyan-500 to-blue-600"
               >
-                <div className="flex flex-wrap gap-2 min-h-[2rem]">
-                  {techStackItems.length === 0 && (
-                    <span className="text-sm text-gray-500 dark:text-gray-400">No technologies added</span>
-                  )}
-                  {techStackItems.map((item, index) => (
-                    <Badge key={`${item}-${index}`} variant="outline" className="gap-1 pr-1 text-sm">
-                      {item}
-                      <button
-                        type="button"
-                        onClick={() => removeTechItem(index)}
-                        className="ml-1 hover:bg-muted rounded-full p-0.5"
-                      >
-                        <X className="h-3 w-3" />
-                      </button>
-                    </Badge>
-                  ))}
-                </div>
-                <div className="flex gap-2">
-                  <Input
-                    placeholder="e.g. React, Node.js, MySQL"
-                    value={techInput}
-                    onChange={(e) => setTechInput(e.target.value)}
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter') {
-                        e.preventDefault();
-                        addTechItem();
-                      }
-                    }}
-                    className={cn(inputClass, 'focus:ring-2 focus:ring-cyan-500/50 focus:border-cyan-500')}
-                  />
-                  <Button type="button" variant="outline" onClick={addTechItem} className="h-12 px-5 rounded-xl">
-                    Add
-                  </Button>
-                </div>
+                <TechnologyStackSelect
+                  value={techStackItems}
+                  onChange={setTechStackItems}
+                  disabled={isSubmitting}
+                />
 
                 <div className="space-y-3">
                   <FieldLabel
@@ -1082,7 +1069,7 @@ export function ProjectForm({
 
               <SectionBlock
                 title="Project Timeline"
-                description={`Duration: ${durationDays} days (from start date)`}
+                description={timelineSectionDescription}
                 icon={Calendar}
                 iconClass="bg-gradient-to-br from-rose-500 to-pink-600"
               >
@@ -1142,6 +1129,51 @@ export function ProjectForm({
                     <div className="flex h-12 items-center rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 px-4 text-sm font-semibold text-gray-900 dark:text-white shadow-sm">
                       {durationDays} days
                     </div>
+                  </div>
+                  <div className="space-y-3">
+                    <FieldLabel dotClass="from-violet-500 to-purple-600">Hours Needed</FieldLabel>
+                    <div className="relative flex h-12 items-center rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 shadow-sm focus-within:ring-2 focus-within:ring-violet-500/40">
+                      <Input
+                        type="text"
+                        inputMode="decimal"
+                        value={values.estimated_hours}
+                        onChange={(e) => setHoursField('estimated_hours', e.target.value)}
+                        placeholder="Not set"
+                        maxLength={8}
+                        className="h-12 border-0 bg-transparent rounded-xl pr-12 text-sm font-semibold text-gray-900 dark:text-white shadow-none focus-visible:ring-0"
+                        aria-label="Total project hours needed"
+                      />
+                      <span className="pointer-events-none absolute inset-y-0 end-0 flex items-center pe-4 text-xs font-medium text-muted-foreground">
+                        hrs
+                      </span>
+                    </div>
+                  </div>
+                  <div className="space-y-3">
+                    <FieldLabel dotClass="from-fuchsia-500 to-pink-600">Developer Hours Taken</FieldLabel>
+                    <div className="relative flex h-12 items-center rounded-xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900/60 shadow-sm">
+                      <Input
+                        type="text"
+                        inputMode="decimal"
+                        value={values.developer_hours_taken}
+                        readOnly
+                        placeholder="Auto from checkout"
+                        maxLength={8}
+                        className="h-12 border-0 bg-transparent rounded-xl pr-12 text-sm font-semibold text-gray-900 dark:text-white shadow-none focus-visible:ring-0 cursor-default"
+                        aria-label="Developer hours taken from checkout"
+                        aria-readonly="true"
+                      />
+                      <span className="pointer-events-none absolute inset-y-0 end-0 flex items-center pe-4 text-xs font-medium text-muted-foreground">
+                        hrs
+                      </span>
+                    </div>
+                    <p className="text-[11px] sm:text-xs text-muted-foreground leading-snug">
+                      Auto-collected from checkout project hours
+                    </p>
+                    {hoursOverEstimate !== null ? (
+                      <p className="text-[11px] sm:text-xs text-amber-700 dark:text-amber-300 leading-snug">
+                        Over estimate by {hoursOverEstimate} hrs
+                      </p>
+                    ) : null}
                   </div>
                 </div>
               </SectionBlock>

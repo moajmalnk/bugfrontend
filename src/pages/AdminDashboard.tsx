@@ -66,6 +66,9 @@ import { RetestsHistoryPanel } from "@/components/dashboard/RetestsHistoryPanel"
 import { MonthlyOpsTimelinePanel } from "@/components/dashboard/MonthlyOpsTimelinePanel";
 import { UserAvatar } from "@/components/users/UserAvatar";
 import { TeamBirthdayBanner } from "@/components/dashboard/TeamBirthdayBanner";
+import { DeadlineTable, type DeadlineBucket, type ProjectHealth } from "@/components/dashboard/DeadlineTable";
+import { StatusBugsTable } from "@/components/dashboard/StatusBugsTable";
+import { PendingsTab } from "@/components/dashboard/PendingsTab";
 import { Bug, User } from "@/types";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
@@ -80,6 +83,7 @@ import {
   CheckCircle2,
   ChevronDown,
   ClipboardCheck,
+  ListChecks,
   Clock,
   FolderKanban,
   Hourglass,
@@ -106,10 +110,10 @@ import {
   YAxis,
 } from "recharts";
 
-type DeadlineBucket = "overdue" | "today" | "week" | "later" | "none";
 
 type DashboardTab =
   | "overview"
+  | "pendings"
   | "projects"
   | "updates"
   | "bugs-fixes"
@@ -119,6 +123,7 @@ type DashboardTab =
 
 const DASHBOARD_TABS: DashboardTab[] = [
   "overview",
+  "pendings",
   "projects",
   "updates",
   "bugs-fixes",
@@ -133,6 +138,7 @@ const DASHBOARD_TAB_ITEMS: {
   icon: LucideIcon;
 }[] = [
   { value: "overview", label: "Overview", icon: LayoutDashboard },
+  { value: "pendings", label: "Pendings", icon: ListChecks },
   { value: "projects", label: "Projects", icon: FolderKanban },
   { value: "updates", label: "Updates", icon: Megaphone },
   { value: "bugs-fixes", label: "Bugs & Fixes", icon: BugIcon },
@@ -148,17 +154,6 @@ function parseDashboardTab(value: string | null): DashboardTab {
   return "overview";
 }
 
-type ProjectHealth = {
-  project: Project;
-  openBugs: number;
-  highBugs: number;
-  fixedBugs: number;
-  updatesCount: number;
-  totalBugs: number;
-  deadline: Date | null;
-  bucket: DeadlineBucket;
-  daysUntil: number | null;
-};
 
 type BugStatusCounts = {
   pending: number;
@@ -610,138 +605,6 @@ function ChartCard({
   );
 }
 
-function DeadlineTable({
-  rows,
-  role,
-  emptyLabel,
-}: {
-  rows: ProjectHealth[];
-  role: string;
-  emptyLabel: string;
-}) {
-  if (rows.length === 0) {
-    return (
-      <div className={cn(PANEL, "border-dashed px-4 py-14 text-center")}>
-        <CalendarClock className="h-8 w-8 mx-auto mb-3 text-muted-foreground/50" />
-        <p className="text-sm font-medium text-gray-500 dark:text-gray-400">{emptyLabel}</p>
-      </div>
-    );
-  }
-
-  return (
-    <div className={cn(PANEL, "overflow-hidden")}>
-      <div className="flex flex-col gap-3 p-3 md:hidden">
-        {rows.map((row) => (
-          <Link
-            key={row.project.id}
-            to={`/${role}/projects/${row.project.id}`}
-            className="block min-w-0 rounded-xl border border-border/60 bg-background/70 p-4 hover:bg-muted/40"
-          >
-            <div className="flex min-w-0 items-start justify-between gap-3">
-              <div className="min-w-0">
-                <p className="truncate font-semibold text-foreground">{row.project.name}</p>
-                {row.project.client_name ? (
-                  <p className="mt-0.5 truncate text-xs text-muted-foreground">
-                    {row.project.client_name}
-                  </p>
-                ) : null}
-              </div>
-              <Badge className={cn("shrink-0 rounded-xl border-0", statusBadgeClass(row.project.status))}>
-                {getProjectStatusLabel(row.project.status)}
-              </Badge>
-            </div>
-            <div className="mt-3 grid grid-cols-12 gap-3">
-              <div className="col-span-7 min-w-0">
-                <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
-                  Deadline
-                </p>
-                <p className={cn("mt-0.5 text-sm font-medium", deadlineTone(row.bucket))}>
-                  {formatProjectDate(row.project.deadline_date)}
-                </p>
-                <p className={cn("text-xs", deadlineTone(row.bucket))}>
-                  {deadlineLabel(row.bucket, row.daysUntil)}
-                </p>
-              </div>
-              <div className="col-span-5 min-w-0 text-right">
-                <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
-                  Open bugs
-                </p>
-                <p
-                  className={cn(
-                    "mt-0.5 text-sm tabular-nums font-semibold",
-                    row.openBugs > 0 ? "text-amber-600 dark:text-amber-400" : "text-foreground"
-                  )}
-                >
-                  {row.openBugs}
-                </p>
-                {row.highBugs > 0 ? (
-                  <p className="text-xs text-red-600 dark:text-red-400">{row.highBugs} high</p>
-                ) : null}
-              </div>
-            </div>
-          </Link>
-        ))}
-      </div>
-      <div className="hidden overflow-x-auto md:block">
-      <Table>
-        <TableHeader>
-          <TableRow className="bg-gray-50/80 dark:bg-gray-800/50 hover:bg-gray-50/80 dark:hover:bg-gray-800/50">
-            <TableHead className="font-semibold">Project</TableHead>
-            <TableHead className="font-semibold">Deadline</TableHead>
-            <TableHead className="font-semibold">Status</TableHead>
-            <TableHead className="text-right font-semibold">Open bugs</TableHead>
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          {rows.map((row) => (
-            <TableRow key={row.project.id}>
-              <TableCell>
-                <Link
-                  to={`/${role}/projects/${row.project.id}`}
-                  className="font-semibold text-gray-900 dark:text-white hover:text-blue-600 dark:hover:text-blue-400"
-                >
-                  {row.project.name}
-                </Link>
-                {row.project.client_name ? (
-                  <p className="text-xs text-muted-foreground mt-0.5">{row.project.client_name}</p>
-                ) : null}
-              </TableCell>
-              <TableCell>
-                <div className={cn("font-medium", deadlineTone(row.bucket))}>
-                  {formatProjectDate(row.project.deadline_date)}
-                </div>
-                <div className={cn("text-xs", deadlineTone(row.bucket))}>
-                  {deadlineLabel(row.bucket, row.daysUntil)}
-                </div>
-              </TableCell>
-              <TableCell>
-                <Badge className={cn("border-0", statusBadgeClass(row.project.status))}>
-                  {getProjectStatusLabel(row.project.status)}
-                </Badge>
-              </TableCell>
-              <TableCell className="text-right tabular-nums">
-                <span
-                  className={
-                    row.openBugs > 0 ? "text-amber-600 dark:text-amber-400 font-semibold" : ""
-                  }
-                >
-                  {row.openBugs}
-                </span>
-                {row.highBugs > 0 ? (
-                  <span className="ml-2 text-xs text-red-600 dark:text-red-400">
-                    {row.highBugs} high
-                  </span>
-                ) : null}
-              </TableCell>
-            </TableRow>
-          ))}
-        </TableBody>
-      </Table>
-      </div>
-    </div>
-  );
-}
-
 function BugPipelineCard({
   bugCounts,
   role,
@@ -850,161 +713,6 @@ function BugPipelineCard({
           })}
         </div>
       </div>
-    </div>
-  );
-}
-
-function StatusBugsTable({
-  bugs,
-  role,
-  mode,
-  emptyLabel,
-  pageSize = 12,
-}: {
-  bugs: Bug[];
-  role: string;
-  mode: "open" | "fixed";
-  emptyLabel: string;
-  pageSize?: number;
-}) {
-  const [page, setPage] = useState(1);
-  const totalPages = Math.max(1, Math.ceil(bugs.length / pageSize));
-  const currentPage = Math.min(page, totalPages);
-  const pageBugs = bugs.slice((currentPage - 1) * pageSize, currentPage * pageSize);
-
-  if (bugs.length === 0) {
-    return (
-      <div className="rounded-2xl border border-dashed border-gray-300 dark:border-gray-700 px-4 py-12 text-center text-sm text-gray-500">
-        {emptyLabel}
-      </div>
-    );
-  }
-
-  const bugHref = (bug: Bug) =>
-    `/${role}/bugs/${bug.id}${mode === "fixed" ? "?from=fixes" : ""}`;
-
-  const metaLabel = (bug: Bug) =>
-    mode === "fixed"
-      ? bug.fixed_by_name || bug.updated_by_name || "—"
-      : bug.status.replace("_", " ");
-
-  const pagination = (
-    <div className="flex flex-wrap items-center justify-between gap-2 px-1 text-sm text-muted-foreground">
-      <span className="font-medium">
-        Showing {(currentPage - 1) * pageSize + 1}–
-        {Math.min(currentPage * pageSize, bugs.length)} of {bugs.length.toLocaleString()}
-      </span>
-      <div className="flex items-center gap-2">
-        <Button
-          variant="outline"
-          size="sm"
-          disabled={currentPage <= 1}
-          onClick={() => setPage((p) => Math.max(1, p - 1))}
-        >
-          Previous
-        </Button>
-        <span className="tabular-nums px-1">
-          {currentPage}/{totalPages}
-        </span>
-        <Button
-          variant="outline"
-          size="sm"
-          disabled={currentPage >= totalPages}
-          onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
-        >
-          Next
-        </Button>
-      </div>
-    </div>
-  );
-
-  return (
-    <div className="space-y-3">
-      {/* Mobile / tablet: card grid */}
-      <div className="grid grid-cols-12 gap-3 lg:hidden">
-        {pageBugs.map((bug) => (
-          <Link
-            key={bug.id}
-            to={bugHref(bug)}
-            className={cn(
-              PANEL,
-              "col-span-12 sm:col-span-6 p-4 space-y-3 transition-all duration-300 hover:shadow-xl hover:-translate-y-0.5"
-            )}
-          >
-            <div className="absolute inset-0 bg-gradient-to-br from-orange-50/30 via-transparent to-red-50/20 dark:from-orange-950/10 dark:via-transparent dark:to-red-950/10 pointer-events-none" />
-            <div className="relative space-y-3">
-              <p className="font-semibold text-gray-900 dark:text-white line-clamp-3 text-[15px] leading-snug">
-                {bug.title}
-              </p>
-              <div className="flex flex-wrap items-center gap-2">
-                <Badge className={cn("border-0 capitalize", priorityBadgeClass(bug.priority))}>
-                  {bug.priority}
-                </Badge>
-                <Badge
-                  variant="outline"
-                  className="capitalize font-semibold border-gray-200 dark:border-gray-700"
-                >
-                  {metaLabel(bug)}
-                </Badge>
-              </div>
-              <div className="flex items-center justify-between gap-2 pt-0.5">
-                <p className="text-xs font-medium text-blue-600 dark:text-blue-400 truncate min-w-0">
-                  {bug.project_name || "No project"}
-                </p>
-                <span className="inline-flex items-center gap-1 text-xs font-semibold text-muted-foreground shrink-0">
-                  View
-                  <ArrowRight className="h-3.5 w-3.5" />
-                </span>
-              </div>
-            </div>
-          </Link>
-        ))}
-      </div>
-
-      {/* Desktop: table */}
-      <div className={cn(PANEL, "overflow-hidden hidden lg:block")}>
-        <div className="overflow-x-auto">
-          <Table>
-            <TableHeader>
-              <TableRow className="bg-gray-50/80 dark:bg-gray-800/50 hover:bg-gray-50/80 dark:hover:bg-gray-800/50">
-                <TableHead className="font-semibold">Bug</TableHead>
-                <TableHead className="font-semibold">Project</TableHead>
-                <TableHead className="font-semibold">Priority</TableHead>
-                <TableHead className="font-semibold">
-                  {mode === "fixed" ? "Fixed by" : "Status"}
-                </TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {pageBugs.map((bug) => (
-                <TableRow key={bug.id}>
-                  <TableCell className="max-w-[280px]">
-                    <Link
-                      to={bugHref(bug)}
-                      className="font-semibold hover:text-blue-600 dark:hover:text-blue-400 line-clamp-2"
-                    >
-                      {bug.title}
-                    </Link>
-                  </TableCell>
-                  <TableCell className="text-muted-foreground max-w-[140px] truncate">
-                    {bug.project_name || "—"}
-                  </TableCell>
-                  <TableCell>
-                    <Badge className={cn("border-0 capitalize", priorityBadgeClass(bug.priority))}>
-                      {bug.priority}
-                    </Badge>
-                  </TableCell>
-                  <TableCell className="capitalize text-muted-foreground">
-                    {metaLabel(bug)}
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </div>
-      </div>
-
-      {pagination}
     </div>
   );
 }
@@ -2308,7 +2016,7 @@ export default function AdminDashboard() {
           gradient: "from-red-500 to-orange-600",
           chip: "from-red-50 to-orange-50 dark:from-red-950/30 dark:to-orange-950/30 border-red-200 dark:border-red-800",
           valueClass: "text-red-700 dark:text-red-300",
-          tab: "projects" as DashboardTab,
+          tab: "pendings" as DashboardTab,
         },
         {
           title: "Due in 7 days",
@@ -2318,7 +2026,7 @@ export default function AdminDashboard() {
           gradient: "from-amber-500 to-yellow-600",
           chip: "from-amber-50 to-yellow-50 dark:from-amber-950/30 dark:to-yellow-950/30 border-amber-200 dark:border-amber-800",
           valueClass: "text-amber-700 dark:text-amber-300",
-          tab: "projects" as DashboardTab,
+          tab: "pendings" as DashboardTab,
         },
         {
           title: "Open bugs",
@@ -2351,7 +2059,7 @@ export default function AdminDashboard() {
           gradient: "from-violet-500 to-purple-600",
           chip: "from-violet-50 to-purple-50 dark:from-violet-950/30 dark:to-purple-950/30 border-violet-200 dark:border-violet-800",
           valueClass: "text-violet-700 dark:text-violet-300",
-          tab: "bugs-fixes" as DashboardTab,
+          tab: "pendings" as DashboardTab,
         },
         {
           title: "Checked in",
@@ -2689,6 +2397,24 @@ export default function AdminDashboard() {
                   </ChartCard>
                 </div>
 
+              </TabsContent>
+
+              
+              <TabsContent value="pendings" className="space-y-6 sm:space-y-8 mt-0">
+                {data && view ? (
+                  <PendingsTab
+                    role={role}
+                    overdue={data.overdue}
+                    upcoming={data.upcoming}
+                    pendingBugs={data.bugsByStatus.pending}
+                    pendingBugCount={data.bugCounts.pending}
+                    pendingUpdates={data.updates.filter(
+                      (u) => String(u.status || "").toLowerCase() === "pending"
+                    )}
+                    retestsPendingCount={periodBugStats?.retests?.pending ?? 0}
+                    enabled={activeTab === "pendings"}
+                  />
+                ) : null}
               </TabsContent>
 
               <TabsContent value="projects" className="space-y-6 sm:space-y-8 mt-0">

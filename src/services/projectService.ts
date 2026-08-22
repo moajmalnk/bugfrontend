@@ -148,6 +148,9 @@ export type ProjectWorkActivityEntry = {
   status: string;
   progress_percentage: number;
   notes: string;
+  /** Hours spent on this project (from checkout allocation). */
+  hours: number;
+  /** @deprecated Prefer `hours` — kept for older clients. */
   hours_today: number;
 };
 
@@ -155,19 +158,26 @@ export type ProjectWorkActivityResult = {
   project_id: string;
   from: string;
   to: string;
+  total_hours: number;
   entries: ProjectWorkActivityEntry[];
 };
 
 function isProjectWorkActivityEntry(value: unknown): value is ProjectWorkActivityEntry {
   if (!value || typeof value !== 'object') return false;
   const entry = value as Record<string, unknown>;
+  const hours =
+    typeof entry.hours === 'number'
+      ? entry.hours
+      : typeof entry.hours_today === 'number'
+        ? entry.hours_today
+        : null;
   return (
     typeof entry.submission_date === 'string' &&
     typeof entry.username === 'string' &&
     typeof entry.status === 'string' &&
     typeof entry.progress_percentage === 'number' &&
     typeof entry.notes === 'string' &&
-    typeof entry.hours_today === 'number'
+    typeof hours === 'number'
   );
 }
 
@@ -359,18 +369,35 @@ class ProjectService {
       project_id: projectId,
       from: '',
       to: '',
+      total_hours: 0,
       entries: [],
     };
 
     const parse = (data: { success?: boolean; data?: unknown }): ProjectWorkActivityResult => {
       const payload = data?.success ? data.data : null;
       if (payload && typeof payload === 'object' && Array.isArray((payload as { entries?: unknown }).entries)) {
-        const raw = payload as { project_id?: string; from?: string; to?: string; entries: unknown[] };
+        const raw = payload as {
+          project_id?: string;
+          from?: string;
+          to?: string;
+          total_hours?: number;
+          entries: unknown[];
+        };
+        const entries = raw.entries
+          .filter(isProjectWorkActivityEntry)
+          .map((entry) => {
+            const hours =
+              typeof entry.hours === 'number' ? entry.hours : Number(entry.hours_today) || 0;
+            return { ...entry, hours, hours_today: hours };
+          });
+        const totalFromEntries = entries.reduce((sum, e) => sum + (Number(e.hours) || 0), 0);
         return {
           project_id: raw.project_id ?? projectId,
           from: raw.from ?? '',
           to: raw.to ?? '',
-          entries: raw.entries.filter(isProjectWorkActivityEntry),
+          total_hours:
+            typeof raw.total_hours === 'number' ? raw.total_hours : Math.round(totalFromEntries * 10) / 10,
+          entries,
         };
       }
       return empty;

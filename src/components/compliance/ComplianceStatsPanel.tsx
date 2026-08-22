@@ -68,19 +68,27 @@ function MiniStat({
   return (
     <div
       className={cn(
-        'flex flex-col gap-2 rounded-xl p-3 sm:p-3.5 min-w-0 border border-white/40 dark:border-white/5',
+        'flex h-full min-h-[8.5rem] flex-col items-center rounded-xl border border-white/40 dark:border-white/5 p-3 sm:p-3.5 min-w-0',
         bgClass
       )}
     >
-      <ComplianceStatusBadge status={status} className="w-fit" />
-      {loading ? (
-        <Skeleton className="h-7 w-10 rounded-lg" />
-      ) : (
-        <p className="text-xl sm:text-2xl font-bold text-foreground tabular-nums leading-none">
-          {count}
-        </p>
-      )}
-      <p className="text-[10px] sm:text-xs text-muted-foreground font-medium truncate">
+      {/* Why: Fixed badge row keeps Completed / Pending / Not started numbers on one baseline. */}
+      <div className="flex h-6 w-full shrink-0 items-center justify-center">
+        <ComplianceStatusBadge
+          status={status}
+          className="max-w-full whitespace-nowrap px-1.5 py-0 text-[9px] sm:text-[10px] leading-none"
+        />
+      </div>
+      <div className="flex min-h-0 flex-1 items-center justify-center py-2">
+        {loading ? (
+          <Skeleton className="h-7 w-10 rounded-lg" />
+        ) : (
+          <p className="text-xl sm:text-2xl font-bold text-foreground tabular-nums leading-none">
+            {count}
+          </p>
+        )}
+      </div>
+      <p className="flex h-8 w-full shrink-0 items-center justify-center truncate px-0.5 text-center text-[10px] sm:text-xs font-medium leading-none text-muted-foreground whitespace-nowrap">
         {getComplianceStatusLabel(status)}
       </p>
     </div>
@@ -121,7 +129,7 @@ export function ComplianceRoleStatsPanel({
         </div>
       </div>
 
-      <div className="grid grid-cols-3 gap-2 sm:gap-3 mt-4">
+      <div className="mt-4 grid grid-cols-3 items-stretch gap-2 sm:gap-3">
         <MiniStat status="completed" count={counts.completed} accent={accent} loading={loading} />
         <MiniStat status="pending" count={counts.pending} accent={accent} loading={loading} />
         <MiniStat

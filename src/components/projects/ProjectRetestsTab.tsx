@@ -211,7 +211,7 @@ export function ProjectRetestsTab({ projectId, initialTab }: ProjectRetestsTabPr
     1,
     data?.pagination?.totalPages || Math.ceil(totalFiltered / itemsPerPage) || 1
   );
-  useClampUrlPage(clampToTotalPages, listTotalPages);
+  useClampUrlPage(clampToTotalPages, listTotalPages, !isLoading);
 
   const allRetestsCount = data?.pagination?.counts?.retestPending ?? totalFiltered;
   const myRetestsCount = data?.pagination?.counts?.myRetestPending ?? 0;

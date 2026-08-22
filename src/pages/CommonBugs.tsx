@@ -247,7 +247,7 @@ const CommonBugs = () => {
     currentPage * itemsPerPage
   );
   const totalPages = Math.max(1, Math.ceil(totalFiltered / itemsPerPage) || 1);
-  useClampUrlPage(clampToTotalPages, totalPages);
+  useClampUrlPage(clampToTotalPages, totalPages, !loading);
 
   const handleDownloadPdfReport = async () => {
     try {

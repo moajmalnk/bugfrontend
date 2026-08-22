@@ -503,7 +503,7 @@ const Fixes = () => {
       Math.ceil(totalFiltered / itemsPerPage) ||
       1
   );
-  useClampUrlPage(clampToTotalPages, listTotalPages);
+  useClampUrlPage(clampToTotalPages, listTotalPages, !isLoading);
 
   const paginatedBugs = filteredBugs;
 

@@ -314,6 +314,10 @@ export interface Project {
   backend_finish_date?: string | null;
   tester_compliance_complete_date?: string | null;
   developer_compliance_complete_date?: string | null;
+  /** Estimated total project hours needed (manual). */
+  estimated_hours?: number | string | null;
+  /** Total developer hours taken — auto-summed from checkout project hours. */
+  developer_hours_taken?: number | string | null;
   timeline_history?: ProjectTimelineHistoryEntry[];
   members?: string[];
   members_detail?: ProjectMemberDetail[];
@@ -399,10 +403,68 @@ export interface CreateProjectData {
   backend_finish_date?: string;
   tester_compliance_complete_date?: string | null;
   developer_compliance_complete_date?: string | null;
+  estimated_hours?: number | null;
+  developer_hours_taken?: number | null;
   members?: ProjectMemberInput[];
 }
 
 export type UpdateProjectData = Partial<CreateProjectData>;
+
+const MAX_PROJECT_HOURS = 99999.9;
+
+/**
+ * Why: Keep form inputs as strings while typing decimals; empty means unset.
+ */
+export function formatHoursFormValue(value?: number | string | null): string {
+  if (value === null || value === undefined || value === '') return '';
+  const n = typeof value === 'number' ? value : Number(value);
+  if (!Number.isFinite(n)) return '';
+  return String(n);
+}
+
+/**
+ * Why: Clamp effort hours for CODO numeric guardrails before API payload.
+ */
+export function parseHoursPayload(raw: string): number | null {
+  const trimmed = raw.trim();
+  if (!trimmed) return null;
+  const n = Number(trimmed);
+  if (!Number.isFinite(n) || n < 0) return null;
+  return Math.min(Math.round(n * 10) / 10, MAX_PROJECT_HOURS);
+}
+
+/**
+ * Why: Sanitize hour input while typing — digits + one decimal, max 99999.9.
+ */
+export function sanitizeHoursInput(raw: string): string {
+  let cleaned = raw.replace(/[^\d.]/g, '');
+  const firstDot = cleaned.indexOf('.');
+  if (firstDot !== -1) {
+    cleaned =
+      cleaned.slice(0, firstDot + 1) + cleaned.slice(firstDot + 1).replace(/\./g, '');
+  }
+  if (cleaned.startsWith('.')) cleaned = `0${cleaned}`;
+  const parts = cleaned.split('.');
+  let whole = parts[0] ?? '';
+  let frac = parts[1] ?? '';
+  if (whole.length > 5) whole = whole.slice(0, 5);
+  if (frac.length > 1) frac = frac.slice(0, 1);
+  const next = parts.length > 1 ? `${whole}.${frac}` : whole;
+  const n = Number(next);
+  if (Number.isFinite(n) && n > MAX_PROJECT_HOURS) {
+    return String(MAX_PROJECT_HOURS);
+  }
+  return next;
+}
+
+/** Why: Consistent display for overview and timeline metrics. */
+export function formatProjectHoursDisplay(value?: number | string | null): string {
+  if (value === null || value === undefined || value === '') return 'Not set';
+  const n = typeof value === 'number' ? value : Number(value);
+  if (!Number.isFinite(n)) return 'Not set';
+  const rounded = Math.round(n * 10) / 10;
+  return `${rounded % 1 === 0 ? String(Math.trunc(rounded)) : String(rounded)} hrs`;
+}
 
 export interface ProjectFormValues {
   name: string;
@@ -439,6 +501,9 @@ export interface ProjectFormValues {
   backend_finish_date: string;
   tester_compliance_complete_date: string;
   developer_compliance_complete_date: string;
+  /** Form string; empty = unset. */
+  estimated_hours: string;
+  developer_hours_taken: string;
   project_lead_id: string;
   developer_ids: string[];
   tester_ids: string[];
@@ -479,6 +544,8 @@ export const emptyProjectFormValues = (): ProjectFormValues => ({
   backend_finish_date: '',
   tester_compliance_complete_date: '',
   developer_compliance_complete_date: '',
+  estimated_hours: '',
+  developer_hours_taken: '',
   project_lead_id: '',
   developer_ids: [],
   tester_ids: [],
@@ -521,6 +588,8 @@ export function projectToFormValues(project: Project): ProjectFormValues {
     backend_finish_date: project.backend_finish_date || '',
     tester_compliance_complete_date: project.tester_compliance_complete_date || '',
     developer_compliance_complete_date: project.developer_compliance_complete_date || '',
+    estimated_hours: formatHoursFormValue(project.estimated_hours),
+    developer_hours_taken: formatHoursFormValue(project.developer_hours_taken),
     project_lead_id: members.find((m) => m.role === 'manager')?.user_id || '',
     developer_ids: members.filter((m) => m.role === 'developer').map((m) => m.user_id),
     tester_ids: members.filter((m) => m.role === 'tester').map((m) => m.user_id),
@@ -574,6 +643,8 @@ export function formValuesToPayload(values: ProjectFormValues): CreateProjectDat
     backend_finish_date: values.backend_finish_date || null,
     tester_compliance_complete_date: values.tester_compliance_complete_date || null,
     developer_compliance_complete_date: values.developer_compliance_complete_date || null,
+    estimated_hours: parseHoursPayload(values.estimated_hours),
+    // developer_hours_taken is auto-collected from checkout — do not overwrite on form save
     members,
   };
 }

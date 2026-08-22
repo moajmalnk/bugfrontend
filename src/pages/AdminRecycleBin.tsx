@@ -419,7 +419,7 @@ export default function AdminRecycleBin() {
     load();
   }, [load]);
 
-  useClampUrlPage(clampToTotalPages, totalPages);
+  useClampUrlPage(clampToTotalPages, totalPages, !loading);
 
   const allSelected = items.length > 0 && items.every((i) => selected.has(i.id));
   const hasActiveFilters = Boolean(

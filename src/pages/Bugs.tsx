@@ -286,7 +286,7 @@ const Bugs = () => {
       Math.ceil(totalFiltered / itemsPerPage) ||
       1
   );
-  useClampUrlPage(clampToTotalPages, totalPages);
+  useClampUrlPage(clampToTotalPages, totalPages, !loading);
 
   const fetchProjects = async () => {
     try {

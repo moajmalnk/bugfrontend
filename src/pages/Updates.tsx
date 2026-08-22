@@ -332,7 +332,7 @@ const Updates = () => {
   // Pagination calculations
   const totalFiltered = filteredUpdates.length;
   const totalPages = Math.max(1, Math.ceil(totalFiltered / itemsPerPage) || 1);
-  useClampUrlPage(clampToTotalPages, totalPages);
+  useClampUrlPage(clampToTotalPages, totalPages, !isLoading);
 
   const paginatedUpdates = filteredUpdates.slice(
     (currentPage - 1) * itemsPerPage,

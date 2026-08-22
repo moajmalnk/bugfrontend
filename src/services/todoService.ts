@@ -72,6 +72,12 @@ export type WorkSubmission = {
   planned_projects?: string[];
   planned_work?: string;
   project_updates?: ProjectWorkUpdate[];
+  time_allocation?: {
+    lunch_hours: number;
+    break_hours: number;
+    growth_glimpse_hours: number;
+    other_hours: number;
+  };
 };
 
 import { ENV } from '@/lib/env';

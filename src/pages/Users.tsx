@@ -667,7 +667,7 @@ const Users = () => {
   const totalFiltered = filteredUsers.length;
   const totalPages =
     totalFiltered > 0 ? Math.max(1, Math.ceil(totalFiltered / itemsPerPage)) : 1;
-  useClampUrlPage(clampToTotalPages, totalPages);
+  useClampUrlPage(clampToTotalPages, totalPages, !isLoading);
   const activePage =
     totalFiltered > 0 ? Math.min(Math.max(1, currentPage), totalPages) : 1;
   const paginatedUsers = filteredUsers.slice(
