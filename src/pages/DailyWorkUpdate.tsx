@@ -3,7 +3,7 @@ import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { submitWork, WorkSubmission, listMyTasks, UserTask, updateTask, listMySubmissions, checkIn, notifyWorkActivity, parseSubmissionsListResponse } from '@/services/todoService';
 import { CheckoutProjectUpdatesCard } from '@/components/daily-work/CheckoutProjectUpdatesCard';
 import { WeeklyReportStep } from '@/components/daily-work/WeeklyReportStep';
-import { isSaturdayYmd } from '@/services/weeklyReportService';
+import { isSaturdayYmd, getWeeklyReport } from '@/services/weeklyReportService';
 import {
   formatProjectUpdatesForText,
   parseProjectUpdatesFromRow,
@@ -333,6 +333,8 @@ export function DailyWorkFlowPanel({
   }>({ version: PROJECT_STATS_CACHE_VERSION, entries: {} });
   const didAutoOpenEditRef = useRef(false);
   const didAutoOpenFlowRef = useRef<string | null>(null);
+  const weeklyReportSatisfiedRef = useRef(false);
+  const isCheckoutWizardOpenRef = useRef(false);
 
   const syncFlowAction = useCallback(
     (action: WorkFlowAction | null) => {
@@ -1145,19 +1147,32 @@ export function DailyWorkFlowPanel({
     setWeeklyReportDirty(dirty);
   }, []);
 
-  const skipWeeklyReportToCheckout = useCallback(() => {
+  const markWeeklyReportDone = useCallback(() => {
+    weeklyReportSatisfiedRef.current = true;
     setWeeklyReportDirty(false);
     setCheckoutWizardStep('form');
   }, []);
 
+  const skipWeeklyReportToCheckout = useCallback(() => {
+    markWeeklyReportDone();
+  }, [markWeeklyReportDone]);
+
   const handleWeeklyReportContinue = useCallback(() => {
-    setWeeklyReportDirty(false);
-    setCheckoutWizardStep('form');
-  }, []);
+    markWeeklyReportDone();
+  }, [markWeeklyReportDone]);
 
   function confirmLeaveWeeklyReport(): boolean {
     if (checkoutWizardStep !== 'weekly_report' || !weeklyReportDirty) return true;
     return window.confirm('You have unsaved changes.');
+  }
+
+  function checkoutWorkDate(): string {
+    if (isEditing) return form.submission_date || serverToday;
+    return form.check_in_time ? form.submission_date : serverToday;
+  }
+
+  function saturdayNeedsWeeklyStep(workDate: string): boolean {
+    return !isEditing && isSaturdayYmd(workDate) && !weeklyReportSatisfiedRef.current;
   }
 
   function openCheckoutWizard() {
@@ -1170,6 +1185,8 @@ export function DailyWorkFlowPanel({
       });
       return;
     }
+    const flowKey = `checkout:${editId || ''}`;
+    didAutoOpenFlowRef.current = flowKey;
     syncFlowAction('checkout');
     if (!isEditing) {
       resetCheckoutFormDefaults();
@@ -1178,18 +1195,16 @@ export function DailyWorkFlowPanel({
         submission_date: prev.check_in_time ? prev.submission_date : serverToday,
       }));
     }
-    const workDate = isEditing
-      ? form.submission_date
-      : form.check_in_time
-        ? form.submission_date
-        : serverToday;
+    const workDate = checkoutWorkDate();
     setWeeklyReportDirty(false);
-    setCheckoutWizardStep(!isEditing && isSaturdayYmd(workDate) ? 'weekly_report' : 'form');
+    setCheckoutWizardStep(saturdayNeedsWeeklyStep(workDate) ? 'weekly_report' : 'form');
+    isCheckoutWizardOpenRef.current = true;
     setIsCheckoutWizardOpen(true);
   }
 
   function dismissCheckoutWizard(): boolean {
     if (!confirmLeaveWeeklyReport()) return false;
+    isCheckoutWizardOpenRef.current = false;
     setIsCheckoutWizardOpen(false);
     setCheckoutWizardStep('form');
     setWeeklyReportDirty(false);
@@ -2085,14 +2100,34 @@ export function DailyWorkFlowPanel({
       }
       syncFlowAction('checkout');
       setCheckoutWizardStep('form');
+      isCheckoutWizardOpenRef.current = true;
       setIsCheckoutWizardOpen(true);
     }
   }, [isEditing, editId, tasksLoading, syncFlowAction, verificationRejected]);
 
   useEffect(() => {
+    if (isEditing || !currentUser?.id || !isSaturdayYmd(serverToday)) return;
+    if (weeklyReportSatisfiedRef.current) return;
+    let cancelled = false;
+    void getWeeklyReport(serverToday)
+      .then((data) => {
+        if (cancelled || data.required) return;
+        weeklyReportSatisfiedRef.current = true;
+      })
+      .catch(() => {
+        // Keep the Saturday gate; checkout can still collect the report.
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [serverToday, isEditing, currentUser?.id]);
+
+  useEffect(() => {
     const flowKey = `${flowAction || ''}:${editId || ''}`;
     if (!flowAction) {
-      if (!editId) didAutoOpenFlowRef.current = null;
+      if (!editId && !isCheckoutWizardOpenRef.current) {
+        didAutoOpenFlowRef.current = null;
+      }
       return;
     }
     if (didAutoOpenFlowRef.current === flowKey) return;
@@ -2121,10 +2156,14 @@ export function DailyWorkFlowPanel({
         return;
       }
       didAutoOpenFlowRef.current = flowKey;
+      if (isCheckoutWizardOpenRef.current) {
+        return;
+      }
       resetCheckoutFormDefaults();
       const workDate = form.check_in_time ? form.submission_date : serverToday;
       setWeeklyReportDirty(false);
-      setCheckoutWizardStep(isSaturdayYmd(workDate) ? 'weekly_report' : 'form');
+      setCheckoutWizardStep(saturdayNeedsWeeklyStep(workDate) ? 'weekly_report' : 'form');
+      isCheckoutWizardOpenRef.current = true;
       setIsCheckoutWizardOpen(true);
     }
   }, [
@@ -2991,6 +3030,7 @@ export function DailyWorkFlowPanel({
               closeCheckoutWizard();
               return;
             }
+            isCheckoutWizardOpenRef.current = false;
             setIsCheckoutWizardOpen(false);
             setCheckoutWizardStep('form');
             setWeeklyReportDirty(false);

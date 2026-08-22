@@ -70,6 +70,8 @@ export function WeeklyReportStep({
   const [fields, setFields] = useState<WeeklyReportFields>(INITIAL_FIELDS);
   const [baseline, setBaseline] = useState<WeeklyReportFields>(INITIAL_FIELDS);
 
+  const [revealed, setRevealed] = useState(false);
+
   const dirty =
     fields.work_completed !== baseline.work_completed ||
     fields.work_in_progress !== baseline.work_in_progress ||
@@ -83,16 +85,20 @@ export function WeeklyReportStep({
   }, [dirty, onDirtyChange]);
 
   useEffect(() => {
-    if (!active) return;
+    if (!active) {
+      setRevealed(false);
+      return;
+    }
 
     let cancelled = false;
     (async () => {
       setLoading(true);
+      setRevealed(false);
       setError('');
       try {
         const data = await getWeeklyReport(workDate);
         if (cancelled) return;
-        if (!data.required && data.report) {
+        if (!data.required) {
           onSkipToCheckout();
           return;
         }
@@ -113,9 +119,11 @@ export function WeeklyReportStep({
         setWeekLabel(data.week_label);
         setFields(next);
         setBaseline(next);
+        setRevealed(true);
       } catch (err) {
         if (cancelled) return;
         setError(extractApiErrorMessage(err, 'Could not load weekly report.'));
+        setRevealed(true);
       } finally {
         if (!cancelled) setLoading(false);
       }
