@@ -17,6 +17,17 @@
       html.dark, html.dark body { background: #0f172a; color: #e2e8f0; }
       html:not(.dark), html:not(.dark) body { background: #f8fafc; color: #0f172a; }
       html.allow-body-scroll body { overflow: auto; }
+      .sr-only {
+        position: absolute;
+        width: 1px;
+        height: 1px;
+        padding: 0;
+        margin: -1px;
+        overflow: hidden;
+        clip: rect(0, 0, 0, 0);
+        white-space: nowrap;
+        border: 0;
+      }
       #app-boot {
         min-height: 100vh;
         margin: 0;
@@ -28,16 +39,17 @@
         text-align: center;
         box-sizing: border-box;
         font-family: Inter, system-ui, -apple-system, sans-serif;
-        background: #f8fafc;
-        color: #0f172a;
+        background: #0f172a;
+        color: #e2e8f0;
       }
-      html.dark #app-boot { background: #0f172a; color: #e2e8f0; }
-      #app-boot .eyebrow { margin: 0 0 0.75rem; font-size: 0.875rem; letter-spacing: 0.06em; text-transform: uppercase; color: #2563eb; font-weight: 600; }
-      html.dark #app-boot .eyebrow { color: #60a5fa; }
-      #app-boot h1 { margin: 0 0 1rem; font-size: clamp(1.75rem, 5vw, 2.75rem); font-weight: 700; line-height: 1.2; max-width: 40rem; color: #0f172a; }
-      html.dark #app-boot h1 { color: #fff; }
-      #app-boot .lead { margin: 0; font-size: 1.0625rem; line-height: 1.65; color: #64748b; max-width: 36rem; }
-      html.dark #app-boot .lead { color: #94a3b8; }
+      #app-boot video {
+        width: 100%;
+        max-width: min(960px, 100%);
+        max-height: min(70vh, 720px);
+        border-radius: 1rem;
+        object-fit: contain;
+        box-shadow: 0 25px 50px -12px rgb(0 0 0 / 0.45);
+      }
     </style>
     
     <!-- Primary Meta Tags -->
@@ -174,11 +186,20 @@
     <div id="root">
       <div id="app-boot">
         <main id="main-content">
-          <p class="eyebrow">BugRicer</p>
-          <h1>Advanced Bug Tracking &amp; Project Management Platform</h1>
-          <p class="lead">
-            Streamline your development workflow with powerful bug tracking, seamless team collaboration, and comprehensive project management tools all in one place.
-          </p>
+          <h1 class="sr-only">
+            BugRicer — Advanced Bug Tracking &amp; Project Management Platform. Streamline your
+            development workflow with powerful bug tracking, seamless team collaboration, and
+            comprehensive project management tools all in one place.
+          </h1>
+          <video
+            src="/404.mp4"
+            autoplay
+            muted
+            loop
+            playsinline
+            preload="auto"
+            aria-hidden="true"
+          ></video>
         </main>
       </div>
     </div>

@@ -1,104 +1,44 @@
-import { useNavigate } from "react-router-dom";
-import { BiWifiOff } from "react-icons/bi";
-import { IoCallOutline } from "react-icons/io5";
-import { MdOutlineMailOutline } from "react-icons/md";
-import { GoGlobe } from "react-icons/go";
-import { FaRegQuestionCircle } from "react-icons/fa";
-import { useState } from "react";
+import { BrandStatusVideoScreen } from "@/components/status/BrandStatusVideoScreen";
+import { Button } from "@/components/ui/button";
 import { useAuth } from "@/context/AuthContext";
+import { RefreshCw } from "lucide-react";
+import { useNavigate } from "react-router-dom";
 
 const NetworkError = () => {
   const navigate = useNavigate();
   const { currentUser } = useAuth();
-  const [isOpen, setIsOpen] = useState(false);
 
   return (
-    <div className="min-h-screen flex flex-col items-center justify-center bg-gray-50 gap-4">
-      <div className="bg-white p-6 px-8 rounded-xl shadow-lg xs:w-[400px] w-[300px] flex flex-col items-center">
-        {/* Network Error Icon */}
-        <div className="w-20 h-20 mb-4 flex items-center justify-center bg-red-50 rounded-full">
-          <BiWifiOff className="w-12 h-12 text-red-500" />
-        </div>
+    <BrandStatusVideoScreen variant="offline">
+      <p className="text-sm font-medium uppercase tracking-wide text-amber-400 mb-2">
+        Offline
+      </p>
+      <h2 className="text-2xl font-bold text-white mb-3">Connection lost</h2>
+      <p className="text-sm text-slate-300 mb-6 leading-relaxed">
+        We&apos;re having trouble connecting to the server. Check your internet connection
+        or try again in a moment.
+      </p>
 
-        {/* Error Title */}
-        <h1 className="text-xl font-bold text-gray-800 mb-2">Connection Lost</h1>
-
-        {/* Error Description */}
-        <p className="text-sm text-gray-600 text-center mb-6">
-          We're having trouble connecting to the server. Please check your internet connection or try again later.
-        </p>
-
-        {/* Action Buttons */}
-        <div className="flex flex-col xs:flex-row gap-3 w-full">
-          <button
-            onClick={() => navigate(`/${currentUser?.role || 'tester'}/projects`)}
-            className="px-4 py-2 rounded-lg bg-gray-100 text-sm text-gray-700 font-medium 
-            hover:bg-gray-200 transition-colors w-full xs:w-auto"
-          >
-            Back to Home
-          </button>
-          <button
-            onClick={() => window.location.reload()}
-            className="px-4 py-2 rounded-lg bg-blue-500 text-sm text-white font-medium 
-            hover:bg-blue-600 transition-colors w-full xs:w-auto"
-          >
-            Refresh Page
-          </button>
-        </div>
-      </div>
-
-      {/* Support Icons Container */}
-      <div className="relative w-[200px] flex justify-center">
-        {/* Question Mark Button */}
-        <button
-          onClick={() => setIsOpen(!isOpen)}
-          className={`w-12 h-12 bg-blue-500 rounded-full flex items-center justify-center shadow-lg hover:bg-blue-600 transition-all duration-300 ${
-            isOpen ? "transform -translate-x-[80px]" : ""
-          }`}
+      <div className="flex flex-col sm:flex-row gap-3 justify-center">
+        <Button
+          type="button"
+          variant="outline"
+          className="rounded-xl h-11 border-white/20 bg-white/5 text-slate-100 hover:bg-white/10 hover:text-white"
+          onClick={() => navigate(`/${currentUser?.role || "tester"}/projects`)}
         >
-          <FaRegQuestionCircle className="h-6 w-6 text-white" />
-        </button>
-
-        {/* Support Options */}
-        <div
-          className={`absolute left-[56px] flex gap-3 transition-all duration-300 ${
-            isOpen
-              ? "opacity-100 transform translate-x-0"
-              : "opacity-0 transform -translate-x-8 pointer-events-none"
-          }`}
+          Back to Home
+        </Button>
+        <Button
+          type="button"
+          className="rounded-xl h-11"
+          onClick={() => window.location.reload()}
         >
-          {/* 📞 Phone */}
-          <a
-            href="tel:+1234567890"
-            className="w-12 h-12 bg-white rounded-full flex items-center justify-center shadow-lg hover:bg-gray-50 transition-colors"
-            title="Call Support"
-          >
-            <IoCallOutline className="h-6 w-6 text-blue-500" />
-          </a>
-
-          {/* 📧 Email */}
-          <a
-            href="mailto:support@bugs.com"
-            className="w-12 h-12 bg-white rounded-full flex items-center justify-center shadow-lg hover:bg-gray-50 transition-colors"
-            title="Email Support"
-          >
-            <MdOutlineMailOutline className="h-6 w-6 text-blue-500" />
-          </a>
-
-          {/* 🌐 Support */}
-          <a
-            href="https://support.bugs.com"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="w-12 h-12 bg-white rounded-full flex items-center justify-center shadow-lg hover:bg-gray-50 transition-colors"
-            title="Visit Support Site"
-          >
-            <GoGlobe className="h-6 w-6 text-blue-500" />
-          </a>
-        </div>
+          <RefreshCw className="mr-2 h-4 w-4" />
+          Refresh Page
+        </Button>
       </div>
-    </div>
+    </BrandStatusVideoScreen>
   );
 };
 
-export default NetworkError; 
+export default NetworkError;

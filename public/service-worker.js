@@ -151,7 +151,7 @@ self.addEventListener('notificationclick', function (event) {
 
 // Stable per deploy — must NOT use new Date() here (causes endless SW updates + page reload loops).
 // Keep in sync with public/version.json when you bump releases.
-const APP_CACHE_VERSION = '1.0.26';
+const APP_CACHE_VERSION = '1.0.27';
 const CACHE_SUFFIX = APP_CACHE_VERSION.replace(/[^a-zA-Z0-9._-]/g, '-');
 const CACHE_NAME = `bugricer-v${CACHE_SUFFIX}`;
 const STATIC_CACHE = `bugricer-static-v${CACHE_SUFFIX}`;
@@ -172,6 +172,7 @@ const CRITICAL_RESOURCES = [
   '/notification-icon-96.png',
   '/notification-badge-96.png',
   '/apple-touch-icon.png',
+  '/404.mp4',
 ];
 
 const STATIC_RESOURCES = [
@@ -278,7 +279,7 @@ function getCacheStrategy(request) {
   }
   
   // Static assets: Cache First (performance optimized)
-  if (url.pathname.match(/\.(js|css|png|jpg|jpeg|gif|svg|ico|woff|woff2)$/)) {
+  if (url.pathname.match(/\.(js|css|png|jpg|jpeg|gif|svg|ico|woff|woff2|mp4|webm)$/)) {
     return 'cacheFirst';
   }
   
