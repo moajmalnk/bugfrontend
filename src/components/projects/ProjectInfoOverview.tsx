@@ -212,13 +212,26 @@ function StatusStatPill({
   label,
   status,
   value,
+  completedAt,
 }: {
   label: string;
   status: Project['status'];
   value: string;
+  completedAt?: string | null;
 }) {
+  const isClosed = status === 'completed' || status === 'release_ready';
+  const completedLabel =
+    isClosed && completedAt ? formatProjectDate(completedAt) : null;
+
   return (
-    <div className="rounded-xl border border-gray-200/70 bg-gray-50/50 px-3 py-2.5 sm:px-4 sm:py-3 min-w-0 dark:border-gray-800/70 dark:bg-gray-800/30">
+    <div
+      className={cn(
+        'rounded-xl border px-3 py-2.5 sm:px-4 sm:py-3 min-w-0',
+        isClosed
+          ? 'border-emerald-300/70 bg-emerald-50/80 dark:border-emerald-800/60 dark:bg-emerald-950/30'
+          : 'border-gray-200/70 bg-gray-50/50 dark:border-gray-800/70 dark:bg-gray-800/30'
+      )}
+    >
       <p className="text-[10px] sm:text-xs font-medium uppercase tracking-wide text-muted-foreground truncate">
         {label}
       </p>
@@ -229,12 +242,18 @@ function StatusStatPill({
             projectStatusBadgeClass(status)
           )}
         >
-          {(status === 'completed' || status === 'release_ready') && (
+          {isClosed && (
             <CheckCircle2 className="h-3.5 w-3.5 shrink-0" aria-hidden />
           )}
           {value}
         </span>
       </div>
+      {completedLabel ? (
+        <span className="mt-1.5 inline-flex items-center gap-1 rounded-full border border-emerald-200/80 bg-emerald-100/70 px-2 py-0.5 text-[10px] sm:text-xs font-semibold text-emerald-800 dark:border-emerald-800/60 dark:bg-emerald-950/50 dark:text-emerald-300">
+          <Calendar className="h-3 w-3 shrink-0" aria-hidden />
+          Completed {completedLabel}
+        </span>
+      ) : null}
     </div>
   );
 }
@@ -492,7 +511,17 @@ export function ProjectInfoOverview({ project, createdByName }: ProjectInfoOverv
         {showDeveloperHours ? (
           <StatPill label="Dev Hours" value={developerHoursDisplay} highlight />
         ) : null}
-        <StatusStatPill label="Status" status={project.status} value={statusLabel} />
+        <StatusStatPill
+          label="Status"
+          status={project.status}
+          value={statusLabel}
+          completedAt={
+            project.completed_at ||
+            ((project.status === 'completed' || project.status === 'release_ready')
+              ? project.updated_at
+              : null)
+          }
+        />
         <DeadlineStatPill deadline={project.deadline_date} status={project.status} />
         <StatPill label="Created" value={formatProjectDate(project.created_at)} />
         <StatPill label="Created By" value={createdByName || 'System'} />

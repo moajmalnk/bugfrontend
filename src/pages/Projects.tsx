@@ -130,6 +130,30 @@ function isDeadlineOverdue(
   return d.getTime() < today.getTime();
 }
 
+/**
+ * Why: Match the project card Timeline block — Start / Deadline / Testing.
+ * Empty or zero dates mean the card hides Timeline; those belong in "No dates".
+ */
+function hasProjectTimelineDates(project: {
+  start_date?: string | null;
+  deadline_date?: string | null;
+  testing_start_date?: string | null;
+  testing_end_date?: string | null;
+}): boolean {
+  const set = (value?: string | null) => {
+    const raw = String(value || "").trim();
+    if (!raw) return false;
+    const ymd = raw.slice(0, 10);
+    return /^\d{4}-\d{2}-\d{2}$/.test(ymd) && ymd !== "0000-00-00";
+  };
+  return (
+    set(project.start_date) ||
+    set(project.deadline_date) ||
+    set(project.testing_end_date) ||
+    set(project.testing_start_date)
+  );
+}
+
 // Enhanced Professional Project Card Skeleton with animations
 const ProjectCardSkeleton = ({ index = 0 }: { index?: number }) => (
   <motion.div
@@ -611,6 +635,17 @@ const Projects = () => {
           getDeadlineTimerReminder(project.deadline_date, project.status).tone ===
           "today"
       );
+    } else if (statusFilter === "due_soon") {
+      filtered = filtered.filter(
+        (project) =>
+          getDeadlineTimerReminder(project.deadline_date, project.status).tone ===
+          "soon"
+      );
+    } else if (statusFilter === "no_dates") {
+      filtered = filtered.filter(
+        (project) =>
+          project.status !== "archived" && !hasProjectTimelineDates(project)
+      );
     } else if (statusFilter !== "all") {
       filtered = filtered.filter((project) => project.status === statusFilter);
     } else if (!searchQuery.trim()) {
@@ -1068,6 +1103,8 @@ const Projects = () => {
                       <SelectItem value="active">Active</SelectItem>
                       <SelectItem value="overdue">Overdue</SelectItem>
                       <SelectItem value="due_today">Due today</SelectItem>
+                      <SelectItem value="due_soon">Due soon</SelectItem>
+                      <SelectItem value="no_dates">No dates</SelectItem>
                       <SelectItem value="completed">Completed</SelectItem>
                       <SelectItem value="release_ready">Release Ready</SelectItem>
                       <SelectItem value="archived">Archived</SelectItem>

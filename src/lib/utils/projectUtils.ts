@@ -278,6 +278,8 @@ export interface Project {
   created_by: string;
   created_at: string;
   updated_at: string;
+  /** When status first became completed / release_ready */
+  completed_at?: string | null;
   client_id?: string | null;
   client?: ClientSummary | null;
   client_name?: string | null;
