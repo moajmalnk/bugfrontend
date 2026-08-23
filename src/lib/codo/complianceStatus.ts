@@ -1,5 +1,6 @@
 import {
   getPipelineStageLabel,
+  isClosedProjectStatus,
   isCompliancePipelineSatisfied,
   type ProjectComplianceSummary,
 } from '@/lib/codo/complianceRules';
@@ -230,12 +231,35 @@ export function countByStatus(
   );
 }
 
+/**
+ * Why: Admin Final Lock (or closed project status) means the project is done.
+ * Those must only appear under Completed — never Pending / Not started.
+ */
+export function isProjectComplianceComplete(
+  item: ProjectComplianceOverview
+): boolean {
+  if (item.adminVerified || item.adminStatus === 'completed') {
+    return true;
+  }
+  const status = String(item.project?.status || '').toLowerCase();
+  return isClosedProjectStatus(status);
+}
+
 export function matchesComplianceFilter(
   item: ProjectComplianceOverview,
   tab: ComplianceFilterTab,
   role: 'admin' | 'developer' | 'tester'
 ): boolean {
   if (tab === 'all') return true;
+
+  // Completed projects are exclusive to the Completed tab for every role.
+  if (isProjectComplianceComplete(item)) {
+    return tab === 'completed';
+  }
+
+  if (tab === 'completed') {
+    return false;
+  }
 
   if (role === 'developer') {
     return item.developerStatus === tab;
@@ -244,6 +268,7 @@ export function matchesComplianceFilter(
     return item.testerStatus === tab;
   }
 
+  // Admin: among incomplete projects, Pending/Not started if any phase matches.
   return (
     item.developerStatus === tab ||
     item.testerStatus === tab ||
