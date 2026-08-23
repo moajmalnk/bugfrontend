@@ -55,10 +55,36 @@ export async function triggerBlobDownload(
   }, 2000);
 }
 
+/**
+ * Why: audio.php is public and often answers with ACAO:* on production.
+ * Credentialed fetch + wildcard Origin is a hard browser CORS failure.
+ */
+function isPublicMediaUrl(url: string): boolean {
+  try {
+    const path = new URL(url, window.location.origin).pathname;
+    return /\/audio\.php$/i.test(path);
+  } catch {
+    return /audio\.php/i.test(url);
+  }
+}
+
 async function fetchBlobForDownload(url: string): Promise<Blob> {
   const token = localStorage.getItem('token');
   const headers: HeadersInit = {};
   if (token) headers.Authorization = `Bearer ${token}`;
+
+  // Public audio: omit credentials first — never trip wildcard + include CORS
+  if (isPublicMediaUrl(url)) {
+    const anonymous = await fetch(url, {
+      method: 'GET',
+      credentials: 'omit',
+      mode: 'cors',
+    });
+    if (!anonymous.ok) {
+      throw new Error(`Download failed (${anonymous.status})`);
+    }
+    return anonymous.blob();
+  }
 
   try {
     const withCredentials = await fetch(url, {

@@ -1,5 +1,23 @@
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Textarea } from "@/components/ui/textarea";
@@ -21,13 +39,24 @@ import {
   type BugDoubtReply,
 } from "@/services/bugDoubtService";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { CircleHelp, Loader2, MessageCircleReply, User } from "lucide-react";
-import { FormEvent, useState } from "react";
+import {
+  CircleHelp,
+  Loader2,
+  MessageCircleReply,
+  Pencil,
+  Trash2,
+  User,
+} from "lucide-react";
+import { FormEvent, useEffect, useRef, useState } from "react";
 
 const BODY_MAX = 2000;
 
+type MessageKind = "doubt" | "reply";
+
 type ChatMessage = {
   id: string;
+  kind: MessageKind;
+  doubtId: string;
   userId: string;
   name: string;
   body: string;
@@ -49,10 +78,14 @@ function VoiceList({
   attachments,
   prefix,
   mine,
+  removableIds,
+  onRemoveAttachment,
 }: {
   attachments: BugDoubtAttachment[];
   prefix: string;
   mine: boolean;
+  removableIds?: Set<string>;
+  onRemoveAttachment?: (id: string) => void;
 }) {
   const [activeId, setActiveId] = useState<string | null>(null);
   if (!attachments?.length) return null;
@@ -60,6 +93,9 @@ function VoiceList({
     <div className="flex w-full min-w-0 flex-col gap-2">
       {attachments.map((att) => {
         const id = `${prefix}-${att.id}`;
+        const canRemove =
+          Boolean(onRemoveAttachment) &&
+          (!removableIds || removableIds.has(att.id));
         return (
           <WhatsAppVoiceMessage
             key={att.id}
@@ -74,6 +110,9 @@ function VoiceList({
             onPause={(voiceId) => {
               if (voiceId === activeId) setActiveId(null);
             }}
+            onRemove={
+              canRemove ? () => onRemoveAttachment?.(att.id) : undefined
+            }
           />
         );
       })}
@@ -84,9 +123,15 @@ function VoiceList({
 function ChatBubble({
   message,
   mine,
+  canManage,
+  onEdit,
+  onDelete,
 }: {
   message: ChatMessage;
   mine: boolean;
+  canManage: boolean;
+  onEdit: () => void;
+  onDelete: () => void;
 }) {
   const hasText = Boolean(message.body.trim());
   const hasVoice = (message.attachments || []).length > 0;
@@ -94,7 +139,7 @@ function ChatBubble({
   return (
     <div
       className={cn(
-        "flex w-full min-w-0",
+        "group flex w-full min-w-0",
         mine ? "justify-end" : "justify-start"
       )}
     >
@@ -127,6 +172,37 @@ function ChatBubble({
             <span className="text-muted-foreground">
               {formatDetailedDate(message.createdAt)}
             </span>
+            {canManage ? (
+              <div
+                className={cn(
+                  "flex items-center gap-1 opacity-100 sm:opacity-0 sm:transition-opacity sm:group-hover:opacity-100 sm:group-focus-within:opacity-100",
+                  mine ? "flex-row-reverse" : "flex-row"
+                )}
+              >
+                <Button
+                  type="button"
+                  size="icon"
+                  variant="ghost"
+                  className="h-7 w-7 rounded-xl text-muted-foreground hover:text-foreground"
+                  onClick={onEdit}
+                  aria-label="Edit message"
+                  title="Edit"
+                >
+                  <Pencil className="h-3.5 w-3.5" />
+                </Button>
+                <Button
+                  type="button"
+                  size="icon"
+                  variant="ghost"
+                  className="h-7 w-7 rounded-xl text-muted-foreground hover:text-destructive"
+                  onClick={onDelete}
+                  aria-label="Delete message"
+                  title="Delete"
+                >
+                  <Trash2 className="h-3.5 w-3.5" />
+                </Button>
+              </div>
+            ) : null}
           </div>
           {hasText ? (
             <div
@@ -249,9 +325,258 @@ function ReplyComposer({
   );
 }
 
+function EditMessageDialog({
+  open,
+  message,
+  onOpenChange,
+  onSaved,
+}: {
+  open: boolean;
+  message: ChatMessage | null;
+  onOpenChange: (open: boolean) => void;
+  onSaved: () => void;
+}) {
+  const [body, setBody] = useState("");
+  const [keptAttachments, setKeptAttachments] = useState<BugDoubtAttachment[]>(
+    []
+  );
+  const [removedIds, setRemovedIds] = useState<string[]>([]);
+  const [voice, setVoice] = useState<RecordedVoiceNote | null>(null);
+  const [saving, setSaving] = useState(false);
+  const [unsavedOpen, setUnsavedOpen] = useState(false);
+  const baselineRef = useRef({ body: "", removed: [] as string[] });
+  const historyPushed = useRef(false);
+  const closingRef = useRef(false);
+  const dirtyRef = useRef(false);
+
+  useEffect(() => {
+    if (!open || !message) {
+      setBody("");
+      setKeptAttachments([]);
+      setRemovedIds([]);
+      setVoice(null);
+      setSaving(false);
+      setUnsavedOpen(false);
+      return;
+    }
+    const nextBody = message.body || "";
+    const nextKept = [...(message.attachments || [])];
+    setBody(nextBody);
+    setKeptAttachments(nextKept);
+    setRemovedIds([]);
+    setVoice(null);
+    baselineRef.current = { body: nextBody, removed: [] };
+    window.history.pushState({ modal: "edit-doubt-message" }, "");
+    historyPushed.current = true;
+    closingRef.current = false;
+    const onPop = () => {
+      if (closingRef.current) {
+        closingRef.current = false;
+        return;
+      }
+      historyPushed.current = false;
+      if (dirtyRef.current) {
+        window.history.pushState({ modal: "edit-doubt-message" }, "");
+        historyPushed.current = true;
+        setUnsavedOpen(true);
+        return;
+      }
+      onOpenChange(false);
+    };
+    window.addEventListener("popstate", onPop);
+    return () => window.removeEventListener("popstate", onPop);
+  }, [open, message, onOpenChange]);
+
+  const isDirty =
+    body.trim() !== baselineRef.current.body.trim() ||
+    removedIds.length > 0 ||
+    voice !== null;
+  dirtyRef.current = isDirty;
+
+  const isValid =
+    body.trim().length > 0 || keptAttachments.length > 0 || voice !== null;
+
+  const closeClean = () => {
+    closingRef.current = true;
+    if (
+      historyPushed.current &&
+      window.history.state?.modal === "edit-doubt-message"
+    ) {
+      historyPushed.current = false;
+      window.history.back();
+    }
+    onOpenChange(false);
+  };
+
+  const requestClose = () => {
+    if (saving) return;
+    if (isDirty) {
+      setUnsavedOpen(true);
+      return;
+    }
+    closeClean();
+  };
+
+  const handleSave = async (e: FormEvent) => {
+    e.preventDefault();
+    if (!message || saving || !isValid) return;
+    setSaving(true);
+    try {
+      const payload = {
+        body: body.trim(),
+        voice: voice
+          ? { blob: voice.blob, duration: voice.duration }
+          : null,
+        removeAttachmentIds: removedIds,
+      };
+      if (message.kind === "doubt") {
+        await bugDoubtService.updateDoubt(message.id, payload);
+      } else {
+        await bugDoubtService.updateReply(message.id, payload);
+      }
+      toast({ title: "Message updated" });
+      onSaved();
+      closeClean();
+    } catch (error) {
+      toast({
+        title: "Update failed",
+        description: extractApiErrorMessage(error, "Could not save changes"),
+        variant: "destructive",
+      });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <>
+      <Dialog
+        open={open}
+        onOpenChange={(next) => {
+          if (!next) requestClose();
+        }}
+      >
+        <DialogContent className="max-w-[600px] rounded-2xl">
+          <DialogHeader>
+            <DialogTitle>
+              Edit {message?.kind === "reply" ? "reply" : "doubt"}
+            </DialogTitle>
+            <DialogDescription>
+              Update the text and voice. Empty messages are not allowed.
+            </DialogDescription>
+          </DialogHeader>
+          <form onSubmit={handleSave} className="grid grid-cols-12 gap-4">
+            <div className="col-span-12 flex flex-col gap-2">
+              <Label htmlFor="edit-doubt-body">Description</Label>
+              <Textarea
+                id="edit-doubt-body"
+                value={body}
+                maxLength={BODY_MAX}
+                disabled={saving}
+                onChange={(e) => setBody(e.target.value.slice(0, BODY_MAX))}
+                className="min-h-[100px] rounded-xl"
+              />
+              <p className="text-right text-xs text-muted-foreground">
+                {body.length}/{BODY_MAX}
+              </p>
+            </div>
+            <div className="col-span-12 flex flex-col gap-2">
+              <Label>Voice message</Label>
+              {keptAttachments.length > 0 ? (
+                <VoiceList
+                  attachments={keptAttachments}
+                  prefix={`edit-${message?.id || "msg"}`}
+                  mine
+                  onRemoveAttachment={(id) => {
+                    setKeptAttachments((prev) =>
+                      prev.filter((att) => att.id !== id)
+                    );
+                    setRemovedIds((prev) =>
+                      prev.includes(id) ? prev : [...prev, id]
+                    );
+                  }}
+                />
+              ) : null}
+              {voice ? (
+                <WhatsAppVoiceMessage
+                  id={`edit-new-voice-${message?.id || "msg"}`}
+                  audioSource={voice.blob}
+                  duration={voice.duration}
+                  waveform={voice.waveform}
+                  accent="sent"
+                  layout="form"
+                  onRemove={() => setVoice(null)}
+                />
+              ) : (
+                <WhatsAppVoiceRecorder
+                  onComplete={(note) => setVoice(note)}
+                  disabled={saving}
+                  maxDuration={300}
+                />
+              )}
+            </div>
+            <DialogFooter className="col-span-12 gap-2 sm:gap-2">
+              <Button
+                type="button"
+                variant="outline"
+                className="rounded-xl"
+                disabled={saving}
+                onClick={requestClose}
+              >
+                Cancel
+              </Button>
+              <Button
+                type="submit"
+                className="rounded-xl"
+                disabled={saving || !isValid}
+              >
+                {saving ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Saving...
+                  </>
+                ) : (
+                  "Save changes"
+                )}
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
+
+      <AlertDialog open={unsavedOpen} onOpenChange={setUnsavedOpen}>
+        <AlertDialogContent className="max-w-[400px] rounded-2xl">
+          <AlertDialogHeader>
+            <AlertDialogTitle>Unsaved changes</AlertDialogTitle>
+            <AlertDialogDescription>
+              Discard your edits to this message?
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter className="gap-2 sm:gap-2">
+            <AlertDialogCancel className="mt-0 rounded-xl">
+              Keep editing
+            </AlertDialogCancel>
+            <AlertDialogAction
+              className="rounded-xl"
+              onClick={() => {
+                setUnsavedOpen(false);
+                closeClean();
+              }}
+            >
+              Discard
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </>
+  );
+}
+
 function toChatMessages(doubt: BugDoubt): ChatMessage[] {
   const asked: ChatMessage = {
     id: doubt.id,
+    kind: "doubt",
+    doubtId: doubt.id,
     userId: doubt.asked_by,
     name: doubt.asked_by_name || "Unknown",
     body: doubt.body || "",
@@ -262,6 +587,8 @@ function toChatMessages(doubt: BugDoubt): ChatMessage[] {
   const replies: ChatMessage[] = (doubt.replies || []).map(
     (reply: BugDoubtReply) => ({
       id: reply.id,
+      kind: "reply" as const,
+      doubtId: doubt.id,
       userId: reply.user_id,
       name: reply.user_name || "Unknown",
       body: reply.body || "",
@@ -276,14 +603,47 @@ function toChatMessages(doubt: BugDoubt): ChatMessage[] {
 function DoubtThread({
   doubt,
   currentUserId,
+  isAdmin,
   readOnly = false,
 }: {
   doubt: BugDoubt;
   currentUserId?: string;
+  isAdmin: boolean;
   readOnly?: boolean;
 }) {
   const [replyOpen, setReplyOpen] = useState(false);
+  const [editTarget, setEditTarget] = useState<ChatMessage | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<ChatMessage | null>(null);
+  const [deleting, setDeleting] = useState(false);
+  const queryClient = useQueryClient();
   const messages = toChatMessages(doubt);
+
+  const refresh = () => {
+    queryClient.invalidateQueries({ queryKey: ["bug-doubts"] });
+  };
+
+  const confirmDelete = async () => {
+    if (!deleteTarget || deleting) return;
+    setDeleting(true);
+    try {
+      if (deleteTarget.kind === "doubt") {
+        await bugDoubtService.deleteDoubt(deleteTarget.id);
+      } else {
+        await bugDoubtService.deleteReply(deleteTarget.id);
+      }
+      toast({ title: "Message deleted" });
+      setDeleteTarget(null);
+      refresh();
+    } catch (error) {
+      toast({
+        title: "Delete failed",
+        description: extractApiErrorMessage(error, "Could not delete message"),
+        variant: "destructive",
+      });
+    } finally {
+      setDeleting(false);
+    }
+  };
 
   return (
     <article className="flex flex-col gap-3 rounded-2xl border border-border/60 bg-background/70 p-3 sm:p-4">
@@ -293,13 +653,21 @@ function DoubtThread({
           scrollbarColor: "hsl(var(--muted-foreground) / 0.35) transparent",
         }}
       >
-        {messages.map((message) => (
-          <ChatBubble
-            key={message.id}
-            message={message}
-            mine={sameUser(message.userId, currentUserId)}
-          />
-        ))}
+        {messages.map((message) => {
+          const mine = sameUser(message.userId, currentUserId);
+          const canManage =
+            !readOnly && (mine || isAdmin);
+          return (
+            <ChatBubble
+              key={`${message.kind}-${message.id}`}
+              message={message}
+              mine={mine}
+              canManage={canManage}
+              onEdit={() => setEditTarget(message)}
+              onDelete={() => setDeleteTarget(message)}
+            />
+          );
+        })}
       </div>
 
       {replyOpen && !readOnly ? (
@@ -317,6 +685,57 @@ function DoubtThread({
           </Button>
         </div>
       ) : null}
+
+      <EditMessageDialog
+        open={Boolean(editTarget)}
+        message={editTarget}
+        onOpenChange={(open) => {
+          if (!open) setEditTarget(null);
+        }}
+        onSaved={refresh}
+      />
+
+      <AlertDialog
+        open={Boolean(deleteTarget)}
+        onOpenChange={(open) => {
+          if (!open && !deleting) setDeleteTarget(null);
+        }}
+      >
+        <AlertDialogContent className="max-w-[400px] rounded-2xl">
+          <AlertDialogHeader>
+            <AlertDialogTitle>
+              Delete {deleteTarget?.kind === "reply" ? "reply" : "doubt"}?
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              {deleteTarget?.kind === "doubt"
+                ? "This permanently removes the doubt and all of its replies."
+                : "This permanently removes this reply and its voice notes."}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter className="gap-2 sm:gap-2">
+            <AlertDialogCancel className="mt-0 rounded-xl" disabled={deleting}>
+              Cancel
+            </AlertDialogCancel>
+            <AlertDialogAction
+              className="rounded-xl bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              disabled={deleting}
+              onClick={(e) => {
+                e.preventDefault();
+                void confirmDelete();
+              }}
+            >
+              {deleting ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Deleting...
+                </>
+              ) : (
+                "Delete"
+              )}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </article>
   );
 }
@@ -329,6 +748,7 @@ export function BugDoubtClearingCard({
   readOnly?: boolean;
 }) {
   const { currentUser } = useAuth();
+  const isAdmin = String(currentUser?.role || "").toLowerCase() === "admin";
   const { data: doubts = [], isLoading, isError } = useQuery({
     queryKey: ["bug-doubts", bugId, readOnly],
     queryFn: () =>
@@ -381,6 +801,7 @@ export function BugDoubtClearingCard({
               key={doubt.id}
               doubt={doubt}
               currentUserId={currentUser?.id}
+              isAdmin={isAdmin}
               readOnly={readOnly}
             />
           ))}

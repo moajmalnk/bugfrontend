@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState, type MouseEvent } from "react";
-import { Play, Pause, Download, Volume2 } from "lucide-react";
+import { Download, Pause, Play, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { probeAudioDuration } from "@/components/voice/probeAudioDuration";
@@ -23,33 +23,11 @@ export interface WhatsAppVoiceMessageProps {
 }
 
 const SPEED_STEPS: Array<0.75 | 1 | 1.5 | 2> = [0.75, 1, 1.5, 2];
-/** Noticeable higher / brighter pitch when robot mode is on */
-const ROBOT_PITCH = 1.55;
-
-type RobotGraph = {
-  ctx: AudioContext;
-  dryGain: GainNode;
-  wetGain: GainNode;
-  tremoloGain: GainNode;
-  modulator: OscillatorNode;
-  modDepth: GainNode;
-};
 
 const isAbortError = (error: unknown) => {
   if (!error || typeof error !== "object") return false;
   const name = (error as { name?: string }).name;
   return name === "AbortError" || name === "NotAllowedError";
-};
-
-const setPreservesPitch = (audio: HTMLAudioElement, preserve: boolean) => {
-  const media = audio as HTMLMediaElement & {
-    preservesPitch?: boolean;
-    webkitPreservesPitch?: boolean;
-    mozPreservesPitch?: boolean;
-  };
-  media.preservesPitch = preserve;
-  media.webkitPreservesPitch = preserve;
-  media.mozPreservesPitch = preserve;
 };
 
 export function WhatsAppVoiceMessage({
@@ -70,7 +48,7 @@ export function WhatsAppVoiceMessage({
   const [audioUrl, setAudioUrl] = useState<string | null>(null);
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
-  const [speedIndex, setSpeedIndex] = useState(1); // default 1x (steps: 0.75, 1, 1.5, 2)
+  const [speedIndex, setSpeedIndex] = useState(1);
   const [mediaDuration, setMediaDuration] = useState(
     Number.isFinite(duration) && duration > 0 ? duration : 0
   );
@@ -80,10 +58,7 @@ export function WhatsAppVoiceMessage({
   const derivedUrlRef = useRef<string | null>(null);
   const playIntentRef = useRef(false);
   const playRequestIdRef = useRef(0);
-  /** Always-on robot voice — no human playback toggle */
-  const robotModeRef = useRef(true);
   const speedIndexRef = useRef(1);
-  const robotGraphRef = useRef<RobotGraph | null>(null);
   const onPlayRef = useRef(onPlay);
   const onPauseRef = useRef(onPause);
   const waveTrackRef = useRef<HTMLDivElement | null>(null);
@@ -106,7 +81,6 @@ export function WhatsAppVoiceMessage({
     }
   }, [duration]);
 
-  // If parent didn't pass duration (legacy WebM), discover it once without blocking play
   useEffect(() => {
     if (!audioUrl) return;
     if (Number.isFinite(duration) && duration > 0) return;
@@ -123,7 +97,6 @@ export function WhatsAppVoiceMessage({
     };
   }, [audioUrl, duration, mediaDuration]);
 
-  // Resolve blob / string source once
   useEffect(() => {
     let cancelled = false;
 
@@ -172,114 +145,20 @@ export function WhatsAppVoiceMessage({
   }, [audioSource]);
 
   const applyRate = (audio: HTMLAudioElement) => {
-    const base = SPEED_STEPS[speedIndexRef.current] ?? 1;
-    const robot = robotModeRef.current;
-    // Chrome defaults preservesPitch=true, so rate alone won't sound robotic
-    setPreservesPitch(audio, !robot);
-    audio.playbackRate = base * (robot ? ROBOT_PITCH : 1);
-  };
-
-  const syncRobotMix = (enabled: boolean) => {
-    const graph = robotGraphRef.current;
-    if (!graph) return;
-    const t = graph.ctx.currentTime;
-    graph.dryGain.gain.setTargetAtTime(enabled ? 0.2 : 1, t, 0.02);
-    graph.wetGain.gain.setTargetAtTime(enabled ? 0.9 : 0, t, 0.02);
-    graph.modDepth.gain.setTargetAtTime(enabled ? 0.45 : 0, t, 0.02);
+    audio.playbackRate = SPEED_STEPS[speedIndexRef.current] ?? 1;
   };
 
   /**
-   * Why: Lazy Web Audio graph — only built when robot is turned on so
-   * normal play stays instant. Tremolo + EQ give a metallic robot timbre.
+   * Why: Plain HTMLAudioElement playback — no Web Audio / crossOrigin.
+   * Forced robot graphs + crossOrigin broke shared notes when CORS mismatched.
    */
-  const ensureRobotGraph = async (audio: HTMLAudioElement) => {
-    if (robotGraphRef.current) {
-      if (robotGraphRef.current.ctx.state === "suspended") {
-        await robotGraphRef.current.ctx.resume();
-      }
-      return robotGraphRef.current;
-    }
-
-    try {
-      const AudioCtx =
-        window.AudioContext ||
-        (window as unknown as { webkitAudioContext: typeof AudioContext })
-          .webkitAudioContext;
-      const ctx = new AudioCtx();
-      const source = ctx.createMediaElementSource(audio);
-
-      const dryGain = ctx.createGain();
-      const wetGain = ctx.createGain();
-      const tremoloGain = ctx.createGain();
-      const modDepth = ctx.createGain();
-      const modulator = ctx.createOscillator();
-      const bandpass = ctx.createBiquadFilter();
-      const highShelf = ctx.createBiquadFilter();
-
-      bandpass.type = "bandpass";
-      bandpass.frequency.value = 1600;
-      bandpass.Q.value = 0.9;
-      highShelf.type = "highshelf";
-      highShelf.frequency.value = 2000;
-      highShelf.gain.value = 8;
-
-      modulator.type = "sine";
-      modulator.frequency.value = 38;
-      tremoloGain.gain.value = 1;
-      modDepth.gain.value = 0;
-
-      source.connect(dryGain);
-      dryGain.connect(ctx.destination);
-
-      source.connect(bandpass);
-      bandpass.connect(highShelf);
-      highShelf.connect(tremoloGain);
-      tremoloGain.connect(wetGain);
-      wetGain.connect(ctx.destination);
-      modulator.connect(modDepth);
-      modDepth.connect(tremoloGain.gain);
-
-      dryGain.gain.value = 1;
-      wetGain.gain.value = 0;
-      modulator.start();
-
-      const graph: RobotGraph = {
-        ctx,
-        dryGain,
-        wetGain,
-        tremoloGain,
-        modulator,
-        modDepth,
-      };
-      robotGraphRef.current = graph;
-      if (ctx.state === "suspended") await ctx.resume();
-      return graph;
-    } catch (error) {
-      console.error("Robot audio graph failed", error);
-      return null;
-    }
-  };
-
-  // Create audio element once URL is ready — metadata only, play on demand
   useEffect(() => {
     if (!audioUrl) return;
 
     playIntentRef.current = false;
     playRequestIdRef.current += 1;
 
-    if (robotGraphRef.current) {
-      try {
-        robotGraphRef.current.modulator.stop();
-        void robotGraphRef.current.ctx.close();
-      } catch {
-        /* ignore */
-      }
-      robotGraphRef.current = null;
-    }
-
     const audio = new Audio();
-    // Required for createMediaElementSource when streaming via audio.php
-    audio.crossOrigin = "anonymous";
     audio.preload = "metadata";
     audio.src = audioUrl;
     audioRef.current = audio;
@@ -323,15 +202,6 @@ export function WhatsAppVoiceMessage({
       audio.removeEventListener("durationchange", onMeta);
       audio.removeEventListener("error", onError);
       if (audioRef.current === audio) audioRef.current = null;
-      if (robotGraphRef.current) {
-        try {
-          robotGraphRef.current.modulator.stop();
-          void robotGraphRef.current.ctx.close();
-        } catch {
-          /* ignore */
-        }
-        robotGraphRef.current = null;
-      }
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [audioUrl, id]);
@@ -340,7 +210,6 @@ export function WhatsAppVoiceMessage({
     if (audioRef.current) applyRate(audioRef.current);
   }, [speedIndex]);
 
-  // Mutual exclusion only — do not re-trigger play if already starting
   useEffect(() => {
     if (!autoPlay) return;
     if (isActive) {
@@ -367,11 +236,11 @@ export function WhatsAppVoiceMessage({
       onPlayRef.current?.(id);
       applyRate(audio);
 
-      // Always apply robot voice on play
-      const graph = await ensureRobotGraph(audio);
-      if (graph) syncRobotMix(true);
-
       try {
+        // Reload once if a prior network error left the element unusable
+        if (audio.error) {
+          audio.load();
+        }
         await audio.play();
         if (requestId !== playRequestIdRef.current || !playIntentRef.current) {
           audio.pause();
@@ -507,21 +376,21 @@ export function WhatsAppVoiceMessage({
   const bars = useMemo(() => {
     const activeCount = Math.floor(waveValues.length * progress);
     return waveValues.map((value, index) => {
-      const height = Math.max(10, value * 34);
+      const height = Math.max(8, value * 28);
       const isBarActive = index < activeCount;
       return (
         <div
           key={`${id}-bar-${index}`}
           className={cn(
-            "w-[3px] rounded-full pointer-events-none",
+            "w-[2.5px] rounded-full pointer-events-none",
             !isScrubbing && "transition-[background-color,height] duration-75",
             accent === "sent"
               ? isBarActive
                 ? "bg-white"
-                : "bg-white/35"
+                : "bg-white/40"
               : isBarActive
-                ? "bg-emerald-500 dark:bg-white"
-                : "bg-emerald-500/35 dark:bg-white/35"
+                ? "bg-foreground/80"
+                : "bg-muted-foreground/35"
           )}
           style={{ height: `${height}px` }}
         />
@@ -530,28 +399,24 @@ export function WhatsAppVoiceMessage({
   }, [accent, id, isScrubbing, progress, waveValues]);
 
   const isForm = layout === "form";
+  const isSent = accent === "sent";
 
   return (
     <div
       className={cn(
-        "flex w-full min-w-0 max-w-full items-end gap-1.5 sm:gap-2",
-        isForm || accent !== "sent" ? "justify-start" : "justify-end"
+        "flex w-full min-w-0 max-w-full items-center",
+        isForm || !isSent ? "justify-start" : "justify-end"
       )}
     >
-      {accent === "received" && !isForm && (
-        <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-emerald-500 text-white shadow sm:h-8 sm:w-8">
-          <Volume2 className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
-        </div>
-      )}
       <div
         className={cn(
-          "flex min-w-0 items-center gap-2 rounded-2xl px-2 py-2 shadow-sm sm:gap-3 sm:px-3",
+          "flex min-w-0 items-center gap-2.5 rounded-2xl px-2.5 py-2 shadow-sm sm:gap-3 sm:px-3",
           isForm
-            ? "w-full max-w-full flex-1 rounded-xl"
-            : "flex-1 sm:max-w-[360px] sm:rounded-3xl",
-          accent === "sent"
-            ? "bg-emerald-500 text-white"
-            : "bg-white text-slate-900 dark:bg-slate-800 dark:text-white"
+            ? "w-full max-w-full flex-1 rounded-xl border border-border/60"
+            : "w-full max-w-[min(100%,22rem)]",
+          isSent
+            ? "bg-emerald-600 text-white dark:bg-emerald-600"
+            : "bg-muted/80 text-foreground dark:bg-slate-800/95"
         )}
       >
         <Button
@@ -564,10 +429,11 @@ export function WhatsAppVoiceMessage({
           }}
           disabled={!audioUrl}
           className={cn(
-            "h-9 w-9 shrink-0 rounded-full border border-white/20 bg-white/10 text-current backdrop-blur transition hover:bg-white/20 sm:h-10 sm:w-10",
-            accent === "received" &&
-              "border-transparent bg-emerald-500/10 text-emerald-500 hover:bg-emerald-500/20",
-            isPlaying && "ring-2 ring-white/40 dark:ring-emerald-400/60",
+            "h-9 w-9 shrink-0 rounded-full transition sm:h-10 sm:w-10",
+            isSent
+              ? "border border-white/25 bg-white/15 text-white hover:bg-white/25"
+              : "border border-border/50 bg-background/80 text-foreground hover:bg-background",
+            isPlaying && (isSent ? "ring-2 ring-white/35" : "ring-2 ring-foreground/20"),
             !audioUrl && "opacity-60"
           )}
           aria-label={isPlaying ? "Pause voice note" : "Play voice note"}
@@ -575,16 +441,17 @@ export function WhatsAppVoiceMessage({
           {isPlaying ? (
             <Pause className="h-4 w-4" />
           ) : (
-            <Play className="h-4 w-4" />
+            <Play className="h-4 w-4 translate-x-px" />
           )}
         </Button>
 
         <div className="min-w-0 flex-1 overflow-hidden">
-          <div className="flex items-center justify-between text-[11px] uppercase tracking-wide">
-            <span className="font-semibold tabular-nums">
+          <div className="flex items-center justify-between gap-2 text-[11px] tabular-nums tracking-wide">
+            <span className="font-semibold">
               {displayCurrentTime}
-              {effectiveDuration > 0 && (isPlaying || isScrubbing || currentTime > 0) ? (
-                <span className="opacity-50 font-medium normal-case">
+              {effectiveDuration > 0 &&
+              (isPlaying || isScrubbing || currentTime > 0) ? (
+                <span className="font-medium opacity-50">
                   {" "}
                   / {formattedDuration}
                 </span>
@@ -628,20 +495,34 @@ export function WhatsAppVoiceMessage({
               }
             }}
             className={cn(
-              "relative mt-1 flex h-11 items-center touch-none select-none",
+              "relative mt-1 flex h-9 items-center touch-none select-none",
               effectiveDuration > 0
                 ? "cursor-pointer"
                 : "cursor-default opacity-80"
             )}
           >
-            <div className="flex h-10 w-full items-end gap-[2px] overflow-hidden px-0.5">
+            <div className="flex h-8 w-full items-end gap-[2px] overflow-hidden px-0.5">
               {bars}
             </div>
           </div>
           {loadError && (
-            <p className="mt-2 break-words text-[11px] font-medium leading-tight text-red-500 dark:text-red-300">
-              {loadError}
-            </p>
+            <button
+              type="button"
+              className={cn(
+                "mt-1.5 text-left text-[11px] font-medium leading-tight underline-offset-2 hover:underline",
+                isSent ? "text-white/90" : "text-destructive"
+              )}
+              onClick={() => {
+                setLoadError(null);
+                const audio = audioRef.current;
+                if (audio) {
+                  audio.load();
+                }
+                void togglePlayback(true);
+              }}
+            >
+              {loadError} · Tap to retry
+            </button>
           )}
         </div>
 
@@ -653,9 +534,10 @@ export function WhatsAppVoiceMessage({
             onClick={cycleSpeed}
             disabled={!audioUrl}
             className={cn(
-              "h-7 rounded-full border border-white/30 bg-white/10 px-2 text-[11px] font-semibold uppercase tracking-wide hover:bg-white/20 sm:px-3",
-              accent === "received" &&
-                "border-emerald-500/30 bg-emerald-500/10 text-emerald-600 hover:bg-emerald-500/20",
+              "h-7 rounded-xl border px-2 text-[11px] font-semibold uppercase tracking-wide sm:px-2.5",
+              isSent
+                ? "border-white/30 bg-white/10 text-white hover:bg-white/20"
+                : "border-border/60 bg-background/60 text-muted-foreground hover:bg-background hover:text-foreground",
               !audioUrl && "opacity-60"
             )}
           >
@@ -671,28 +553,31 @@ export function WhatsAppVoiceMessage({
                   void handleDownload(event);
                 }}
                 className={cn(
-                  "h-7 w-7 rounded-full border border-transparent bg-white/10 text-current hover:bg-white/20",
-                  accent === "received" &&
-                    "bg-emerald-500/10 text-emerald-500 hover:bg-emerald-500/20"
+                  "h-7 w-7 rounded-xl",
+                  isSent
+                    ? "bg-white/10 text-white hover:bg-white/20"
+                    : "bg-background/50 text-muted-foreground hover:bg-background hover:text-foreground"
                 )}
                 aria-label="Download voice note"
               >
-                <Download className="h-3 w-3" />
+                <Download className="h-3.5 w-3.5" />
               </Button>
             )}
             {onRemove && (
               <Button
+                type="button"
                 size="icon"
                 variant="ghost"
                 onClick={onRemove}
                 className={cn(
-                  "h-7 w-7 rounded-full bg-white/10 text-current hover:bg-white/20",
-                  accent === "received" &&
-                    "bg-emerald-500/10 text-emerald-500 hover:bg-emerald-500/20"
+                  "h-7 w-7 rounded-xl",
+                  isSent
+                    ? "bg-white/10 text-white hover:bg-white/20"
+                    : "bg-background/50 text-muted-foreground hover:bg-background hover:text-foreground"
                 )}
                 aria-label="Remove voice note"
               >
-                ×
+                <X className="h-3.5 w-3.5" />
               </Button>
             )}
           </div>
@@ -713,7 +598,7 @@ const formatTime = (seconds: number) => {
 };
 
 const placeholderWaveform = () =>
-  new Array(32).fill(0).map((_, idx) => {
+  new Array(36).fill(0).map((_, idx) => {
     const base = Math.sin((idx / 5) * Math.PI) ** 2;
-    return 0.3 + base * 0.6;
+    return 0.28 + base * 0.55;
   });

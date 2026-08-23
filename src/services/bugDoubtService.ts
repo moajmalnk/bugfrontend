@@ -33,6 +33,17 @@ export type BugDoubt = {
   replies: BugDoubtReply[];
 };
 
+export type BugDoubtVoicePayload = {
+  blob: Blob;
+  duration: number;
+};
+
+export type BugDoubtUpdatePayload = {
+  body: string;
+  voice?: BugDoubtVoicePayload | null;
+  removeAttachmentIds?: string[];
+};
+
 type ApiResponse<T> = {
   success: boolean;
   message?: string;
@@ -45,13 +56,21 @@ function voiceExtension(blob: Blob): string {
   return "wav";
 }
 
-function appendVoice(formData: FormData, voice: { blob: Blob; duration: number } | null) {
+function appendVoice(
+  formData: FormData,
+  voice: BugDoubtVoicePayload | null | undefined
+) {
   if (!voice) return;
   const name = `voice_note.${voiceExtension(voice.blob)}`;
   formData.append("voice_notes[]", voice.blob, name);
   if (Number.isFinite(voice.duration) && voice.duration > 0) {
     formData.append("voice_note_duration_0", String(Math.round(voice.duration)));
   }
+}
+
+function appendRemoveIds(formData: FormData, ids?: string[]) {
+  if (!ids?.length) return;
+  formData.append("remove_attachment_ids", JSON.stringify(ids));
 }
 
 export const bugDoubtService = {
@@ -75,7 +94,7 @@ export const bugDoubtService = {
   async create(
     bugId: string,
     body: string,
-    voice: { blob: Blob; duration: number } | null
+    voice: BugDoubtVoicePayload | null
   ): Promise<BugDoubt | null> {
     const formData = new FormData();
     formData.append("bug_id", bugId);
@@ -92,10 +111,44 @@ export const bugDoubtService = {
     return response.data.data?.doubt ?? null;
   },
 
+  async updateDoubt(
+    doubtId: string,
+    payload: BugDoubtUpdatePayload
+  ): Promise<BugDoubt | null> {
+    const formData = new FormData();
+    formData.append("action", "update");
+    formData.append("id", doubtId);
+    formData.append("body", payload.body);
+    appendRemoveIds(formData, payload.removeAttachmentIds);
+    appendVoice(formData, payload.voice);
+    const response = await apiClient.post<ApiResponse<{ doubt: BugDoubt | null }>>(
+      "/bugs/doubts.php",
+      formData,
+      { timeout: 30000 }
+    );
+    if (!response.data.success) {
+      throw new Error(response.data.message || "Failed to update doubt");
+    }
+    return response.data.data?.doubt ?? null;
+  },
+
+  async deleteDoubt(doubtId: string): Promise<void> {
+    const formData = new FormData();
+    formData.append("action", "delete");
+    formData.append("id", doubtId);
+    const response = await apiClient.post<ApiResponse<unknown>>(
+      "/bugs/doubts.php",
+      formData
+    );
+    if (!response.data.success) {
+      throw new Error(response.data.message || "Failed to delete doubt");
+    }
+  },
+
   async reply(
     doubtId: string,
     body: string,
-    voice: { blob: Blob; duration: number } | null
+    voice: BugDoubtVoicePayload | null
   ): Promise<BugDoubtReply | null> {
     const formData = new FormData();
     formData.append("doubt_id", doubtId);
@@ -108,5 +161,37 @@ export const bugDoubtService = {
       throw new Error(response.data.message || "Failed to submit reply");
     }
     return response.data.data?.reply ?? null;
+  },
+
+  async updateReply(
+    replyId: string,
+    payload: BugDoubtUpdatePayload
+  ): Promise<BugDoubtReply | null> {
+    const formData = new FormData();
+    formData.append("action", "update");
+    formData.append("id", replyId);
+    formData.append("body", payload.body);
+    appendRemoveIds(formData, payload.removeAttachmentIds);
+    appendVoice(formData, payload.voice);
+    const response = await apiClient.post<
+      ApiResponse<{ reply: BugDoubtReply | null }>
+    >("/bugs/doubt_reply.php", formData, { timeout: 30000 });
+    if (!response.data.success) {
+      throw new Error(response.data.message || "Failed to update reply");
+    }
+    return response.data.data?.reply ?? null;
+  },
+
+  async deleteReply(replyId: string): Promise<void> {
+    const formData = new FormData();
+    formData.append("action", "delete");
+    formData.append("id", replyId);
+    const response = await apiClient.post<ApiResponse<unknown>>(
+      "/bugs/doubt_reply.php",
+      formData
+    );
+    if (!response.data.success) {
+      throw new Error(response.data.message || "Failed to delete reply");
+    }
   },
 };
