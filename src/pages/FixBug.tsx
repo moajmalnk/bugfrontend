@@ -29,7 +29,6 @@ import {
 } from "lucide-react";
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
-import { BugFixCelebration } from "@/components/celebration/BugFixCelebration";
 
 interface ApiResponse<T> {
   success: boolean;
@@ -51,8 +50,6 @@ const FixBug = () => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [fixDescription, setFixDescription] = useState("");
   const [status, setStatus] = useState<Bug["status"]>("fixed");
-  const [showCelebration, setShowCelebration] = useState(false);
-  const [celebrationBug, setCelebrationBug] = useState<Bug | null>(null);
   const [hasInitializedNotes, setHasInitializedNotes] = useState(false);
 
   const fromProject = searchParams.get("from") === "project";
@@ -156,11 +153,6 @@ const FixBug = () => {
         description: "Bug status updated successfully",
       });
 
-      if (status === "fixed") {
-        setCelebrationBug(updatedBug);
-        setShowCelebration(true);
-      }
-
       if (status && bug) {
         queueMicrotask(() => {
           broadcastNotificationService
@@ -176,9 +168,7 @@ const FixBug = () => {
         });
       }
 
-      if (status !== "fixed") {
-        navigate(getBugDetailsUrl());
-      }
+      navigate(getBugDetailsUrl());
     } catch (error) {
       if (previousBug) {
         queryClient.setQueryData(["bug", bugId], previousBug);
@@ -610,16 +600,6 @@ const FixBug = () => {
             </div>
           </div>
         </div>
-
-      <BugFixCelebration
-        bug={celebrationBug}
-        isVisible={showCelebration}
-        onClose={() => {
-          setShowCelebration(false);
-          setCelebrationBug(null);
-          navigate(getBugDetailsUrl());
-        }}
-      />
     </div>
   );
 };

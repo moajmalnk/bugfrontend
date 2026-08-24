@@ -30,7 +30,6 @@ import { cn } from "@/lib/utils";
 import { useQueryClient } from "@tanstack/react-query";
 import { useEffect, useRef, useState } from "react";
 import { GoogleDocsButton } from "./GoogleDocsButton";
-import { BugFixCelebration } from "@/components/celebration/BugFixCelebration";
 
 interface BugDetailsCardProps {
   bug: Bug;
@@ -52,7 +51,6 @@ export const BugDetailsCard = ({
   const [updating, setUpdating] = useState(false);
   const updatingRef = useRef(false);
   const [bugState, setBugState] = useState(bug);
-  const [showCelebration, setShowCelebration] = useState(false);
 
   useEffect(() => {
     setBugState(bug);
@@ -206,8 +204,6 @@ export const BugDetailsCard = ({
       });
 
       if (markingFixed && currentUser) {
-        setShowCelebration(true);
-
         void broadcastNotificationService
           .broadcastStatusChange(
             serverBug.title,
@@ -451,12 +447,6 @@ export const BugDetailsCard = ({
           <GoogleDocsButton bugId={String(bugState.id)} />
         </CardContent>
       </Card>
-
-      <BugFixCelebration
-        bug={bugState}
-        isVisible={showCelebration}
-        onClose={() => setShowCelebration(false)}
-      />
     </div>
   );
 };

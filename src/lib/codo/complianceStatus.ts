@@ -18,6 +18,36 @@ export type ComplianceFilterTab =
 
 export type CompliancePhase = 'developer' | 'tester';
 
+/**
+ * Why: Search bar verified-combo filter — which roles have finished their side.
+ * Values are exact phase/admin completed flags from the overview row.
+ */
+export type ComplianceVerifiedFilter =
+  | 'all'
+  | 'admin_only'
+  | 'developer_only'
+  | 'tester_only'
+  | 'admin_developer'
+  | 'admin_tester'
+  | 'developer_tester'
+  | 'all_verified'
+  | 'none_verified';
+
+export const COMPLIANCE_VERIFIED_FILTER_OPTIONS: {
+  value: ComplianceVerifiedFilter;
+  label: string;
+}[] = [
+  { value: 'all', label: 'All verifications' },
+  { value: 'admin_only', label: 'Admin verified only' },
+  { value: 'developer_only', label: 'Developer verified only' },
+  { value: 'tester_only', label: 'Tester verified only' },
+  { value: 'admin_developer', label: 'Admin + Developer verified' },
+  { value: 'admin_tester', label: 'Admin + Tester verified' },
+  { value: 'developer_tester', label: 'Developer + Tester verified' },
+  { value: 'all_verified', label: 'All sides verified' },
+  { value: 'none_verified', label: 'None verified yet' },
+];
+
 const PENDING_WINDOW_DAYS = 7;
 
 function startOfDay(d: Date): Date {
@@ -249,6 +279,41 @@ export function isProjectComplianceComplete(
   }
   const status = String(item.project?.status || '').toLowerCase();
   return isClosedProjectStatus(status);
+}
+
+/**
+ * Why: Combo filter for Admin / Developer / Tester verified sides in Search & Filter.
+ */
+export function matchesVerifiedFilter(
+  item: ProjectComplianceOverview,
+  filter: ComplianceVerifiedFilter
+): boolean {
+  if (filter === 'all') return true;
+
+  const admin = item.adminVerified || item.adminStatus === 'completed';
+  const developer = item.developerStatus === 'completed';
+  const tester = item.testerStatus === 'completed';
+
+  switch (filter) {
+    case 'admin_only':
+      return admin;
+    case 'developer_only':
+      return developer;
+    case 'tester_only':
+      return tester;
+    case 'admin_developer':
+      return admin && developer;
+    case 'admin_tester':
+      return admin && tester;
+    case 'developer_tester':
+      return developer && tester;
+    case 'all_verified':
+      return admin && developer && tester;
+    case 'none_verified':
+      return !admin && !developer && !tester;
+    default:
+      return true;
+  }
 }
 
 export function matchesComplianceFilter(

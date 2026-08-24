@@ -32,10 +32,13 @@ import {
 } from '@/hooks/useUrlPagination';
 import {
   buildProjectComplianceOverview,
+  COMPLIANCE_VERIFIED_FILTER_OPTIONS,
   countByStatus,
   getDefaultComplianceTab,
   matchesComplianceFilter,
+  matchesVerifiedFilter,
   type ComplianceFilterTab,
+  type ComplianceVerifiedFilter,
 } from '@/lib/codo/complianceStatus';
 import { cn, getEffectiveRole } from '@/lib/utils';
 import { projectService } from '@/services/projectService';
@@ -58,6 +61,10 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useLocation, useSearchParams } from 'react-router-dom';
 
 type SortOption = 'name' | 'developer_date' | 'tester_date' | 'overdue';
+
+const VERIFIED_FILTER_VALUES = new Set<string>(
+  COMPLIANCE_VERIFIED_FILTER_OPTIONS.map((opt) => opt.value)
+);
 
 const FILTER_TABS: ComplianceFilterTab[] = [
   'all',
@@ -121,12 +128,20 @@ const ComplianceOverview = () => {
   const [filters, setFilter, clearFilters] = usePersistedFilters('compliance-overview', {
     searchTerm: '',
     sortBy: 'name' as SortOption,
+    verifiedFilter: 'all' as ComplianceVerifiedFilter,
   });
 
   const searchTerm = filters.searchTerm || '';
   const sortBy = (filters.sortBy as SortOption) || 'name';
+  const verifiedFilter = (
+    VERIFIED_FILTER_VALUES.has(filters.verifiedFilter || '')
+      ? filters.verifiedFilter
+      : 'all'
+  ) as ComplianceVerifiedFilter;
   const [searchDraft, setSearchDraft] = useState(searchTerm);
   const setSortBy = (value: SortOption) => setFilter('sortBy', value);
+  const setVerifiedFilter = (value: ComplianceVerifiedFilter) =>
+    setFilter('verifiedFilter', value);
 
   useEffect(() => {
     const timer = window.setTimeout(() => {
@@ -211,6 +226,10 @@ const ComplianceOverview = () => {
       matchesComplianceFilter(item, activeTab, roleKey, currentUser?.id)
     );
 
+    if (verifiedFilter !== 'all') {
+      items = items.filter((item) => matchesVerifiedFilter(item, verifiedFilter));
+    }
+
     if (query) {
       items = items.filter((item) => {
         const name = item.project.name?.toLowerCase() ?? '';
@@ -248,12 +267,20 @@ const ComplianceOverview = () => {
           return a.project.name.localeCompare(b.project.name);
       }
     });
-  }, [overviewItems, activeTab, roleKey, searchTerm, sortBy, currentUser?.id]);
+  }, [
+    overviewItems,
+    activeTab,
+    roleKey,
+    searchTerm,
+    sortBy,
+    verifiedFilter,
+    currentUser?.id,
+  ]);
 
   const totalPages = Math.max(1, Math.ceil(filteredItems.length / itemsPerPage));
   useClampUrlPage(clampToTotalPages, totalPages, !isLoading);
 
-  useResetUrlPageOnChange(setCurrentPage, [activeTab, searchTerm, sortBy]);
+  useResetUrlPageOnChange(setCurrentPage, [activeTab, searchTerm, sortBy, verifiedFilter]);
 
   const paginatedItems = useMemo(() => {
     const start = (currentPage - 1) * itemsPerPage;
@@ -288,7 +315,8 @@ const ComplianceOverview = () => {
         : 'No assigned projects with compliance tracking.'
       : 'No projects match the current filters.';
 
-  const hasActiveFilters = Boolean(searchDraft.trim()) || sortBy !== 'name';
+  const hasActiveFilters =
+    Boolean(searchDraft.trim()) || sortBy !== 'name' || verifiedFilter !== 'all';
 
   const filterFieldClass = 'flex items-center gap-2 min-w-0 w-full';
   const filterTriggerClass = listFilterTriggerClass('blue');
@@ -334,7 +362,7 @@ const ComplianceOverview = () => {
             />
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-3 min-w-0">
+          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3 min-w-0">
             <div className={filterFieldClass}>
               <div className="p-1.5 bg-indigo-500 rounded-lg shrink-0" aria-hidden>
                 <CircleDot className="h-4 w-4 text-white" />
@@ -357,6 +385,31 @@ const ComplianceOverview = () => {
             <div className={filterFieldClass}>
               <div className="p-1.5 bg-orange-500 rounded-lg shrink-0" aria-hidden>
                 <Filter className="h-4 w-4 text-white" />
+              </div>
+              <div className="min-w-0 flex-1">
+                <Select
+                  value={verifiedFilter}
+                  onValueChange={(value) =>
+                    setVerifiedFilter(value as ComplianceVerifiedFilter)
+                  }
+                >
+                  <SelectTrigger className={filterTriggerClass}>
+                    <SelectValue placeholder="Verified filter" />
+                  </SelectTrigger>
+                  <SelectContent position="popper" className="z-[60] rounded-xl">
+                    {COMPLIANCE_VERIFIED_FILTER_OPTIONS.map((opt) => (
+                      <SelectItem key={opt.value} value={opt.value}>
+                        {opt.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+
+            <div className={filterFieldClass}>
+              <div className="p-1.5 bg-slate-500 rounded-lg shrink-0" aria-hidden>
+                <RotateCcw className="h-4 w-4 text-white" />
               </div>
               <div className="min-w-0 flex-1">
                 <Button
