@@ -10,7 +10,6 @@ import { NotificationPopover } from "@/components/notifications/NotificationPopo
 import { GlobalSearchProvider, useGlobalSearchModal } from "@/context/GlobalSearchContext";
 import { GlobalSearchDialog } from "@/components/search/GlobalSearchDialog";
 import { AdminActiveUsersStrip } from "@/components/users/AdminActiveUsersStrip";
-import { AdminShortsStrip } from "@/components/shorts/AdminShortsStrip";
 import { ImpersonateBanner } from "../ui/ImpersonateBanner";
 
 // Non-critical widgets: loaded in separate chunks so they never block first paint.
@@ -238,7 +237,6 @@ export const MainLayout = ({ children }: MainLayoutProps) => {
             <OnboardingVerificationBanner />
           </Suspense>
 
-          {role === "admin" && !isUsersListPage ? <AdminShortsStrip /> : null}
           {role === "admin" && isUsersListPage ? <AdminActiveUsersStrip /> : null}
 
           {/* Main content area */}
