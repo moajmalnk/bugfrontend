@@ -338,37 +338,49 @@ export function ConvertBugDialog({
   return (
     <>
       <Dialog open={open} onOpenChange={onOpenChange}>
-        <DialogContent className="sm:max-w-xl max-h-[min(92vh,760px)] flex flex-col gap-4 overflow-hidden rounded-2xl">
-          <DialogHeader className="shrink-0">
-            <DialogTitle className="flex items-center gap-2 text-xl">
-              <span className="inline-flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-sky-500 to-indigo-600 text-white shadow-sm">
+        <DialogContent
+          className={cn(
+            "flex flex-col gap-2 sm:gap-3 overflow-hidden rounded-2xl p-3 sm:p-6 min-h-0",
+            "w-[calc(100%-1rem)] max-w-xl",
+            // Why: Bound height so header/mode/footer stay visible; body is the only scroll surface.
+            "h-[calc(100dvh-1rem)] max-h-[calc(100dvh-1rem)]",
+            "sm:h-auto sm:max-h-[min(92dvh,760px)]",
+            "top-[max(0.5rem,env(safe-area-inset-top))] translate-y-0",
+            "sm:top-[50%] sm:translate-y-[-50%]",
+            "data-[state=open]:slide-in-from-top-2 sm:data-[state=open]:slide-in-from-top-[48%]",
+            "data-[state=closed]:slide-out-to-top-2 sm:data-[state=closed]:slide-out-to-top-[48%]"
+          )}
+        >
+          <DialogHeader className="shrink-0 space-y-1 pr-8 text-left">
+            <DialogTitle className="flex items-center gap-2 text-lg sm:text-xl">
+              <span className="inline-flex h-8 w-8 sm:h-9 sm:w-9 items-center justify-center rounded-xl bg-gradient-to-br from-sky-500 to-indigo-600 text-white shadow-sm">
                 <ArrowRightLeft className="h-4 w-4" />
               </span>
               Convert bug
             </DialogTitle>
-            <DialogDescription className="text-sm leading-relaxed pt-1">
+            <DialogDescription className="text-xs sm:text-sm leading-relaxed line-clamp-2 sm:line-clamp-none">
               Choose whether to move this bug between projects, or turn it into
               a project Update (with attachment copy and audit trail).
             </DialogDescription>
           </DialogHeader>
 
-          <div className="shrink-0 grid grid-cols-1 sm:grid-cols-2 gap-2">
+          <div className="shrink-0 grid grid-cols-12 gap-1.5 sm:gap-2">
             <button
               type="button"
               onClick={() => setMode("move")}
               disabled={submitting}
               className={cn(
-                "rounded-2xl border px-3 py-3 text-left transition-all",
+                "col-span-6 rounded-xl sm:rounded-2xl border px-2.5 py-2 sm:px-3 sm:py-2.5 text-left transition-all min-w-0",
                 mode === "move"
                   ? "border-sky-500/60 bg-sky-50/80 dark:bg-sky-950/40 shadow-sm"
                   : "border-border/60 bg-muted/20 hover:bg-muted/40"
               )}
             >
-              <div className="flex items-center gap-2 font-semibold text-sm">
-                <FolderInput className="h-4 w-4 text-sky-600 dark:text-sky-400" />
-                Move to project
+              <div className="flex items-center gap-1.5 sm:gap-2 font-semibold text-xs sm:text-sm">
+                <FolderInput className="h-3.5 w-3.5 sm:h-4 sm:w-4 shrink-0 text-sky-600 dark:text-sky-400" />
+                <span className="truncate">Move to project</span>
               </div>
-              <p className="mt-1.5 text-xs text-muted-foreground leading-relaxed">
+              <p className="mt-1 hidden sm:block text-xs text-muted-foreground leading-relaxed">
                 Keep the same bug record. Change project only. History stays.
               </p>
             </button>
@@ -377,31 +389,31 @@ export function ConvertBugDialog({
               onClick={() => setMode("to_update")}
               disabled={submitting}
               className={cn(
-                "rounded-2xl border px-3 py-3 text-left transition-all",
+                "col-span-6 rounded-xl sm:rounded-2xl border px-2.5 py-2 sm:px-3 sm:py-2.5 text-left transition-all min-w-0",
                 mode === "to_update"
                   ? "border-violet-500/60 bg-violet-50/80 dark:bg-violet-950/40 shadow-sm"
                   : "border-border/60 bg-muted/20 hover:bg-muted/40"
               )}
             >
-              <div className="flex items-center gap-2 font-semibold text-sm">
-                <Megaphone className="h-4 w-4 text-violet-600 dark:text-violet-400" />
-                Convert to Update
+              <div className="flex items-center gap-1.5 sm:gap-2 font-semibold text-xs sm:text-sm">
+                <Megaphone className="h-3.5 w-3.5 sm:h-4 sm:w-4 shrink-0 text-violet-600 dark:text-violet-400" />
+                <span className="truncate">Convert to Update</span>
               </div>
-              <p className="mt-1.5 text-xs text-muted-foreground leading-relaxed">
+              <p className="mt-1 hidden sm:block text-xs text-muted-foreground leading-relaxed">
                 Create a new update, copy attachments, archive this bug.
               </p>
             </button>
           </div>
 
-          <div className="min-h-0 flex-1 space-y-4 overflow-hidden flex flex-col">
-            <div className="shrink-0 rounded-xl border border-border/60 bg-muted/30 px-4 py-3">
-              <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+          <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain touch-pan-y space-y-2.5 sm:space-y-3 [scrollbar-width:thin] [&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-border">
+            <div className="rounded-xl border border-border/60 bg-muted/30 px-3 py-2 sm:px-4 sm:py-3">
+              <p className="text-[10px] sm:text-xs font-medium uppercase tracking-wide text-muted-foreground">
                 Bug
               </p>
               <p className="mt-1 text-sm font-semibold text-foreground line-clamp-2">
                 {bug.title || "Untitled Bug"}
               </p>
-              <p className="mt-2 text-xs text-muted-foreground">
+              <p className="mt-1.5 text-xs text-muted-foreground break-words">
                 Current project:{" "}
                 <span className="font-medium text-foreground">
                   {bug.project_name || "Unknown"}
@@ -420,23 +432,23 @@ export function ConvertBugDialog({
 
             {mode === "to_update" && (
               <>
-                <div className="shrink-0 rounded-xl border border-amber-200/70 dark:border-amber-800/50 bg-amber-50/60 dark:bg-amber-950/20 px-3 py-2.5 flex gap-2">
+                <div className="rounded-xl border border-amber-200/70 dark:border-amber-800/50 bg-amber-50/60 dark:bg-amber-950/20 px-2.5 py-2 sm:px-3 sm:py-2.5 flex gap-2">
                   <ShieldAlert className="h-4 w-4 text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" />
-                  <p className="text-xs text-amber-900 dark:text-amber-100/90 leading-relaxed">
+                  <p className="text-[11px] sm:text-xs text-amber-900 dark:text-amber-100/90 leading-relaxed">
                     Creates a <strong>pending</strong> update. Title, description
                     (plus expected/actual), and priority map across. Source bug
                     becomes <strong>declined</strong> with a conversion note.
                     You will open the new update after success.
                   </p>
                 </div>
-                <div className="shrink-0 space-y-2">
+                <div className="space-y-1.5 sm:space-y-2">
                   <Label className="text-sm font-semibold">Update type</Label>
                   <Select
                     value={updateType}
                     onValueChange={(v) => setUpdateType(v as UpdateType)}
                     disabled={submitting}
                   >
-                    <SelectTrigger className="rounded-xl">
+                    <SelectTrigger className="rounded-xl h-10">
                       <SelectValue placeholder="Select type…" />
                     </SelectTrigger>
                     <SelectContent>
@@ -449,23 +461,22 @@ export function ConvertBugDialog({
               </>
             )}
 
-            <div className="min-h-0 flex-1 flex flex-col space-y-2 overflow-hidden">
-              <label className="shrink-0 text-sm font-semibold text-foreground flex items-center gap-2">
-                <FolderInput className="h-4 w-4 text-sky-600 dark:text-sky-400" />
-                {mode === "move" ? "Destination project" : "Project for new update"}
+            <div className="flex flex-col gap-1.5 sm:gap-2 pb-1">
+              <label className="text-sm font-semibold text-foreground flex items-center gap-2 min-w-0">
+                <FolderInput className="h-4 w-4 shrink-0 text-sky-600 dark:text-sky-400" />
+                <span className="truncate">
+                  {mode === "move" ? "Destination project" : "Project for new update"}
+                </span>
               </label>
 
-              <div className="min-h-0 flex-1 rounded-xl border border-border/70 bg-background overflow-hidden">
-                <Command
-                  className="h-full max-h-[min(38vh,320px)] rounded-xl"
-                  shouldFilter
-                >
+              <div className="rounded-xl border border-border/70 bg-background overflow-hidden">
+                <Command className="rounded-xl" shouldFilter>
                   <CommandInput
                     placeholder="Search project…"
                     disabled={projectsLoading || submitting}
                   />
                   <CommandList
-                    className="max-h-[min(30vh,280px)] overflow-y-auto overscroll-contain"
+                    className="max-h-[min(28vh,200px)] sm:max-h-[min(32vh,240px)] overflow-y-auto overscroll-contain touch-pan-y [scrollbar-width:thin]"
                     onWheel={(e) => e.stopPropagation()}
                   >
                     <CommandEmpty>No project found.</CommandEmpty>
@@ -503,7 +514,7 @@ export function ConvertBugDialog({
                 </Command>
               </div>
 
-              <p className="shrink-0 text-xs text-muted-foreground">
+              <p className="text-[11px] sm:text-xs text-muted-foreground break-words">
                 {selected
                   ? selectedNeedsAccessRequest
                     ? `Selected: ${selected.name} — you’ll request access from admins and project members.`
@@ -518,7 +529,7 @@ export function ConvertBugDialog({
               </p>
 
               {selectedNeedsAccessRequest ? (
-                <div className="shrink-0 space-y-2">
+                <div className="space-y-1.5 sm:space-y-2">
                   <Label htmlFor="access-request-note" className="text-sm font-semibold">
                     Message for admins (optional)
                   </Label>
@@ -536,13 +547,13 @@ export function ConvertBugDialog({
             </div>
           </div>
 
-          <DialogFooter className="shrink-0 gap-2 sm:gap-0">
+          <DialogFooter className="shrink-0 flex-row items-center justify-stretch sm:justify-end gap-2 border-t border-border/40 pt-2.5 sm:pt-3 pb-[max(0px,env(safe-area-inset-bottom))]">
             <Button
               type="button"
               variant="outline"
               onClick={() => onOpenChange(false)}
               disabled={submitting}
-              className="rounded-xl"
+              className="rounded-xl flex-1 sm:flex-none h-10"
             >
               Cancel
             </Button>
@@ -551,7 +562,7 @@ export function ConvertBugDialog({
               onClick={handlePrimaryClick}
               disabled={!canSubmit}
               className={cn(
-                "rounded-xl text-white",
+                "rounded-xl flex-1 sm:flex-none h-10 text-white min-w-0",
                 selectedNeedsAccessRequest
                   ? "bg-gradient-to-r from-amber-600 to-orange-600 hover:from-amber-700 hover:to-orange-700"
                   : mode === "to_update"
@@ -561,23 +572,25 @@ export function ConvertBugDialog({
             >
               {submitting ? (
                 <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  {selectedNeedsAccessRequest ? "Sending…" : "Converting…"}
+                  <Loader2 className="mr-2 h-4 w-4 shrink-0 animate-spin" />
+                  <span className="truncate">
+                    {selectedNeedsAccessRequest ? "Sending…" : "Converting…"}
+                  </span>
                 </>
               ) : selectedNeedsAccessRequest ? (
                 <>
-                  <BellRing className="mr-2 h-4 w-4" />
-                  Request access
+                  <BellRing className="mr-2 h-4 w-4 shrink-0" />
+                  <span className="truncate">Request access</span>
                 </>
               ) : mode === "to_update" ? (
                 <>
-                  <Megaphone className="mr-2 h-4 w-4" />
-                  Convert to Update
+                  <Megaphone className="mr-2 h-4 w-4 shrink-0" />
+                  <span className="truncate">Convert to Update</span>
                 </>
               ) : (
                 <>
-                  <ArrowRightLeft className="mr-2 h-4 w-4" />
-                  Move bug
+                  <ArrowRightLeft className="mr-2 h-4 w-4 shrink-0" />
+                  <span className="truncate">Move bug</span>
                 </>
               )}
             </Button>
@@ -586,7 +599,7 @@ export function ConvertBugDialog({
       </Dialog>
 
       <AlertDialog open={accessConfirmOpen} onOpenChange={setAccessConfirmOpen}>
-        <AlertDialogContent className="max-w-[400px] rounded-2xl">
+        <AlertDialogContent className="w-[calc(100%-1.5rem)] max-w-[400px] rounded-2xl">
           <AlertDialogHeader>
             <AlertDialogTitle>Request project access?</AlertDialogTitle>
             <AlertDialogDescription className="space-y-2">
@@ -627,7 +640,7 @@ export function ConvertBugDialog({
       </AlertDialog>
 
       <AlertDialog open={confirmOpen} onOpenChange={setConfirmOpen}>
-        <AlertDialogContent className="max-w-[400px] rounded-2xl">
+        <AlertDialogContent className="w-[calc(100%-1.5rem)] max-w-[400px] rounded-2xl">
           <AlertDialogHeader>
             <AlertDialogTitle>Convert bug to update?</AlertDialogTitle>
             <AlertDialogDescription className="space-y-2">
