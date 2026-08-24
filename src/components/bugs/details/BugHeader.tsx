@@ -146,11 +146,13 @@ export const BugHeader = ({
 
   const backText = isFromProject
     ? "Back to Project Bugs"
-    : isFromFixes
-      ? "Back to Fixes"
-      : isFromCommonBugs
-        ? "Back to Common Bugs"
-        : "Back to Bugs";
+    : isFromRetests
+      ? "Back to Retests"
+      : isFromFixes
+        ? "Back to Fixes"
+        : isFromCommonBugs
+          ? "Back to Common Bugs"
+          : "Back to Bugs";
 
   const handleBackNavigation = () => {
     const target = backLink;

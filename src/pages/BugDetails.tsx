@@ -467,9 +467,10 @@ const BugDetails = () => {
   const idsEqual = (a: unknown, b: unknown) =>
     a != null && b != null && String(a) === String(b);
   
-  // Check if user came from project / fixes page
+  // Check if user came from project / fixes / retests page
   const fromProject = searchParams.get("from") === "project";
   const fromFixes = searchParams.get("from") === "fixes";
+  const fromRetests = searchParams.get("from") === "retests";
   const fromCommonBugs = searchParams.get("from") === "common-bugs";
   const projectIdFromQuery = searchParams.get("projectId");
 
@@ -887,6 +888,8 @@ const BugDetails = () => {
     // Preserve entry context only — do NOT stamp from=project just because bug has a project_id
     if (fromFixes) {
       params.set("from", "fixes");
+    } else if (fromRetests) {
+      params.set("from", "retests");
     } else if (fromProject) {
       params.set("from", "project");
       if (navigationProjectId) params.set("projectId", String(navigationProjectId));

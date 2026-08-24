@@ -33,7 +33,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { useQueryClient } from "@tanstack/react-query";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import {
   CheckCircle2,
   ClipboardCheck,
@@ -233,10 +233,13 @@ export function TesterVerificationPanel({ bug, onUpdated }: TesterVerificationPa
   const { currentUser } = useAuth();
   const { toast } = useToast();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const queryClient = useQueryClient();
   const role = String(currentUser?.role || "").toLowerCase();
   const canVerify = role === "admin" || role === "tester";
   const apiBaseUrl = ENV.API_URL;
+  const fromRetests = searchParams.get("from") === "retests";
+  const fromFixes = searchParams.get("from") === "fixes";
 
   const screenshotInputRef = useRef<HTMLInputElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -308,9 +311,9 @@ export function TesterVerificationPanel({ bug, onUpdated }: TesterVerificationPa
       ? retested === "yes" && issueFixed === "no"
       : false;
 
-  const bugsListPath = currentUser?.role
-    ? `/${currentUser.role}/bugs`
-    : "/bugs";
+  const reopenedBugPath = currentUser?.role
+    ? `/${currentUser.role}/bugs/${bug.id}`
+    : `/bugs/${bug.id}`;
 
   const buildImageUrl = (path: string) =>
     `${apiBaseUrl}/get_attachment.php?path=${encodeURIComponent(path)}`;
@@ -422,13 +425,25 @@ export function TesterVerificationPanel({ bug, onUpdated }: TesterVerificationPa
       await queryClient.invalidateQueries({ queryKey: ["bugLifecycle", bug.id] });
       notifyAdminNavCountsChanged();
 
-      if (didReopen && reopen) {
+      // Why: Still-broken must leave Retests/Fixes and open the bug under Bugs so
+      // developers pick it up; always redirect after a successful reopen save.
+      if (reopen) {
         toast({
           title: "Bug reopened",
           description:
             "Marked still broken and moved back to Bugs for developers to fix again.",
         });
-        navigate(bugsListPath, { replace: true });
+        navigate(reopenedBugPath, { replace: true });
+        return;
+      }
+
+      if (didReopen && (fromRetests || fromFixes)) {
+        toast({
+          title: "Bug reopened",
+          description:
+            "Marked still broken and moved back to Bugs for developers to fix again.",
+        });
+        navigate(reopenedBugPath, { replace: true });
         return;
       }
 
@@ -999,8 +1014,8 @@ export function TesterVerificationPanel({ bug, onUpdated }: TesterVerificationPa
             <AlertDialogTitle>Reopen this bug?</AlertDialogTitle>
             <AlertDialogDescription>
               You marked the fix as still broken. This will move the bug from{" "}
-              <strong>Fixes</strong> back to <strong>Bugs</strong> as pending so
-              developers can work on it again.
+              <strong>{fromRetests ? "Retests" : "Fixes"}</strong> back to{" "}
+              <strong>Bugs</strong> as pending so developers can work on it again.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
