@@ -5,10 +5,10 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { useAuth } from '@/context/AuthContext';
 import { complianceService } from '@/services/complianceService';
 import { projectService } from '@/services/projectService';
-import { getProjectStatusLabel, type ProjectStatus } from '@/lib/utils/projectUtils';
+import { getProjectStatusLabel, isProjectComplianceRequired, type ProjectStatus } from '@/lib/utils/projectUtils';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { ArrowLeft, FolderOpen, ShieldCheck } from 'lucide-react';
-import { Link, useLocation, useParams } from 'react-router-dom';
+import { FolderOpen, ShieldCheck } from 'lucide-react';
+import { Link, Navigate, useLocation, useParams } from 'react-router-dom';
 import { getReturnPathFromState } from '@/hooks/useUrlPagination';
 
 const ProjectCompliance = () => {
@@ -21,6 +21,9 @@ const ProjectCompliance = () => {
     location.state,
     `/${role}/projects`
   );
+  const projectDetailsPath = projectId
+    ? `/${role}/projects/${projectId}`
+    : projectsListPath;
 
   const { data: project, isLoading } = useQuery({
     queryKey: ['project', projectId],
@@ -28,10 +31,12 @@ const ProjectCompliance = () => {
     enabled: !!projectId,
   });
 
+  const complianceEnabled = isProjectComplianceRequired(project);
+
   const { data: compliance, isLoading: complianceLoading } = useQuery({
     queryKey: ['project-compliance', projectId],
     queryFn: () => complianceService.getCompliance(projectId!),
-    enabled: !!projectId,
+    enabled: !!projectId && complianceEnabled,
   });
 
   const handleStatusFinalized = (status: ProjectStatus) => {
@@ -74,6 +79,10 @@ const ProjectCompliance = () => {
         <p className="text-muted-foreground">Project not found.</p>
       </div>
     );
+  }
+
+  if (!complianceEnabled) {
+    return <Navigate to={projectDetailsPath} replace />;
   }
 
   return (

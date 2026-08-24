@@ -41,6 +41,7 @@ import {
   type ComplianceVerifiedFilter,
 } from '@/lib/codo/complianceStatus';
 import { cn, getEffectiveRole } from '@/lib/utils';
+import { isProjectComplianceRequired } from '@/lib/utils/projectUtils';
 import { projectService } from '@/services/projectService';
 import { useQuery } from '@tanstack/react-query';
 import {
@@ -199,9 +200,12 @@ const ComplianceOverview = () => {
 
   const scopedProjects = useMemo(() => {
     const all = projectsData ?? [];
-    if (isAdmin) return all;
+    const complianceScoped = all.filter((project) =>
+      isProjectComplianceRequired(project)
+    );
+    if (isAdmin) return complianceScoped;
     if (!currentUser?.id) return [];
-    return filterAssignedProjects(all, currentUser.id);
+    return filterAssignedProjects(complianceScoped, currentUser.id);
   }, [projectsData, isAdmin, currentUser?.id]);
 
   const overviewItems = useMemo(

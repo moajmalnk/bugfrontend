@@ -48,6 +48,22 @@ export interface ProjectWhatsAppShareData {
   createdAtLabel?: string | null;
   sharedBy?: string | null;
   sharedByRole?: string | null;
+  /** Project timeline (matches Overview dates) */
+  startDateLabel?: string | null;
+  deadlineDateLabel?: string | null;
+  /** Why: Surface overdue / due-soon / due-today on the deadline line. */
+  deadlineReminderLabel?: string | null;
+  deadlineReminderTone?: 'ok' | 'soon' | 'today' | 'overdue' | 'done' | 'none' | null;
+  expectedPublishDateLabel?: string | null;
+  testingStartDateLabel?: string | null;
+  testingEndDateLabel?: string | null;
+  frontendFinishDateLabel?: string | null;
+  backendFinishDateLabel?: string | null;
+  testerComplianceCompleteDateLabel?: string | null;
+  developerComplianceCompleteDateLabel?: string | null;
+  durationDaysLabel?: string | null;
+  hoursNeededLabel?: string | null;
+  developerHoursTakenLabel?: string | null;
   /** Bug / work analytics */
   totalBugs?: number | null;
   openBugs?: number | null;
@@ -120,6 +136,47 @@ class WhatsAppService {
           ? `${data.description.slice(0, 280)}…`
           : data.description.trim();
       message += `\n📝 *Overview*\n${desc}\n`;
+    }
+
+    const timelineLines: string[] = [];
+    const pushTimeline = (label: string, value?: string | null) => {
+      if (!value || value === "Not set") return;
+      timelineLines.push(`• ${label}: *${value}*`);
+    };
+    pushTimeline("Start", data.startDateLabel);
+    if (data.deadlineDateLabel && data.deadlineDateLabel !== "Not set") {
+      let deadlineLine = `• Deadline: *${data.deadlineDateLabel}*`;
+      const reminder = data.deadlineReminderLabel?.trim();
+      const tone = data.deadlineReminderTone;
+      if (reminder && tone === "overdue") {
+        deadlineLine += `\n  ⚠️ *Deadline not met — ${reminder}*`;
+      } else if (reminder && (tone === "today" || tone === "soon")) {
+        deadlineLine += `\n  ⏰ *${reminder}*`;
+      }
+      timelineLines.push(deadlineLine);
+    }
+    pushTimeline("Expected publish", data.expectedPublishDateLabel);
+    pushTimeline("Testing start", data.testingStartDateLabel);
+    pushTimeline("Testing end", data.testingEndDateLabel);
+    pushTimeline("Frontend finish", data.frontendFinishDateLabel);
+    pushTimeline("Backend finish", data.backendFinishDateLabel);
+    pushTimeline("Tester compliance complete", data.testerComplianceCompleteDateLabel);
+    pushTimeline(
+      "Developer compliance complete",
+      data.developerComplianceCompleteDateLabel
+    );
+    pushTimeline("Duration", data.durationDaysLabel);
+    if (data.hoursNeededLabel && data.hoursNeededLabel !== "Not set") {
+      pushTimeline("Hours needed", data.hoursNeededLabel);
+    }
+    if (
+      data.developerHoursTakenLabel &&
+      data.developerHoursTakenLabel !== "Not set"
+    ) {
+      pushTimeline("Developer hours taken", data.developerHoursTakenLabel);
+    }
+    if (timelineLines.length > 0) {
+      message += `\n🗓️ *Timeline*\n${timelineLines.join("\n")}\n`;
     }
 
     message += `\n📊 *Analytics*\n`;

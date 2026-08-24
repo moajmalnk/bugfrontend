@@ -4,6 +4,7 @@ import {
   matchesComplianceFilter,
 } from '@/lib/codo/complianceStatus';
 import type { Project } from '@/lib/utils/projectUtils';
+import { isProjectComplianceRequired } from '@/lib/utils/projectUtils';
 import { ENV } from '@/lib/env';
 import { userService } from '@/services/userService';
 import { clientService } from '@/services/clientService';
@@ -163,6 +164,7 @@ function countPendingComplianceProjects(
   roleKey: 'admin' | 'developer' | 'tester'
 ): number {
   return projects
+    .filter((project) => isProjectComplianceRequired(project))
     .map((project) => buildProjectComplianceOverview(project))
     .filter((item) => matchesComplianceFilter(item, 'pending', roleKey)).length;
 }

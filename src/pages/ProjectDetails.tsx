@@ -86,6 +86,7 @@ import { canReportBug } from "@/lib/utils";
 import { cn } from "@/lib/utils";
 import {
   getProjectStatusLabel,
+  isProjectComplianceRequired,
   projectStatusBadgeClass,
 } from "@/lib/utils/projectUtils";
 import { formatLocalDate } from "@/lib/utils/dateUtils";
@@ -4942,7 +4943,8 @@ const ProjectDetails = () => {
             <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 w-full xl:w-auto flex-shrink-0">
               {(currentUser?.role === "admin" ||
                 currentUser?.role === "developer" ||
-                currentUser?.role === "tester") && (
+                currentUser?.role === "tester") &&
+                isProjectComplianceRequired(project) && (
                 <Button
                   asChild
                   variant="outline"

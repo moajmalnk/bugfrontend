@@ -23,6 +23,7 @@ import { TimePicker } from '@/components/ui/TimePicker';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Switch } from '@/components/ui/switch';
 import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
 import { buildDocumentPreviewPagePath } from '@/lib/attachmentUtils';
@@ -406,6 +407,7 @@ export function ProjectForm({
       typeof value === 'string' &&
       requiresComplianceToClose(value, effectiveRole) &&
       mode === 'edit' &&
+      values.compliance_required &&
       !isCompliancePipelineSatisfied(complianceSummary)
     ) {
       toast({
@@ -685,7 +687,35 @@ export function ProjectForm({
                     />
                   </div>
 
-                  {mode === 'edit' && complianceSummary && (
+                  <div className="space-y-3">
+                    <FieldLabel
+                      htmlFor="compliance_required"
+                      dotClass="from-indigo-500 to-violet-600"
+                    >
+                      Compliance required
+                    </FieldLabel>
+                    <div className="flex items-center justify-between gap-3 min-h-[2.75rem] rounded-xl border border-gray-200/70 dark:border-gray-700/70 bg-white/80 dark:bg-gray-900/80 px-4 py-2.5">
+                      <div className="min-w-0">
+                        <p className="text-sm font-semibold text-gray-900 dark:text-white">
+                          {values.compliance_required ? 'Required' : 'Not required'}
+                        </p>
+                        <p className="text-xs text-muted-foreground mt-0.5">
+                          {values.compliance_required
+                            ? 'CODO checklists and Compliance button stay enabled.'
+                            : 'Compliance is hidden and not required to close this project.'}
+                        </p>
+                      </div>
+                      <Switch
+                        id="compliance_required"
+                        checked={values.compliance_required}
+                        onCheckedChange={(checked) => setField('compliance_required', checked)}
+                        aria-label="Compliance required"
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                  {mode === 'edit' && values.compliance_required && complianceSummary && (
                     <div className="space-y-3">
                       <FieldLabel dotClass="from-indigo-500 to-violet-600">
                         Compliance Pipeline
@@ -744,7 +774,6 @@ export function ProjectForm({
                       </div>
                     </div>
                   )}
-                </div>
               </SectionBlock>
 
               <SectionBlock
@@ -1082,8 +1111,20 @@ export function ProjectForm({
                     { key: 'testing_end_date' as const, label: 'Testing End', dot: 'from-lime-500 to-green-600' },
                     { key: 'frontend_finish_date' as const, label: 'Frontend Finish', dot: 'from-green-500 to-emerald-600' },
                     { key: 'backend_finish_date' as const, label: 'Backend Finish', dot: 'from-emerald-500 to-teal-600' },
-                    { key: 'tester_compliance_complete_date' as const, label: 'Tester Compliance Complete', dot: 'from-cyan-500 to-sky-600' },
-                    { key: 'developer_compliance_complete_date' as const, label: 'Developer Compliance Complete', dot: 'from-indigo-500 to-blue-600' },
+                    ...(values.compliance_required
+                      ? [
+                          {
+                            key: 'tester_compliance_complete_date' as const,
+                            label: 'Tester Compliance Complete',
+                            dot: 'from-cyan-500 to-sky-600',
+                          },
+                          {
+                            key: 'developer_compliance_complete_date' as const,
+                            label: 'Developer Compliance Complete',
+                            dot: 'from-indigo-500 to-blue-600',
+                          },
+                        ]
+                      : []),
                   ].map(({ key, label, dot }) => {
                     const lastChange = latestTimelineChange(timelineHistory, key);
                     return (

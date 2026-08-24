@@ -8,6 +8,7 @@ import {
   formatProjectHoursDisplay,
   getDeadlineTimerReminder,
   getProjectStatusLabel,
+  isProjectComplianceRequired,
   latestTimelineChange,
   parseProjectPlatforms,
   PROJECT_PLATFORM_OPTIONS,
@@ -470,16 +471,20 @@ export function ProjectInfoOverview({ project, createdByName }: ProjectInfoOverv
     { label: 'Testing End', value: formatProjectDateTime(project.testing_end_date), fieldKey: 'testing_end_date' },
     { label: 'Frontend Finish', value: formatProjectDateTime(project.frontend_finish_date), fieldKey: 'frontend_finish_date' },
     { label: 'Backend Finish', value: formatProjectDateTime(project.backend_finish_date), fieldKey: 'backend_finish_date' },
-    {
-      label: 'Tester Compliance Complete',
-      value: formatProjectDateTime(project.tester_compliance_complete_date),
-      fieldKey: 'tester_compliance_complete_date',
-    },
-    {
-      label: 'Developer Compliance Complete',
-      value: formatProjectDateTime(project.developer_compliance_complete_date),
-      fieldKey: 'developer_compliance_complete_date',
-    },
+    ...(isProjectComplianceRequired(project)
+      ? [
+          {
+            label: 'Tester Compliance Complete',
+            value: formatProjectDateTime(project.tester_compliance_complete_date),
+            fieldKey: 'tester_compliance_complete_date',
+          },
+          {
+            label: 'Developer Compliance Complete',
+            value: formatProjectDateTime(project.developer_compliance_complete_date),
+            fieldKey: 'developer_compliance_complete_date',
+          },
+        ]
+      : []),
     { label: 'Duration', value: `${duration} days` },
     { label: 'Hours Needed', value: formatProjectHoursDisplay(project.estimated_hours) },
     {

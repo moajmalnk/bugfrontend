@@ -48,16 +48,20 @@ import {
 import { formatLocalDate } from "@/lib/utils/dateUtils";
 import { canReportBug, cn } from "@/lib/utils";
 import {
+  computeProjectDurationDays,
   deadlineTimerToneClass,
+  formatProjectDate,
+  formatProjectDateTime,
+  formatProjectHoursDisplay,
+  formatProjectTime,
   getDeadlineTimerReminder,
   getProjectStatusLabel,
+  isProjectComplianceRequired,
   parseProjectCategories,
   parseProjectPlatforms,
   PROJECT_CATEGORY_OPTIONS,
   PROJECT_PLATFORM_OPTIONS,
   sortProjectsByWorkload,
-  formatProjectDate,
-  formatProjectTime,
 } from "@/lib/utils/projectUtils";
 import { Project, projectService } from "@/services/projectService";
 import { complianceService } from "@/services/complianceService";
@@ -364,6 +368,12 @@ const Projects = () => {
 
         const memberStats = projectMemberCounts[project.id];
         const platforms = formatProjectPlatformsLabel(project.platforms);
+        const deadlineReminder = getDeadlineTimerReminder(
+          project.deadline_date,
+          project.status
+        );
+        const complianceOn = isProjectComplianceRequired(project);
+        const durationDays = computeProjectDurationDays(project);
 
         const briefing = whatsappService.formatProjectShareMessage({
           projectId: project.id,
@@ -385,6 +395,34 @@ const Projects = () => {
           createdAtLabel: formatLocalDate(project.created_at, "date"),
           sharedBy: currentUser?.username || null,
           sharedByRole: currentUser?.role || null,
+          startDateLabel: formatProjectDateTime(project.start_date),
+          deadlineDateLabel: formatProjectDateTime(project.deadline_date),
+          deadlineReminderLabel: deadlineReminder.label,
+          deadlineReminderTone: deadlineReminder.tone,
+          expectedPublishDateLabel: formatProjectDateTime(
+            project.expected_publish_date
+          ),
+          testingStartDateLabel: formatProjectDateTime(
+            project.testing_start_date
+          ),
+          testingEndDateLabel: formatProjectDateTime(project.testing_end_date),
+          frontendFinishDateLabel: formatProjectDateTime(
+            project.frontend_finish_date
+          ),
+          backendFinishDateLabel: formatProjectDateTime(
+            project.backend_finish_date
+          ),
+          testerComplianceCompleteDateLabel: complianceOn
+            ? formatProjectDateTime(project.tester_compliance_complete_date)
+            : null,
+          developerComplianceCompleteDateLabel: complianceOn
+            ? formatProjectDateTime(project.developer_compliance_complete_date)
+            : null,
+          durationDaysLabel: `${durationDays} day${durationDays === 1 ? "" : "s"}`,
+          hoursNeededLabel: formatProjectHoursDisplay(project.estimated_hours),
+          developerHoursTakenLabel: formatProjectHoursDisplay(
+            project.developer_hours_taken
+          ),
           totalBugs,
           openBugs,
           fixedBugs,
@@ -395,23 +433,38 @@ const Projects = () => {
           testers,
           developerCount: memberStats?.developers ?? developers.length,
           testerCount: memberStats?.testers ?? testers.length,
-          complianceStage: project.compliance
-            ? getPipelineStageLabel(
-                project.compliance.pipeline_stage as CompliancePipelineStage
-              )
+          complianceStage:
+            complianceOn && project.compliance
+              ? getPipelineStageLabel(
+                  project.compliance.pipeline_stage as CompliancePipelineStage
+                )
+              : null,
+          developerComplianceVerified: complianceOn
+            ? project.compliance?.developer_verified ?? 0
             : null,
-          developerComplianceVerified: project.compliance?.developer_verified ?? 0,
-          developerComplianceTotal: project.compliance?.developer_total ?? 0,
-          testerComplianceVerified: project.compliance?.tester_verified ?? 0,
-          testerComplianceTotal: project.compliance?.tester_total ?? 0,
-          adminVerified: isCompliancePipelineSatisfied(project.compliance),
-          complianceBypass: project.compliance?.emergency_bypass ?? false,
-          developerComplianceCompleteAt: project.developer_compliance_complete_date
-            ? formatLocalDate(project.developer_compliance_complete_date, "date")
+          developerComplianceTotal: complianceOn
+            ? project.compliance?.developer_total ?? 0
             : null,
-          testerComplianceCompleteAt: project.tester_compliance_complete_date
-            ? formatLocalDate(project.tester_compliance_complete_date, "date")
+          testerComplianceVerified: complianceOn
+            ? project.compliance?.tester_verified ?? 0
             : null,
+          testerComplianceTotal: complianceOn
+            ? project.compliance?.tester_total ?? 0
+            : null,
+          adminVerified: complianceOn
+            ? isCompliancePipelineSatisfied(project.compliance)
+            : null,
+          complianceBypass: complianceOn
+            ? project.compliance?.emergency_bypass ?? false
+            : false,
+          developerComplianceCompleteAt:
+            complianceOn && project.developer_compliance_complete_date
+              ? formatLocalDate(project.developer_compliance_complete_date, "date")
+              : null,
+          testerComplianceCompleteAt:
+            complianceOn && project.tester_compliance_complete_date
+              ? formatLocalDate(project.tester_compliance_complete_date, "date")
+              : null,
         });
 
         if (navigator.clipboard?.writeText) {
@@ -1000,6 +1053,7 @@ const Projects = () => {
     const missing = projects.filter(
       (project) =>
         ids.includes(project.id) &&
+        isProjectComplianceRequired(project) &&
         !project.compliance &&
         !attemptedComplianceIds.current.has(project.id)
     );
@@ -1568,7 +1622,9 @@ const Projects = () => {
                         {getProjectClientLabel(project)}
                       </Badge>
                     )}
-                    {project.compliance && canUseProjectActions && (
+                    {isProjectComplianceRequired(project) &&
+                      project.compliance &&
+                      canUseProjectActions && (
                       <Badge
                         variant="outline"
                         className="text-[10px] sm:text-xs px-2 py-0.5 mb-2 rounded-full border-slate-600 text-slate-600 dark:text-slate-300"
@@ -1853,6 +1909,7 @@ const Projects = () => {
                         </div>
                       </div>
 
+                      {isProjectComplianceRequired(project) && (
                       <div className="grid grid-cols-12 gap-2 sm:gap-3">
                         <div
                           className="col-span-4 flex flex-col items-center justify-center min-h-[5rem] p-2 sm:p-3 rounded-xl bg-emerald-50/70 dark:bg-emerald-900/20 hover:bg-emerald-100/80 dark:hover:bg-emerald-900/30 transition-colors duration-200 text-center"
@@ -1923,6 +1980,7 @@ const Projects = () => {
                           </span>
                         </div>
                       </div>
+                      )}
                     </div>
 
                     {/* Enhanced Team Stats */}
@@ -1965,6 +2023,25 @@ const Projects = () => {
                 </CardContent>
                 {canUseProjectActions && (
                 <CardFooter className="relative pt-2 mt-auto p-4 sm:p-5">
+                  {(() => {
+                    const showComplianceBtn =
+                      canUseProjectActions &&
+                      isProjectComplianceRequired(project);
+                    const showCopyBtn =
+                      (currentUser?.role === "admin" ||
+                        currentUser?.role === "tester") &&
+                      canUseProjectActions;
+                    const showDeleteBtn = currentUser?.role === "admin";
+                    /** Why: Pair Copy+Delete when Compliance is off; lone actions span full width. */
+                    const copySpansFull =
+                      showCopyBtn && !showComplianceBtn && !showDeleteBtn;
+                    const deleteSpansFull =
+                      showDeleteBtn && (showComplianceBtn || !showCopyBtn);
+                    const complianceSpansFull =
+                      showComplianceBtn &&
+                      currentUser?.role === "developer";
+
+                    return (
                   <div className="grid grid-cols-2 gap-2 w-full">
                     {((currentUser?.role === "developer" && activeTab === "my-projects") ||
                       currentUser?.role === "admin" ||
@@ -2014,13 +2091,14 @@ const Projects = () => {
                         </Link>
                       </Button>
                     )}
-                    {canUseProjectActions && (
+                    {showComplianceBtn && (
                     <Button
                       asChild
                       variant="outline"
-                      className={`h-11 w-full min-w-0 px-2 rounded-xl border-slate-300 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-900/40 text-slate-700 dark:text-slate-200 font-semibold shadow-sm hover:shadow-md transition-all duration-300 ${
-                        currentUser?.role === "developer" ? "col-span-2" : ""
-                      }`}
+                      className={cn(
+                        "h-11 w-full min-w-0 px-2 rounded-xl border-slate-300 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-900/40 text-slate-700 dark:text-slate-200 font-semibold shadow-sm hover:shadow-md transition-all duration-300",
+                        complianceSpansFull && "col-span-2"
+                      )}
                     >
                       <Link
                         to={
@@ -2035,12 +2113,14 @@ const Projects = () => {
                       </Link>
                     </Button>
                     )}
-                    {(currentUser?.role === "admin" || currentUser?.role === "tester") &&
-                      canUseProjectActions && (
+                    {showCopyBtn && (
                       <Button
                         type="button"
                         variant="outline"
-                        className="h-11 w-full min-w-0 px-2 rounded-xl border-emerald-200 dark:border-emerald-800 hover:bg-emerald-50 dark:hover:bg-emerald-950/20 text-emerald-700 dark:text-emerald-300 font-semibold shadow-sm hover:shadow-md transition-all duration-300"
+                        className={cn(
+                          "h-11 w-full min-w-0 px-2 rounded-xl border-emerald-200 dark:border-emerald-800 hover:bg-emerald-50 dark:hover:bg-emerald-950/20 text-emerald-700 dark:text-emerald-300 font-semibold shadow-sm hover:shadow-md transition-all duration-300",
+                          copySpansFull && "col-span-2"
+                        )}
                         title="Copy project briefing to clipboard"
                         disabled={copyingProjectId === project.id}
                         onClick={() => void handleCopyProject(project)}
@@ -2057,10 +2137,13 @@ const Projects = () => {
                         </span>
                       </Button>
                     )}
-                    {currentUser?.role === "admin" && (
+                    {showDeleteBtn && (
                       <Button
                         variant="destructive"
-                        className="w-full h-11 shadow-sm hover:shadow-md transition-all duration-200 col-span-2"
+                        className={cn(
+                          "w-full h-11 shadow-sm hover:shadow-md transition-all duration-200",
+                          deleteSpansFull && "col-span-2"
+                        )}
                         title="You can only delete projects that have no team members or bugs"
                         onClick={() => {
                           setProjectToDelete(project.id);
@@ -2071,6 +2154,8 @@ const Projects = () => {
                       </Button>
                     )}
                   </div>
+                    );
+                  })()}
                 </CardFooter>
                 )}
                 {!isAssigned &&

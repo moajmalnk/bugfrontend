@@ -280,6 +280,10 @@ export interface Project {
   updated_at: string;
   /** When status first became completed / release_ready */
   completed_at?: string | null;
+  /**
+   * Why: Per-project CODO opt-out. Missing/true = compliance on; false/0 = no compliance UI/gate.
+   */
+  compliance_required?: boolean | number | string | null;
   client_id?: string | null;
   client?: ClientSummary | null;
   client_name?: string | null;
@@ -396,6 +400,8 @@ export interface CreateProjectData {
   github_frontend?: string;
   github_backend?: string;
   github_app?: string;
+  /** 1/true = CODO on; 0/false = skip compliance for this project */
+  compliance_required?: boolean | number;
   start_date?: string;
   deadline_date?: string;
   expected_publish_date?: string;
@@ -494,6 +500,8 @@ export interface ProjectFormValues {
   github_frontend: string;
   github_backend: string;
   github_app: string;
+  /** Form toggle — default true for new projects */
+  compliance_required: boolean;
   start_date: string;
   deadline_date: string;
   expected_publish_date: string;
@@ -537,6 +545,7 @@ export const emptyProjectFormValues = (): ProjectFormValues => ({
   github_frontend: '',
   github_backend: '',
   github_app: '',
+  compliance_required: true,
   start_date: '',
   deadline_date: '',
   expected_publish_date: '',
@@ -581,6 +590,7 @@ export function projectToFormValues(project: Project): ProjectFormValues {
     github_frontend: project.github_frontend || '',
     github_backend: project.github_backend || '',
     github_app: project.github_app || '',
+    compliance_required: isProjectComplianceRequired(project),
     start_date: project.start_date || '',
     deadline_date: project.deadline_date || '',
     expected_publish_date: project.expected_publish_date || '',
@@ -636,6 +646,7 @@ export function formValuesToPayload(values: ProjectFormValues): CreateProjectDat
     github_frontend: values.github_frontend.trim() || undefined,
     github_backend: values.github_backend.trim() || undefined,
     github_app: values.github_app.trim() || undefined,
+    compliance_required: values.compliance_required ? 1 : 0,
     start_date: values.start_date || null,
     deadline_date: values.deadline_date || null,
     expected_publish_date: values.expected_publish_date || null,
@@ -664,6 +675,22 @@ export function getProjectStatusLabel(status: ProjectStatus): string {
     default:
       return status;
   }
+}
+
+/**
+ * Why: Missing column / null means compliance stays on (legacy projects).
+ * Explicit 0 / false / "false" / "no" opts the project out.
+ */
+export function isProjectComplianceRequired(
+  project?: Pick<Project, 'compliance_required'> | null
+): boolean {
+  const raw = project?.compliance_required;
+  if (raw === undefined || raw === null || raw === '') return true;
+  if (typeof raw === 'boolean') return raw;
+  if (typeof raw === 'number') return raw !== 0;
+  const s = String(raw).trim().toLowerCase();
+  if (s === '0' || s === 'false' || s === 'no' || s === 'off') return false;
+  return true;
 }
 
 export function projectStatusBadgeClass(status?: ProjectStatus | string | null): string {
