@@ -68,7 +68,12 @@ function isPublicMediaUrl(url: string): boolean {
   }
 }
 
-async function fetchBlobForDownload(url: string): Promise<Blob> {
+/**
+ * Why: Mobile Safari/Chrome will not inline-render PDFs from
+ * get_attachment.php URLs (shows "get_attachment.php" + Open).
+ * Fetch as a blob so preview can use a blob: URL with application/pdf.
+ */
+export async function fetchAttachmentBlob(url: string): Promise<Blob> {
   const token = localStorage.getItem('token');
   const headers: HeadersInit = {};
   if (token) headers.Authorization = `Bearer ${token}`;
@@ -104,6 +109,10 @@ async function fetchBlobForDownload(url: string): Promise<Blob> {
     throw new Error(`Download failed (${anonymous.status})`);
   }
   return anonymous.blob();
+}
+
+async function fetchBlobForDownload(url: string): Promise<Blob> {
+  return fetchAttachmentBlob(url);
 }
 
 export async function downloadAttachmentFile(

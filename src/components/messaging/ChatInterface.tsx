@@ -21,6 +21,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { DocumentPreviewBody } from "@/components/attachments/DocumentPreviewBody";
 import { useAuth } from "@/context/AuthContext";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
@@ -62,124 +63,9 @@ import { MessageReactions } from "./MessageReactions";
 import { MessageStatus } from "./MessageStatus";
 import { PinnedMessages } from "./PinnedMessages";
 
-type DocumentPreviewKind = "pdf" | "image" | "video" | "audio" | "text" | "none";
-
 type SendChatMessagePayload = Parameters<typeof MessagingService.sendMessage>[0];
 
 const MAX_CHAT_IMAGE_DROP_BYTES = 100 * 1024 * 1024;
-
-function documentPreviewKind(fileName: string): DocumentPreviewKind {
-  const ext = fileName.includes(".")
-    ? fileName.split(".").pop()!.toLowerCase()
-    : "";
-  if (ext === "pdf") return "pdf";
-  if (["jpg", "jpeg", "png", "gif", "webp", "bmp", "svg"].includes(ext))
-    return "image";
-  if (["mp4", "webm", "mov"].includes(ext)) return "video";
-  if (["mp3", "wav", "ogg", "m4a"].includes(ext)) return "audio";
-  if (["txt", "csv", "log", "md", "json", "xml"].includes(ext)) return "text";
-  return "none";
-}
-
-function DocumentTextPreview({ url }: { url: string }) {
-  const [text, setText] = useState<string | null>(null);
-  const [failed, setFailed] = useState(false);
-  useEffect(() => {
-    let cancelled = false;
-    setText(null);
-    setFailed(false);
-    fetch(url)
-      .then((r) => {
-        if (!r.ok) throw new Error("bad response");
-        return r.text();
-      })
-      .then((t) => {
-        if (!cancelled) setText(t);
-      })
-      .catch(() => {
-        if (!cancelled) setFailed(true);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [url]);
-  if (failed) {
-    return (
-      <p className="text-sm text-muted-foreground text-center py-8 px-4">
-        Could not load a text preview. Use “Open in new tab” or Download.
-      </p>
-    );
-  }
-  if (text === null) {
-    return (
-      <p className="text-sm text-muted-foreground text-center py-8">Loading…</p>
-    );
-  }
-  return (
-    <pre className="text-xs sm:text-sm overflow-auto max-h-[70vh] p-4 whitespace-pre-wrap font-mono bg-muted/40 rounded-md m-3 border">
-      {text}
-    </pre>
-  );
-}
-
-function DocumentPreviewBody({
-  url,
-  fileName,
-}: {
-  url: string;
-  fileName: string;
-}) {
-  const kind = documentPreviewKind(fileName);
-  if (kind === "pdf") {
-    return (
-      <iframe
-        title={fileName}
-        src={`${url}#navpanes=0`}
-        className="w-full min-h-[70vh] border-0 bg-background"
-      />
-    );
-  }
-  if (kind === "image") {
-    return (
-      <div className="flex justify-center p-3">
-        <img
-          src={url}
-          alt={fileName}
-          className="max-w-full max-h-[70vh] object-contain rounded-md"
-        />
-      </div>
-    );
-  }
-  if (kind === "video") {
-    return (
-      <div className="p-3 flex justify-center">
-        <video
-          src={url}
-          controls
-          className="max-w-full max-h-[70vh] rounded-md bg-black"
-        />
-      </div>
-    );
-  }
-  if (kind === "audio") {
-    return (
-      <div className="p-6 flex justify-center">
-        <audio src={url} controls className="w-full max-w-md" />
-      </div>
-    );
-  }
-  if (kind === "text") {
-    return <DocumentTextPreview url={url} />;
-  }
-  return (
-    <div className="text-center py-10 px-4 space-y-3">
-      <FileText className="h-12 w-12 mx-auto text-muted-foreground opacity-60" />
-      <p className="text-sm text-muted-foreground">
-        No inline preview for this file type. Open in a new tab or download.
-      </p>
-    </div>
-  );
-}
 
 interface ChatInterfaceProps {
   selectedGroup: ChatGroup | null;

@@ -51,7 +51,9 @@ import {
   deadlineTimerToneClass,
   getDeadlineTimerReminder,
   getProjectStatusLabel,
+  parseProjectCategories,
   parseProjectPlatforms,
+  PROJECT_CATEGORY_OPTIONS,
   PROJECT_PLATFORM_OPTIONS,
   sortProjectsByWorkload,
   formatProjectDate,
@@ -73,6 +75,7 @@ import {
   Clock,
   Code,
   FolderKanban,
+  Layers,
   Loader2,
   Lock,
   Copy,
@@ -244,18 +247,21 @@ const Projects = () => {
   const [filters, setFilter, clearFilters] = usePersistedFilters("projects", {
     searchQuery: "",
     statusFilter: "all",
+    categoryFilter: "all",
     developerFilter: "all",
     testerFilter: "all",
     clientFilter: "all",
   });
   const searchQuery = filters.searchQuery || "";
   const statusFilter = filters.statusFilter || "all";
+  const categoryFilter = filters.categoryFilter || "all";
   const developerFilter = filters.developerFilter || "all";
   const testerFilter = filters.testerFilter || "all";
   const clientFilter = filters.clientFilter || "all";
   
   const setSearchQuery = (value: string) => setFilter("searchQuery", value);
   const setStatusFilter = (value: string) => setFilter("statusFilter", value);
+  const setCategoryFilter = (value: string) => setFilter("categoryFilter", value);
   const setDeveloperFilter = (value: string) => setFilter("developerFilter", value);
   const setTesterFilter = (value: string) => setFilter("testerFilter", value);
   const setClientFilter = (value: string) => setFilter("clientFilter", value);
@@ -588,6 +594,7 @@ const Projects = () => {
   useResetUrlPageOnChange(setCurrentPage, [
     searchQuery,
     statusFilter,
+    categoryFilter,
     developerFilter,
     testerFilter,
     clientFilter,
@@ -652,6 +659,18 @@ const Projects = () => {
       filtered = filtered.filter((project) => project.status !== "archived");
     }
 
+    if (categoryFilter === "none") {
+      filtered = filtered.filter(
+        (project) => parseProjectCategories(project.project_categories).length === 0
+      );
+    } else if (categoryFilter !== "all") {
+      filtered = filtered.filter((project) =>
+        parseProjectCategories(project.project_categories).includes(
+          categoryFilter as (typeof PROJECT_CATEGORY_OPTIONS)[number]["value"]
+        )
+      );
+    }
+
     if (clientFilter !== "all") {
       filtered = filtered.filter((project) => project.client_id === clientFilter);
     }
@@ -687,6 +706,7 @@ const Projects = () => {
     userProjectMemberships,
     tabFromUrl,
     statusFilter,
+    categoryFilter,
     developerFilter,
     testerFilter,
     clientFilter,
@@ -941,7 +961,15 @@ const Projects = () => {
 
   // clearFilters is now provided by usePersistedFilters hook
 
-  const hasActiveFilters = searchQuery || statusFilter !== "all" || developerFilter !== "all" || testerFilter !== "all" || clientFilter !== "all";
+  const activeFilterLabels = [
+    searchQuery && "Search",
+    statusFilter !== "all" && "Status",
+    categoryFilter !== "all" && "Category",
+    developerFilter !== "all" && "Developer",
+    testerFilter !== "all" && "Tester",
+    clientFilter !== "all" && "Client",
+  ].filter(Boolean) as string[];
+  const hasActiveFilters = activeFilterLabels.length > 0;
 
   const getProjectClientLabel = (project: Project) =>
     project.client?.corporate_name || project.client_name || null;
@@ -1070,7 +1098,8 @@ const Projects = () => {
                 {hasActiveFilters && (
                   <div className="flex items-center gap-2 shrink-0">
                     <div className="px-2 py-1 bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 rounded-full text-xs font-medium whitespace-nowrap">
-                      {[searchQuery && "Search", statusFilter !== "all" && "Status", developerFilter !== "all" && "Developer", testerFilter !== "all" && "Tester", clientFilter !== "all" && "Client"].filter(Boolean).length} filter{([searchQuery && "Search", statusFilter !== "all" && "Status", developerFilter !== "all" && "Developer", testerFilter !== "all" && "Tester", clientFilter !== "all" && "Client"].filter(Boolean).length) !== 1 ? "s" : ""} active
+                      {activeFilterLabels.length} filter
+                      {activeFilterLabels.length !== 1 ? "s" : ""} active
                     </div>
                   </div>
                 )}
@@ -1108,6 +1137,26 @@ const Projects = () => {
                       <SelectItem value="completed">Completed</SelectItem>
                       <SelectItem value="release_ready">Release Ready</SelectItem>
                       <SelectItem value="archived">Archived</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="flex items-center gap-2 min-w-0">
+                  <div className="p-1.5 bg-sky-500 rounded-lg shrink-0">
+                    <Layers className="h-4 w-4 text-white" />
+                  </div>
+                  <Select value={categoryFilter} onValueChange={setCategoryFilter}>
+                    <SelectTrigger className="w-full min-w-0 h-11 bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 rounded-xl shadow-sm hover:shadow-md transition-all duration-300">
+                      <SelectValue placeholder="Category" />
+                    </SelectTrigger>
+                    <SelectContent position="popper" className="z-[60]">
+                      <SelectItem value="all">All Categories</SelectItem>
+                      {PROJECT_CATEGORY_OPTIONS.map((opt) => (
+                        <SelectItem key={opt.value} value={opt.value}>
+                          {opt.label}
+                        </SelectItem>
+                      ))}
+                      <SelectItem value="none">No category</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>

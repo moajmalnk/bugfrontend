@@ -221,7 +221,7 @@ function StatusStatPill({
 }) {
   const isClosed = status === 'completed' || status === 'release_ready';
   const completedLabel =
-    isClosed && completedAt ? formatProjectDate(completedAt) : null;
+    isClosed && completedAt ? formatProjectDateTime(completedAt) : null;
 
   return (
     <div
@@ -518,7 +518,7 @@ export function ProjectInfoOverview({ project, createdByName }: ProjectInfoOverv
           completedAt={
             project.completed_at ||
             ((project.status === 'completed' || project.status === 'release_ready')
-              ? project.updated_at
+              ? project.updated_at || project.created_at
               : null)
           }
         />

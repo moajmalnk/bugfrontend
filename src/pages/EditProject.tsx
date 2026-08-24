@@ -15,7 +15,7 @@ import {
 } from '@/services/projectService';
 import { userService } from '@/services/userService';
 import { clientService } from '@/services/clientService';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { ArrowLeft, FolderKanban, Pencil } from 'lucide-react';
 import { FormEvent, useEffect, useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
@@ -23,6 +23,7 @@ import { useNavigate, useParams } from 'react-router-dom';
 const EditProject = () => {
   const { projectId } = useParams<{ projectId: string }>();
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const { currentUser } = useAuth();
   const [values, setValues] = useState(projectToFormValues({
     id: '',
@@ -42,10 +43,14 @@ const EditProject = () => {
   const docsSelectionInitialized = useRef(false);
   const sheetsSelectionInitialized = useRef(false);
 
+  // Why: App QueryClient marks queries fresh for 5 minutes, so edit must always
+  // refetch on mount instead of hydrating the form from the last cached snapshot.
   const { data: project, isLoading: projectLoading } = useQuery({
     queryKey: ['project', projectId],
     queryFn: () => projectService.getProject(projectId!),
     enabled: !!projectId,
+    staleTime: 0,
+    refetchOnMount: 'always',
   });
 
   const { data: complianceSummary } = useQuery({
@@ -64,6 +69,8 @@ const EditProject = () => {
       };
     },
     enabled: !!projectId,
+    staleTime: 0,
+    refetchOnMount: 'always',
   });
 
   const { data: users = [] } = useQuery({
@@ -82,6 +89,8 @@ const EditProject = () => {
     queryKey: ['project-attachments', projectId],
     queryFn: () => projectService.getAttachments(projectId!),
     enabled: !!projectId,
+    staleTime: 0,
+    refetchOnMount: 'always',
   });
 
   const { data: allBugDocs = [], isFetched: bugDocsFetched } = useQuery({
@@ -255,6 +264,14 @@ const EditProject = () => {
             sheet.role || 'all'
           );
         }),
+      ]);
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ['project', projectId] }),
+        queryClient.invalidateQueries({ queryKey: ['project-attachments', projectId] }),
+        queryClient.invalidateQueries({ queryKey: ['project-compliance', projectId] }),
+        queryClient.invalidateQueries({ queryKey: ['projects'] }),
+        queryClient.invalidateQueries({ queryKey: ['project-form-all-bugdocs'] }),
+        queryClient.invalidateQueries({ queryKey: ['project-form-all-bugsheets'] }),
       ]);
 
       toast({
