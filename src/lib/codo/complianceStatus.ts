@@ -8,7 +8,13 @@ import type { Project, ProjectComplianceSummaryLite } from '@/lib/utils/projectU
 
 export type CompliancePhaseStatus = 'completed' | 'pending' | 'not_started';
 
-export type ComplianceFilterTab = 'all' | CompliancePhaseStatus;
+/** Role tabs: Admins / Dev / Tester — each shows that side’s Pending projects only. */
+export type ComplianceMembershipTab = 'admins' | 'dev' | 'testers';
+
+export type ComplianceFilterTab =
+  | 'all'
+  | CompliancePhaseStatus
+  | ComplianceMembershipTab;
 
 export type CompliancePhase = 'developer' | 'tester';
 
@@ -248,9 +254,15 @@ export function isProjectComplianceComplete(
 export function matchesComplianceFilter(
   item: ProjectComplianceOverview,
   tab: ComplianceFilterTab,
-  role: 'admin' | 'developer' | 'tester'
+  role: 'admin' | 'developer' | 'tester',
+  _userId?: string | number | null
 ): boolean {
   if (tab === 'all') return true;
+
+  // Why: Role tabs = that side’s Pending only (same numbers as the matrix cards).
+  if (tab === 'admins') return item.adminStatus === 'pending';
+  if (tab === 'dev') return item.developerStatus === 'pending';
+  if (tab === 'testers') return item.testerStatus === 'pending';
 
   // Completed projects are exclusive to the Completed tab for every role.
   if (isProjectComplianceComplete(item)) {
