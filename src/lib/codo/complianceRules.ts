@@ -430,6 +430,8 @@ export interface ProjectComplianceData {
   project_checks: ComplianceCheckItem[];
   custom_rules?: ComplianceCustomRule[];
   project?: { id: string; status: ProjectStatus; name?: string };
+  /** Pending retests auto-marked verified fixed on admin finalize */
+  auto_verified_retests?: number;
 }
 
 export function getPipelineStageLabel(stage: CompliancePipelineStage): string {

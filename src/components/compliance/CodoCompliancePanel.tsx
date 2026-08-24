@@ -207,9 +207,13 @@ export function CodoCompliancePanel({
       const nextStatus = result.project?.status || finalizeStatus;
       onStatusFinalized?.(nextStatus);
       notifyAdminNavCountsChanged();
+      const autoVerified = Number(result.auto_verified_retests ?? 0);
       toast({
         title: 'Project status updated',
-        description: `Project marked as ${getProjectStatusLabel(nextStatus as 'completed' | 'release_ready')}.`,
+        description:
+          autoVerified > 0
+            ? `Project marked as ${getProjectStatusLabel(nextStatus as 'completed' | 'release_ready')}. ${autoVerified} pending retest${autoVerified === 1 ? '' : 's'} auto-verified as fixed.`
+            : `Project marked as ${getProjectStatusLabel(nextStatus as 'completed' | 'release_ready')}.`,
       });
     } catch (err) {
       toast({

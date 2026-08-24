@@ -401,10 +401,53 @@ export function ScreenshotViewer({
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);
       }
-      const blob = await response.blob();
+      const sourceBlob = await response.blob();
+
+      // Why: ClipboardItem.write only accepts image/png in Chromium/Safari —
+      // JPEG/WebP blobs throw NotAllowedError ("Type image/jpeg not supported").
+      const pngBlob =
+        sourceBlob.type === "image/png"
+          ? sourceBlob
+          : await new Promise<Blob>((resolve, reject) => {
+              const objectUrl = URL.createObjectURL(sourceBlob);
+              const img = new Image();
+              img.onload = () => {
+                try {
+                  const canvas = document.createElement("canvas");
+                  canvas.width = img.naturalWidth || img.width;
+                  canvas.height = img.naturalHeight || img.height;
+                  const ctx = canvas.getContext("2d");
+                  if (!ctx) {
+                    reject(new Error("Canvas unavailable"));
+                    return;
+                  }
+                  ctx.drawImage(img, 0, 0);
+                  canvas.toBlob(
+                    (blob) => {
+                      URL.revokeObjectURL(objectUrl);
+                      if (!blob) {
+                        reject(new Error("PNG conversion failed"));
+                        return;
+                      }
+                      resolve(blob);
+                    },
+                    "image/png"
+                  );
+                } catch (err) {
+                  URL.revokeObjectURL(objectUrl);
+                  reject(err);
+                }
+              };
+              img.onerror = () => {
+                URL.revokeObjectURL(objectUrl);
+                reject(new Error("Failed to load image for clipboard copy"));
+              };
+              img.src = objectUrl;
+            });
+
       await navigator.clipboard.write([
         new ClipboardItem({
-          [blob.type]: blob,
+          "image/png": pngBlob,
         }),
       ]);
       toast({
