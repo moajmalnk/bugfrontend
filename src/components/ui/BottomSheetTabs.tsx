@@ -30,6 +30,13 @@ export type BottomSheetTabsProps = {
   desktopBreakpoint?: "lg" | "xl";
   /** Extra classes for the desktop TabsList grid (e.g. grid-cols-5). */
   desktopGridClassName?: string;
+  /** Tab bar underlay gradient (list-page pages often tint by product). */
+  underlayClassName?: string;
+  /**
+   * Bottom-sheet body layout on tablet/mobile.
+   * `grid` = compact 2-column chips (status filters); `list` = large row cards.
+   */
+  sheetLayout?: "list" | "grid";
   className?: string;
 };
 
@@ -45,6 +52,8 @@ export function BottomSheetTabs({
   description = "Choose a section to navigate",
   desktopBreakpoint = "xl",
   desktopGridClassName,
+  underlayClassName = "from-gray-50/50 to-blue-50/50 dark:from-gray-800/50 dark:to-blue-900/50",
+  sheetLayout = "list",
   className,
 }: BottomSheetTabsProps) {
   const [open, setOpen] = useState(false);
@@ -80,8 +89,13 @@ export function BottomSheetTabs({
                   : "grid-cols-8");
 
   return (
-    <div className={cn("relative w-full", className)}>
-      <div className="absolute inset-0 rounded-2xl bg-gradient-to-r from-gray-50/50 to-blue-50/50 pointer-events-none dark:from-gray-800/50 dark:to-blue-900/50" />
+    <div className={cn("relative w-full min-w-0", className)}>
+      <div
+        className={cn(
+          "pointer-events-none absolute inset-0 rounded-2xl bg-gradient-to-r",
+          underlayClassName
+        )}
+      />
       <div className="relative rounded-2xl border border-gray-200/50 bg-white/60 p-2 backdrop-blur-sm dark:border-gray-700/50 dark:bg-gray-900/60">
         {/* Mobile / tablet: bottom sheet trigger */}
         <div className={cn("p-1", mobileOnly)}>
@@ -124,7 +138,7 @@ export function BottomSheetTabs({
               <TabsTrigger
                 key={tab.value}
                 value={tab.value}
-                className="flex h-full min-w-0 items-center justify-center gap-1.5 rounded-xl px-1 text-sm font-semibold transition-all duration-300 data-[state=active]:border data-[state=active]:border-gray-200 data-[state=active]:bg-white data-[state=active]:shadow-lg dark:data-[state=active]:border-gray-700 dark:data-[state=active]:bg-gray-800 sm:text-base sm:gap-2 sm:px-2"
+                className="flex h-full min-w-0 items-center justify-center gap-1.5 rounded-xl px-1 text-sm font-semibold transition-all duration-300 data-[state=active]:border data-[state=active]:border-gray-200 data-[state=active]:bg-white data-[state=active]:shadow-lg dark:data-[state=active]:border-gray-700 dark:data-[state=active]:bg-gray-800 sm:gap-2 sm:px-2 sm:text-base"
               >
                 {Icon ? <Icon className="h-4 w-4 shrink-0 sm:h-5 sm:w-5" /> : null}
                 <span className="truncate">
@@ -160,55 +174,116 @@ export function BottomSheetTabs({
             </DrawerTitle>
             <DrawerDescription>{description}</DrawerDescription>
           </DrawerHeader>
-          <div className="max-h-[65vh] space-y-3 overflow-y-auto px-4 pb-6 hide-scrollbar">
-            {items.map((tab) => {
-              const isActive = value === tab.value;
-              const Icon = tab.icon;
-              return (
-                <button
-                  key={tab.value}
-                  type="button"
-                  onClick={() => select(tab.value)}
-                  className={cn(
-                    "flex min-h-20 w-full items-center justify-between rounded-3xl px-4 py-4 transition-colors",
-                    isActive
-                      ? "bg-gradient-to-r from-orange-500 to-red-600 text-white"
-                      : "bg-gray-100/80 text-gray-900 dark:bg-gray-800/80 dark:text-gray-100"
-                  )}
-                >
-                  <span className="flex min-w-0 items-center gap-3">
-                    <span
+
+          {sheetLayout === "grid" ? (
+            <div className="max-h-[65vh] overflow-y-auto px-4 pb-6">
+              <div className="grid grid-cols-12 gap-3 rounded-2xl border border-border/50 bg-muted/20 p-3 dark:bg-muted/10">
+                {items.map((tab) => {
+                  const isActive = value === tab.value;
+                  const Icon = tab.icon;
+                  return (
+                    <button
+                      key={tab.value}
+                      type="button"
+                      onClick={() => select(tab.value)}
                       className={cn(
-                        "inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full",
+                        "col-span-6 flex min-w-0 items-center gap-2 rounded-xl px-3 py-3 text-left transition-colors",
                         isActive
-                          ? "bg-white/20 text-white"
-                          : "bg-gray-200 text-gray-700 dark:bg-gray-700 dark:text-gray-200"
+                          ? "bg-background shadow-sm ring-1 ring-border dark:bg-gray-800/90"
+                          : "hover:bg-background/60 dark:hover:bg-gray-800/40"
                       )}
                     >
-                      {Icon ? <Icon className="h-5 w-5" /> : null}
-                    </span>
-                    <span className="truncate text-lg font-semibold">{tab.label}</span>
-                  </span>
-                  <span
+                      {Icon ? (
+                        <Icon
+                          className={cn(
+                            "h-4 w-4 shrink-0",
+                            isActive
+                              ? "text-foreground"
+                              : "text-muted-foreground"
+                          )}
+                        />
+                      ) : null}
+                      <span
+                        className={cn(
+                          "min-w-0 flex-1 truncate text-sm font-semibold",
+                          isActive
+                            ? "text-foreground"
+                            : "text-muted-foreground"
+                        )}
+                      >
+                        {tab.shortLabel || tab.label}
+                      </span>
+                      {tab.count != null ? (
+                        <span
+                          className={cn(
+                            "shrink-0 rounded-full px-2 py-0.5 text-[11px] font-bold tabular-nums",
+                            tab.countClassName ??
+                              "bg-muted text-muted-foreground"
+                          )}
+                        >
+                          {tab.count}
+                        </span>
+                      ) : null}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          ) : (
+            <div className="max-h-[65vh] space-y-3 overflow-y-auto px-4 pb-6 hide-scrollbar">
+              {items.map((tab) => {
+                const isActive = value === tab.value;
+                const Icon = tab.icon;
+                return (
+                  <button
+                    key={tab.value}
+                    type="button"
+                    onClick={() => select(tab.value)}
                     className={cn(
-                      "inline-flex h-10 min-w-10 shrink-0 items-center justify-center rounded-full px-2",
+                      "flex min-h-20 w-full items-center justify-between rounded-3xl px-4 py-4 transition-colors",
                       isActive
-                        ? "bg-gray-950 text-white"
-                        : "bg-gray-200 dark:bg-gray-700"
+                        ? "bg-gradient-to-r from-orange-500 to-red-600 text-white"
+                        : "bg-gray-100/80 text-gray-900 dark:bg-gray-800/80 dark:text-gray-100"
                     )}
                   >
-                    {isActive ? (
-                      <Check className="h-5 w-5" />
-                    ) : tab.count != null ? (
-                      <span className="text-sm font-bold tabular-nums">{tab.count}</span>
-                    ) : (
-                      <ChevronDown className="h-4 w-4 -rotate-90 opacity-80" />
-                    )}
-                  </span>
-                </button>
-              );
-            })}
-          </div>
+                    <span className="flex min-w-0 items-center gap-3">
+                      <span
+                        className={cn(
+                          "inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full",
+                          isActive
+                            ? "bg-white/20 text-white"
+                            : "bg-gray-200 text-gray-700 dark:bg-gray-700 dark:text-gray-200"
+                        )}
+                      >
+                        {Icon ? <Icon className="h-5 w-5" /> : null}
+                      </span>
+                      <span className="truncate text-lg font-semibold">
+                        {tab.label}
+                      </span>
+                    </span>
+                    <span
+                      className={cn(
+                        "inline-flex h-10 min-w-10 shrink-0 items-center justify-center rounded-full px-2",
+                        isActive
+                          ? "bg-gray-950 text-white"
+                          : "bg-gray-200 dark:bg-gray-700"
+                      )}
+                    >
+                      {isActive ? (
+                        <Check className="h-5 w-5" />
+                      ) : tab.count != null ? (
+                        <span className="text-sm font-bold tabular-nums">
+                          {tab.count}
+                        </span>
+                      ) : (
+                        <ChevronDown className="h-4 w-4 -rotate-90 opacity-80" />
+                      )}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+          )}
         </DrawerContent>
       </Drawer>
     </div>

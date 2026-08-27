@@ -18,14 +18,13 @@ import {
 } from '@/components/ui/select';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Tabs, TabsContent } from '@/components/ui/tabs';
+import { BottomSheetTabs } from '@/components/ui/BottomSheetTabs';
 import { toast } from '@/components/ui/use-toast';
 import { ItemsPerPageSelect } from '@/components/pagination/ItemsPerPageSelect';
 import { DashboardPeriodFilter } from '@/components/dashboard/DashboardPeriodFilter';
 import {
   ListPageHeader,
   ListPageShell,
-  ListPageTabTrigger,
-  ListPageTabsShell,
   LIST_TABS_CONTENT,
 } from '@/components/layout/list-page';
 import { AssetFormModal } from '@/components/creative/AssetFormModal';
@@ -562,30 +561,27 @@ export default function BugCreative() {
       />
 
       <Tabs value={statusTab} onValueChange={setStatusTab} className="w-full">
-        <ListPageTabsShell
-          columns={6}
-          underlayClassName="from-gray-50/50 to-fuchsia-50/50 dark:from-gray-800/50 dark:to-fuchsia-900/50"
-        >
-          {tabs.map((tab) => {
+        <BottomSheetTabs
+          items={tabs.map((tab) => {
             const meta = TAB_META[tab];
-            const Icon = meta.icon;
-            return (
-              <ListPageTabTrigger key={tab} value={tab}>
-                <Icon className="mr-1.5 h-4 w-4 shrink-0 sm:mr-2 sm:h-5 sm:w-5" />
-                <span className="hidden truncate sm:inline">{meta.label}</span>
-                <span className="truncate sm:hidden">{meta.shortLabel}</span>
-                <span
-                  className={cn(
-                    'ml-1 shrink-0 rounded-full px-1.5 py-0.5 text-[10px] font-bold sm:ml-2 sm:px-2 sm:py-1 sm:text-xs',
-                    meta.badgeClass
-                  )}
-                >
-                  {getTabCount(tab)}
-                </span>
-              </ListPageTabTrigger>
-            );
+            return {
+              value: tab,
+              label: meta.label,
+              shortLabel: meta.shortLabel,
+              icon: meta.icon,
+              count: getTabCount(tab),
+              countClassName: meta.badgeClass,
+            };
           })}
-        </ListPageTabsShell>
+          value={statusTab}
+          onValueChange={setStatusTab}
+          title="Status"
+          description="Filter assets by workflow status"
+          desktopBreakpoint="xl"
+          desktopGridClassName="grid-cols-6"
+          sheetLayout="grid"
+          underlayClassName="from-gray-50/50 to-fuchsia-50/50 dark:from-gray-800/50 dark:to-fuchsia-900/50"
+        />
 
         <TabsContent value={statusTab} className={LIST_TABS_CONTENT}>
           <div className="relative w-full min-w-0">
