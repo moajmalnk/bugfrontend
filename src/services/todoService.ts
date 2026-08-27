@@ -78,6 +78,9 @@ export type WorkSubmission = {
     break_hours: number;
     growth_glimpse_hours: number;
     other_hours: number;
+    lunch_attended?: boolean;
+    breaks_attended?: boolean;
+    growth_glimpse_attended?: boolean;
   };
 };
 

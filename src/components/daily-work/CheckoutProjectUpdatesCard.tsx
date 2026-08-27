@@ -16,6 +16,7 @@ import {
   formatHoursShort,
   hoursTallyMatches,
   isGrowthGlimpseDay,
+  type AttendanceSlot,
   type TimeAllocation,
 } from '@/lib/checkoutTimeAllocation';
 import type { ProjectWorkUpdate } from '@/lib/projectWorkUpdates';
@@ -36,6 +37,7 @@ type Props = {
   submissionDate: string;
   timeAllocation: TimeAllocation;
   onOtherHoursChange: (hours: number) => void;
+  onSlotAttendanceChange: (slot: AttendanceSlot, attended: boolean) => void;
   loading?: boolean;
 };
 
@@ -51,7 +53,8 @@ function emptyUpdate(projectId: string): ProjectWorkUpdate {
 
 /**
  * Why: Checkout lists planned projects first, then lets the user add other
- * assigned (unplanned) projects they actually worked on.
+ * assigned (unplanned) projects they actually worked on. Lunch / Breaks /
+ * Growth Glimpse are optional — skipped slots free time into projects/Other.
  */
 export function CheckoutProjectUpdatesCard({
   projects,
@@ -65,6 +68,7 @@ export function CheckoutProjectUpdatesCard({
   submissionDate,
   timeAllocation,
   onOtherHoursChange,
+  onSlotAttendanceChange,
   loading = false,
 }: Props) {
   const plannedSet = new Set(plannedProjectIds);
@@ -102,8 +106,8 @@ export function CheckoutProjectUpdatesCard({
               Hours &amp; Project Progress
             </h3>
             <p className="text-xs text-gray-500 dark:text-gray-400">
-              Planned projects first. Add any other assigned project you worked on. Totals must match{' '}
-              {formatHoursShort(target)}h.
+              Mark Lunch, Breaks, and Growth Glimpse if you took them. Skipped time goes to projects
+              or Other. Totals must match {formatHoursShort(target)}h.
             </p>
           </div>
         </div>
@@ -128,12 +132,30 @@ export function CheckoutProjectUpdatesCard({
       </div>
 
       <div className="mb-5 grid grid-cols-2 gap-2 sm:grid-cols-4">
-        <FixedSlot label="Lunch" hours={timeAllocation.lunch_hours} />
-        <FixedSlot label="Breaks" hours={timeAllocation.break_hours} />
+        <AttendanceSlotCard
+          label="Lunch"
+          hours={timeAllocation.lunch_hours}
+          attended={timeAllocation.lunch_attended}
+          onAttendanceChange={(attended) => onSlotAttendanceChange('lunch', attended)}
+        />
+        <AttendanceSlotCard
+          label="Breaks"
+          hours={timeAllocation.break_hours}
+          attended={timeAllocation.breaks_attended}
+          onAttendanceChange={(attended) => onSlotAttendanceChange('breaks', attended)}
+        />
         {showGlimpse ? (
-          <FixedSlot label="Growth Glimpse" hours={timeAllocation.growth_glimpse_hours} />
+          <AttendanceSlotCard
+            label="Growth Glimpse"
+            hours={timeAllocation.growth_glimpse_hours}
+            attended={timeAllocation.growth_glimpse_attended}
+            onAttendanceChange={(attended) => onSlotAttendanceChange('growth_glimpse', attended)}
+          />
         ) : (
-          <FixedSlot label="Growth Glimpse" hours={0} muted="Not today" />
+          <div className="rounded-xl border border-gray-200 bg-gray-50/80 px-3 py-2.5 dark:border-gray-700 dark:bg-gray-900/50">
+            <p className="text-[11px] font-medium text-muted-foreground">Growth Glimpse</p>
+            <p className="mt-1 text-sm font-normal text-muted-foreground">Not today</p>
+          </div>
         )}
         <div className="rounded-xl border border-gray-200 bg-gray-50/80 px-3 py-2.5 dark:border-gray-700 dark:bg-gray-900/50">
           <Label
@@ -341,25 +363,66 @@ export function CheckoutProjectUpdatesCard({
   );
 }
 
-function FixedSlot({
+function AttendanceSlotCard({
   label,
   hours,
-  muted,
+  attended,
+  onAttendanceChange,
 }: {
   label: string;
   hours: number;
-  muted?: string;
+  attended: boolean;
+  onAttendanceChange: (attended: boolean) => void;
 }) {
   return (
-    <div className="rounded-xl border border-gray-200 bg-gray-50/80 px-3 py-2.5 dark:border-gray-700 dark:bg-gray-900/50">
+    <div
+      className={cn(
+        'rounded-xl border px-3 py-2.5',
+        attended
+          ? 'border-gray-200 bg-gray-50/80 dark:border-gray-700 dark:bg-gray-900/50'
+          : 'border-dashed border-gray-300 bg-transparent dark:border-gray-600'
+      )}
+    >
       <p className="text-[11px] font-medium text-muted-foreground">{label}</p>
       <p className="mt-1 text-sm font-semibold tabular-nums text-gray-900 dark:text-white">
-        {muted && hours <= 0 ? (
-          <span className="font-normal text-muted-foreground">{muted}</span>
-        ) : (
+        {attended ? (
           <>{formatHoursShort(hours)}h</>
+        ) : (
+          <span className="font-normal text-muted-foreground">Skipped · 0h</span>
         )}
       </p>
+      <div
+        className="mt-2 grid grid-cols-2 gap-1 rounded-xl bg-background/80 p-0.5 ring-1 ring-border"
+        role="group"
+        aria-label={`${label} attendance`}
+      >
+        <button
+          type="button"
+          onClick={() => onAttendanceChange(true)}
+          className={cn(
+            'rounded-xl px-1.5 py-1 text-[10px] font-medium transition-colors',
+            attended
+              ? 'bg-foreground text-background'
+              : 'text-muted-foreground hover:text-foreground'
+          )}
+          aria-pressed={attended}
+        >
+          Attended
+        </button>
+        <button
+          type="button"
+          onClick={() => onAttendanceChange(false)}
+          className={cn(
+            'rounded-xl px-1.5 py-1 text-[10px] font-medium transition-colors',
+            !attended
+              ? 'bg-foreground text-background'
+              : 'text-muted-foreground hover:text-foreground'
+          )}
+          aria-pressed={!attended}
+        >
+          Skipped
+        </button>
+      </div>
     </div>
   );
 }

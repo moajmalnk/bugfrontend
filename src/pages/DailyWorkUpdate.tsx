@@ -13,7 +13,9 @@ import {
 import {
   defaultTimeAllocation,
   formatHoursShort,
+  isGrowthGlimpseDay,
   parseTimeAllocationFromRow,
+  withSlotAttendance,
   type TimeAllocation,
 } from '@/lib/checkoutTimeAllocation';
 import { Button } from '@/components/ui/button';
@@ -1135,6 +1137,9 @@ export function DailyWorkFlowPanel({
           break_hours: timeAllocation.break_hours,
           growth_glimpse_hours: timeAllocation.growth_glimpse_hours,
           other_hours: timeAllocation.other_hours,
+          lunch_attended: timeAllocation.lunch_attended,
+          breaks_attended: timeAllocation.breaks_attended,
+          growth_glimpse_attended: timeAllocation.growth_glimpse_attended,
         },
       };
       
@@ -1616,11 +1621,20 @@ export function DailyWorkFlowPanel({
     }
 
     const allocLines = [
-      `Lunch: ${formatHoursShort(timeAllocation.lunch_hours)}h`,
-      `Breaks: ${formatHoursShort(timeAllocation.break_hours)}h`,
+      timeAllocation.lunch_attended
+        ? `Lunch: ${formatHoursShort(timeAllocation.lunch_hours)}h`
+        : 'Lunch: Skipped',
+      timeAllocation.breaks_attended
+        ? `Breaks: ${formatHoursShort(timeAllocation.break_hours)}h`
+        : 'Breaks: Skipped',
     ];
-    if (timeAllocation.growth_glimpse_hours > 0) {
-      allocLines.push(`Growth Glimpse: ${formatHoursShort(timeAllocation.growth_glimpse_hours)}h`);
+    const glimpseDay = isGrowthGlimpseDay(form.submission_date || todayYMD());
+    if (glimpseDay) {
+      allocLines.push(
+        timeAllocation.growth_glimpse_attended
+          ? `Growth Glimpse: ${formatHoursShort(timeAllocation.growth_glimpse_hours)}h`
+          : 'Growth Glimpse: Skipped'
+      );
     }
     if (timeAllocation.other_hours > 0) {
       allocLines.push(`Other: ${formatHoursShort(timeAllocation.other_hours)}h`);
@@ -1793,10 +1807,16 @@ export function DailyWorkFlowPanel({
     });
   }, [isCheckoutWizardOpen, checkoutProjects]);
 
-  // Keep fixed lunch/breaks/glimpse in sync when the work date changes
+  // Keep fixed lunch/breaks/glimpse in sync when the work date changes (preserve attendance + other)
   useEffect(() => {
     const date = form.submission_date || todayYMD();
-    setTimeAllocation((prev) => defaultTimeAllocation(date, prev.other_hours || 0));
+    setTimeAllocation((prev) =>
+      defaultTimeAllocation(date, prev.other_hours || 0, {
+        lunch_attended: prev.lunch_attended,
+        breaks_attended: prev.breaks_attended,
+        growth_glimpse_attended: prev.growth_glimpse_attended,
+      })
+    );
   }, [form.submission_date]);
 
   useEffect(() => {
@@ -1992,7 +2012,11 @@ export function DailyWorkFlowPanel({
             );
             setTimeAllocation(
               draft.timeAllocation
-                ? defaultTimeAllocation(attendanceDate, draft.timeAllocation.other_hours || 0)
+                ? defaultTimeAllocation(attendanceDate, draft.timeAllocation.other_hours || 0, {
+                    lunch_attended: draft.timeAllocation.lunch_attended,
+                    breaks_attended: draft.timeAllocation.breaks_attended,
+                    growth_glimpse_attended: draft.timeAllocation.growth_glimpse_attended,
+                  })
                 : parseTimeAllocationFromRow(
                     existingSubmission.time_allocation,
                     attendanceDate
@@ -2075,7 +2099,11 @@ export function DailyWorkFlowPanel({
           );
           setTimeAllocation(
             draft.timeAllocation
-              ? defaultTimeAllocation(attendanceDate, draft.timeAllocation.other_hours || 0)
+              ? defaultTimeAllocation(attendanceDate, draft.timeAllocation.other_hours || 0, {
+                  lunch_attended: draft.timeAllocation.lunch_attended,
+                  breaks_attended: draft.timeAllocation.breaks_attended,
+                  growth_glimpse_attended: draft.timeAllocation.growth_glimpse_attended,
+                })
               : defaultTimeAllocation(attendanceDate, 0)
           );
           setIsOnBreak(false);
@@ -3517,6 +3545,16 @@ export function DailyWorkFlowPanel({
                     onOtherHoursChange={(hours) =>
                       setTimeAllocation((prev) => ({ ...prev, other_hours: hours }))
                     }
+                    onSlotAttendanceChange={(slot, attended) =>
+                      setTimeAllocation((prev) =>
+                        withSlotAttendance(
+                          prev,
+                          form.submission_date || serverToday,
+                          slot,
+                          attended
+                        )
+                      )
+                    }
                     loading={loadingProjects && checkoutProjects.length === 0 && assignableCheckoutProjects.length === 0}
                   />
 
@@ -3548,10 +3586,12 @@ export function DailyWorkFlowPanel({
                         <AlertTriangle className="h-4 w-4 text-white" />
                       </div>
                       <p className="text-sm leading-relaxed text-red-700 dark:text-red-300">
-                        Set hours worked (1–8) and allocate them across projects so the total matches
-                        (lunch 0.5h, breaks 0.5h
-                        {timeAllocation.growth_glimpse_hours > 0 ? ', Growth Glimpse 0.5h' : ''}
-                        ). Tasks and Office/WFH are not required here.
+                        Set hours worked (1–8) and allocate them across Lunch, Breaks
+                        {isGrowthGlimpseDay(form.submission_date || serverToday)
+                          ? ', Growth Glimpse'
+                          : ''}
+                        , projects, and Other so the total matches. Mark slots you skipped. Tasks and
+                        Office/WFH are not required here.
                       </p>
                     </div>
                   ) : null}

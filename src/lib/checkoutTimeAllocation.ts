@@ -1,6 +1,7 @@
 /**
- * Why: Checkout must allocate hours_today across fixed non-project slots
+ * Why: Checkout must allocate hours_today across optional non-project slots
  * (lunch, breaks, Growth Glimpse) plus per-project hours so totals always tally.
+ * Users mark Attended / Skipped; skipped slots free 0.5h into projects or Other.
  */
 
 export const LUNCH_HOURS = 0.5;
@@ -8,12 +9,24 @@ export const BREAK_HOURS = 0.5;
 export const GROWTH_GLIMPSE_HOURS = 0.5;
 export const HOURS_TALLY_TOLERANCE = 0.05;
 
+export type AttendanceSlot = 'lunch' | 'breaks' | 'growth_glimpse';
+
 export type TimeAllocation = {
   lunch_hours: number;
   break_hours: number;
   growth_glimpse_hours: number;
   other_hours: number;
+  lunch_attended: boolean;
+  breaks_attended: boolean;
+  growth_glimpse_attended: boolean;
 };
+
+function coerceAttended(value: unknown, fallback = true): boolean {
+  if (typeof value === 'boolean') return value;
+  if (value === 0 || value === '0' || value === 'false' || value === 'no') return false;
+  if (value === 1 || value === '1' || value === 'true' || value === 'yes') return true;
+  return fallback;
+}
 
 /** Tue / Thu / Sat in Asia/Kolkata (Growth Glimpse days). */
 export function isGrowthGlimpseDay(dateStr: string): boolean {
@@ -29,18 +42,65 @@ export function isGrowthGlimpseDay(dateStr: string): boolean {
   return weekday === 'Tue' || weekday === 'Thu' || weekday === 'Sat';
 }
 
-export function buildFixedTimeAllocation(dateStr: string): Omit<TimeAllocation, 'other_hours'> {
+/**
+ * Build fixed-slot hours from attendance flags + weekday gate.
+ * Legacy callers without flags default to attended.
+ */
+export function buildFixedTimeAllocation(
+  dateStr: string,
+  attendance?: Partial<
+    Pick<TimeAllocation, 'lunch_attended' | 'breaks_attended' | 'growth_glimpse_attended'>
+  >
+): Omit<TimeAllocation, 'other_hours'> {
+  const glimpseDay = isGrowthGlimpseDay(dateStr);
+  const lunchAttended = attendance?.lunch_attended ?? true;
+  const breaksAttended = attendance?.breaks_attended ?? true;
+  const glimpseAttended = attendance?.growth_glimpse_attended ?? true;
+
   return {
-    lunch_hours: LUNCH_HOURS,
-    break_hours: BREAK_HOURS,
-    growth_glimpse_hours: isGrowthGlimpseDay(dateStr) ? GROWTH_GLIMPSE_HOURS : 0,
+    lunch_attended: lunchAttended,
+    breaks_attended: breaksAttended,
+    growth_glimpse_attended: glimpseDay ? glimpseAttended : false,
+    lunch_hours: lunchAttended ? LUNCH_HOURS : 0,
+    break_hours: breaksAttended ? BREAK_HOURS : 0,
+    growth_glimpse_hours: glimpseDay && glimpseAttended ? GROWTH_GLIMPSE_HOURS : 0,
   };
 }
 
-export function defaultTimeAllocation(dateStr: string, otherHours = 0): TimeAllocation {
+export function defaultTimeAllocation(
+  dateStr: string,
+  otherHours = 0,
+  attendance?: Partial<
+    Pick<TimeAllocation, 'lunch_attended' | 'breaks_attended' | 'growth_glimpse_attended'>
+  >
+): TimeAllocation {
   return {
-    ...buildFixedTimeAllocation(dateStr),
+    ...buildFixedTimeAllocation(dateStr, attendance),
     other_hours: clampHours(otherHours),
+  };
+}
+
+/**
+ * Toggle a fixed slot; hours are derived from attendance (never free-typed).
+ */
+export function withSlotAttendance(
+  allocation: TimeAllocation,
+  dateStr: string,
+  slot: AttendanceSlot,
+  attended: boolean
+): TimeAllocation {
+  const nextAttendance = {
+    lunch_attended: allocation.lunch_attended,
+    breaks_attended: allocation.breaks_attended,
+    growth_glimpse_attended: allocation.growth_glimpse_attended,
+  };
+  if (slot === 'lunch') nextAttendance.lunch_attended = attended;
+  if (slot === 'breaks') nextAttendance.breaks_attended = attended;
+  if (slot === 'growth_glimpse') nextAttendance.growth_glimpse_attended = attended;
+
+  return {
+    ...buildFixedTimeAllocation(dateStr, nextAttendance),
+    other_hours: clampHours(allocation.other_hours),
   };
 }
 
@@ -97,11 +157,9 @@ export function parseTimeAllocationFromRow(raw: unknown, dateStr: string): TimeA
   }
   if (!obj || typeof obj !== 'object') return defaults;
   const row = obj as Record<string, unknown>;
-  const fixed = buildFixedTimeAllocation(dateStr);
-  return {
-    lunch_hours: fixed.lunch_hours,
-    break_hours: fixed.break_hours,
-    growth_glimpse_hours: fixed.growth_glimpse_hours,
-    other_hours: clampHours(Number(row.other_hours) || 0),
-  };
+  return defaultTimeAllocation(dateStr, Number(row.other_hours) || 0, {
+    lunch_attended: coerceAttended(row.lunch_attended, true),
+    breaks_attended: coerceAttended(row.breaks_attended, true),
+    growth_glimpse_attended: coerceAttended(row.growth_glimpse_attended, true),
+  });
 }
