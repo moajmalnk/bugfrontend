@@ -22,7 +22,10 @@ export type LeaveRequest = {
   start_date: string;
   end_date: string;
   days_count: number;
+  is_half_day?: boolean;
+  half_day_type?: 'first_half' | 'second_half' | string | null;
   reason?: string | null;
+  emergency_contact?: string | null;
   status: LeaveStatus;
   reviewed_by?: string | null;
   reviewed_at?: string | null;
@@ -145,6 +148,9 @@ export async function requestLeave(body: {
   start_date: string;
   end_date: string;
   reason?: string;
+  is_half_day?: boolean;
+  half_day_type?: 'first_half' | 'second_half' | null;
+  emergency_contact?: string;
 }): Promise<{ request: LeaveRequest; message: string }> {
   const res = await fetch(`${API}/request.php`, {
     method: 'POST',

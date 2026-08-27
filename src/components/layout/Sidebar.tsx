@@ -25,6 +25,7 @@ import {
   Activity,
   Mic,
   Calendar,
+  CalendarDays,
   Database,
   Timer,
   Repeat,
@@ -239,6 +240,17 @@ export const Sidebar = ({ className, closeSidebar }: SidebarProps) => {
                     ? `${navCounts.creative} asset${navCounts.creative === 1 ? "" : "s"} in review`
                     : `${navCounts.creative} creative asset${navCounts.creative === 1 ? "" : "s"}`
                 }
+              />
+            )}
+            {(can("BUGDATES_VIEW") ||
+              role === "admin" ||
+              role === "developer" ||
+              role === "creator" ||
+              role === "user") && (
+              <NavLink
+                to="/bugdates"
+                icon={<CalendarDays className="h-5 w-5" />}
+                label="BugDates"
               />
             )}
             {!isCreator && (role === "admin" || role === "developer" || role === "tester") && (

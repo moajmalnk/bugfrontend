@@ -131,6 +131,8 @@ export default function LeaveRequests() {
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
   const [reason, setReason] = useState('');
+  const [isHalfDay, setIsHalfDay] = useState(false);
+  const [halfDayType, setHalfDayType] = useState<'first_half' | 'second_half'>('first_half');
   const [historyFilter, setHistoryFilter] = useState<'all' | LeaveStatus>('all');
   const [month, setMonth] = useState(() => new Date().toISOString().slice(0, 7));
 
@@ -199,8 +201,10 @@ export default function LeaveRequests() {
       const { message } = await requestLeave({
         leave_type_id: Number(leaveTypeId),
         start_date: startDate,
-        end_date: endDate || startDate,
+        end_date: isHalfDay ? startDate : endDate || startDate,
         reason: reason.trim() || undefined,
+        is_half_day: isHalfDay,
+        half_day_type: isHalfDay ? halfDayType : null,
       });
       const wasSplit = /split/i.test(message);
       toast({
@@ -210,6 +214,8 @@ export default function LeaveRequests() {
       setReason('');
       setStartDate('');
       setEndDate('');
+      setIsHalfDay(false);
+      setHalfDayType('first_half');
       await load();
     } catch (err) {
       toast({
@@ -478,7 +484,11 @@ export default function LeaveRequests() {
                     value={startDate}
                     onChange={(v) => {
                       setStartDate(v);
-                      if (!endDate || (v && endDate < v)) setEndDate(v);
+                      if (isHalfDay) {
+                        setEndDate(v);
+                      } else if (!endDate || (v && endDate < v)) {
+                        setEndDate(v);
+                      }
                     }}
                     placeholder="Pick start date"
                     disableFuture={false}
@@ -486,6 +496,40 @@ export default function LeaveRequests() {
                   />
                 </div>
 
+                <label className="flex items-center gap-2 text-sm font-medium">
+                  <input
+                    type="checkbox"
+                    checked={isHalfDay}
+                    onChange={(e) => {
+                      const on = e.target.checked;
+                      setIsHalfDay(on);
+                      if (on && startDate) setEndDate(startDate);
+                    }}
+                  />
+                  Half-day leave
+                </label>
+
+                {isHalfDay && (
+                  <div className="space-y-2">
+                    <Label className="text-sm font-semibold">Half</Label>
+                    <Select
+                      value={halfDayType}
+                      onValueChange={(v) =>
+                        setHalfDayType(v as 'first_half' | 'second_half')
+                      }
+                    >
+                      <SelectTrigger className="h-11 rounded-xl border-gray-200/70 dark:border-gray-700/70 bg-white/70 dark:bg-gray-800/70">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="first_half">First half</SelectItem>
+                        <SelectItem value="second_half">Second half</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                )}
+
+                {!isHalfDay && (
                 <div className="space-y-2">
                   <Label className="text-sm font-semibold">End date</Label>
                   <DatePicker
@@ -496,6 +540,7 @@ export default function LeaveRequests() {
                     className="h-11 rounded-xl border-gray-200/70 dark:border-gray-700/70 bg-white/70 dark:bg-gray-800/70"
                   />
                 </div>
+                )}
 
                 <div className="space-y-2">
                   <Label className="text-sm font-semibold">
@@ -615,6 +660,11 @@ export default function LeaveRequests() {
                             <span className="font-semibold tabular-nums">
                               {r.days_count} day{r.days_count === 1 ? '' : 's'}
                             </span>
+                            {r.is_half_day ? (
+                              <span className="ms-1 text-xs">
+                                (half · {r.half_day_type === 'second_half' ? '2nd' : '1st'})
+                              </span>
+                            ) : null}
                           </p>
                           {r.reason ? (
                             <p className="text-xs text-muted-foreground line-clamp-2">
