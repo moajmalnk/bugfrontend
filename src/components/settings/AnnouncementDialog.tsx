@@ -41,6 +41,7 @@ import {
   Code,
   Megaphone,
   Shield,
+  Palette,
   TestTube,
   Users,
   X,
@@ -96,6 +97,13 @@ const ROLE_OPTIONS = [
     color: 'text-pink-600 dark:text-pink-400',
     chip: 'bg-pink-100 text-pink-700 dark:bg-pink-900/20 dark:text-pink-300',
   },
+  {
+    value: 'creators',
+    label: 'Creators Only',
+    icon: Palette,
+    color: 'text-amber-600 dark:text-amber-400',
+    chip: 'bg-amber-100 text-amber-800 dark:bg-amber-900/20 dark:text-amber-300',
+  },
 ] as const;
 
 export const AnnouncementDialog = ({
@@ -109,7 +117,7 @@ export const AnnouncementDialog = ({
   const [selectedRecipients, setSelectedRecipients] = useState<string[]>([]);
   const [loadingUsers, setLoadingUsers] = useState(false);
   const [recipientSearch, setRecipientSearch] = useState('');
-  const [recipientRoleFilter, setRecipientRoleFilter] = useState<'all' | 'admin' | 'developer' | 'tester'>('all');
+  const [recipientRoleFilter, setRecipientRoleFilter] = useState<'all' | 'admin' | 'developer' | 'tester' | 'creator'>('all');
 
   const form = useForm<z.infer<typeof announcementSchema>>({
     resolver: zodResolver(announcementSchema),
@@ -249,6 +257,7 @@ export const AnnouncementDialog = ({
     if (normalized === 'admin') return 'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-300';
     if (normalized === 'developer') return 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300';
     if (normalized === 'tester') return 'bg-pink-100 text-pink-700 dark:bg-pink-900/30 dark:text-pink-300';
+    if (normalized === 'creator') return 'bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-300';
     return 'bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300';
   };
 
@@ -512,6 +521,7 @@ export const AnnouncementDialog = ({
                     { value: 'admin', label: 'Admins' },
                     { value: 'developer', label: 'Developers' },
                     { value: 'tester', label: 'Testers' },
+                    { value: 'creator', label: 'Creators' },
                   ].map((roleOption) => (
                     <Button
                       key={roleOption.value}
@@ -521,7 +531,7 @@ export const AnnouncementDialog = ({
                       className="h-9 min-w-[90px] rounded-md"
                       onClick={() =>
                         setRecipientRoleFilter(
-                          roleOption.value as 'all' | 'admin' | 'developer' | 'tester'
+                          roleOption.value as 'all' | 'admin' | 'developer' | 'tester' | 'creator'
                         )
                       }
                     >

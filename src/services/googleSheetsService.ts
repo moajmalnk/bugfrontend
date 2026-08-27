@@ -216,14 +216,18 @@ class GoogleSheetsService {
         id: number;
         sheet_url: string;
         sheet_title: string;
-      }>('/sheets/create-general-sheet.php', {
-        sheet_title: sheetTitle,
-        template_id: templateId,
-        sheet_type: sheetType,
-        project_id: projectId || null,
-        role: role || 'all',
-        allowed_user_ids: allowedUserIds || null,
-      });
+      }>(
+        '/sheets/create-general-sheet.php',
+        {
+          sheet_title: sheetTitle,
+          template_id: templateId,
+          sheet_type: sheetType,
+          project_id: projectId || null,
+          role: role || 'all',
+          allowed_user_ids: allowedUserIds || null,
+        },
+        { skipErrorHandler: true } as Record<string, unknown>
+      );
 
       if (!response.data.success) {
         throw new Error(response.data.message || 'Failed to create sheet');

@@ -7,9 +7,10 @@ import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 import { sortUsersActiveFirst } from "@/lib/utils/userSort";
 import { userService } from "@/services/userService";
+import { roleBadgeClassName } from "@/lib/accessRoles";
 import type { User } from "@/types";
 
-type RoleFilter = "all" | "admin" | "developer" | "tester";
+type RoleFilter = "all" | "admin" | "developer" | "tester" | "creator";
 
 type AccessUsersPickerProps = {
   selectedUserIds: string[];
@@ -21,14 +22,7 @@ type AccessUsersPickerProps = {
 };
 
 function roleBadgeClass(role: string) {
-  const normalized = role.toLowerCase();
-  if (normalized === "admin")
-    return "bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-300";
-  if (normalized === "developer")
-    return "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300";
-  if (normalized === "tester")
-    return "bg-pink-100 text-pink-700 dark:bg-pink-900/30 dark:text-pink-300";
-  return "bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300";
+  return roleBadgeClassName(role);
 }
 
 /**
@@ -163,6 +157,7 @@ export function AccessUsersPicker({
               { value: "admin", label: "Admins" },
               { value: "developer", label: "Developers" },
               { value: "tester", label: "Testers" },
+              { value: "creator", label: "Creators" },
             ] as const
           ).map((opt) => (
             <Button

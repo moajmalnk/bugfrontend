@@ -216,14 +216,18 @@ class GoogleDocsService {
         id: number;
         document_url: string;
         document_title: string;
-      }>('/docs/create-general-doc.php', {
-        doc_title: docTitle,
-        template_id: templateId,
-        doc_type: docType,
-        project_id: projectId || null,
-        role: role || 'all',
-        allowed_user_ids: allowedUserIds || null,
-      });
+      }>(
+        '/docs/create-general-doc.php',
+        {
+          doc_title: docTitle,
+          template_id: templateId,
+          doc_type: docType,
+          project_id: projectId || null,
+          role: role || 'all',
+          allowed_user_ids: allowedUserIds || null,
+        },
+        { skipErrorHandler: true } as Record<string, unknown>
+      );
 
       if (!response.data.success) {
         throw new Error(response.data.message || 'Failed to create document');

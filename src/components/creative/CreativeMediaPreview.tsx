@@ -34,6 +34,8 @@ type CreativeMediaPreviewProps = {
   mediaClassName?: string;
   /** Prefer thumbnail when present (images); fall back to uploaded file. */
   fallbackPath?: string | null;
+  /** Detail view: show native video controls instead of a muted poster. */
+  controls?: boolean;
 };
 
 export function CreativeMediaPreview({
@@ -42,10 +44,17 @@ export function CreativeMediaPreview({
   alt = 'Creative asset',
   className,
   mediaClassName,
+  controls = false,
 }: CreativeMediaPreviewProps) {
   const primary = (path || '').trim();
   const fallback = (fallbackPath || '').trim();
-  const mediaPath = primary || fallback;
+  // Why: Prefer the uploaded file for video/pdf when thumbnail is an unrelated image.
+  const primaryKind = creativeMediaKind(primary);
+  const fallbackKind = creativeMediaKind(fallback);
+  const mediaPath =
+    controls && fallbackKind === 'video'
+      ? fallback
+      : primary || fallback;
   const src = resolveCreativeMediaUrl(mediaPath);
   const kind = creativeMediaKind(mediaPath);
 
@@ -67,24 +76,32 @@ export function CreativeMediaPreview({
       <div className={cn('relative h-full w-full bg-black', className)}>
         <video
           src={src}
-          className={cn('h-full w-full object-cover', mediaClassName)}
-          muted
+          className={cn(
+            'h-full w-full',
+            controls ? 'object-contain' : 'object-cover',
+            mediaClassName
+          )}
+          muted={!controls}
           playsInline
           preload="metadata"
-          controls={false}
+          controls={controls}
         />
-        <div className="pointer-events-none absolute inset-0 flex items-center justify-center bg-black/25">
-          <Film className="h-9 w-9 text-white/90 drop-shadow" />
-        </div>
+        {!controls ? (
+          <div className="pointer-events-none absolute inset-0 flex items-center justify-center bg-black/25">
+            <Film className="h-9 w-9 text-white/90 drop-shadow" />
+          </div>
+        ) : null}
       </div>
     );
   }
 
-  if (kind === 'image') {
+  if (kind === 'image' || primaryKind === 'image') {
+    const imageSrc =
+      kind === 'image' ? src : resolveCreativeMediaUrl(primary) || src;
     return (
       <div className={cn('h-full w-full bg-muted', className)}>
         <img
-          src={src}
+          src={imageSrc}
           alt={alt}
           className={cn(
             'h-full w-full object-cover',

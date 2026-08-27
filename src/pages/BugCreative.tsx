@@ -469,6 +469,9 @@ export default function BugCreative() {
       notifyAdminNavCountsChanged();
       toast({ title: 'Asset deleted' });
       setDeleteTarget(null);
+      if (assetParam === deleteTarget.id) {
+        closeAsset();
+      }
       void getCreativeStats({ from: periodFrom, to: periodTo })
         .then(setStats)
         .catch(() => {});
@@ -483,6 +486,12 @@ export default function BugCreative() {
       setDeleting(false);
     }
   };
+
+  const canDeleteAsset = (asset: CreativeAsset) =>
+    canManage ||
+    ((asset.status === 'Draft' || asset.status === 'In Review') &&
+      asset.creator_id === currentUser?.id &&
+      canCreate);
 
   const getTabCount = (tab: StatusTab) => {
     if (!stats) return 0;
@@ -806,11 +815,7 @@ export default function BugCreative() {
                     asset={asset}
                     onOpen={() => openAsset(asset.id)}
                     onDelete={() => setDeleteTarget(asset)}
-                    canDelete={
-                      canManage ||
-                      (asset.status === 'Draft' &&
-                        asset.creator_id === currentUser?.id)
-                    }
+                    canDelete={canDeleteAsset(asset)}
                   />
                 </div>
               ))}
@@ -858,11 +863,13 @@ export default function BugCreative() {
           canManage={canManage}
           canReview={canReview}
           canCreate={canCreate}
+          viewerUserId={currentUser?.id}
           projects={projects}
           onClose={closeAsset}
           onDirtyChange={(dirty) => {
             formDirtyRef.current = dirty;
           }}
+          onRequestDelete={(asset) => setDeleteTarget(asset)}
           onSaved={() => {
             notifyAdminNavCountsChanged();
             void load();

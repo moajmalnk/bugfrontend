@@ -36,10 +36,11 @@ import { googleSheetsService, UserSheet, Template } from "@/services/googleSheet
 import { projectService } from "@/services/projectService";
 import { ProjectCardsGrid, ProjectWithCount } from "@/components/docs/ProjectCardsGrid";
 import { resolveProjectLabels } from "@/lib/projectLabels";
+import { AccessUsersPicker, parseAllowedUserIds } from "@/components/docs/AccessUsersPicker";
 import {
-  AccessUsersPicker,
-  parseAllowedUserIds,
-} from "@/components/docs/AccessUsersPicker";
+  DOCUMENT_ACCESS_ROLES,
+  accessRoleMeta,
+} from "@/lib/accessRoles";
 import {
   FileSpreadsheet,
   Plus,
@@ -57,9 +58,6 @@ import {
   Edit,
   Copy,
   Shield,
-  Code,
-  TestTube,
-  Users,
   CheckCircle2,
   AlertTriangle,
   Lightbulb,
@@ -153,7 +151,8 @@ const BugSheetsPage = () => {
   const navigate = useNavigate();
   const userRole = currentUser ? getEffectiveRole(currentUser) : 'user';
   const isAdmin = userRole === 'admin';
-  const isDevOrTester = userRole === 'developer' || userRole === 'tester';
+  const isSharedAudience =
+    userRole === 'developer' || userRole === 'tester' || userRole === 'creator';
 
   /** Edit/Delete: creator or admin only — never expose controls to other roles. */
   const canManageSheet = (sheet: UserSheet): boolean => {
@@ -218,7 +217,7 @@ const BugSheetsPage = () => {
   // Set default tab based on role
   const getDefaultTab = () => {
     if (isAdmin) return "all-sheets";
-    if (isDevOrTester) return "shared-sheets";
+    if (isSharedAudience) return "shared-sheets";
     return "my-sheets";
   };
   const initialTab = searchParams.get("tab") || getDefaultTab();
@@ -408,7 +407,7 @@ const BugSheetsPage = () => {
       }
 
       // Load Shared Sheets count (developer/tester only)
-      if (isDevOrTester) {
+      if (isSharedAudience) {
         const sharedSheets = await googleSheetsService.getSharedSheets();
         setSharedSheetsCount(sharedSheets.length);
       }
@@ -432,7 +431,7 @@ const BugSheetsPage = () => {
         // Flatten for display
         sheetsList = result.sheets.flatMap(group => group.sheets);
         setAllSheetsCount(sheetsList.length);
-      } else if (activeTab === "shared-sheets" && isDevOrTester) {
+      } else if (activeTab === "shared-sheets" && isSharedAudience) {
         // Load shared sheets (from projects user is member of)
         sheetsList = await googleSheetsService.getSharedSheets();
         setSharedSheetsCount(sheetsList.length);
@@ -789,41 +788,13 @@ const BugSheetsPage = () => {
   };
 
   const getRoleBadge = (role: string | undefined) => {
-    const roleValue = role || "all";
-
-    switch (roleValue) {
-      case "for_me":
-        return {
-          label: "For Me",
-          icon: <User className="h-3 w-3" />,
-          className: "bg-orange-100 dark:bg-orange-900/30 text-orange-700 dark:text-orange-300 border-orange-200 dark:border-orange-800"
-        };
-      case "admins":
-        return {
-          label: "Admins Only",
-          icon: <Shield className="h-3 w-3" />,
-          className: "bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300 border-purple-200 dark:border-purple-800"
-        };
-      case "developers":
-        return {
-          label: "Developers Only",
-          icon: <Code className="h-3 w-3" />,
-          className: "bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 border-blue-200 dark:border-blue-800"
-        };
-      case "testers":
-        return {
-          label: "Testers Only",
-          icon: <TestTube className="h-3 w-3" />,
-          className: "bg-pink-100 dark:bg-pink-900/30 text-pink-700 dark:text-pink-300 border-pink-200 dark:border-pink-800"
-        };
-      case "all":
-      default:
-        return {
-          label: "All Users",
-          icon: <Users className="h-3 w-3" />,
-          className: "bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300 border-green-200 dark:border-green-800"
-        };
-    }
+    const meta = accessRoleMeta(role || "all");
+    const Icon = meta.Icon;
+    return {
+      label: meta.label,
+      icon: <Icon className="h-3 w-3" />,
+      className: meta.badgeClass,
+    };
   };
 
   // Get all role badges for comma-separated roles
@@ -925,7 +896,7 @@ const BugSheetsPage = () => {
       case "all-sheets":
         return isAdmin ? allSheetsCount : 0;
       case "shared-sheets":
-        return isDevOrTester ? sharedSheetsCount : 0;
+        return isSharedAudience ? sharedSheetsCount : 0;
       case "my-sheets":
         return mySheetsCount;
       default:
@@ -1630,22 +1601,15 @@ const BugSheetsPage = () => {
                         {selectedRoles.length > 0 && (
                           <div className="flex flex-wrap gap-2 p-3 bg-muted/50 rounded-xl border border-dashed">
                             {selectedRoles.map((roleValue) => {
-                              const roleMap: Record<string, { label: string; icon: React.ReactNode; color: string }> = {
-                                for_me: { label: "For Me", icon: <User className="h-3 w-3" />, color: "bg-orange-100 text-orange-700 dark:bg-orange-900/20 dark:text-orange-300" },
-                                all: { label: "All Users", icon: <Users className="h-3 w-3" />, color: "bg-green-100 text-green-700 dark:bg-green-900/20 dark:text-green-300" },
-                                admins: { label: "Admins Only", icon: <Shield className="h-3 w-3" />, color: "bg-purple-100 text-purple-700 dark:bg-purple-900/20 dark:text-purple-300" },
-                                developers: { label: "Developers Only", icon: <Code className="h-3 w-3" />, color: "bg-blue-100 text-blue-700 dark:bg-blue-900/20 dark:text-blue-300" },
-                                testers: { label: "Testers Only", icon: <TestTube className="h-3 w-3" />, color: "bg-pink-100 text-pink-700 dark:bg-pink-900/20 dark:text-pink-300" },
-                              };
-                              const role = roleMap[roleValue];
-                              if (!role) return null;
+                              const role = accessRoleMeta(roleValue);
+                              const RoleIcon = role.Icon;
                               return (
                                 <Badge
                                   key={roleValue}
                                   variant="outline"
-                                  className={`flex items-center gap-1.5 px-2.5 py-1 text-xs font-medium ${role.color}`}
+                                  className={`flex items-center gap-1.5 px-2.5 py-1 text-xs font-medium ${role.chipClass}`}
                                 >
-                                  {role.icon}
+                                  <RoleIcon className="h-3 w-3" />
                                   {role.label}
                                   <button
                                     type="button"
@@ -1662,13 +1626,7 @@ const BugSheetsPage = () => {
                         )}
 
                         <div className="space-y-2 p-4 border rounded-xl bg-background">
-                          {[
-                            { value: "for_me", label: "For Me", icon: <User className="h-4 w-4" />, color: "text-orange-600 dark:text-orange-400" },
-                            { value: "all", label: "All Users", icon: <Users className="h-4 w-4" />, color: "text-green-600 dark:text-green-400" },
-                            { value: "admins", label: "Admins Only", icon: <Shield className="h-4 w-4" />, color: "text-purple-600 dark:text-purple-400" },
-                            { value: "developers", label: "Developers Only", icon: <Code className="h-4 w-4" />, color: "text-blue-600 dark:text-blue-400" },
-                            { value: "testers", label: "Testers Only", icon: <TestTube className="h-4 w-4" />, color: "text-pink-600 dark:text-pink-400" },
-                          ].map((role) => (
+                          {DOCUMENT_ACCESS_ROLES.map((role) => (
                             <div
                               key={role.value}
                               className={`flex items-center space-x-3 p-2.5 rounded-xl transition-colors ${
@@ -1700,7 +1658,7 @@ const BugSheetsPage = () => {
                                 htmlFor={`role-${role.value}`}
                                 className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer flex-1 flex items-center gap-2"
                               >
-                                <span className={role.color}>{role.icon}</span>
+                                <span className={role.iconClass}><role.Icon className="h-4 w-4" /></span>
                                 {role.label}
                                 {selectedRoles.includes(role.value) && (
                                   <CheckCircle2 className="h-4 w-4 text-primary" />
@@ -2085,22 +2043,15 @@ const BugSheetsPage = () => {
                 {editSelectedRoles.length > 0 && (
                   <div className="flex flex-wrap gap-2 p-3 bg-muted/50 rounded-lg border border-dashed">
                     {editSelectedRoles.map((roleValue) => {
-                      const roleMap: Record<string, { label: string; icon: React.ReactNode; color: string }> = {
-                        for_me: { label: "For Me", icon: <User className="h-3 w-3" />, color: "bg-orange-100 text-orange-700 dark:bg-orange-900/20 dark:text-orange-300" },
-                        all: { label: "All Users", icon: <Users className="h-3 w-3" />, color: "bg-green-100 text-green-700 dark:bg-green-900/20 dark:text-green-300" },
-                        admins: { label: "Admins Only", icon: <Shield className="h-3 w-3" />, color: "bg-purple-100 text-purple-700 dark:bg-purple-900/20 dark:text-purple-300" },
-                        developers: { label: "Developers Only", icon: <Code className="h-3 w-3" />, color: "bg-blue-100 text-blue-700 dark:bg-blue-900/20 dark:text-blue-300" },
-                        testers: { label: "Testers Only", icon: <TestTube className="h-3 w-3" />, color: "bg-pink-100 text-pink-700 dark:bg-pink-900/20 dark:text-pink-300" },
-                      };
-                      const role = roleMap[roleValue];
-                      if (!role) return null;
+                      const role = accessRoleMeta(roleValue);
+                      const RoleIcon = role.Icon;
                       return (
                         <Badge
                           key={roleValue}
                           variant="outline"
-                          className={`flex items-center gap-1.5 px-2.5 py-1 text-xs font-medium ${role.color}`}
+                          className={`flex items-center gap-1.5 px-2.5 py-1 text-xs font-medium ${role.chipClass}`}
                         >
-                          {role.icon}
+                          <RoleIcon className="h-3 w-3" />
                           {role.label}
                           <button
                             type="button"
@@ -2118,13 +2069,7 @@ const BugSheetsPage = () => {
 
                 {/* Roles List */}
                 <div className="space-y-2 p-4 border rounded-lg bg-background">
-                  {[
-                    { value: "for_me", label: "For Me", icon: <User className="h-4 w-4" />, color: "text-orange-600 dark:text-orange-400" },
-                    { value: "all", label: "All Users", icon: <Users className="h-4 w-4" />, color: "text-green-600 dark:text-green-400" },
-                    { value: "admins", label: "Admins Only", icon: <Shield className="h-4 w-4" />, color: "text-purple-600 dark:text-purple-400" },
-                    { value: "developers", label: "Developers Only", icon: <Code className="h-4 w-4" />, color: "text-blue-600 dark:text-blue-400" },
-                    { value: "testers", label: "Testers Only", icon: <TestTube className="h-4 w-4" />, color: "text-pink-600 dark:text-pink-400" },
-                  ].map((role) => (
+                  {DOCUMENT_ACCESS_ROLES.map((role) => (
                     <div
                       key={role.value}
                       className={`flex items-center space-x-3 p-2.5 rounded-md transition-colors ${
@@ -2161,7 +2106,7 @@ const BugSheetsPage = () => {
                         htmlFor={`edit-role-${role.value}`}
                         className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer flex-1 flex items-center gap-2"
                       >
-                        <span className={role.color}>{role.icon}</span>
+                        <span className={role.iconClass}><role.Icon className="h-4 w-4" /></span>
                         {role.label}
                         {editSelectedRoles.includes(role.value) && (
                           <CheckCircle2 className="h-4 w-4 text-primary" />
