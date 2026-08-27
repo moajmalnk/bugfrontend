@@ -105,7 +105,7 @@ export type CommonBugsSummary = {
   duplicate_count: number;
 };
 
-export type UserRole = 'admin' | 'developer' | 'tester';
+export type UserRole = 'admin' | 'developer' | 'tester' | 'creator';
 
 export interface Permission {
   id: number;

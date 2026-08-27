@@ -1,4 +1,4 @@
-import { formatRetestSummary, triState } from "@/components/bugs/details/TesterVerificationPanel";
+import { formatRetestSummary, triState } from "@/lib/verificationUtils";
 import { formatMetaChangeValue, formatMetaFieldLabel } from "@/lib/bugMetaUtils";
 import { formatLocalDate } from "@/lib/utils/dateUtils";
 import type {

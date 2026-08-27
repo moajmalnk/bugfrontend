@@ -685,7 +685,7 @@ export default function CommonCodoRules() {
                 Access Denied
               </h3>
               <p className="text-sm sm:text-lg text-gray-600 dark:text-gray-400 max-w-md mx-auto">
-                Common CODO is available to administrators, developers, and testers.
+                Common CODO is available to administrators, developers, testers, and creators.
               </p>
             </div>
           </div>

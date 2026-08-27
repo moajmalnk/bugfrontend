@@ -35,7 +35,7 @@ type UserGroup = {
 };
 
 type StatusFilter = 'pending' | 'all' | 'approved' | 'rejected' | 'cancelled';
-type RoleFilter = 'all' | 'admin' | 'developer' | 'tester' | 'user';
+type RoleFilter = 'all' | 'admin' | 'developer' | 'tester' | 'creator' | 'user';
 
 function groupByUser(rows: LeaveRequest[]): UserGroup[] {
   const map = new Map<string, UserGroup>();
@@ -366,7 +366,7 @@ export default function AdminLeaveRequests() {
               </div>
 
               <div className="flex flex-wrap gap-2">
-                {(['all', 'admin', 'developer', 'tester', 'user'] as const).map((rf) => (
+                {(['all', 'admin', 'developer', 'tester', 'creator', 'user'] as const).map((rf) => (
                   <Button
                     key={rf}
                     type="button"

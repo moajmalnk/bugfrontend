@@ -14,7 +14,7 @@ import {
 } from "@/components/ui/dialog";
 import { createMeeting, getMeeting } from "@/services/meetings";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Loader2, Video, Users, Copy, Check, Plus, Clock, ExternalLink, Calendar, Search, Filter, X, User, Shield, Code, TestTube, Mail, Eye, BarChart3, UserCheck, Timer, Trash2, RefreshCw, Link as LinkIcon, Phone } from "lucide-react";
+import { Loader2, Video, Users, Copy, Check, Plus, Clock, ExternalLink, Calendar, Search, Filter, X, User, Shield, Code, TestTube, Mail, Eye, BarChart3, UserCheck, Timer, Trash2, RefreshCw, Link as LinkIcon, Phone, Palette } from "lucide-react";
 import { DatePicker } from "@/components/ui/DatePicker";
 import { TimePicker } from "@/components/ui/TimePicker";
 import { googleDocsService } from "@/services/googleDocsService";
@@ -23,6 +23,7 @@ import { toast } from "sonner";
 import { ENV } from "@/lib/env";
 import { apiClient } from "@/lib/axios";
 import { useAuth } from "@/context/AuthContext";
+import { getRoleBadgeClass, getRoleIcon } from "@/lib/roleBadge";
 import { useUndoDelete } from "@/hooks/useUndoDelete";
 import { UndoDeleteNotificationPortal } from "@/components/ui/UndoDeleteNotification";
 
@@ -67,7 +68,7 @@ interface RunningMeetsResponse {
 interface TeamMember {
   email: string;
   phone?: string | null;
-  role: 'admin' | 'developer' | 'tester';
+  role: 'admin' | 'developer' | 'tester' | 'creator';
 }
 
 interface TeamMembersResponse {
@@ -199,7 +200,7 @@ export default function MeetLobby() {
   const [teamMembers, setTeamMembers] = useState<TeamMember[]>([]);
   const [selectedUsers, setSelectedUsers] = useState<string[]>([]);
   const [loadingUsers, setLoadingUsers] = useState(false);
-  const [activeRoleTab, setActiveRoleTab] = useState<"all" | "admin" | "developer" | "tester">("all");
+  const [activeRoleTab, setActiveRoleTab] = useState<"all" | "admin" | "developer" | "tester" | "creator">("all");
   const [isDetailsModalOpen, setIsDetailsModalOpen] = useState(false);
   const [meetingDetails, setMeetingDetails] = useState<MeetingDetails | null>(null);
   const [loadingDetails, setLoadingDetails] = useState(false);
@@ -846,18 +847,20 @@ export default function MeetLobby() {
     setLoadingUsers(true);
     try {
       // Fetch all three types of users in parallel (apiClient handles token and impersonation automatically)
-      const [adminsResponse, developersResponse, testersResponse] = await Promise.all([
+      const [adminsResponse, developersResponse, testersResponse, creatorsResponse] = await Promise.all([
         apiClient.get(`/get_all_admins.php`),
         apiClient.get(`/get_all_developers.php`),
-        apiClient.get(`/get_all_testers.php`)
+        apiClient.get(`/get_all_testers.php`),
+        apiClient.get(`/get_all_creators.php`)
       ]);
 
       const adminsData = adminsResponse.data as TeamMembersResponse;
       const developersData = developersResponse.data as TeamMembersResponse;
       const testersData = testersResponse.data as TeamMembersResponse;
+      const creatorsData = creatorsResponse.data as TeamMembersResponse;
 
       // Helper function to create team member with phone number
-      const createTeamMember = (email: string, role: 'admin' | 'developer' | 'tester', dataArray?: Array<{email: string; phone?: string | null}>) => {
+      const createTeamMember = (email: string, role: 'admin' | 'developer' | 'tester' | 'creator', dataArray?: Array<{email: string; phone?: string | null}>) => {
         const userData = dataArray?.find(user => user.email === email);
         return {
           email,
@@ -870,7 +873,8 @@ export default function MeetLobby() {
       const allTeamMembers: TeamMember[] = [
         ...(adminsData.emails || []).map(email => createTeamMember(email, 'admin', adminsData.data)),
         ...(developersData.emails || []).map(email => createTeamMember(email, 'developer', developersData.data)),
-        ...(testersData.emails || []).map(email => createTeamMember(email, 'tester', testersData.data))
+        ...(testersData.emails || []).map(email => createTeamMember(email, 'tester', testersData.data)),
+        ...(creatorsData.emails || []).map(email => createTeamMember(email, 'creator', creatorsData.data))
       ];
 
       // Update cache
@@ -945,31 +949,7 @@ export default function MeetLobby() {
     );
   };
 
-  const getRoleIcon = (role: string) => {
-    switch (role) {
-      case 'admin':
-        return <Shield className="h-4 w-4" />;
-      case 'developer':
-        return <Code className="h-4 w-4" />;
-      case 'tester':
-        return <TestTube className="h-4 w-4" />;
-      default:
-        return <User className="h-4 w-4" />;
-    }
-  };
-
-  const getRoleColor = (role: string) => {
-    switch (role) {
-      case 'admin':
-        return 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300';
-      case 'developer':
-        return 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300';
-      case 'tester':
-        return 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300';
-      default:
-        return 'bg-gray-100 text-gray-800 dark:bg-gray-900/30 dark:text-gray-300';
-    }
-  };
+  const getRoleColor = (role: string) => getRoleBadgeClass(role);
 
   // Get selected users - memoized for performance
   const getSelectedUsers = useMemo(() => {
@@ -990,7 +970,8 @@ export default function MeetLobby() {
       all: teamMembers.length,
       admin: teamMembers.filter(m => m.role === 'admin').length,
       developer: teamMembers.filter(m => m.role === 'developer').length,
-      tester: teamMembers.filter(m => m.role === 'tester').length
+      tester: teamMembers.filter(m => m.role === 'tester').length,
+      creator: teamMembers.filter(m => m.role === 'creator').length
     };
   }, [teamMembers]);
 
@@ -1479,7 +1460,7 @@ export default function MeetLobby() {
                     ) : (
                       <div className="space-y-3">
                         {/* Role Tabs - Responsive Grid */}
-                        <div className="grid grid-cols-2 sm:grid-cols-4 gap-1 p-1 bg-gray-100 dark:bg-gray-800 rounded-lg">
+                        <div className="grid grid-cols-2 sm:grid-cols-5 gap-1 p-1 bg-gray-100 dark:bg-gray-800 rounded-xl">
                           <button
                             onClick={() => setActiveRoleTab("all")}
                             className={`flex items-center justify-center gap-1 sm:gap-2 px-2 sm:px-3 py-2 rounded-md text-xs sm:text-sm font-medium transition-all duration-200 ${
@@ -1538,6 +1519,21 @@ export default function MeetLobby() {
                             <span className="sm:hidden">Test</span>
                             <span className="ml-1 px-1.5 sm:px-2 py-0.5 bg-green-200 dark:bg-green-800 text-green-700 dark:text-green-300 rounded-full text-xs">
                               {getRoleCounts.tester}
+                            </span>
+                          </button>
+                          <button
+                            onClick={() => setActiveRoleTab("creator")}
+                            className={`flex items-center justify-center gap-1 sm:gap-2 px-2 sm:px-3 py-2 rounded-xl text-xs sm:text-sm font-medium transition-all duration-200 ${
+                              activeRoleTab === "creator"
+                                ? "bg-fuchsia-100 dark:bg-fuchsia-900/30 text-fuchsia-700 dark:text-fuchsia-300 shadow-sm"
+                                : "text-gray-600 dark:text-gray-400 hover:text-fuchsia-600 dark:hover:text-fuchsia-400"
+                            }`}
+                          >
+                            <Palette className="h-3 w-3 sm:h-4 sm:w-4" />
+                            <span className="hidden sm:inline">Creators</span>
+                            <span className="sm:hidden">Create</span>
+                            <span className="ml-1 px-1.5 sm:px-2 py-0.5 bg-fuchsia-200 dark:bg-fuchsia-800 text-fuchsia-700 dark:text-fuchsia-300 rounded-full text-xs">
+                              {getRoleCounts.creator}
                             </span>
                           </button>
                         </div>

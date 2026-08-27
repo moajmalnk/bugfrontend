@@ -1,5 +1,5 @@
 import { BugTypeFilterSelect } from "@/components/bugs/BugTypeFilterSelect";
-import { formatRetestSummary } from "@/components/bugs/details/TesterVerificationPanel";
+import { formatRetestSummary } from "@/lib/verificationUtils";
 import { ItemsPerPageSelect } from "@/components/pagination/ItemsPerPageSelect";
 import { PageJumpSelect } from "@/components/pagination/PageJumpSelect";
 import { Badge } from "@/components/ui/badge";

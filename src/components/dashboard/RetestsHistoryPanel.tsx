@@ -1,4 +1,4 @@
-import { formatRetestSummary } from "@/components/bugs/details/TesterVerificationPanel";
+import { formatRetestSummary } from "@/lib/verificationUtils";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";

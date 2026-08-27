@@ -8,6 +8,7 @@ import { testerGuideArticles } from "./articles/tester-guides";
 import { developerGuideArticles } from "./articles/developer-guides";
 import { adminGuideArticles } from "./articles/admin-guides";
 import { sharedFeatureArticles } from "./articles/shared-features";
+import { creatorGuideArticles } from "./articles/creator-guides";
 import { articleMatchesRole } from "./searchIndex";
 import type { HelpArticle } from "./types";
 import type { HelpRoleFilter } from "./searchIndex";
@@ -23,6 +24,7 @@ export const ALL_HELP_ARTICLES: HelpArticle[] = [
   ...testerGuideArticles,
   ...developerGuideArticles,
   ...adminGuideArticles,
+  ...creatorGuideArticles,
   ...sharedFeatureArticles,
 ];
 

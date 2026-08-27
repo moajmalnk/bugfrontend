@@ -8,17 +8,17 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { 
-  Bug, 
-  Code2, 
-  Calendar, 
-  Mail, 
-  AtSign, 
-  Shield, 
-  ExternalLink,
-  AlertTriangle,
+import { getRoleIcon, getRoleBadgeClass } from "@/lib/roleBadge";
+import {
+  AtSign,
+  Bug,
+  Calendar,
+  CheckCircle,
   Clock,
-  CheckCircle
+  Code2,
+  Mail,
+  Shield,
+  AlertTriangle,
 } from "lucide-react";
 import { format, formatDistanceToNow } from "date-fns";
 
@@ -137,32 +137,6 @@ export default function Dashboard() {
     }
   };
 
-  const getRoleIcon = (role: string) => {
-    switch (role) {
-      case "admin":
-        return <Shield className="h-5 w-5 text-blue-500" />;
-      case "developer":
-        return <Code2 className="h-5 w-5 text-green-500" />;
-      case "tester":
-        return <Bug className="h-5 w-5 text-yellow-500" />;
-      default:
-        return null;
-    }
-  };
-
-  const getRoleColor = (role: string) => {
-    switch (role) {
-      case "admin":
-        return "bg-blue-100 text-blue-800";
-      case "developer":
-        return "bg-green-100 text-green-800";
-      case "tester":
-        return "bg-yellow-100 text-yellow-800";
-      default:
-        return "bg-gray-100 text-gray-800";
-    }
-  };
-
   if (isLoading) {
     return (
       <div className="container mx-auto px-4 py-8 max-w-4xl">
@@ -224,7 +198,7 @@ export default function Dashboard() {
             <h1 className="text-2xl font-bold">{user.name}</h1>
             <div className="flex items-center gap-2">
               {getRoleIcon(user.role)}
-              <Badge className={getRoleColor(user.role)}>
+              <Badge className={getRoleBadgeClass(user.role)}>
                 {user.role.charAt(0).toUpperCase() + user.role.slice(1)}
               </Badge>
             </div>

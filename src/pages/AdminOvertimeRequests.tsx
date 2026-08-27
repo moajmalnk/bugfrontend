@@ -126,7 +126,7 @@ export default function AdminOvertimeRequests() {
     Array<{ id: string; username: string; role: string; accountActive?: number }>
   >([]);
   const [searchQuery, setSearchQuery] = useState('');
-  const [roleFilter, setRoleFilter] = useState<'all' | 'admin' | 'developer' | 'tester' | 'user'>('all');
+  const [roleFilter, setRoleFilter] = useState<'all' | 'admin' | 'developer' | 'tester' | 'creator' | 'user'>('all');
   const [activityFilter, setActivityFilter] = useState<
     'all' | 'pending' | 'with_submissions' | 'without_submissions' | 'admin_entries'
   >('all');
@@ -403,7 +403,7 @@ export default function AdminOvertimeRequests() {
                 />
               </div>
               <div className="flex flex-wrap gap-2">
-                {(['all', 'admin', 'developer', 'tester', 'user'] as const).map((rf) => (
+                {(['all', 'admin', 'developer', 'tester', 'creator', 'user'] as const).map((rf) => (
                   <Button
                     key={rf}
                     type="button"

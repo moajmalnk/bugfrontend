@@ -132,7 +132,7 @@ export interface Database {
           user_id: string
           full_name: string
           avatar_url: string | null
-          role: 'admin' | 'developer' | 'tester'
+          role: 'admin' | 'developer' | 'tester' | 'creator'
           created_at: string
         }
         Insert: {
@@ -140,7 +140,7 @@ export interface Database {
           user_id: string
           full_name: string
           avatar_url?: string | null
-          role: 'admin' | 'developer' | 'tester'
+          role: 'admin' | 'developer' | 'tester' | 'creator'
           created_at?: string
         }
         Update: {
@@ -148,7 +148,7 @@ export interface Database {
           user_id?: string
           full_name?: string
           avatar_url?: string | null
-          role?: 'admin' | 'developer' | 'tester'
+          role?: 'admin' | 'developer' | 'tester' | 'creator'
           created_at?: string
         }
       }

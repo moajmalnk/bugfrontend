@@ -57,6 +57,7 @@ import { EditUserDialog } from "./EditUserDialog";
 import { UserWorkStats } from "./UserWorkStats";
 import { ActiveHours } from "./ActiveHours";
 import { usePermissions } from "@/hooks/usePermissions";
+import { getRoleIcon as roleIcon } from "@/lib/roleBadge";
 
 export interface DeleteUserDialogProps {
   user: User;
@@ -191,18 +192,7 @@ export function UserDetailDialog({
     enabled: !!user.id,
   });
 
-  const getRoleIcon = (role: string) => {
-    switch (role) {
-      case "admin":
-        return <Shield className="h-5 w-5 text-blue-500" />;
-      case "developer":
-        return <Code2 className="h-5 w-5 text-green-500" />;
-      case "tester":
-        return <Bug className="h-5 w-5 text-yellow-500" />;
-      default:
-        return null;
-    }
-  };
+  const getRoleIcon = (role: string) => roleIcon(role, "h-5 w-5");
 
   // Calculate user status based on last_active_at
   const getUserStatus = (): 'active' | 'idle' | 'offline' => {

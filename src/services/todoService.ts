@@ -12,6 +12,7 @@ export type UserTask = {
   spent_hours?: number;
   created_at?: string;
   updated_at?: string;
+  deleted_at?: string | null;
 };
 
 export type { StatusOption, ProjectWorkUpdate } from '@/lib/projectWorkUpdates';
@@ -91,7 +92,13 @@ export async function listMyTasks(params: { status?: string; project_id?: string
     headers: authHeaders(),
   });
   if (!res.ok) throw new Error('Failed to load tasks');
-  return res.json();
+  const payload = await res.json();
+  const rows = payload?.data ?? payload;
+  const live = Array.isArray(rows) ? rows.filter((t: UserTask) => !t?.deleted_at) : rows;
+  if (payload && typeof payload === 'object' && Array.isArray(payload.data)) {
+    return { ...payload, data: live };
+  }
+  return live;
 }
 
 export async function createTask(task: UserTask) {

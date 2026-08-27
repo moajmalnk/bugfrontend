@@ -8,8 +8,9 @@ import Home from "@/pages/Home";
 import { lazy, Suspense } from "react";
 import { Navigate, Outlet, Route, Routes, useParams, useLocation } from "react-router-dom";
 import { HelpSupportRoute, HelpArticleRoute } from "@/pages/help/HelpRoutes";
+import { getEffectiveRole } from "@/lib/utils";
 
-const APP_ROLES = new Set(["admin", "developer", "tester", "user"]);
+const APP_ROLES = new Set(["admin", "developer", "tester", "user", "creator"]);
 
 /**
  * Why: Role-prefixed routes must exist while logged out so ProtectedRoute can
@@ -28,11 +29,12 @@ function RoleAlignedLayout() {
     );
   }
 
-  if (currentUser?.role && currentUser.role !== urlRole) {
+  const effectiveRole = getEffectiveRole(currentUser || {});
+  if (currentUser && effectiveRole !== urlRole) {
     const suffix = location.pathname.replace(`/${urlRole}`, "") || "/dashboard";
     return (
       <Navigate
-        to={`/${currentUser.role}${suffix}${location.search}`}
+        to={`/${effectiveRole}${suffix}${location.search}`}
         replace
       />
     );
@@ -122,6 +124,7 @@ const Settings = lazy(() => import("@/pages/Settings"));
 const BugBackup = lazy(() => import("@/pages/BugBackup"));
 const AdminRecycleBin = lazy(() => import("@/pages/AdminRecycleBin"));
 const BugRecruitment = lazy(() => import("@/pages/BugRecruitment"));
+const BugCreative = lazy(() => import("@/pages/BugCreative"));
 const Profile = lazy(() => import("@/pages/Profile"));
 const Reports = lazy(() => import("@/pages/Reports"));
 const Fixes = lazy(() => import("@/pages/Fixes"));
@@ -263,7 +266,7 @@ const RolePathRedirect = ({ suffix }: { suffix: string }) => {
   const params = useParams();
   const location = useLocation();
   const { isAuthenticated, currentUser, storeIntendedDestination } = useAuth();
-  const role = currentUser?.role;
+  const role = currentUser ? getEffectiveRole(currentUser) : '';
 
   let path = suffix;
   Object.entries(params).forEach(([key, value]) => {
@@ -399,6 +402,7 @@ const RouteConfig = () => {
       <Route path="/clients" element={<RolePathRedirect suffix="clients" />} />
       <Route path="/recycle-bin" element={<RolePathRedirect suffix="recycle-bin" />} />
       <Route path="/bug-recruitment" element={<RolePathRedirect suffix="bug-recruitment" />} />
+      <Route path="/bugcreative" element={<RolePathRedirect suffix="bugcreative" />} />
       <Route path="/updates" element={<RolePathRedirect suffix="updates" />} />
       <Route path="/projects" element={<RolePathRedirect suffix="projects" />} />
       <Route path="/compliance" element={<RolePathRedirect suffix="compliance" />} />
@@ -440,6 +444,7 @@ const RouteConfig = () => {
           <Route path="bugbackup" element={<BugBackup />} />
           <Route path="recycle-bin" element={<AdminRecycleBin />} />
           <Route path="bug-recruitment" element={<BugRecruitment />} />
+          <Route path="bugcreative" element={<BugCreative />} />
           <Route path="profile" element={<Profile />} />
           <Route path="reports" element={<Reports />} />
           <Route path="messages" element={<Messages />} />

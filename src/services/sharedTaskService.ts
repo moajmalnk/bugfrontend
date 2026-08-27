@@ -26,6 +26,7 @@ export interface SharedTask {
   completed_at?: string;
   created_at?: string;
   updated_at?: string;
+  deleted_at?: string | null;
 }
 
 const API_BASE = `${ENV.API_URL}/tasks`;
@@ -74,7 +75,7 @@ export const sharedTaskService = {
       if (!data?.success) {
         throw new Error(data?.message || 'Failed to fetch shared tasks');
       }
-      return data?.data || [];
+      return (data?.data || []).filter((task: SharedTask) => !task?.deleted_at);
     } catch (error: any) {
       console.error('Error fetching shared tasks:', error);
       throw error;
@@ -97,7 +98,7 @@ export const sharedTaskService = {
       if (!data?.success) {
         throw new Error(data?.message || 'Failed to fetch project shared tasks');
       }
-      return data?.data || [];
+      return (data?.data || []).filter((task: SharedTask) => !task?.deleted_at);
     } catch (error: any) {
       console.error('Error fetching project shared tasks:', error);
       throw error;

@@ -2,6 +2,7 @@ import { toast } from "@/components/ui/use-toast";
 import { getNetworkErrorMessage } from "@/lib/apiError";
 import { resolveAvatarUrl } from "@/lib/avatarUrl";
 import { ENV } from "@/lib/env";
+import { getEffectiveRole } from "@/lib/utils";
 import { syncFcmTokenForSession, clearFcmRegistrationCache, applyServerFcmEpoch, setupFcmPwaAutoSync, prepareFcmOnLogin } from "@/firebase-messaging-sw";
 import { User } from "@/types";
 import {
@@ -309,7 +310,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         // Get the intended destination or default to the user's role dashboard
         const intendedDestination =
           localStorage.getItem("intendedDestination") ||
-          `/${user.role}/dashboard`;
+          `/${getEffectiveRole(user)}/dashboard`;
         localStorage.removeItem("intendedDestination");
         navigate(intendedDestination, { replace: true });
         return true;
@@ -351,7 +352,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         const user = result.data.user;
         setCurrentUser(withResolvedAvatar(user));
         handleAuthFcmSync({ user, fcm_token_epoch: user?.fcm_token_epoch ?? result.fcm_token_epoch });
-        navigate(`/${user.role}/dashboard`, { replace: true });
+        navigate(`/${getEffectiveRole(user)}/dashboard`, { replace: true });
         return true;
       }
 
@@ -432,7 +433,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     // Get the intended destination or default to the user's role dashboard
     const intendedDestination =
-      localStorage.getItem("intendedDestination") || `/${user.role}/dashboard`;
+      localStorage.getItem("intendedDestination") || `/${getEffectiveRole(user)}/dashboard`;
     localStorage.removeItem("intendedDestination");
     navigate(intendedDestination, { replace: true });
   };

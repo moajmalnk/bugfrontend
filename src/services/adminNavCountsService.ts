@@ -62,6 +62,7 @@ export type AdminNavCounts = {
   settings: number;
   backup: number;
   recycleBin: number;
+  creative: number;
 };
 
 export const EMPTY_ADMIN_NAV_COUNTS: AdminNavCounts = {
@@ -96,6 +97,7 @@ export const EMPTY_ADMIN_NAV_COUNTS: AdminNavCounts = {
   settings: 0,
   backup: 0,
   recycleBin: 0,
+  creative: 0,
 };
 
 export const ADMIN_NAV_COUNTS_QUERY_KEY = ['admin-nav-counts'] as const;
@@ -281,6 +283,7 @@ function normalizeCounts(payload: Partial<AdminNavCounts>): AdminNavCounts {
     settings: asCount(payload.settings),
     backup: asCount(payload.backup),
     recycleBin: asCount(payload.recycleBin),
+    creative: asCount(payload.creative),
   };
 }
 

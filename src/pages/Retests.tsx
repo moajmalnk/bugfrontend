@@ -1,5 +1,5 @@
 import { BugTypeFilterSelect } from "@/components/bugs/BugTypeFilterSelect";
-import { formatRetestSummary } from "@/components/bugs/details/TesterVerificationPanel";
+import { formatRetestSummary } from "@/lib/verificationUtils";
 import {
   ListPageHeader,
   ListPageShell,

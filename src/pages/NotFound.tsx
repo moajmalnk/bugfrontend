@@ -4,7 +4,7 @@ import { BrandStatusVideoScreen } from "@/components/status/BrandStatusVideoScre
 import { useAuth } from "@/context/AuthContext";
 import { HomeIcon } from "lucide-react";
 
-const APP_ROLE_PREFIX = /^\/(admin|developer|tester|user)(\/|$)/;
+const APP_ROLE_PREFIX = /^\/(admin|developer|tester|user|creator)(\/|$)/;
 
 const NotFound = () => {
   const { currentUser, isAuthenticated, isLoading, storeIntendedDestination } = useAuth();

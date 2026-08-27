@@ -679,6 +679,8 @@ const Projects = () => {
       if (tabFromUrl === "my-projects") {
         filtered = filtered.filter((project) => userProjectMemberships[project.id]);
       }
+    } else if (currentUser?.role === "creator") {
+      filtered = filtered.filter((project) => userProjectMemberships[project.id]);
     }
 
     if (statusFilter === "archived") {
@@ -1114,7 +1116,8 @@ const Projects = () => {
     const showProjectActions =
       (currentUser?.role === "developer" && activeTab === "my-projects") ||
       currentUser?.role === "admin" ||
-      currentUser?.role === "tester";
+      currentUser?.role === "tester" ||
+      currentUser?.role === "creator";
 
     const showBrowseHint =
       currentUser?.role === "developer" && activeTab === "all-projects";

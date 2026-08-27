@@ -24,7 +24,7 @@ import {
   isAlreadyRaised,
 } from "@/lib/bugMetaUtils";
 import { Badge } from "@/components/ui/badge";
-import { formatRetestSummary } from "@/components/bugs/details/TesterVerificationPanel";
+import { formatRetestSummary } from "@/lib/verificationUtils";
 import { BugTypeMultiSelect } from "@/components/bugs/BugTypeMultiSelect";
 import { cn } from "@/lib/utils";
 import { useQueryClient } from "@tanstack/react-query";

@@ -9,7 +9,8 @@ import {
 } from "@/components/ui/dialog";
 import { DocumentPreviewBody } from "@/components/attachments/DocumentPreviewBody";
 import { ScreenshotViewer } from "@/components/ui/ScreenshotViewer";
-import { formatRetestSummary, TesterVerificationPanel, triState } from "@/components/bugs/details/TesterVerificationPanel";
+import { TesterVerificationPanel } from "@/components/bugs/details/TesterVerificationPanel";
+import { formatRetestSummary, triState } from "@/lib/verificationUtils";
 import { buildFullBugJourney } from "@/lib/bugJourney";
 import { formatDetailedDate } from "@/lib/dateUtils";
 import {

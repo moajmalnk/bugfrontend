@@ -1,4 +1,4 @@
-export type HelpRole = "admin" | "developer" | "tester" | "all";
+export type HelpRole = "admin" | "developer" | "tester" | "creator" | "all";
 
 export type HelpCalloutVariant = "info" | "warning" | "tip";
 

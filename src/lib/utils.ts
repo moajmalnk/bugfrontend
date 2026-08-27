@@ -32,27 +32,27 @@ export const extractResourceId = (path: string, resourceType: string): string | 
   return null;
 };
 
+const SYSTEM_ROLES = ['admin', 'developer', 'tester', 'creator'] as const;
+
 /**
- * Get effective user role for routing and display
- * Uses role_id to determine the effective role (admin/developer/tester)
- * @param user - User object with role and role_id
- * @returns The effective role to use for routing ('admin', 'developer', 'tester', or 'user' for custom roles)
+ * Get effective user role for routing and display.
+ * Prefer a known ENUM on users.role so first-class roles (including creator)
+ * keep `/creator/...` URLs even when role_id is not 1/2/3.
  */
 export const getEffectiveRole = (user: { role?: string; role_id?: number | null }): string => {
   if (!user) return 'user';
-  
-  // If role_id is set (new system)
+
+  if (user.role && (SYSTEM_ROLES as readonly string[]).includes(user.role)) {
+    return user.role;
+  }
+
   if (user.role_id) {
-    // Map role_id to role
-    // 1 = Admin, 2 = Developer, 3 = Tester
     if (user.role_id === 1) return 'admin';
     if (user.role_id === 2) return 'developer';
     if (user.role_id === 3) return 'tester';
-    // Custom roles (role_id > 3) should default to 'user' for routing
     return 'user';
   }
-  
-  // Fallback to legacy role field
+
   return user.role || 'user';
 };
 
@@ -79,7 +79,7 @@ export const userHasPendingOnboarding = (user: {
 
 /** Show BugMessage in the main sidebar (after BugUpdate) for admins and developers. */
 export const showBugMessageInMainNav = (role: string | undefined | null): boolean =>
-  role === "admin" || role === "developer";
+  role === "admin" || role === "developer" || role === "creator";
 
 /** Who may report a new bug (on projects they are assigned to). */
 export const canReportBug = (role: string | undefined | null): boolean =>

@@ -39,6 +39,7 @@ import {
   KeyRound,
   FileText,
   Search,
+  Palette,
 } from "lucide-react";
 import { forwardRef, useEffect, useImperativeHandle, useMemo, useState } from "react";
 
@@ -139,6 +140,7 @@ export const RolesTab = forwardRef<RolesTabHandle>(function RolesTab(_props, ref
     const normalized = roleName.toLowerCase();
     if (normalized.includes("admin")) return <Shield className="h-5 w-5" />;
     if (normalized.includes("developer")) return <UserCog className="h-5 w-5" />;
+    if (normalized.includes("creator")) return <Palette className="h-5 w-5 text-fuchsia-500" />;
     return <Users className="h-5 w-5" />;
   };
 

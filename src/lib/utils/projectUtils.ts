@@ -1,6 +1,6 @@
 export type ProjectStatus = 'active' | 'completed' | 'archived' | 'release_ready';
 export type ClientAccountStatus = 'active' | 'inactive';
-export type ProjectMemberRole = 'manager' | 'developer' | 'tester';
+export type ProjectMemberRole = 'manager' | 'developer' | 'tester' | 'creator';
 /** Comma-separated in DB; use helpers below. */
 export type ProjectPlatform = 'web' | 'ios' | 'android';
 /** Delivery categories — multi-select, separate from device platforms. */
@@ -517,6 +517,7 @@ export interface ProjectFormValues {
   project_lead_id: string;
   developer_ids: string[];
   tester_ids: string[];
+  creator_ids: string[];
 }
 
 export const emptyProjectFormValues = (): ProjectFormValues => ({
@@ -560,6 +561,7 @@ export const emptyProjectFormValues = (): ProjectFormValues => ({
   project_lead_id: '',
   developer_ids: [],
   tester_ids: [],
+  creator_ids: [],
 });
 
 export function projectToFormValues(project: Project): ProjectFormValues {
@@ -605,6 +607,7 @@ export function projectToFormValues(project: Project): ProjectFormValues {
     project_lead_id: members.find((m) => m.role === 'manager')?.user_id || '',
     developer_ids: members.filter((m) => m.role === 'developer').map((m) => m.user_id),
     tester_ids: members.filter((m) => m.role === 'tester').map((m) => m.user_id),
+    creator_ids: members.filter((m) => m.role === 'creator').map((m) => m.user_id),
   };
 }
 
@@ -618,6 +621,9 @@ export function formValuesToPayload(values: ProjectFormValues): CreateProjectDat
   });
   values.tester_ids.forEach((userId) => {
     if (userId) members.push({ user_id: userId, role: 'tester' });
+  });
+  values.creator_ids.forEach((userId) => {
+    if (userId) members.push({ user_id: userId, role: 'creator' });
   });
 
   return {

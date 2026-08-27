@@ -39,6 +39,7 @@ import {
   CalendarClock,
   ClipboardList,
   UserRoundSearch,
+  Palette,
 } from "lucide-react";
 import { Link, useLocation } from "react-router-dom";
 import { NotificationPopover } from "@/components/notifications/NotificationPopover";
@@ -68,6 +69,7 @@ export const Sidebar = ({ className, closeSidebar }: SidebarProps) => {
   const { hasPermission } = usePermissions(null);
   const { setOpen: setSearchOpen } = useGlobalSearchModal();
   const role = getEffectiveRole(currentUser || {});
+  const isCreator = role === "creator";
   // Why: Bridge legacy ENUM admin until all new permission keys are seeded/granted.
   const can = (key: string) => role === "admin" || hasPermission(key);
 
@@ -207,6 +209,7 @@ export const Sidebar = ({ className, closeSidebar }: SidebarProps) => {
             {(can("DASHBOARD_VIEW") ||
               role === "developer" ||
               role === "tester" ||
+              role === "creator" ||
               role === "user") && (
               <NavLink
                 to="/dashboard"
@@ -225,7 +228,20 @@ export const Sidebar = ({ className, closeSidebar }: SidebarProps) => {
                   : `${navCounts.projects} assigned project${navCounts.projects === 1 ? "" : "s"}`
               }
             />
-            {(role === "admin" || role === "developer" || role === "tester") && (
+            {(can("CREATIVE_VIEW") || isCreator) && (
+              <NavLink
+                to="/bugcreative"
+                icon={<Palette className="h-5 w-5" />}
+                label="BugCreative"
+                badge={formatNavCount(navCounts.creative)}
+                badgeTitle={
+                  role === "admin"
+                    ? `${navCounts.creative} asset${navCounts.creative === 1 ? "" : "s"} in review`
+                    : `${navCounts.creative} creative asset${navCounts.creative === 1 ? "" : "s"}`
+                }
+              />
+            )}
+            {!isCreator && (role === "admin" || role === "developer" || role === "tester") && (
               <NavLink
                 to="/compliance"
                 icon={<ShieldCheck className="h-5 w-5" />}
@@ -235,6 +251,8 @@ export const Sidebar = ({ className, closeSidebar }: SidebarProps) => {
                 badgeTitle={`${navCounts.compliance} pending compliance item${navCounts.compliance === 1 ? "" : "s"}`}
               />
             )}
+            {!isCreator && (
+              <>
             <NavLink
               to="/bugs"
               icon={<Bug className="h-5 w-5" />}
@@ -263,6 +281,8 @@ export const Sidebar = ({ className, closeSidebar }: SidebarProps) => {
               badge={formatNavCount(navCounts.updates)}
               badgeTitle={`${navCounts.updates} update${navCounts.updates === 1 ? "" : "s"}`}
             />
+              </>
+            )}
             {/* Why: Testers focus on bugs/fixes — hide docs/sheets/meet/daily-update/leave from their nav. */}
             {role !== "tester" && (can("DOCS_VIEW") || can("DOCS_CREATE")) && (
               <NavLink
@@ -374,7 +394,7 @@ export const Sidebar = ({ className, closeSidebar }: SidebarProps) => {
               />
             )}
 
-            {can("COMMON_BUGS_VIEW") && (
+            {can("COMMON_BUGS_VIEW") && !isCreator && (
               <NavLink
                 to="/common-bugs"
                 icon={<Repeat className="h-5 w-5" />}
@@ -445,7 +465,7 @@ export const Sidebar = ({ className, closeSidebar }: SidebarProps) => {
               hasRecycleBinView ||
               hasRecruitmentView;
 
-            if (!hasAnyAdminLinks) {
+            if (!hasAnyAdminLinks || isCreator) {
               return null;
             }
 

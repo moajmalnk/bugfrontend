@@ -7,6 +7,7 @@ const ROLE_LABELS: Record<HelpRole, string> = {
   admin: "Admin",
   developer: "Developer",
   tester: "Tester",
+  creator: "Creator",
 };
 
 const ROLE_STYLES: Record<HelpRole, string> = {
@@ -16,6 +17,8 @@ const ROLE_STYLES: Record<HelpRole, string> = {
     "bg-blue-100 text-blue-700 dark:bg-blue-950/40 dark:text-blue-300 border-blue-200 dark:border-blue-800",
   tester:
     "bg-emerald-100 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800",
+  creator:
+    "bg-fuchsia-100 text-fuchsia-700 dark:bg-fuchsia-950/40 dark:text-fuchsia-300 border-fuchsia-200 dark:border-fuchsia-800",
 };
 
 interface HelpRoleBadgeProps {

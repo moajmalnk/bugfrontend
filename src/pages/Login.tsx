@@ -47,6 +47,7 @@ import { GOOGLE_OAUTH_CONFIG } from '@/config/google-oauth-config';
 import { GoogleSignInButton } from '@/components/GoogleSignInButton';
 import { clearGoogleOAuthCache, handleGoogleOAuthError } from '@/utils/googleOAuthUtils'; 
 import { User as UserType } from "@/types";
+import { getEffectiveRole } from "@/lib/utils";
 type LoginMethod = "username" | "email" | "otp" | "forgot" | "magic";
 
 type AuthApiResponse = {
@@ -138,7 +139,7 @@ const Login = () => {
           setTimeout(() => {
             setShowSuccess(false);
             setIsAnimating(false);
-            navigate(`/${user.role}/dashboard`, { replace: true });
+            navigate(`/${getEffectiveRole(user)}/dashboard`, { replace: true });
           }, 1500);
         } else {
           throw new Error(data.message || "Magic link verification failed");
@@ -225,7 +226,7 @@ const Login = () => {
     const token =
       localStorage.getItem("token") || sessionStorage.getItem("token");
     if (isAuthenticated && currentUser?.role && token) {
-      navigate(`/${currentUser.role}/dashboard`, { replace: true });
+      navigate(`/${getEffectiveRole(currentUser)}/dashboard`, { replace: true });
     }
   }, [
     isAuthenticated,
@@ -430,7 +431,7 @@ const Login = () => {
           setShowSuccess(false);
           setIsAnimating(false);
           // Navigate after animation
-          navigate(`/${user.role}/dashboard`, { replace: true });
+          navigate(`/${getEffectiveRole(user)}/dashboard`, { replace: true });
         }, 1500);
       }
     } catch (error: unknown) {
@@ -607,7 +608,7 @@ const Login = () => {
           setShowSuccess(false);
           setIsAnimating(false);
           // Navigate to the appropriate dashboard based on user role
-          navigate(`/${data.user!.role}/dashboard`, { replace: true });
+          navigate(`/${getEffectiveRole(data.user!)}/dashboard`, { replace: true });
         }, 1500);
       } else {
         throw new Error(data.message || "Google Sign-In failed");

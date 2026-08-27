@@ -141,7 +141,7 @@ import { sortUsernamesActiveFirst, compareUsersActiveFirst } from "@/lib/utils/u
 import {
   getVerificationFilterKey,
   VERIFICATION_FILTER_OPTIONS,
-} from "@/components/bugs/details/TesterVerificationPanel";
+} from "@/lib/verificationUtils";
 
 // Skeleton components for loading state
 const ProjectHeaderSkeleton = () => (
@@ -4568,7 +4568,7 @@ const ProjectDetails = () => {
   }, [bugs, members, admins]);
 
   const allDisplayMembers = useMemo(() => {
-    const roleOrder: Record<string, number> = { admin: 0, developer: 1, tester: 2 };
+    const roleOrder: Record<string, number> = { admin: 0, developer: 1, tester: 2, creator: 3 };
     const adminEntries = filteredAdmins.map((admin) => ({
       ...admin,
       isAdmin: true as const,

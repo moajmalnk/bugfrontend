@@ -172,6 +172,7 @@ export function PeriodDetailsFilterBar({
                   <SelectItem value="admin">Admin</SelectItem>
                   <SelectItem value="developer">Developer</SelectItem>
                   <SelectItem value="tester">Tester</SelectItem>
+                  <SelectItem value="creator">Creator</SelectItem>
                 </SelectContent>
               </Select>
             </div>

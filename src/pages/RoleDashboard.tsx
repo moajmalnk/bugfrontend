@@ -7,6 +7,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 const AdminDashboard = lazy(() => import("@/pages/AdminDashboard"));
 const DeveloperDashboard = lazy(() => import("@/pages/DeveloperDashboard"));
 const TesterDashboard = lazy(() => import("@/pages/TesterDashboard"));
+const CreatorDashboard = lazy(() => import("@/pages/CreatorDashboard"));
 
 function DashboardFallback() {
   return (
@@ -36,6 +37,8 @@ export default function RoleDashboard() {
     <Suspense fallback={<DashboardFallback />}>
       {canViewOps ? (
         <AdminDashboard />
+      ) : role === "creator" ? (
+        <CreatorDashboard />
       ) : role === "developer" ? (
         <DeveloperDashboard />
       ) : (

@@ -6,6 +6,7 @@ export function getHelpRoleFilterForUser(effectiveRole: string): HelpRoleFilter 
   if (effectiveRole === "admin") return "all";
   if (effectiveRole === "developer") return "developer";
   if (effectiveRole === "tester") return "tester";
+  if (effectiveRole === "creator") return "creator";
   return "all";
 }
 
@@ -18,6 +19,7 @@ export const HELP_ROLE_FILTER_OPTIONS: { value: HelpRoleFilter; label: string }[
   { value: "admin", label: "Admin" },
   { value: "developer", label: "Developer" },
   { value: "tester", label: "Tester" },
+  { value: "creator", label: "Creator" },
 ];
 
 export function getHelpRoleFilterOptions(effectiveRole: string) {
@@ -29,6 +31,9 @@ export function getHelpRoleFilterOptions(effectiveRole: string) {
   }
   if (effectiveRole === "tester") {
     return HELP_ROLE_FILTER_OPTIONS.filter((option) => option.value === "tester");
+  }
+  if (effectiveRole === "creator") {
+    return HELP_ROLE_FILTER_OPTIONS.filter((option) => option.value === "creator");
   }
   return HELP_ROLE_FILTER_OPTIONS.filter((option) => option.value === "all");
 }

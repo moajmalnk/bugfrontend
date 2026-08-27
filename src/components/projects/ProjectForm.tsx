@@ -870,6 +870,15 @@ export function ProjectForm({
                   roleFilter={['tester']}
                   placeholder="No QA assigned"
                 />
+                <MultiUserSelect
+                  label="Creators"
+                  dotClass="from-fuchsia-500 to-violet-600"
+                  users={users}
+                  selectedIds={values.creator_ids}
+                  onChange={(ids) => setField('creator_ids', ids)}
+                  roleFilter={['creator']}
+                  placeholder="No creators assigned"
+                />
               </SectionBlock>
 
               <SectionBlock

@@ -26,10 +26,11 @@ import { UndoDeleteNotificationPortal } from "@/components/ui/UndoDeleteNotifica
 import { ENV } from "@/lib/env";
 import { resolveAvatarUrl } from "@/lib/avatarUrl";
 import { getEffectiveRole } from "@/lib/utils";
+import { getRoleIcon as getRoleIconFn } from "@/lib/roleBadge";
 import { userService } from "@/services/userService";
 import { notifyAdminNavCountsChanged } from "@/services/adminNavCountsService";
 import { User, UserRole } from "@/types";
-import { BarChart3, Bug, ClipboardList, Code2, Shield, UserCheck, UserRound } from "lucide-react";
+import { BarChart3, ClipboardList, Palette, Shield, UserCheck, UserRound, Code2, Bug } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import {
@@ -372,11 +373,11 @@ const Users = () => {
         filtered = filtered.filter(user => user.role === "tester");
       } else if (tabFromUrl === "admins") {
         filtered = filtered.filter(user => user.role === "admin");
+      } else if (tabFromUrl === "creators") {
+        filtered = filtered.filter(user => user.role === "creator");
       } else if (tabFromUrl === "others") {
-        // Show users with custom roles (role_id not 1, 2, or 3)
         filtered = filtered.filter(user => {
-          const hasCustomRole = user.role_id && ![1, 2, 3].includes(user.role_id);
-          return hasCustomRole;
+          return !["admin", "developer", "tester", "creator"].includes(user.role);
         });
       }
     }
@@ -396,16 +397,7 @@ const Users = () => {
   };
 
   const getRoleIcon = (role: string) => {
-    switch (role) {
-      case "admin":
-        return <Shield className="h-5 w-5 sm:h-6 sm:w-6 text-blue-500" />;
-      case "developer":
-        return <Code2 className="h-5 w-5 sm:h-6 sm:w-6 text-green-500" />;
-      case "tester":
-        return <Bug className="h-5 w-5 sm:h-6 sm:w-6 text-yellow-500" />;
-      default:
-        return null;
-    }
+    return getRoleIconFn(role, "h-5 w-5 sm:h-6 sm:w-6");
   };
 
   const handleAddUser = async (userData: NewUser): Promise<boolean> => {
@@ -522,7 +514,10 @@ const Users = () => {
   const adminCount = users.filter(u => u.role === "admin").length;
   const developerCount = users.filter(u => u.role === "developer").length;
   const testerCount = users.filter(u => u.role === "tester").length;
-  const othersCount = users.filter(u => u.role_id && ![1, 2, 3].includes(u.role_id)).length;
+  const creatorCount = users.filter(u => u.role === "creator").length;
+  const othersCount = users.filter(
+    (u) => !["admin", "developer", "tester", "creator"].includes(u.role)
+  ).length;
   const activeTodayCount = users.filter((u) => u.checked_in_today).length;
   const pendingVerificationCount = users.filter((u) => {
     const status = String(u.onboarding_verification_status || "").toLowerCase();
@@ -536,6 +531,7 @@ const Users = () => {
     admins: adminCount,
     developers: developerCount,
     testers: testerCount,
+    creators: creatorCount,
     others: othersCount,
     analytics: analyticsCount,
   };
@@ -547,6 +543,7 @@ const Users = () => {
     "admins",
     "developers",
     "testers",
+    "creators",
     "others",
     "analytics",
   ] as const;
@@ -555,7 +552,7 @@ const Users = () => {
   const isValidTab =
     isKnownTab && (isLoading || tabHasRows(tabFromUrl));
   const defaultTab =
-    (["active", "pending", "admins", "developers", "testers", "others", "analytics"] as const).find(
+    (["active", "pending", "admins", "developers", "testers", "creators", "others", "analytics"] as const).find(
       (tab) => tabHasRows(tab)
     ) || "analytics";
   const activeTab = isValidTab ? tabFromUrl : defaultTab;
@@ -600,6 +597,14 @@ const Users = () => {
       icon: Bug,
       count: testerCount,
       countClass: "bg-yellow-100 dark:bg-yellow-900/30 text-yellow-700 dark:text-yellow-300",
+    },
+    {
+      value: "creators",
+      label: "Creators",
+      shortLabel: "Creators",
+      icon: Palette,
+      count: creatorCount,
+      countClass: "bg-fuchsia-100 dark:bg-fuchsia-900/30 text-fuchsia-700 dark:text-fuchsia-300",
     },
     {
       value: "others",
@@ -655,8 +660,12 @@ const Users = () => {
           return users.filter((u) => u.role === "developer");
         case "testers":
           return users.filter((u) => u.role === "tester");
+        case "creators":
+          return users.filter((u) => u.role === "creator");
         case "others":
-          return users.filter((u) => u.role_id && ![1, 2, 3].includes(u.role_id));
+          return users.filter(
+            (u) => !["admin", "developer", "tester", "creator"].includes(u.role)
+          );
         default:
           return users;
       }
@@ -777,6 +786,9 @@ const Users = () => {
           {renderUsersContent()}
         </TabsContent>
         <TabsContent value="testers" className="space-y-6 sm:space-y-8">
+          {renderUsersContent()}
+        </TabsContent>
+        <TabsContent value="creators" className="space-y-6 sm:space-y-8">
           {renderUsersContent()}
         </TabsContent>
         <TabsContent value="admins" className="space-y-6 sm:space-y-8">

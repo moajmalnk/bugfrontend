@@ -444,6 +444,7 @@ export function ProjectInfoOverview({ project, createdByName }: ProjectInfoOverv
   const leads = members.filter((m) => m.role === 'manager').map(toChip);
   const developers = members.filter((m) => m.role === 'developer').map(toChip);
   const testers = members.filter((m) => m.role === 'tester').map(toChip);
+  const creators = members.filter((m) => m.role === 'creator').map(toChip);
 
   const statusLabel = getProjectStatusLabel(project.status);
   const isActiveClient = project.client_account_status !== 'inactive';
@@ -607,6 +608,11 @@ export function ProjectInfoOverview({ project, createdByName }: ProjectInfoOverv
             <TeamRoleMembers
               label="QA & Testing"
               members={testers}
+              emptyLabel="Not assigned"
+            />
+            <TeamRoleMembers
+              label="Creators"
+              members={creators}
               emptyLabel="Not assigned"
             />
           </div>

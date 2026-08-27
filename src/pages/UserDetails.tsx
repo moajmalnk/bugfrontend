@@ -34,6 +34,7 @@ import { userRequiresOnboarding } from "@/lib/utils";
 import { usePermissions } from "@/hooks/usePermissions";
 import { useToast } from "@/hooks/use-toast";
 import { cn, getEffectiveRole } from "@/lib/utils";
+import { getRoleIcon as roleIcon } from "@/lib/roleBadge";
 import { VerifiedBlueTick, isFullFledgedUser } from "@/components/ui/VerifiedBlueTick";
 import { userService } from "@/services/userService";
 import { onboardingService } from "@/services/onboardingService";
@@ -43,9 +44,7 @@ import { formatDistanceToNow } from "date-fns";
 import {
   AtSign,
   Briefcase,
-  Bug,
   Calendar,
-  Code2,
   ExternalLink,
   Key,
   Loader2,
@@ -53,7 +52,6 @@ import {
   Mail,
   Pencil,
   Phone,
-  Shield,
   Timer,
   Trash2,
   UserPlus,
@@ -107,16 +105,7 @@ function parseUserDetailsTab(
 }
 
 function getRoleIcon(role: string) {
-  switch (role) {
-    case "admin":
-      return <Shield className="h-5 w-5 text-blue-500" />;
-    case "developer":
-      return <Code2 className="h-5 w-5 text-green-500" />;
-    case "tester":
-      return <Bug className="h-5 w-5 text-yellow-500" />;
-    default:
-      return null;
-  }
+  return roleIcon(role, "h-5 w-5");
 }
 
 function computeStatus(user: User): UserStatus {

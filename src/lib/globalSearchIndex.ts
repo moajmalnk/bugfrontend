@@ -75,36 +75,42 @@ const PAGE_ENTRIES: PageSearchEntry[] = [
     label: "Bugs",
     path: "/bugs",
     keywords: ["bugs", "bug", "issues", "report", "defect", "ticket"],
+    excludeRoles: ["creator"],
   },
   {
     id: "page-bugs-new",
     label: "New Bug",
     path: "/bugs/new",
     keywords: ["new bug", "report bug", "create bug", "submit bug", "raise bug"],
+    excludeRoles: ["creator"],
   },
   {
     id: "page-fixes",
     label: "Fixes",
     path: "/fixes",
     keywords: ["fixes", "fixed", "resolved", "verify", "verification"],
+    excludeRoles: ["creator"],
   },
   {
     id: "page-retests",
     label: "Retests",
     path: "/retests",
     keywords: ["retests", "retest", "verification pending", "verify fix", "tester verification"],
+    excludeRoles: ["creator"],
   },
   {
     id: "page-updates",
     label: "Updates",
     path: "/updates",
     keywords: ["updates", "update", "release notes", "changelog", "release"],
+    excludeRoles: ["creator"],
   },
   {
     id: "page-new-update",
     label: "New Update",
     path: "/new-update",
     keywords: ["new update", "create update", "release note", "publish update"],
+    excludeRoles: ["creator"],
   },
 
   // —— Attendance & work (non-tester) ——
@@ -239,6 +245,14 @@ const PAGE_ENTRIES: PageSearchEntry[] = [
     keywords: ["sheets", "spreadsheet", "bugsheets", "google sheets"],
     excludeRoles: ["tester"],
   },
+  {
+    id: "page-bugcreative",
+    label: "BugCreative",
+    path: "/bugcreative",
+    keywords: ["bugcreative", "creative", "design", "poster", "reel", "carousel", "mockup", "assets"],
+    permission: "CREATIVE_VIEW",
+    subtitle: "Creative asset pipeline",
+  },
 
   // —— Account & help ——
   {
@@ -266,6 +280,7 @@ const PAGE_ENTRIES: PageSearchEntry[] = [
     path: "/common-bugs",
     keywords: ["common bugs", "duplicate", "already raised", "recurring", "known issues"],
     permission: "COMMON_BUGS_VIEW",
+    excludeRoles: ["creator"],
   },
   {
     id: "page-common-codo",
