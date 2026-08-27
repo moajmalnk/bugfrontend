@@ -13,7 +13,7 @@ export type CreativeMaterialType =
   | 'Brochure'
   | 'Other';
 export type CreativePlatform = 'Insta' | 'Web' | 'YouTube' | 'LinkedIn' | 'Other';
-export type CreativeSource = 'link' | 'upload';
+export type CreativeSource = 'link' | 'upload' | 'both';
 export type CreativeReviewStatus = 'Approved' | 'Changes Requested' | 'Rejected';
 
 export type CreativeReview = {
@@ -223,15 +223,22 @@ export async function reviewCreativeAsset(payload: {
   return data.data as CreativeAsset;
 }
 
-export async function uploadCreativeFile(file: File): Promise<{
+export async function uploadCreativeFile(
+  file: File,
+  options?: { purpose?: 'thumbnail' | 'asset' }
+): Promise<{
   file_path: string;
   file_name: string;
   file_size: number;
   preview_thumbnail_url?: string | null;
+  purpose?: string;
 }> {
   const token = sessionStorage.getItem('token') || localStorage.getItem('token');
   const form = new FormData();
   form.append('file', file);
+  if (options?.purpose) {
+    form.append('purpose', options.purpose);
+  }
   const res = await fetch(`${ENV.API_URL}/creative/upload.php`, {
     method: 'POST',
     headers: token ? { Authorization: `Bearer ${token}` } : {},

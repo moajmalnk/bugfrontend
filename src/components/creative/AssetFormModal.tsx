@@ -57,9 +57,12 @@ import {
   Calendar,
   ExternalLink,
   FolderOpen,
+  ImagePlus,
+  Link2,
   Loader2,
   Pencil,
   Trash2,
+  Upload,
   UserRound,
 } from 'lucide-react';
 import { useEffect, useState } from 'react';
@@ -82,6 +85,22 @@ type FormState = typeof INITIAL;
 type ModalMode = 'view' | 'edit';
 
 type ProjectOption = { id: string; name: string };
+
+/**
+ * Why: Drive link and file upload are independent — source is derived, not toggled.
+ */
+function deriveAssetSource(driveLink: string, uploadedPath: string): CreativeSource {
+  const hasLink = Boolean(driveLink.trim());
+  const hasFile = Boolean(uploadedPath.trim());
+  if (hasLink && hasFile) return 'both';
+  if (hasFile) return 'upload';
+  return 'link';
+}
+
+function normalizeSource(value?: string | null): CreativeSource {
+  if (value === 'upload' || value === 'both' || value === 'link') return value;
+  return 'link';
+}
 
 type Props = {
   open: boolean;
@@ -153,6 +172,7 @@ export function AssetFormModal({
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [uploading, setUploading] = useState(false);
+  const [uploadingThumb, setUploadingThumb] = useState(false);
   const [reviewStatus, setReviewStatus] = useState<CreativeReviewStatus>('Approved');
   const [reviewComments, setReviewComments] = useState('');
   const [reviewing, setReviewing] = useState(false);
@@ -214,7 +234,7 @@ export function AssetFormModal({
           material_type: row.material_type || 'Poster',
           platform: row.platform || 'Insta',
           hook_content: row.hook_content || '',
-          asset_source: row.asset_source === 'upload' ? 'upload' : 'link',
+          asset_source: normalizeSource(row.asset_source),
           drive_link: row.drive_link || '',
           uploaded_file_path: row.uploaded_file_path || '',
           preview_thumbnail_url: row.preview_thumbnail_url || '',
@@ -240,7 +260,7 @@ export function AssetFormModal({
 
   const titleError = form.title.trim() ? '' : 'Title is required';
   const linkError =
-    form.asset_source === 'link' && form.drive_link.trim() && !/^https?:\/\//i.test(form.drive_link)
+    form.drive_link.trim() && !/^https?:\/\//i.test(form.drive_link.trim())
       ? 'Link must start with http:// or https://'
       : '';
   const isValid = !titleError && !linkError;
@@ -270,7 +290,7 @@ export function AssetFormModal({
     material_type: form.material_type,
     platform: form.platform,
     hook_content: form.hook_content.trim().slice(0, 2000) || null,
-    asset_source: form.asset_source,
+    asset_source: deriveAssetSource(form.drive_link, form.uploaded_file_path),
     drive_link: form.drive_link.trim() || null,
     uploaded_file_path: form.uploaded_file_path || null,
     preview_thumbnail_url: form.preview_thumbnail_url || null,
@@ -281,14 +301,22 @@ export function AssetFormModal({
   });
 
   const handleSave = async (submit = false) => {
-    if (!isValid || saving || !canCreate) return;
+    if (!isValid || saving || uploading || uploadingThumb || !canCreate) return;
     setSaving(true);
     try {
       const payload = buildPayload({ submit });
       const saved = isNew
         ? await createCreativeAsset(payload)
         : await updateCreativeAsset({ ...payload, id: assetId as string });
-      setBaseline(form);
+      const synced: FormState = {
+        ...form,
+        asset_source: normalizeSource(saved.asset_source),
+        drive_link: saved.drive_link || '',
+        uploaded_file_path: saved.uploaded_file_path || '',
+        preview_thumbnail_url: saved.preview_thumbnail_url || '',
+      };
+      setForm(synced);
+      setBaseline(synced);
       setAsset(saved);
       onSaved(saved);
       toast({ title: submit ? 'Submitted for review' : 'Asset saved' });
@@ -310,16 +338,21 @@ export function AssetFormModal({
   };
 
   const handleUpload = async (file: File) => {
-    if (uploading) return;
+    if (uploading || uploadingThumb) return;
     setUploading(true);
     try {
       const uploaded = await uploadCreativeFile(file);
-      setForm((prev) => ({
-        ...prev,
-        asset_source: 'upload',
-        uploaded_file_path: uploaded.file_path || '',
-        preview_thumbnail_url: uploaded.preview_thumbnail_url || '',
-      }));
+      setForm((prev) => {
+        const uploaded_file_path = uploaded.file_path || '';
+        return {
+          ...prev,
+          uploaded_file_path,
+          asset_source: deriveAssetSource(prev.drive_link, uploaded_file_path),
+          // Keep a custom card thumbnail unless this upload is itself an image.
+          preview_thumbnail_url:
+            prev.preview_thumbnail_url || uploaded.preview_thumbnail_url || '',
+        };
+      });
       toast({ title: 'File uploaded' });
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : 'Could not upload file';
@@ -331,6 +364,50 @@ export function AssetFormModal({
     } finally {
       setUploading(false);
     }
+  };
+
+  const handleUploadThumbnail = async (file: File) => {
+    if (uploading || uploadingThumb) return;
+    const ext = file.name.split('.').pop()?.toLowerCase() || '';
+    if (!['webp', 'jpg', 'jpeg', 'png', 'gif'].includes(ext)) {
+      toast({
+        title: 'Invalid thumbnail',
+        description: 'Use a WebP, JPG, PNG, or GIF image for the card thumbnail.',
+        variant: 'destructive',
+      });
+      return;
+    }
+    setUploadingThumb(true);
+    try {
+      const uploaded = await uploadCreativeFile(file, { purpose: 'thumbnail' });
+      const thumb = uploaded.preview_thumbnail_url || uploaded.file_path || '';
+      setForm((prev) => ({
+        ...prev,
+        preview_thumbnail_url: thumb,
+      }));
+      toast({ title: 'Thumbnail uploaded' });
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'Could not upload thumbnail';
+      toast({
+        title: 'Thumbnail upload failed',
+        description: message,
+        variant: 'destructive',
+      });
+    } finally {
+      setUploadingThumb(false);
+    }
+  };
+
+  const clearThumbnail = () => {
+    setForm((prev) => ({ ...prev, preview_thumbnail_url: '' }));
+  };
+
+  const clearUploadedFile = () => {
+    setForm((prev) => ({
+      ...prev,
+      uploaded_file_path: '',
+      asset_source: deriveAssetSource(prev.drive_link, ''),
+    }));
   };
 
   const handleReview = async () => {
@@ -388,10 +465,12 @@ export function AssetFormModal({
     asset?.project_name ||
     projects.find((p) => p.id === (asset?.project_id || form.project_id))?.name ||
     null;
-  const mediaPath = form.uploaded_file_path || form.preview_thumbnail_url;
+  const thumbPath = form.preview_thumbnail_url.trim();
+  const mediaPath = form.uploaded_file_path || thumbPath;
   const mediaKind = creativeMediaKind(mediaPath);
   const fileUrl = resolveCreativeMediaUrl(mediaPath);
   const linkUrl = form.drive_link.trim();
+  const hasCardPreview = Boolean(thumbPath || form.uploaded_file_path || linkUrl);
 
   const reviewPanel =
     canReview && asset && asset.status === 'In Review' ? (
@@ -432,26 +511,16 @@ export function AssetFormModal({
     <div className="grid grid-cols-12 gap-4">
       <div className="col-span-12 overflow-hidden rounded-2xl border bg-muted/30 lg:col-span-7">
         <div className="aspect-video w-full min-h-[220px]">
-          {mediaPath || linkUrl ? (
-            mediaPath ? (
-              <CreativeMediaPreview
-                path={form.preview_thumbnail_url}
-                fallbackPath={form.uploaded_file_path}
-                alt={form.title || 'Creative preview'}
-                className="h-full min-h-[220px]"
-                controls
-              />
-            ) : (
-              <div className="flex h-full min-h-[220px] flex-col items-center justify-center gap-3 p-6 text-center">
-                <ExternalLink className="h-10 w-10 text-muted-foreground" />
-                <p className="text-sm text-muted-foreground">External link asset</p>
-                <Button asChild className="rounded-xl" variant="secondary">
-                  <a href={linkUrl} target="_blank" rel="noopener noreferrer">
-                    Open link
-                  </a>
-                </Button>
-              </div>
-            )
+          {hasCardPreview ? (
+            <CreativeMediaPreview
+              path={thumbPath || undefined}
+              fallbackPath={form.uploaded_file_path || undefined}
+              driveLink={linkUrl || undefined}
+              alt={form.title || 'Creative preview'}
+              className="h-full min-h-[220px]"
+              controls
+              embedDriveFolder={!thumbPath && !form.uploaded_file_path}
+            />
           ) : (
             <CreativeMediaPreview className="h-full min-h-[220px]" alt="No media" />
           )}
@@ -549,6 +618,12 @@ export function AssetFormModal({
               <p className="truncate font-medium">
                 {form.uploaded_file_path.split('/').pop()}
               </p>
+            </div>
+          ) : null}
+          {thumbPath ? (
+            <div className="min-w-0">
+              <p className="text-xs text-muted-foreground">Card thumbnail</p>
+              <p className="truncate font-medium">{thumbPath.split('/').pop()}</p>
             </div>
           ) : null}
         </div>
@@ -683,77 +758,173 @@ export function AssetFormModal({
         </Select>
       </div>
 
-      <div className="col-span-12 flex flex-wrap gap-2">
-        <Button
-          type="button"
-          variant={form.asset_source === 'link' ? 'default' : 'outline'}
-          className="rounded-xl"
-          disabled={locked}
-          onClick={() => setForm((p) => ({ ...p, asset_source: 'link' }))}
-        >
-          Drive / link
-        </Button>
-        <Button
-          type="button"
-          variant={form.asset_source === 'upload' ? 'default' : 'outline'}
-          className="rounded-xl"
-          disabled={locked}
-          onClick={() => setForm((p) => ({ ...p, asset_source: 'upload' }))}
-        >
-          Upload
-        </Button>
-      </div>
-
-      {form.asset_source === 'link' ? (
-        <div className="col-span-12">
-          <Label htmlFor="creative-link">Asset link</Label>
-          <Input
-            id="creative-link"
-            value={form.drive_link ?? ''}
-            disabled={locked}
-            onChange={(e) => setForm((p) => ({ ...p, drive_link: e.target.value }))}
-            className="mt-1 h-11 rounded-xl"
-            placeholder="https://drive.google.com/..."
-          />
-          {linkError ? <p className="mt-1 text-xs text-red-500">{linkError}</p> : null}
+      <div className="col-span-12 space-y-4 rounded-2xl border border-border/70 bg-muted/15 p-4">
+        <div className="min-w-0">
+          <p className="text-sm font-semibold text-foreground">Asset resources</p>
+          <p className="mt-0.5 text-xs text-muted-foreground">
+            Add a Drive link, upload a file, or both. Card thumbnail is optional and controls the
+            grid image.
+          </p>
         </div>
-      ) : (
-        <div className="col-span-12">
-          <Label htmlFor="creative-file">Upload file</Label>
-          <Input
-            id="creative-file"
-            type="file"
-            disabled={locked || uploading}
-            accept=".webp,.jpg,.jpeg,.png,.gif,.pdf,.mp4,.zip"
-            className="mt-1 h-11 rounded-xl"
-            onChange={(e) => {
-              const file = e.target.files?.[0];
-              if (file) void handleUpload(file);
-              e.target.value = '';
-            }}
-          />
-          {uploading ? (
-            <p className="mt-1 text-xs text-muted-foreground">Uploading…</p>
-          ) : null}
-        </div>
-      )}
 
-      {form.preview_thumbnail_url || form.uploaded_file_path ? (
-        <div className="col-span-12">
-          <CreativeMediaPreview
-            path={form.preview_thumbnail_url}
-            fallbackPath={form.uploaded_file_path}
-            alt={form.title || 'Creative preview'}
-            className="max-h-56 min-h-[12rem] rounded-xl"
-            controls
-          />
-          {form.uploaded_file_path ? (
-            <p className="mt-2 truncate text-xs text-muted-foreground">
-              {form.uploaded_file_path.split('/').pop()}
+        <div className="grid grid-cols-12 gap-4">
+          <div className="col-span-12 space-y-2 rounded-xl border bg-background/80 p-3 sm:p-4">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <Label htmlFor="creative-link" className="inline-flex items-center gap-2">
+                <Link2 className="h-4 w-4 text-muted-foreground" />
+                Drive / web link
+                <span className="text-[11px] font-normal text-muted-foreground">(optional)</span>
+              </Label>
+              {form.drive_link.trim() ? (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  className="h-8 rounded-xl px-2 text-muted-foreground"
+                  disabled={locked}
+                  onClick={() =>
+                    setForm((p) => ({
+                      ...p,
+                      drive_link: '',
+                      asset_source: deriveAssetSource('', p.uploaded_file_path),
+                    }))
+                  }
+                >
+                  Clear
+                </Button>
+              ) : null}
+            </div>
+            <Input
+              id="creative-link"
+              value={form.drive_link ?? ''}
+              disabled={locked}
+              onChange={(e) =>
+                setForm((p) => ({
+                  ...p,
+                  drive_link: e.target.value,
+                  asset_source: deriveAssetSource(e.target.value, p.uploaded_file_path),
+                }))
+              }
+              className="h-11 rounded-xl"
+              placeholder="https://drive.google.com/drive/folders/…"
+            />
+            {linkError ? <p className="text-xs text-red-500">{linkError}</p> : null}
+            <p className="text-xs text-muted-foreground">
+              Folder links open the kit in Drive; file links can preview PDF/images.
             </p>
-          ) : null}
+          </div>
+
+          <div className="col-span-12 space-y-2 rounded-xl border bg-background/80 p-3 sm:p-4">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <Label htmlFor="creative-file" className="inline-flex items-center gap-2">
+                <Upload className="h-4 w-4 text-muted-foreground" />
+                Upload file
+                <span className="text-[11px] font-normal text-muted-foreground">(optional)</span>
+              </Label>
+              {form.uploaded_file_path ? (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  className="h-8 rounded-xl px-2 text-muted-foreground"
+                  disabled={locked || uploading}
+                  onClick={clearUploadedFile}
+                >
+                  <Trash2 className="mr-1 h-3.5 w-3.5" />
+                  Remove
+                </Button>
+              ) : null}
+            </div>
+            <Input
+              id="creative-file"
+              type="file"
+              disabled={locked || uploading || uploadingThumb}
+              accept=".webp,.jpg,.jpeg,.png,.gif,.pdf,.mp4,.zip"
+              className="h-11 rounded-xl"
+              onChange={(e) => {
+                const file = e.target.files?.[0];
+                if (file) void handleUpload(file);
+                e.target.value = '';
+              }}
+            />
+            {uploading ? (
+              <p className="flex items-center gap-2 text-xs text-muted-foreground">
+                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                Uploading file…
+              </p>
+            ) : form.uploaded_file_path ? (
+              <p className="truncate text-xs font-medium text-foreground">
+                {form.uploaded_file_path.split('/').pop()}
+              </p>
+            ) : (
+              <p className="text-xs text-muted-foreground">
+                WebP, JPG, PNG, GIF, PDF, MP4, or ZIP — up to 25MB.
+              </p>
+            )}
+          </div>
+
+          <div className="col-span-12 space-y-3 rounded-xl border border-dashed border-border/80 bg-muted/20 p-3 sm:p-4">
+            <div className="flex flex-wrap items-start justify-between gap-3">
+              <div className="min-w-0">
+                <Label htmlFor="creative-thumb" className="inline-flex items-center gap-2">
+                  <ImagePlus className="h-4 w-4 text-muted-foreground" />
+                  Card thumbnail
+                  <span className="text-[11px] font-normal text-muted-foreground">(optional)</span>
+                </Label>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  Shown on the BugCreative grid. Recommended when the asset is a Drive folder.
+                </p>
+              </div>
+              {thumbPath ? (
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="h-9 shrink-0 rounded-xl"
+                  disabled={locked || uploadingThumb}
+                  onClick={clearThumbnail}
+                >
+                  <Trash2 className="mr-1.5 h-3.5 w-3.5" />
+                  Remove
+                </Button>
+              ) : null}
+            </div>
+
+            <Input
+              id="creative-thumb"
+              type="file"
+              disabled={locked || uploading || uploadingThumb}
+              accept=".webp,.jpg,.jpeg,.png,.gif,image/webp,image/jpeg,image/png,image/gif"
+              className="h-11 rounded-xl"
+              onChange={(e) => {
+                const file = e.target.files?.[0];
+                if (file) void handleUploadThumbnail(file);
+                e.target.value = '';
+              }}
+            />
+            {uploadingThumb ? (
+              <p className="flex items-center gap-2 text-xs text-muted-foreground">
+                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                Uploading thumbnail…
+              </p>
+            ) : null}
+
+            {thumbPath || form.uploaded_file_path || linkUrl ? (
+              <div className="overflow-hidden rounded-xl border bg-background">
+                <div className="aspect-video max-h-56 min-h-[10rem] w-full">
+                  <CreativeMediaPreview
+                    path={thumbPath || undefined}
+                    fallbackPath={form.uploaded_file_path || undefined}
+                    driveLink={linkUrl || undefined}
+                    alt={form.title || 'Card thumbnail preview'}
+                    className="h-full min-h-[10rem]"
+                  />
+                </div>
+              </div>
+            ) : null}
+          </div>
         </div>
-      ) : null}
+      </div>
 
       <div className="col-span-12 md:col-span-6">
         <Label>Scheduled date</Label>
@@ -896,7 +1067,7 @@ export function AssetFormModal({
                       type="button"
                       variant="secondary"
                       className="rounded-xl"
-                      disabled={!isValid || saving}
+                      disabled={!isValid || saving || uploading || uploadingThumb}
                       onClick={() => void handleSave(false)}
                     >
                       {saving ? (
@@ -908,7 +1079,7 @@ export function AssetFormModal({
                     <Button
                       type="button"
                       className="rounded-xl"
-                      disabled={!isValid || saving}
+                      disabled={!isValid || saving || uploading || uploadingThumb}
                       onClick={() => void handleSave(true)}
                     >
                       {saving ? (

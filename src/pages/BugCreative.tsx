@@ -198,6 +198,7 @@ function AssetCard({
           <CreativeMediaPreview
             path={asset.preview_thumbnail_url}
             fallbackPath={asset.uploaded_file_path}
+            driveLink={asset.drive_link}
             alt={asset.title}
             className="transition-transform duration-300 group-hover:scale-[1.02]"
           />
