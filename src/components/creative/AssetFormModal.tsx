@@ -29,7 +29,7 @@ import {
 import { Textarea } from '@/components/ui/textarea';
 import { DatePicker } from '@/components/ui/DatePicker';
 import { toast } from '@/components/ui/use-toast';
-import { buildAttachmentUrl } from '@/lib/attachmentUtils';
+import { CreativeMediaPreview } from '@/components/creative/CreativeMediaPreview';
 import { cn } from '@/lib/utils';
 import type {
   CreativeAsset,
@@ -49,7 +49,7 @@ import {
   uploadCreativeFile,
 } from '@/services/creativeService';
 import { Loader2 } from 'lucide-react';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useState } from 'react';
 
 const INITIAL = {
   title: '',
@@ -135,10 +135,10 @@ export function AssetFormModal({
         if (cancelled) return;
         const next: FormState = {
           title: row.title || '',
-          material_type: row.material_type,
-          platform: row.platform,
+          material_type: row.material_type || 'Poster',
+          platform: row.platform || 'Insta',
           hook_content: row.hook_content || '',
-          asset_source: row.asset_source,
+          asset_source: row.asset_source === 'upload' ? 'upload' : 'link',
           drive_link: row.drive_link || '',
           uploaded_file_path: row.uploaded_file_path || '',
           preview_thumbnail_url: row.preview_thumbnail_url || '',
@@ -169,13 +169,6 @@ export function AssetFormModal({
       : '';
   const isValid = !titleError && !linkError;
   const locked = !!asset && !['Draft', 'Rejected'].includes(asset.status) && !canManage;
-
-  const previewSrc = useMemo(() => {
-    const path = form.preview_thumbnail_url || form.uploaded_file_path;
-    if (!path) return '';
-    if (/^https?:\/\//i.test(path)) return path;
-    return buildAttachmentUrl(path);
-  }, [form.preview_thumbnail_url, form.uploaded_file_path]);
 
   const requestClose = () => {
     if (dirty) {
@@ -231,8 +224,9 @@ export function AssetFormModal({
       setForm((prev) => ({
         ...prev,
         asset_source: 'upload',
-        uploaded_file_path: uploaded.file_path,
-        preview_thumbnail_url: uploaded.preview_thumbnail_url || prev.preview_thumbnail_url,
+        uploaded_file_path: uploaded.file_path || '',
+        // Why: Videos/PDFs have no image thumbnail — clear stale image previews.
+        preview_thumbnail_url: uploaded.preview_thumbnail_url || '',
       }));
       toast({ title: 'File uploaded' });
     } catch (err: any) {
@@ -323,7 +317,7 @@ export function AssetFormModal({
                   <Input
                     id="creative-title"
                     maxLength={255}
-                    value={form.title}
+                    value={form.title ?? ''}
                     disabled={locked}
                     onChange={(e) => setForm((p) => ({ ...p, title: e.target.value.slice(0, 255) }))}
                     className="mt-1 h-11 rounded-xl"
@@ -380,7 +374,7 @@ export function AssetFormModal({
                   <Textarea
                     id="creative-hook"
                     maxLength={2000}
-                    value={form.hook_content}
+                    value={form.hook_content ?? ''}
                     disabled={locked}
                     onChange={(e) =>
                       setForm((p) => ({ ...p, hook_content: e.target.value.slice(0, 2000) }))
@@ -438,7 +432,7 @@ export function AssetFormModal({
                     <Label htmlFor="creative-link">Asset link</Label>
                     <Input
                       id="creative-link"
-                      value={form.drive_link}
+                      value={form.drive_link ?? ''}
                       disabled={locked}
                       onChange={(e) => setForm((p) => ({ ...p, drive_link: e.target.value }))}
                       className="mt-1 h-11 rounded-xl"
@@ -467,13 +461,19 @@ export function AssetFormModal({
                   </div>
                 )}
 
-                {previewSrc ? (
+                {(form.preview_thumbnail_url || form.uploaded_file_path) ? (
                   <div className="col-span-12">
-                    <img
-                      src={previewSrc}
+                    <CreativeMediaPreview
+                      path={form.preview_thumbnail_url}
+                      fallbackPath={form.uploaded_file_path}
                       alt={form.title || 'Creative preview'}
-                      className="max-h-48 w-full rounded-xl object-cover"
+                      className="max-h-56 min-h-[12rem] rounded-xl"
                     />
+                    {form.uploaded_file_path ? (
+                      <p className="mt-2 truncate text-xs text-muted-foreground">
+                        {form.uploaded_file_path.split('/').pop()}
+                      </p>
+                    ) : null}
                   </div>
                 ) : null}
 
@@ -481,8 +481,10 @@ export function AssetFormModal({
                   <Label>Scheduled date</Label>
                   <div className="mt-1">
                     <DatePicker
-                      value={form.scheduled_date}
-                      onChange={(v) => setForm((p) => ({ ...p, scheduled_date: v }))}
+                      value={form.scheduled_date ?? ''}
+                      onChange={(v) =>
+                        setForm((p) => ({ ...p, scheduled_date: v ?? '' }))
+                      }
                     />
                   </div>
                 </div>
@@ -490,8 +492,10 @@ export function AssetFormModal({
                   <Label>Published date</Label>
                   <div className="mt-1">
                     <DatePicker
-                      value={form.published_date}
-                      onChange={(v) => setForm((p) => ({ ...p, published_date: v }))}
+                      value={form.published_date ?? ''}
+                      onChange={(v) =>
+                        setForm((p) => ({ ...p, published_date: v ?? '' }))
+                      }
                     />
                   </div>
                 </div>
@@ -521,7 +525,7 @@ export function AssetFormModal({
                     </Select>
                     <Textarea
                       maxLength={4000}
-                      value={reviewComments}
+                      value={reviewComments ?? ''}
                       onChange={(e) => setReviewComments(e.target.value.slice(0, 4000))}
                       className="min-h-[80px] rounded-xl"
                       placeholder="Comments for the creator"

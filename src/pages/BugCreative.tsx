@@ -29,9 +29,9 @@ import {
   LIST_TABS_CONTENT,
 } from '@/components/layout/list-page';
 import { AssetFormModal } from '@/components/creative/AssetFormModal';
+import { CreativeMediaPreview } from '@/components/creative/CreativeMediaPreview';
 import { useAuth } from '@/context/AuthContext';
 import { usePermissions } from '@/hooks/usePermissions';
-import { buildAttachmentUrl } from '@/lib/attachmentUtils';
 import {
   resolveWorkPeriod,
   type WorkPeriodPreset,
@@ -187,13 +187,6 @@ function AssetCard({
   onDelete: () => void;
   canDelete: boolean;
 }) {
-  const preview = asset.preview_thumbnail_url || asset.uploaded_file_path;
-  const src = preview
-    ? /^https?:\/\//i.test(preview)
-      ? preview
-      : buildAttachmentUrl(preview)
-    : '';
-
   return (
     <div className="group flex h-full min-w-0 flex-col overflow-hidden rounded-2xl border border-border/60 bg-card shadow-sm transition-all duration-300 hover:border-fuchsia-300/60 hover:shadow-md dark:hover:border-fuchsia-700/50">
       <button
@@ -202,19 +195,12 @@ function AssetCard({
         className="flex min-w-0 flex-1 flex-col text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-fuchsia-500/40"
       >
         <div className="relative h-40 w-full overflow-hidden bg-muted">
-          {src ? (
-            <img
-              src={src}
-              alt={asset.title}
-              className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-[1.02]"
-              loading="lazy"
-              decoding="async"
-            />
-          ) : (
-            <div className="flex h-full items-center justify-center bg-gradient-to-br from-fuchsia-500/10 via-muted to-violet-500/10">
-              <ImageIcon className="h-10 w-10 text-muted-foreground/70" />
-            </div>
-          )}
+          <CreativeMediaPreview
+            path={asset.preview_thumbnail_url}
+            fallbackPath={asset.uploaded_file_path}
+            alt={asset.title}
+            className="transition-transform duration-300 group-hover:scale-[1.02]"
+          />
           <span
             className={cn(
               'absolute left-3 top-3 inline-flex rounded-full px-2.5 py-1 text-[11px] font-semibold shadow-sm',
