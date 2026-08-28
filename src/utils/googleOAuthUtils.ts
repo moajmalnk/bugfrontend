@@ -103,3 +103,9 @@ export const handleGoogleOAuthError = (error: any) => {
   
   return 'Failed to sign in with Google. Please try again.';
 };
+
+/** Why: BugDocs/Meet need Docs or Calendar scopes — stale tokens show as connected but fail on create. */
+export const isGoogleScopeInsufficientError = (message?: string | null): boolean => {
+  if (!message) return false;
+  return /GOOGLE_SCOPE_INSUFFICIENT|insufficient authentication scopes|ACCESS_TOKEN_SCOPE_INSUFFICIENT/i.test(message);
+};

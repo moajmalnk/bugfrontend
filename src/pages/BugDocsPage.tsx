@@ -63,6 +63,7 @@ import {
   AlertTriangle,
 } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
+import { isGoogleScopeInsufficientError } from "@/utils/googleOAuthUtils";
 
 const BugDocCardSkeleton = ({ index = 0 }: { index?: number }) => (
   <div
@@ -183,6 +184,7 @@ const BugDocsPage = () => {
   const [isCreating, setIsCreating] = useState(false);
   const [isDeleting, setIsDeleting] = useState<number | null>(null);
   const [isConnected, setIsConnected] = useState(false);
+  const [needsGoogleReauth, setNeedsGoogleReauth] = useState(false);
   const [isCheckingConnection, setIsCheckingConnection] = useState(true);
   const [connectedEmail, setConnectedEmail] = useState<string | null>(null);
 
@@ -218,7 +220,6 @@ const BugDocsPage = () => {
   // Set default tab based on role
   const getDefaultTab = () => {
     if (isAdmin) return "all-docs";
-    if (isSharedAudience) return "shared-docs";
     return "my-docs";
   };
   const initialTab = searchParams.get("tab") || getDefaultTab();
@@ -341,12 +342,26 @@ const BugDocsPage = () => {
       const result = await googleDocsService.checkConnection();
       setIsConnected(result.connected);
       setConnectedEmail(result.email || null);
-      return result.connected;
+      setNeedsGoogleReauth(!!result.connected && !!result.needs_reauth);
+      return result.connected && !result.needs_reauth;
     } catch {
       setIsConnected(false);
       setConnectedEmail(null);
+      setNeedsGoogleReauth(false);
       return false;
     }
+  };
+
+  const handleConnectGoogleDocs = (forceReauth = false) => {
+    const token = sessionStorage.getItem('token') || localStorage.getItem('token');
+
+    const isLocal = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+    const returnUrl = isLocal
+      ? `http://localhost:8080${window.location.pathname}`
+      : `https://bugs.bugricer.com${window.location.pathname}`;
+
+    const authUrl = googleDocsService.getAuthUrl(token ?? undefined, returnUrl, forceReauth);
+    window.location.href = authUrl;
   };
 
   const handleDisconnect = async () => {
@@ -355,6 +370,7 @@ const BugDocsPage = () => {
       await googleDocsService.disconnect();
       setIsConnected(false);
       setConnectedEmail(null);
+      setNeedsGoogleReauth(false);
       setShowDisconnectDialog(false);
       toast({
         title: "Disconnected",
@@ -371,22 +387,6 @@ const BugDocsPage = () => {
     } finally {
       setIsDisconnecting(false);
     }
-  };
-
-  const handleConnectGoogleDocs = () => {
-    // Get JWT token to pass as state parameter (check sessionStorage first for impersonation tokens)
-    const token = sessionStorage.getItem('token') || localStorage.getItem('token');
-
-    // Build return URL based on current environment
-    const isLocal = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
-    const returnUrl = isLocal
-      ? `http://localhost:8080${window.location.pathname}`
-      : `https://bugs.bugricer.com${window.location.pathname}`;
-
-    // Navigate to Google OAuth with JWT token and return URL as state
-    // In impersonation mode, the token's user_id is the impersonated user's ID
-    const authUrl = googleDocsService.getAuthUrl(token, returnUrl);
-    window.location.href = authUrl;
   };
 
   // Preload all tab counts for accurate tab badge numbers
@@ -414,22 +414,23 @@ const BugDocsPage = () => {
     }
   };
 
-  const loadDocuments = async () => {
+  const loadDocuments = async (tabOverride?: string) => {
     try {
       let docs: UserDocument[] = [];
+      const tab = tabOverride ?? activeTab;
 
-      if (activeTab === "my-docs") {
+      if (tab === "my-docs") {
         // Load user's own documents
         docs = await googleDocsService.listGeneralDocuments();
         setMyDocsCount(docs.length);
-      } else if (activeTab === "all-docs" && isAdmin) {
+      } else if (tab === "all-docs" && isAdmin) {
         // Load all documents from all users (admins, developers, testers, and others) grouped by project
         const result = await googleDocsService.getAllDocuments();
         setAllDocumentsGrouped(result.documents);
         // Flatten for display
         docs = result.documents.flatMap(group => group.documents);
         setAllDocsCount(docs.length);
-      } else if (activeTab === "shared-docs" && isSharedAudience) {
+      } else if (tab === "shared-docs" && isSharedAudience) {
         // Load shared documents (from projects user is member of)
         docs = await googleDocsService.getSharedDocuments();
         setSharedDocsCount(docs.length);
@@ -522,8 +523,19 @@ const BugDocsPage = () => {
       // Open the document in a new tab
       googleDocsService.openDocument(result.document_url);
 
-      // Reload documents list
-      await refreshDocuments();
+      // Reload documents list (My Docs — Shared tab excludes own documents)
+      if (!isAdmin) {
+        setActiveTab("my-docs");
+        setSearchParams((prev) => {
+          const p = new URLSearchParams(prev);
+          p.set("tab", "my-docs");
+          return p;
+        });
+        await preloadAllTabCounts();
+        await loadDocuments("my-docs");
+      } else {
+        await refreshDocuments();
+      }
 
       // Reset form and close modal
       setDocTitle("");
@@ -534,9 +546,22 @@ const BugDocsPage = () => {
       setProjectSearchTerm("");
       setIsCreateModalOpen(false);
     } catch (error: any) {
+      const message = error?.message || "Failed to create document";
+      if (
+        error?.code === "GOOGLE_SCOPE_INSUFFICIENT" ||
+        isGoogleScopeInsufficientError(message)
+      ) {
+        setNeedsGoogleReauth(true);
+        toast({
+          title: "Google Docs permission required",
+          description: "Reconnect your Google account and allow Docs access to create documents.",
+          variant: "destructive",
+        });
+        return;
+      }
       toast({
         title: "Error",
-        description: error.message || "Failed to create document",
+        description: message,
         variant: "destructive",
       });
     } finally {
@@ -971,7 +996,7 @@ const BugDocsPage = () => {
                   </>
                 ) : (
                   <>
-                    {isConnected && (
+                    {isConnected && !needsGoogleReauth && (
                       <Button
                         onClick={() => setIsCreateModalOpen(true)}
                         className="h-12 px-6 bg-gradient-to-r from-orange-600 to-red-700 hover:from-orange-700 hover:to-red-800 text-white font-semibold shadow-lg hover:shadow-xl transition-all duration-300 transform hover:scale-105 self-start"
@@ -1003,6 +1028,27 @@ const BugDocsPage = () => {
         </div>
 
 
+
+        {needsGoogleReauth ? (
+          <div className="rounded-2xl border border-amber-200/80 dark:border-amber-800/80 bg-amber-50/90 dark:bg-amber-950/30 p-4 sm:p-5 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+            <div className="flex items-start gap-3 min-w-0">
+              <AlertTriangle className="h-5 w-5 text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" />
+              <div className="min-w-0">
+                <p className="font-semibold text-amber-950 dark:text-amber-100">Reconnect Google for Docs access</p>
+                <p className="text-sm text-amber-900/80 dark:text-amber-200/80 mt-1">
+                  Your account is linked but missing Google Docs permission. Reconnect and approve Docs access to create documents.
+                </p>
+              </div>
+            </div>
+            <Button
+              type="button"
+              className="rounded-xl h-11 px-5 shrink-0 bg-gradient-to-r from-orange-600 to-red-700 hover:from-orange-700 hover:to-red-800 text-white"
+              onClick={() => handleConnectGoogleDocs(true)}
+            >
+              Reconnect Google
+            </Button>
+          </div>
+        ) : null}
 
         {/* Disconnect Confirmation Dialog */}
         <Dialog open={showDisconnectDialog} onOpenChange={setShowDisconnectDialog}>
@@ -1250,22 +1296,30 @@ const BugDocsPage = () => {
                           <FileText className="h-10 w-10 text-white" />
                         </div>
                         <h3 className="text-2xl font-bold text-gray-900 dark:text-white mb-3">
-                          {!isConnected ? "Google Account Not Connected" : activeTab === "all-docs" ? "No documents found" : "No documents found"}
+                          {!isConnected || needsGoogleReauth
+                            ? needsGoogleReauth
+                              ? "Google Docs permission required"
+                              : "Google Account Not Connected"
+                            : activeTab === "all-docs"
+                              ? "No documents found"
+                              : "No documents found"}
                         </h3>
                         <p className="text-lg text-gray-600 dark:text-gray-400 mb-8 max-w-md mx-auto">
-                          {!isConnected
-                            ? "Please connect your Google account first to view and manage documents."
+                          {!isConnected || needsGoogleReauth
+                            ? needsGoogleReauth
+                              ? "Reconnect your Google account and allow Docs access to create and manage documents."
+                              : "Please connect your Google account first to view and manage documents."
                             : activeTab === "all-docs"
                               ? "No documents available. Create your first document to get started."
                               : "No documents available. Create your first document to get started."}
                         </p>
-                        {!isConnected ? (
+                        {!isConnected || needsGoogleReauth ? (
                           <Button
-                            onClick={() => navigate(`/${userRole}/profile`)}
+                            onClick={() => handleConnectGoogleDocs(needsGoogleReauth)}
                             className="h-12 px-6 bg-gradient-to-r from-orange-600 to-red-700 hover:from-orange-700 hover:to-red-800 text-white font-semibold shadow-lg hover:shadow-xl transition-all duration-300 transform hover:scale-105"
                           >
                             <LinkIcon className="h-5 w-5 mr-2" />
-                            Connect Google Account
+                            {needsGoogleReauth ? "Reconnect Google Account" : "Connect Google Account"}
                           </Button>
                         ) : (
                           <Button

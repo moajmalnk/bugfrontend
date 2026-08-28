@@ -16,6 +16,8 @@ export interface BugDocument {
 export interface GoogleDocsConnectionStatus {
   connected: boolean;
   email?: string | null;
+  scopes_ok?: boolean;
+  needs_reauth?: boolean;
 }
 
 export interface CreateDocumentResponse {
@@ -68,7 +70,9 @@ class GoogleDocsService {
 
       const result = {
         connected: response.data.data?.connected || false,
-        email: response.data.data?.email || null
+        email: response.data.data?.email || null,
+        scopes_ok: response.data.data?.scopes_ok ?? true,
+        needs_reauth: response.data.data?.needs_reauth ?? false,
       };
       return result;
     } catch (error) {
@@ -102,22 +106,26 @@ class GoogleDocsService {
    * @param token JWT token to pass as state
    * @param returnUrl Optional return URL to redirect to after OAuth callback
    */
-  getAuthUrl(token?: string, returnUrl?: string): string {
+  getAuthUrl(token?: string, returnUrl?: string, forceReauth = false): string {
     const baseUrl = `${ENV.API_URL}/oauth/auth`;
+    const params = new URLSearchParams();
     if (token) {
       if (returnUrl) {
-        // Encode both token and return_url as JSON, then base64 encode
         const stateData = {
           jwt_token: token,
           return_url: returnUrl
         };
         const encodedState = btoa(JSON.stringify(stateData));
-        return `${baseUrl}?state=${encodeURIComponent(encodedState)}`;
+        params.set('state', encodedState);
+      } else {
+        params.set('state', token);
       }
-      // Just pass token as before for backward compatibility
-      return `${baseUrl}?state=${encodeURIComponent(token)}`;
     }
-    return baseUrl;
+    if (forceReauth) {
+      params.set('force_reauth', '1');
+    }
+    const query = params.toString();
+    return query ? `${baseUrl}?${query}` : baseUrl;
   }
 
   /**
@@ -236,7 +244,12 @@ class GoogleDocsService {
       return response.data;
     } catch (error: any) {
       console.error('Failed to create general document:', error);
-      throw new Error(error.response?.data?.message || 'Failed to create document');
+      const message = error.response?.data?.message || 'Failed to create document';
+      const scopeError = new Error(message) as Error & { code?: string };
+      if (error.response?.data?.error_code === 'GOOGLE_SCOPE_INSUFFICIENT') {
+        scopeError.code = 'GOOGLE_SCOPE_INSUFFICIENT';
+      }
+      throw scopeError;
     }
   }
 

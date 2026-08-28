@@ -385,6 +385,33 @@ export function AssetFormModal({
         ...prev,
         preview_thumbnail_url: thumb,
       }));
+
+      // Why: Persist immediately on edit so card/grid previews update before submit-for-review.
+      if (!isNew && assetId && thumb) {
+        const saved = await updateCreativeAsset({
+          ...buildPayload(),
+          id: assetId,
+          preview_thumbnail_url: thumb,
+        });
+        const synced: FormState = {
+          title: saved.title || '',
+          material_type: saved.material_type || 'Poster',
+          platform: saved.platform || 'Insta',
+          hook_content: saved.hook_content || '',
+          asset_source: normalizeSource(saved.asset_source),
+          drive_link: saved.drive_link || '',
+          uploaded_file_path: saved.uploaded_file_path || '',
+          preview_thumbnail_url: saved.preview_thumbnail_url || thumb,
+          project_id: saved.project_id || '',
+          scheduled_date: saved.scheduled_date || '',
+          published_date: saved.published_date || '',
+        };
+        setForm(synced);
+        setBaseline(synced);
+        setAsset(saved);
+        onSaved(saved);
+      }
+
       toast({ title: 'Thumbnail uploaded' });
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : 'Could not upload thumbnail';
