@@ -286,9 +286,16 @@ export function DailySubmissionDetailCard({
       setDeleteOpen(false);
       await onChanged?.();
     } catch (e) {
+      const message = e instanceof Error ? e.message : "Unknown error";
+      if (/already in the recycle bin/i.test(message)) {
+        toast({ title: "Submission deleted", description: formatDayLabel(dayKey) });
+        setDeleteOpen(false);
+        await onChanged?.();
+        return;
+      }
       toast({
         title: "Delete failed",
-        description: e instanceof Error ? e.message : "Unknown error",
+        description: message,
         variant: "destructive",
       });
     } finally {
