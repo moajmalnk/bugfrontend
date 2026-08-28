@@ -36,6 +36,11 @@ import { googleDocsService, UserDocument, Template } from "@/services/googleDocs
 import { projectService } from "@/services/projectService";
 import { ProjectCardsGrid, ProjectWithCount } from "@/components/docs/ProjectCardsGrid";
 import { resolveProjectLabels } from "@/lib/projectLabels";
+import {
+  getDefaultDocsTab,
+  isSharedDocsSheetsAudience,
+  resolveDocsTabFromUrl,
+} from "@/lib/bugDocsSheetsTabs";
 import { AccessUsersPicker, parseAllowedUserIds } from "@/components/docs/AccessUsersPicker";
 import {
   DOCUMENT_ACCESS_ROLES,
@@ -152,8 +157,7 @@ const BugDocsPage = () => {
   const navigate = useNavigate();
   const userRole = currentUser ? getEffectiveRole(currentUser) : 'user';
   const isAdmin = userRole === 'admin';
-  const isSharedAudience =
-    userRole === 'developer' || userRole === 'tester' || userRole === 'creator';
+  const isSharedAudience = isSharedDocsSheetsAudience(userRole);
 
   /** Edit/Delete: creator or admin only — never expose controls to other roles. */
   const canManageDocument = (doc: UserDocument): boolean => {
@@ -217,12 +221,7 @@ const BugDocsPage = () => {
 
   // Tab and filter state
   const [searchParams, setSearchParams] = useSearchParams();
-  // Set default tab based on role
-  const getDefaultTab = () => {
-    if (isAdmin) return "all-docs";
-    return "my-docs";
-  };
-  const initialTab = searchParams.get("tab") || getDefaultTab();
+  const initialTab = resolveDocsTabFromUrl(searchParams.get("tab"), isAdmin);
   const [activeTab, setActiveTab] = useState(initialTab);
   const [searchTerm, setSearchTerm] = useState("");
   const [localSearchTerm, setLocalSearchTerm] = useState("");
@@ -434,6 +433,10 @@ const BugDocsPage = () => {
         // Load shared documents (from projects user is member of)
         docs = await googleDocsService.getSharedDocuments();
         setSharedDocsCount(docs.length);
+      } else {
+        // Why: Non-admins must never land on all-docs — fall back to owner inventory.
+        docs = await googleDocsService.listGeneralDocuments();
+        setMyDocsCount(docs.length);
       }
 
       setDocuments(docs);
@@ -525,14 +528,15 @@ const BugDocsPage = () => {
 
       // Reload documents list (My Docs — Shared tab excludes own documents)
       if (!isAdmin) {
-        setActiveTab("my-docs");
+        const ownerTab = getDefaultDocsTab(false);
+        setActiveTab(ownerTab);
         setSearchParams((prev) => {
           const p = new URLSearchParams(prev);
-          p.set("tab", "my-docs");
+          p.set("tab", ownerTab);
           return p;
         });
         await preloadAllTabCounts();
-        await loadDocuments("my-docs");
+        await loadDocuments(ownerTab);
       } else {
         await refreshDocuments();
       }
@@ -905,10 +909,10 @@ const BugDocsPage = () => {
 
   // Keep tab in sync with URL changes (back/forward navigation)
   useEffect(() => {
-    const urlTab = searchParams.get("tab") || "all-docs";
+    const urlTab = resolveDocsTabFromUrl(searchParams.get("tab"), isAdmin);
     if (urlTab !== activeTab) setActiveTab(urlTab);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [searchParams]);
+  }, [searchParams, isAdmin]);
 
   // Deep-link / browser Back: ?edit=<id> opens Edit Document; removing it closes
   useEffect(() => {

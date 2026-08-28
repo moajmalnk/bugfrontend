@@ -36,6 +36,11 @@ import { googleSheetsService, UserSheet, Template } from "@/services/googleSheet
 import { projectService } from "@/services/projectService";
 import { ProjectCardsGrid, ProjectWithCount } from "@/components/docs/ProjectCardsGrid";
 import { resolveProjectLabels } from "@/lib/projectLabels";
+import {
+  getDefaultSheetsTab,
+  isSharedDocsSheetsAudience,
+  resolveSheetsTabFromUrl,
+} from "@/lib/bugDocsSheetsTabs";
 import { AccessUsersPicker, parseAllowedUserIds } from "@/components/docs/AccessUsersPicker";
 import {
   DOCUMENT_ACCESS_ROLES,
@@ -151,8 +156,7 @@ const BugSheetsPage = () => {
   const navigate = useNavigate();
   const userRole = currentUser ? getEffectiveRole(currentUser) : 'user';
   const isAdmin = userRole === 'admin';
-  const isSharedAudience =
-    userRole === 'developer' || userRole === 'tester' || userRole === 'creator';
+  const isSharedAudience = isSharedDocsSheetsAudience(userRole);
 
   /** Edit/Delete: creator or admin only — never expose controls to other roles. */
   const canManageSheet = (sheet: UserSheet): boolean => {
@@ -214,13 +218,7 @@ const BugSheetsPage = () => {
 
   // Tab and filter state
   const [searchParams, setSearchParams] = useSearchParams();
-  // Set default tab based on role
-  const getDefaultTab = () => {
-    if (isAdmin) return "all-sheets";
-    if (isSharedAudience) return "shared-sheets";
-    return "my-sheets";
-  };
-  const initialTab = searchParams.get("tab") || getDefaultTab();
+  const initialTab = resolveSheetsTabFromUrl(searchParams.get("tab"), isAdmin);
   const [activeTab, setActiveTab] = useState(initialTab);
   const [searchTerm, setSearchTerm] = useState("");
   const [localSearchTerm, setLocalSearchTerm] = useState("");
@@ -416,25 +414,30 @@ const BugSheetsPage = () => {
     }
   };
 
-  const loadSheets = async () => {
+  const loadSheets = async (tabOverride?: string) => {
     try {
       let sheetsList: UserSheet[] = [];
+      const tab = tabOverride ?? activeTab;
 
-      if (activeTab === "my-sheets") {
+      if (tab === "my-sheets") {
         // Load user's own sheets
         sheetsList = await googleSheetsService.listGeneralSheets();
         setMySheetsCount(sheetsList.length);
-      } else if (activeTab === "all-sheets" && isAdmin) {
+      } else if (tab === "all-sheets" && isAdmin) {
         // Load all sheets from all users (admins, developers, testers, and others) grouped by project
         const result = await googleSheetsService.getAllSheets();
         setAllSheetsGrouped(result.sheets);
         // Flatten for display
         sheetsList = result.sheets.flatMap(group => group.sheets);
         setAllSheetsCount(sheetsList.length);
-      } else if (activeTab === "shared-sheets" && isSharedAudience) {
+      } else if (tab === "shared-sheets" && isSharedAudience) {
         // Load shared sheets (from projects user is member of)
         sheetsList = await googleSheetsService.getSharedSheets();
         setSharedSheetsCount(sheetsList.length);
+      } else {
+        // Why: Non-admins must never land on all-sheets — fall back to owner inventory.
+        sheetsList = await googleSheetsService.listGeneralSheets();
+        setMySheetsCount(sheetsList.length);
       }
 
       setSheets(sheetsList);
@@ -527,8 +530,20 @@ const BugSheetsPage = () => {
       // Open the sheet in a new tab
       googleSheetsService.openSheet(result.sheet_url);
 
-      // Reload sheets list
-      await refreshSheets();
+      // Reload sheets list (My Sheets — Shared tab excludes own sheets)
+      if (!isAdmin) {
+        const ownerTab = getDefaultSheetsTab(false);
+        setActiveTab(ownerTab);
+        setSearchParams((prev) => {
+          const p = new URLSearchParams(prev);
+          p.set("tab", ownerTab);
+          return p;
+        });
+        await preloadAllTabCounts();
+        await loadSheets(ownerTab);
+      } else {
+        await refreshSheets();
+      }
 
       closeCreateModal();
     } catch (error: any) {
@@ -918,10 +933,10 @@ const BugSheetsPage = () => {
 
   // Keep tab in sync with URL changes (back/forward navigation)
   useEffect(() => {
-    const urlTab = searchParams.get("tab") || "all-sheets";
+    const urlTab = resolveSheetsTabFromUrl(searchParams.get("tab"), isAdmin);
     if (urlTab !== activeTab) setActiveTab(urlTab);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [searchParams]);
+  }, [searchParams, isAdmin]);
 
   // Deep-link / browser Back: ?edit=<id> opens Edit Sheet; removing it closes
   useEffect(() => {
