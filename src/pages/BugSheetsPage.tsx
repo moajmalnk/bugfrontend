@@ -739,25 +739,37 @@ const BugSheetsPage = () => {
   const handleDeleteConfirm = async () => {
     if (!sheetToDelete) return;
 
-    setIsDeleting(sheetToDelete.id);
+    const removedId = sheetToDelete.id;
+    setIsDeleting(removedId);
     try {
-      await googleSheetsService.deleteSheet(sheetToDelete.id);
+      await googleSheetsService.deleteSheet(removedId);
 
       toast({
         title: "Success",
-        description: `Sheet "${sheetToDelete.sheet_title}" deleted successfully.`,
+        description: `Sheet "${sheetToDelete.sheet_title}" moved to recycle bin.`,
       });
 
-      // Reload sheets list
+      setSheets((prev) => prev.filter((s) => s.id !== removedId));
       await refreshSheets();
 
-      // Close dialog
       setIsDeleteDialogOpen(false);
       setSheetToDelete(null);
     } catch (error: any) {
+      const message = error?.message || "Failed to delete sheet";
+      if (/already in the recycle bin/i.test(message)) {
+        setSheets((prev) => prev.filter((s) => s.id !== removedId));
+        await refreshSheets();
+        setIsDeleteDialogOpen(false);
+        setSheetToDelete(null);
+        toast({
+          title: "Already deleted",
+          description: "This sheet is already in the recycle bin.",
+        });
+        return;
+      }
       toast({
         title: "Error",
-        description: error.message || "Failed to delete sheet",
+        description: message,
         variant: "destructive",
       });
     } finally {

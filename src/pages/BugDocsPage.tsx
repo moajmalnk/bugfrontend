@@ -715,25 +715,37 @@ const BugDocsPage = () => {
   const handleDeleteConfirm = async () => {
     if (!documentToDelete) return;
 
-    setIsDeleting(documentToDelete.id);
+    const removedId = documentToDelete.id;
+    setIsDeleting(removedId);
     try {
-      await googleDocsService.deleteDocument(documentToDelete.id);
+      await googleDocsService.deleteDocument(removedId);
 
       toast({
         title: "Success",
-        description: `Document "${documentToDelete.doc_title}" deleted successfully.`,
+        description: `Document "${documentToDelete.doc_title}" moved to recycle bin.`,
       });
 
-      // Reload documents list
+      setDocuments((prev) => prev.filter((d) => d.id !== removedId));
       await refreshDocuments();
 
-      // Close dialog
       setIsDeleteDialogOpen(false);
       setDocumentToDelete(null);
     } catch (error: any) {
+      const message = error?.message || "Failed to delete document";
+      if (/already in the recycle bin/i.test(message)) {
+        setDocuments((prev) => prev.filter((d) => d.id !== removedId));
+        await refreshDocuments();
+        setIsDeleteDialogOpen(false);
+        setDocumentToDelete(null);
+        toast({
+          title: "Already deleted",
+          description: "This document is already in the recycle bin.",
+        });
+        return;
+      }
       toast({
         title: "Error",
-        description: error.message || "Failed to delete document",
+        description: message,
         variant: "destructive",
       });
     } finally {
