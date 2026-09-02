@@ -36,3 +36,35 @@ export function getRoleBadgeClass(role: string): string {
 }
 
 export const SYSTEM_USER_ROLES = ["admin", "developer", "tester", "creator"] as const;
+
+/**
+ * Why: Attendance exceptions, leave, and office-day rollups include every
+ * staffed BugRicer login — not only admin / developer / legacy user.
+ */
+export const WORKFORCE_ROSTER_ROLES = [
+  "admin",
+  "developer",
+  "tester",
+  "creator",
+  "user",
+] as const;
+
+export type WorkforceRosterRole = (typeof WORKFORCE_ROSTER_ROLES)[number];
+
+export function isWorkforceRosterRole(role?: string | null): boolean {
+  if (!role) return false;
+  return WORKFORCE_ROSTER_ROLES.includes(
+    String(role).trim().toLowerCase() as WorkforceRosterRole
+  );
+}
+
+export const WORKFORCE_ROLE_FILTER_OPTIONS: {
+  value: WorkforceRosterRole;
+  label: string;
+}[] = [
+  { value: "admin", label: "Admin" },
+  { value: "developer", label: "Developer" },
+  { value: "tester", label: "Tester" },
+  { value: "creator", label: "Creator" },
+  { value: "user", label: "User" },
+];

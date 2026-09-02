@@ -34,6 +34,7 @@ import {
   buildProjectComplianceOverview,
   COMPLIANCE_VERIFIED_FILTER_OPTIONS,
   countByStatus,
+  countNotRequiredProjects,
   getDefaultComplianceTab,
   matchesComplianceFilter,
   matchesVerifiedFilter,
@@ -41,7 +42,6 @@ import {
   type ComplianceVerifiedFilter,
 } from '@/lib/codo/complianceStatus';
 import { cn, getEffectiveRole } from '@/lib/utils';
-import { isProjectComplianceRequired } from '@/lib/utils/projectUtils';
 import { projectService } from '@/services/projectService';
 import { useQuery } from '@tanstack/react-query';
 import {
@@ -51,6 +51,7 @@ import {
   Code,
   Filter,
   Layers,
+  MinusCircle,
   RotateCcw,
   Search,
   Shield,
@@ -72,6 +73,7 @@ const FILTER_TABS: ComplianceFilterTab[] = [
   'completed',
   'pending',
   'not_started',
+  'not_required',
   'admins',
   'dev',
   'testers',
@@ -82,6 +84,7 @@ const TAB_LABELS: Record<ComplianceFilterTab, string> = {
   completed: 'Completed',
   pending: 'Pending',
   not_started: 'Not started',
+  not_required: 'Not required',
   admins: 'Admins',
   dev: 'Dev',
   testers: 'Tester',
@@ -92,6 +95,7 @@ const TAB_ICONS: Record<ComplianceFilterTab, typeof Layers> = {
   completed: CheckCircle2,
   pending: Clock,
   not_started: Timer,
+  not_required: MinusCircle,
   admins: Shield,
   dev: Code,
   testers: TestTube,
@@ -102,6 +106,7 @@ const TAB_BADGE_CLASS: Record<ComplianceFilterTab, string> = {
   completed: 'bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-300',
   pending: 'bg-amber-100 dark:bg-amber-900/30 text-amber-800 dark:text-amber-300',
   not_started: 'bg-slate-100 dark:bg-slate-800/50 text-slate-600 dark:text-slate-400',
+  not_required: 'bg-rose-100 dark:bg-rose-900/30 text-rose-700 dark:text-rose-300',
   admins: 'bg-violet-100 dark:bg-violet-900/30 text-violet-700 dark:text-violet-300',
   dev: 'bg-cyan-100 dark:bg-cyan-900/30 text-cyan-700 dark:text-cyan-300',
   testers: 'bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300',
@@ -200,17 +205,24 @@ const ComplianceOverview = () => {
 
   const scopedProjects = useMemo(() => {
     const all = projectsData ?? [];
-    const complianceScoped = all.filter((project) =>
-      isProjectComplianceRequired(project)
-    );
-    if (isAdmin) return complianceScoped;
+    if (isAdmin) return all;
     if (!currentUser?.id) return [];
-    return filterAssignedProjects(complianceScoped, currentUser.id);
+    return filterAssignedProjects(all, currentUser.id);
   }, [projectsData, isAdmin, currentUser?.id]);
 
   const overviewItems = useMemo(
     () => scopedProjects.map((project) => buildProjectComplianceOverview(project)),
     [scopedProjects]
+  );
+
+  const trackedItems = useMemo(
+    () => overviewItems.filter((item) => item.complianceRequired),
+    [overviewItems]
+  );
+
+  const notRequiredCount = useMemo(
+    () => countNotRequiredProjects(overviewItems),
+    [overviewItems]
   );
 
   const tabCounts = useMemo(() => {
@@ -230,7 +242,7 @@ const ComplianceOverview = () => {
       matchesComplianceFilter(item, activeTab, roleKey, currentUser?.id)
     );
 
-    if (verifiedFilter !== 'all') {
+    if (verifiedFilter !== 'all' && activeTab !== 'not_required') {
       items = items.filter((item) => matchesVerifiedFilter(item, verifiedFilter));
     }
 
@@ -292,19 +304,20 @@ const ComplianceOverview = () => {
   }, [filteredItems, currentPage, itemsPerPage]);
 
   const devCounts = useMemo(
-    () => countByStatus(overviewItems, (item) => item.developerStatus),
-    [overviewItems]
+    () => countByStatus(trackedItems, (item) => item.developerStatus),
+    [trackedItems]
   );
   const testerCounts = useMemo(
-    () => countByStatus(overviewItems, (item) => item.testerStatus),
-    [overviewItems]
+    () => countByStatus(trackedItems, (item) => item.testerStatus),
+    [trackedItems]
   );
   const adminCounts = useMemo(
-    () => countByStatus(overviewItems, (item) => item.adminStatus),
-    [overviewItems]
+    () => countByStatus(trackedItems, (item) => item.adminStatus),
+    [trackedItems]
   );
 
   const pendingCount = tabCounts.pending;
+  const isNotRequiredTab = activeTab === 'not_required';
 
   const headerDescription = isAdmin
     ? 'Organization-wide CODO compliance across all active projects.'
@@ -313,11 +326,15 @@ const ComplianceOverview = () => {
       : 'Tester compliance status for your assigned projects.';
 
   const emptyMessage =
-    scopedProjects.length === 0
-      ? isAdmin
-        ? 'No active projects.'
-        : 'No assigned projects with compliance tracking.'
-      : 'No projects match the current filters.';
+    activeTab === 'not_required'
+      ? notRequiredCount === 0
+        ? 'No projects are marked as compliance-exempt.'
+        : 'No exempt projects match the current filters.'
+      : trackedItems.length === 0
+        ? isAdmin
+          ? 'No projects require compliance tracking.'
+          : 'No assigned projects require compliance tracking.'
+        : 'No projects match the current filters.';
 
   const hasActiveFilters =
     Boolean(searchDraft.trim()) || sortBy !== 'name' || verifiedFilter !== 'all';
@@ -346,8 +363,17 @@ const ComplianceOverview = () => {
               </p>
             ) : (
               <p className="text-sm text-muted-foreground">
-                <span className="font-semibold text-foreground">{overviewItems.length}</span>{' '}
-                project{overviewItems.length === 1 ? '' : 's'} tracked
+                <span className="font-semibold text-foreground">{trackedItems.length}</span>{' '}
+                tracked
+                {notRequiredCount > 0 && (
+                  <>
+                    {' · '}
+                    <span className="font-semibold text-rose-700 dark:text-rose-300">
+                      {notRequiredCount}
+                    </span>{' '}
+                    exempt
+                  </>
+                )}
               </p>
             )}
           </div>
@@ -396,17 +422,24 @@ const ComplianceOverview = () => {
                   onValueChange={(value) =>
                     setVerifiedFilter(value as ComplianceVerifiedFilter)
                   }
+                  disabled={isNotRequiredTab}
                 >
                   <SelectTrigger className={filterTriggerClass}>
-                    <SelectValue placeholder="Verified filter" />
+                    <SelectValue
+                      placeholder={
+                        isNotRequiredTab ? 'N/A for exempt projects' : 'Verified filter'
+                      }
+                    />
                   </SelectTrigger>
-                  <SelectContent position="popper" className="z-[60] rounded-xl">
-                    {COMPLIANCE_VERIFIED_FILTER_OPTIONS.map((opt) => (
-                      <SelectItem key={opt.value} value={opt.value}>
-                        {opt.label}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
+                  {!isNotRequiredTab && (
+                    <SelectContent position="popper" className="z-[60] rounded-xl">
+                      {COMPLIANCE_VERIFIED_FILTER_OPTIONS.map((opt) => (
+                        <SelectItem key={opt.value} value={opt.value}>
+                          {opt.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  )}
                 </Select>
               </div>
             </div>
@@ -452,29 +485,50 @@ const ComplianceOverview = () => {
         description={headerDescription}
         accentBarClassName="from-blue-600 to-emerald-600"
         underlayClassName="from-blue-50/50 via-transparent to-emerald-50/50 dark:from-blue-950/20 dark:via-transparent dark:to-emerald-950/20"
-        count={overviewItems.length}
+        count={trackedItems.length}
         countIcon={<ShieldCheck className="h-5 w-5" />}
         countClassName="from-blue-50 to-emerald-50 dark:from-blue-950/30 dark:to-emerald-950/30 border-blue-200 dark:border-blue-800 text-blue-700 dark:text-blue-300"
         loading={isLoading}
         actions={
-          !isLoading && pendingCount > 0 ? (
-            <div className="flex items-center gap-2 px-4 py-3 rounded-xl border border-amber-200 dark:border-amber-800 bg-amber-50/80 dark:bg-amber-950/30 text-amber-800 dark:text-amber-200 text-sm font-semibold shadow-sm">
-              <Clock className="h-4 w-4 shrink-0" />
-              {pendingCount} pending
+          !isLoading ? (
+            <div className="flex flex-wrap items-center gap-2">
+              {pendingCount > 0 && (
+                <div className="flex items-center gap-2 px-4 py-3 rounded-xl border border-amber-200 dark:border-amber-800 bg-amber-50/80 dark:bg-amber-950/30 text-amber-800 dark:text-amber-200 text-sm font-semibold shadow-sm">
+                  <Clock className="h-4 w-4 shrink-0" />
+                  {pendingCount} pending
+                </div>
+              )}
+              {notRequiredCount > 0 && (
+                <div className="flex items-center gap-2 px-4 py-3 rounded-xl border border-rose-200 dark:border-rose-800 bg-rose-50/80 dark:bg-rose-950/30 text-rose-800 dark:text-rose-200 text-sm font-semibold shadow-sm">
+                  <MinusCircle className="h-4 w-4 shrink-0" />
+                  {notRequiredCount} exempt
+                </div>
+              )}
             </div>
           ) : undefined
         }
       />
 
-      <ComplianceStatsPanel
-        isAdmin={isAdmin}
-        isDeveloper={isDeveloper}
-        isTester={isTester}
-        devCounts={devCounts}
-        testerCounts={testerCounts}
-        adminCounts={adminCounts}
-        loading={isLoading}
-      />
+      {!isNotRequiredTab && (
+        <ComplianceStatsPanel
+          isAdmin={isAdmin}
+          isDeveloper={isDeveloper}
+          isTester={isTester}
+          devCounts={devCounts}
+          testerCounts={testerCounts}
+          adminCounts={adminCounts}
+          loading={isLoading}
+        />
+      )}
+
+      {isNotRequiredTab && !isLoading && (
+        <div className="rounded-2xl border border-rose-200/60 dark:border-rose-800/40 bg-rose-50/50 dark:bg-rose-950/20 p-4 sm:p-5">
+          <p className="text-sm text-rose-900 dark:text-rose-100">
+            These projects have compliance tracking turned off in project settings. They are
+            excluded from developer, tester, and admin pipeline counts.
+          </p>
+        </div>
+      )}
 
       <Tabs value={activeTab} onValueChange={handleTabChange} className="w-full min-w-0">
         <ListPageTabsShell
@@ -518,12 +572,13 @@ const ComplianceOverview = () => {
           <ComplianceOverviewTable
             items={paginatedItems}
             role={role}
-            showAdminColumn={showAdminColumn}
+            showAdminColumn={showAdminColumn && !isNotRequiredTab}
             loading={isLoading}
             listFromState={listFromState}
             emptyMessage={emptyMessage}
             hasActiveFilters={hasActiveFilters}
             onClearFilters={handleClearFilters}
+            variant={isNotRequiredTab ? 'not_required' : 'tracked'}
           />
 
           {filteredItems.length > 0 && !isLoading && (

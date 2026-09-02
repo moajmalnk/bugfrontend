@@ -4,16 +4,24 @@ import {
   isCompliancePipelineSatisfied,
   type ProjectComplianceSummary,
 } from '@/lib/codo/complianceRules';
-import type { Project, ProjectComplianceSummaryLite } from '@/lib/utils/projectUtils';
+import {
+  isProjectComplianceRequired,
+  type Project,
+  type ProjectComplianceSummaryLite,
+} from '@/lib/utils/projectUtils';
 
 export type CompliancePhaseStatus = 'completed' | 'pending' | 'not_started';
 
 /** Role tabs: Admins / Dev / Tester — each shows that side’s Pending projects only. */
 export type ComplianceMembershipTab = 'admins' | 'dev' | 'testers';
 
+/** Project-level exemption — not a pipeline phase. */
+export type ComplianceExemptionTab = 'not_required';
+
 export type ComplianceFilterTab =
   | 'all'
   | CompliancePhaseStatus
+  | ComplianceExemptionTab
   | ComplianceMembershipTab;
 
 export type CompliancePhase = 'developer' | 'tester';
@@ -158,6 +166,8 @@ export function getComplianceStatusBadgeClass(status: CompliancePhaseStatus): st
 
 export type ProjectComplianceOverview = {
   project: Project;
+  /** False when project opted out via compliance_required = 0. */
+  complianceRequired: boolean;
   developerStatus: CompliancePhaseStatus;
   testerStatus: CompliancePhaseStatus;
   adminStatus: CompliancePhaseStatus;
@@ -185,10 +195,40 @@ const defaultCompliance: ProjectComplianceSummaryLite = {
   emergency_bypass: false,
 };
 
+/**
+ * Why: Exempt projects still appear on the overview under the Not required tab.
+ */
+export function buildNotRequiredComplianceOverview(
+  project: Project
+): ProjectComplianceOverview {
+  return {
+    project,
+    complianceRequired: false,
+    developerStatus: 'not_started',
+    testerStatus: 'not_started',
+    adminStatus: 'not_started',
+    developerVerified: 0,
+    developerTotal: 0,
+    testerVerified: 0,
+    testerTotal: 0,
+    developerTargetDate: null,
+    testerTargetDate: null,
+    developerOverdue: false,
+    testerOverdue: false,
+    overallPercent: 0,
+    pipelineLabel: 'Not required',
+    adminVerified: false,
+  };
+}
+
 export function buildProjectComplianceOverview(
   project: Project,
   now = new Date()
 ): ProjectComplianceOverview {
+  if (!isProjectComplianceRequired(project)) {
+    return buildNotRequiredComplianceOverview(project);
+  }
+
   const compliance = project.compliance ?? defaultCompliance;
   const developerVerified = compliance.developer_verified ?? 0;
   const developerTotal = compliance.developer_total ?? 0;
@@ -221,6 +261,7 @@ export function buildProjectComplianceOverview(
 
   return {
     project,
+    complianceRequired: true,
     developerStatus,
     testerStatus,
     adminStatus,
@@ -258,13 +299,21 @@ export function countByStatus(
   items: ProjectComplianceOverview[],
   pickStatus: (item: ProjectComplianceOverview) => CompliancePhaseStatus
 ): ComplianceStatusCounts {
-  return items.reduce<ComplianceStatusCounts>(
-    (acc, item) => {
-      acc[pickStatus(item)] += 1;
-      return acc;
-    },
-    { completed: 0, pending: 0, not_started: 0 }
-  );
+  return items
+    .filter((item) => item.complianceRequired)
+    .reduce<ComplianceStatusCounts>(
+      (acc, item) => {
+        acc[pickStatus(item)] += 1;
+        return acc;
+      },
+      { completed: 0, pending: 0, not_started: 0 }
+    );
+}
+
+export function countNotRequiredProjects(
+  items: ProjectComplianceOverview[]
+): number {
+  return items.filter((item) => !item.complianceRequired).length;
 }
 
 /**
@@ -322,6 +371,15 @@ export function matchesComplianceFilter(
   role: 'admin' | 'developer' | 'tester',
   _userId?: string | number | null
 ): boolean {
+  if (tab === 'not_required') {
+    return !item.complianceRequired;
+  }
+
+  // Exempt projects only belong on the Not required tab.
+  if (!item.complianceRequired) {
+    return false;
+  }
+
   if (tab === 'all') return true;
 
   // Why: Role tabs = that side’s Pending only (same numbers as the matrix cards).

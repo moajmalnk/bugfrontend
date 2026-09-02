@@ -386,7 +386,10 @@ export const Sidebar = ({ className, closeSidebar }: SidebarProps) => {
             )}
 
             {role !== "tester" &&
-              (can("LEAVE_VIEW") || role === "developer" || role === "user") && (
+              (can("LEAVE_VIEW") ||
+                role === "developer" ||
+                role === "creator" ||
+                role === "user") && (
               <NavLink
                 to="/leave"
                 icon={<PlaneTakeoff className="h-5 w-5" />}

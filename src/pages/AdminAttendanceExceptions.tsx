@@ -41,6 +41,7 @@ import { Switch } from '@/components/ui/switch';
 import { toast } from '@/components/ui/use-toast';
 import { useAuth } from '@/context/AuthContext';
 import { cn, getEffectiveRole, hasPermissionOrAdmin } from '@/lib/utils';
+import { isWorkforceRosterRole, WORKFORCE_ROLE_FILTER_OPTIONS } from '@/lib/roleBadge';
 import { usePermissions } from '@/hooks/usePermissions';
 import {
   listAllAttendanceExceptions,
@@ -112,11 +113,7 @@ export default function AdminAttendanceExceptions() {
       setData(payload);
       setPendingWfh(Array.isArray(wfhPayload.pending) ? wfhPayload.pending : []);
       const staff = (userList || [])
-        .filter((u) => {
-          const r = String(u.role || '').toLowerCase();
-          const isStaff = r === 'admin' || r === 'developer' || r === 'user';
-          return isStaff && isAccountActive(u);
-        })
+        .filter((u) => isWorkforceRosterRole(u.role) && isAccountActive(u))
         .sort(compareUsersByActivityThenHours);
       setUsers(staff);
       setGrantUserId((prev) => {
@@ -773,9 +770,11 @@ export default function AdminAttendanceExceptions() {
                           </SelectTrigger>
                           <SelectContent position="popper" className="z-[60]">
                             <SelectItem value="all">All roles</SelectItem>
-                            <SelectItem value="admin">Admin</SelectItem>
-                            <SelectItem value="developer">Developer</SelectItem>
-                            <SelectItem value="user">User</SelectItem>
+                            {WORKFORCE_ROLE_FILTER_OPTIONS.map((opt) => (
+                              <SelectItem key={opt.value} value={opt.value}>
+                                {opt.label}
+                              </SelectItem>
+                            ))}
                           </SelectContent>
                         </Select>
                       </div>

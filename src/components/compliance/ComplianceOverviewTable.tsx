@@ -23,6 +23,7 @@ import {
   Crown,
   FlaskConical,
   FolderOpen,
+  MinusCircle,
   RotateCcw,
   Search,
   ShieldCheck,
@@ -91,6 +92,131 @@ function ProgressMiniBar({ percent }: { percent: number }) {
           className="h-full rounded-full bg-gradient-to-r from-blue-500 to-emerald-500 transition-all duration-500"
           style={{ width: `${Math.min(100, Math.max(0, percent))}%` }}
         />
+      </div>
+    </div>
+  );
+}
+
+function NotRequiredBadge() {
+  return (
+    <span className="inline-flex items-center gap-1 rounded-full border border-rose-200 bg-rose-50 px-2 py-0.5 text-[10px] font-semibold text-rose-700 dark:border-rose-800 dark:bg-rose-950/40 dark:text-rose-300">
+      <MinusCircle className="h-3 w-3" />
+      Not required
+    </span>
+  );
+}
+
+function NotRequiredTableRow({
+  item,
+  role,
+  listFromState,
+  index,
+}: Omit<ComplianceRowProps, 'showAdminColumn'>) {
+  const { project } = item;
+  const status = (project.status ?? 'active') as ProjectStatus;
+  const projectPath = `/${role}/projects/${project.id}`;
+
+  return (
+    <TableRow
+      className={cn(
+        'group hover:bg-gradient-to-r hover:from-rose-50/50 hover:to-slate-50/50 dark:hover:from-rose-900/20 dark:hover:to-slate-900/20 transition-all duration-300 border-b border-gray-100/50 dark:border-gray-800/50',
+        index % 2 === 0 ? 'bg-white/50 dark:bg-gray-900/50' : 'bg-gray-50/30 dark:bg-gray-800/30'
+      )}
+    >
+      <TableCell className="align-top min-w-[11rem] max-w-[14rem] px-4 py-4">
+        <div className="flex flex-col gap-3 min-w-0">
+          <div className="flex items-start gap-2 min-w-0">
+            <div className="p-2 rounded-xl bg-gradient-to-br from-rose-500 to-orange-600 shadow-sm shrink-0">
+              <FolderOpen className="h-4 w-4 text-white" />
+            </div>
+            <div className="min-w-0">
+              <p className="font-bold text-sm text-gray-900 dark:text-white break-words">
+                {project.name}
+              </p>
+              {project.client_name && (
+                <p className="text-xs text-muted-foreground break-words mt-0.5">
+                  {project.client_name}
+                </p>
+              )}
+            </div>
+          </div>
+          <div className="flex flex-wrap items-center gap-2">
+            <Badge variant="secondary" className="w-fit rounded-full text-[10px] capitalize">
+              {getProjectStatusLabel(status)}
+            </Badge>
+            <NotRequiredBadge />
+          </div>
+        </div>
+      </TableCell>
+      <TableCell className="align-top min-w-[12rem] max-w-[18rem] px-4 py-4">
+        <ComplianceProjectTeam project={project} density="compact" />
+      </TableCell>
+      <TableCell colSpan={2} className="align-top px-4 py-4">
+        <p className="text-sm text-muted-foreground max-w-md">
+          Compliance tracking is disabled for this project. Enable it in project settings if CODO
+          checks are needed before close-out.
+        </p>
+      </TableCell>
+      <TableCell className="align-top text-right px-4 py-4">
+        <Button
+          variant="outline"
+          size="sm"
+          asChild
+          className="h-9 rounded-xl font-semibold shadow-sm"
+        >
+          <Link to={projectPath} state={listFromState}>
+            View project
+            <ArrowRight className="h-3.5 w-3.5 ml-1" />
+          </Link>
+        </Button>
+      </TableCell>
+    </TableRow>
+  );
+}
+
+function NotRequiredProjectCard({
+  item,
+  role,
+  listFromState,
+}: Omit<ComplianceRowProps, 'showAdminColumn' | 'index'>) {
+  const { project } = item;
+  const status = (project.status ?? 'active') as ProjectStatus;
+  const projectPath = `/${role}/projects/${project.id}`;
+
+  return (
+    <div className="group relative overflow-hidden rounded-2xl border border-rose-200/50 dark:border-rose-800/40 bg-white/80 dark:bg-gray-900/80 backdrop-blur-sm shadow-lg">
+      <div className="relative p-5 sm:p-6 flex flex-col gap-4">
+        <div className="flex items-start justify-between gap-3 min-w-0">
+          <div className="min-w-0 flex-1">
+            <div className="flex items-center gap-2 min-w-0">
+              <div className="p-2 rounded-xl bg-gradient-to-br from-rose-500 to-orange-600 shadow-sm shrink-0">
+                <FolderOpen className="h-4 w-4 text-white" />
+              </div>
+              <h3 className="font-bold text-base text-gray-900 dark:text-white break-words">
+                {project.name}
+              </h3>
+            </div>
+            {project.client_name && (
+              <p className="text-xs text-muted-foreground mt-1 break-words pl-10">
+                {project.client_name}
+              </p>
+            )}
+          </div>
+          <NotRequiredBadge />
+        </div>
+        <Badge variant="secondary" className="w-fit rounded-full text-[10px] capitalize">
+          {getProjectStatusLabel(status)}
+        </Badge>
+        <ComplianceProjectTeam project={project} density="comfortable" />
+        <p className="text-sm text-muted-foreground">
+          Compliance tracking is disabled. Turn it on in project settings if needed.
+        </p>
+        <Button variant="outline" asChild className="w-full rounded-xl h-11 font-semibold">
+          <Link to={projectPath} state={listFromState}>
+            View project
+            <ArrowRight className="h-4 w-4 ml-auto" />
+          </Link>
+        </Button>
       </div>
     </div>
   );
@@ -336,6 +462,7 @@ interface ComplianceOverviewTableProps {
   emptyMessage: string;
   hasActiveFilters?: boolean;
   onClearFilters?: () => void;
+  variant?: 'tracked' | 'not_required';
 }
 
 export function ComplianceOverviewTable({
@@ -347,7 +474,9 @@ export function ComplianceOverviewTable({
   emptyMessage,
   hasActiveFilters = false,
   onClearFilters,
+  variant = 'tracked',
 }: ComplianceOverviewTableProps) {
+  const isNotRequired = variant === 'not_required';
   if (loading) {
     return (
       <div className="flex flex-col gap-4">
@@ -434,25 +563,36 @@ export function ComplianceOverviewTable({
                     Team
                   </span>
                 </TableHead>
-                <TableHead className="min-w-[10rem] px-4 font-bold text-sm text-gray-900 dark:text-white py-4">
-                  <span className="inline-flex items-center gap-1.5">
-                    <Code2 className="h-4 w-4 text-emerald-600" />
-                    Developer
-                  </span>
-                </TableHead>
-                <TableHead className="min-w-[10rem] px-4 font-bold text-sm text-gray-900 dark:text-white py-4">
-                  <span className="inline-flex items-center gap-1.5">
-                    <FlaskConical className="h-4 w-4 text-purple-600" />
-                    Tester
-                  </span>
-                </TableHead>
-                {showAdminColumn && (
-                  <TableHead className="min-w-[9rem] px-4 font-bold text-sm text-gray-900 dark:text-white py-4">
-                    <span className="inline-flex items-center gap-1.5">
-                      <Crown className="h-4 w-4 text-blue-600" />
-                      Admin lock
-                    </span>
+                {isNotRequired ? (
+                  <TableHead
+                    colSpan={2}
+                    className="min-w-[10rem] px-4 font-bold text-sm text-gray-900 dark:text-white py-4"
+                  >
+                    Compliance status
                   </TableHead>
+                ) : (
+                  <>
+                    <TableHead className="min-w-[10rem] px-4 font-bold text-sm text-gray-900 dark:text-white py-4">
+                      <span className="inline-flex items-center gap-1.5">
+                        <Code2 className="h-4 w-4 text-emerald-600" />
+                        Developer
+                      </span>
+                    </TableHead>
+                    <TableHead className="min-w-[10rem] px-4 font-bold text-sm text-gray-900 dark:text-white py-4">
+                      <span className="inline-flex items-center gap-1.5">
+                        <FlaskConical className="h-4 w-4 text-purple-600" />
+                        Tester
+                      </span>
+                    </TableHead>
+                    {showAdminColumn && (
+                      <TableHead className="min-w-[9rem] px-4 font-bold text-sm text-gray-900 dark:text-white py-4">
+                        <span className="inline-flex items-center gap-1.5">
+                          <Crown className="h-4 w-4 text-blue-600" />
+                          Admin lock
+                        </span>
+                      </TableHead>
+                    )}
+                  </>
                 )}
                 <TableHead className="w-[120px] pr-4 text-right font-bold text-sm text-gray-900 dark:text-white py-4">
                   Action
@@ -460,31 +600,50 @@ export function ComplianceOverviewTable({
               </TableRow>
             </TableHeader>
             <TableBody>
-              {items.map((item, index) => (
-                <ComplianceTableRow
-                  key={item.project.id}
-                  item={item}
-                  role={role}
-                  showAdminColumn={showAdminColumn}
-                  listFromState={listFromState}
-                  index={index}
-                />
-              ))}
+              {items.map((item, index) =>
+                isNotRequired ? (
+                  <NotRequiredTableRow
+                    key={item.project.id}
+                    item={item}
+                    role={role}
+                    listFromState={listFromState}
+                    index={index}
+                  />
+                ) : (
+                  <ComplianceTableRow
+                    key={item.project.id}
+                    item={item}
+                    role={role}
+                    showAdminColumn={showAdminColumn}
+                    listFromState={listFromState}
+                    index={index}
+                  />
+                )
+              )}
             </TableBody>
           </Table>
         </div>
       </div>
 
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:hidden">
-        {items.map((item) => (
-          <ComplianceProjectCard
-            key={item.project.id}
-            item={item}
-            role={role}
-            showAdminColumn={showAdminColumn}
-            listFromState={listFromState}
-          />
-        ))}
+        {items.map((item) =>
+          isNotRequired ? (
+            <NotRequiredProjectCard
+              key={item.project.id}
+              item={item}
+              role={role}
+              listFromState={listFromState}
+            />
+          ) : (
+            <ComplianceProjectCard
+              key={item.project.id}
+              item={item}
+              role={role}
+              showAdminColumn={showAdminColumn}
+              listFromState={listFromState}
+            />
+          )
+        )}
       </div>
     </div>
   );
