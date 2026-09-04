@@ -280,13 +280,19 @@ export default function DailyUpdate() {
       const credited = Number(s.hours_today || 0);
       const leaveCode = String(s.leave_type_code || '').toLowerCase();
       const creditNote =
-        leaveCode === 'paid' || leaveCode === 'personal'
-          ? 'Leave credited as 8 work hours for this day.'
-          : 'Attendance blocked for this approved leave day.';
+        leaveCode === 'corporate'
+          ? 'Official leave credited as 8 work hours for this day.'
+          : leaveCode === 'paid' || leaveCode === 'personal'
+            ? 'Leave credited as 8 work hours for this day.'
+            : 'Attendance blocked for this approved leave day.';
+      const leaveLabel =
+        leaveCode === 'corporate'
+          ? String(s.leave_reason || leaveName || 'Official Leave').trim()
+          : leaveName;
       return (
         `🧾 CODO Daily Work Update — User\n` +
         `📅 Date: ${dateText}\n` +
-        `🏖 Leave day · ${leaveName}\n` +
+        `🏖 ${leaveCode === 'corporate' ? 'Official leave' : 'Leave day'} · ${leaveLabel}\n` +
         `⏱ Today's Working Hours: ${credited} Hours\n` +
         `✅ ${creditNote}` +
         (s.leave_request_id ? ` · Request #${s.leave_request_id}` : '') +
@@ -917,23 +923,32 @@ export default function DailyUpdate() {
                     {visibleSubmissions.map((s) => {
                       const checkInLabel = formatCheckInTime(s.check_in_time);
                       const isLeave = String(s.day_status || '').toLowerCase() === 'leave';
+                      const leaveCode = String(s.leave_type_code || '').toLowerCase();
+                      const isOfficialLeave = isLeave && leaveCode === 'corporate';
                       const isAdminEntry = !isLeave && isAdminHoursSubmission(s);
                       const leaveName = String(s.leave_type_name || s.leave_type_code || 'Leave').trim();
+                      const officialTitle = String(s.leave_reason || leaveName || 'Official Leave').trim();
                       const leaveOnly = isLeave && !s.id;
                       const cardKey = s.id ?? `leave-${s.leave_request_id ?? 'x'}-${s.submission_date}`;
                       return (
                   <div key={cardKey} className={`bg-white/60 dark:bg-gray-800/60 border rounded-2xl p-4 sm:p-6 hover:shadow-lg transition-all duration-200 min-w-0 ${
-                    isLeave
-                      ? 'border-teal-200/70 dark:border-teal-800/50 hover:border-teal-300 dark:hover:border-teal-700'
-                      : isAdminEntry
-                        ? 'border-red-200/70 dark:border-red-800/50 hover:border-red-300 dark:hover:border-red-700'
-                        : 'border-gray-200/60 dark:border-gray-700/60 hover:border-gray-300 dark:hover:border-gray-600'
+                    isOfficialLeave
+                      ? 'border-amber-200/70 dark:border-amber-800/50 hover:border-amber-300 dark:hover:border-amber-700'
+                      : isLeave
+                        ? 'border-teal-200/70 dark:border-teal-800/50 hover:border-teal-300 dark:hover:border-teal-700'
+                        : isAdminEntry
+                          ? 'border-red-200/70 dark:border-red-800/50 hover:border-red-300 dark:hover:border-red-700'
+                          : 'border-gray-200/60 dark:border-gray-700/60 hover:border-gray-300 dark:hover:border-gray-600'
                   }`}>
                     <div className="flex flex-col gap-3 xl:flex-row xl:items-start xl:justify-between mb-3 min-w-0">
                       <div className="min-w-0 flex-1">
                         <div className="font-semibold text-sm text-gray-900 dark:text-white break-words flex flex-wrap items-center gap-2">
                           <span>{s.submission_date}</span>
-                          {isLeave ? (
+                          {isOfficialLeave ? (
+                            <span className="inline-flex items-center rounded-xl border border-amber-200 bg-amber-100 px-2 py-0.5 text-[10px] font-medium text-amber-950 dark:border-amber-800 dark:bg-amber-950/50 dark:text-amber-200">
+                              Official leave{officialTitle ? ` (${officialTitle})` : ''}
+                            </span>
+                          ) : isLeave ? (
                             <span className="inline-flex items-center rounded-xl border border-teal-200 bg-teal-100 px-2 py-0.5 text-[10px] font-medium text-teal-900 dark:border-teal-800 dark:bg-teal-950/50 dark:text-teal-200">
                               On leave{leaveName ? ` (${leaveName})` : ''}
                             </span>
@@ -950,15 +965,17 @@ export default function DailyUpdate() {
                           </div>
                         )}
                         <div className="text-xs text-gray-500 dark:text-gray-400 break-words mt-1">
-                          {isLeave
-                            ? `Leave day · ${leaveName}`
-                            : isAdminEntry
-                              ? 'Admin hours entry'
-                              : checkInLabel
-                                ? `Checked in at ${checkInLabel}`
-                                : s.start_time
-                                  ? `Started at ${s.start_time}`
-                                  : 'No check-in time'}{' '}
+                          {isOfficialLeave
+                            ? `Official leave · ${officialTitle}`
+                            : isLeave
+                              ? `Leave day · ${leaveName}`
+                              : isAdminEntry
+                                ? 'Admin hours entry (forgot checkout)'
+                                : checkInLabel
+                                  ? `Checked in at ${checkInLabel}`
+                                  : s.start_time
+                                    ? `Started at ${s.start_time}`
+                                    : 'No check-in time'}{' '}
                           • {Number(s.hours_today ?? 0).toFixed(2)} hours
                           {!isLeave && Number(s.overtime_hours || 0) > 0 && (
                             <span className="ml-2 px-2 py-0.5 bg-orange-100 dark:bg-orange-900/30 text-orange-700 dark:text-orange-300 rounded-full text-xs font-medium">
@@ -1024,11 +1041,13 @@ export default function DailyUpdate() {
                       </div>
                     </div>
                     <div className={`max-h-48 min-w-0 overflow-y-auto overflow-x-hidden rounded-xl p-3 no-scrollbar ${
-                      isLeave
-                        ? 'bg-teal-50/80 dark:bg-teal-950/30 border border-teal-200/60 dark:border-teal-800/40'
-                        : isAdminEntry
-                          ? 'bg-red-50/80 dark:bg-red-950/30 border border-red-200/60 dark:border-red-800/40'
-                          : 'bg-gray-50 dark:bg-gray-800'
+                      isOfficialLeave
+                        ? 'bg-amber-50/80 dark:bg-amber-950/30 border border-amber-200/60 dark:border-amber-800/40'
+                        : isLeave
+                          ? 'bg-teal-50/80 dark:bg-teal-950/30 border border-teal-200/60 dark:border-teal-800/40'
+                          : isAdminEntry
+                            ? 'bg-red-50/80 dark:bg-red-950/30 border border-red-200/60 dark:border-red-800/40'
+                            : 'bg-gray-50 dark:bg-gray-800'
                     }`}>
                       <pre className="max-w-full min-w-0 text-xs whitespace-pre-wrap break-words [overflow-wrap:anywhere] text-gray-700 dark:text-gray-300 leading-relaxed">
                         {formatSubmissionText(s)}

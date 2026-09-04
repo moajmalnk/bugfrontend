@@ -535,6 +535,14 @@ export const Sidebar = ({ className, closeSidebar }: SidebarProps) => {
                     />
                   )}
 
+                  {hasLeaveManage && (
+                    <NavLink
+                      to="/official-leave"
+                      icon={<Building2 className="h-5 w-5" />}
+                      label="Official Leave"
+                    />
+                  )}
+
                   {hasRecruitmentView && (
                     <NavLink
                       to="/bug-recruitment"

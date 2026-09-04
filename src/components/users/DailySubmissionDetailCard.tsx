@@ -316,9 +316,25 @@ export function DailySubmissionDetailCard({
               {formatDayLabel(dayKey)}
             </span>
             {String(submission.day_status || '') === 'leave' ? (
-              <Badge className="bg-teal-100 text-teal-900 border-teal-200 dark:bg-teal-950/50 dark:text-teal-200 dark:border-teal-800">
-                On leave
-                {submission.leave_type_name ? ` (${submission.leave_type_name})` : ''}
+              <Badge
+                className={
+                  String(submission.leave_type_code || '').toLowerCase() === 'corporate'
+                    ? 'bg-amber-100 text-amber-950 border-amber-200 dark:bg-amber-950/50 dark:text-amber-200 dark:border-amber-800'
+                    : 'bg-teal-100 text-teal-900 border-teal-200 dark:bg-teal-950/50 dark:text-teal-200 dark:border-teal-800'
+                }
+              >
+                {String(submission.leave_type_code || '').toLowerCase() === 'corporate'
+                  ? 'Official leave'
+                  : 'On leave'}
+                {String(submission.leave_type_code || '').toLowerCase() === 'corporate'
+                  ? submission.leave_reason
+                    ? ` (${submission.leave_reason})`
+                    : submission.leave_type_name
+                      ? ` (${submission.leave_type_name})`
+                      : ''
+                  : submission.leave_type_name
+                    ? ` (${submission.leave_type_name})`
+                    : ''}
               </Badge>
             ) : null}
             {showUser && submission.username ? (
@@ -383,22 +399,54 @@ export function DailySubmissionDetailCard({
       </div>
 
       {String(submission.day_status || '') === 'leave' ? (
-        <div className="rounded-xl border border-teal-200/70 dark:border-teal-800/50 bg-teal-50/70 dark:bg-teal-950/30 px-3 py-2.5 text-xs space-y-1">
-          <div className="font-semibold text-teal-800 dark:text-teal-200">
-            Leave day
-            {submission.leave_type_name ? ` · ${submission.leave_type_name}` : ''}
+        (() => {
+          const leaveCode = String(submission.leave_type_code || '').toLowerCase();
+          const isOfficial = leaveCode === 'corporate';
+          return (
+        <div
+          className={
+            isOfficial
+              ? 'rounded-xl border border-amber-200/70 dark:border-amber-800/50 bg-amber-50/70 dark:bg-amber-950/30 px-3 py-2.5 text-xs space-y-1'
+              : 'rounded-xl border border-teal-200/70 dark:border-teal-800/50 bg-teal-50/70 dark:bg-teal-950/30 px-3 py-2.5 text-xs space-y-1'
+          }
+        >
+          <div
+            className={
+              isOfficial
+                ? 'font-semibold text-amber-900 dark:text-amber-200'
+                : 'font-semibold text-teal-800 dark:text-teal-200'
+            }
+          >
+            {isOfficial ? 'Official leave' : 'Leave day'}
+            {isOfficial
+              ? submission.leave_reason
+                ? ` · ${submission.leave_reason}`
+                : submission.leave_type_name
+                  ? ` · ${submission.leave_type_name}`
+                  : ''
+              : submission.leave_type_name
+                ? ` · ${submission.leave_type_name}`
+                : ''}
           </div>
-          <p className="text-teal-700/90 dark:text-teal-300/90">
-            {['paid', 'personal'].includes(
-              String(submission.leave_type_code || '').toLowerCase()
-            )
-              ? 'Leave credited as 8 work hours for this day.'
-              : 'Attendance is blocked for this approved leave day.'}
+          <p
+            className={
+              isOfficial
+                ? 'text-amber-800/90 dark:text-amber-300/90'
+                : 'text-teal-700/90 dark:text-teal-300/90'
+            }
+          >
+            {isOfficial
+              ? 'Official leave credited as 8 work hours for this day.'
+              : ['paid', 'personal'].includes(leaveCode)
+                ? 'Leave credited as 8 work hours for this day.'
+                : 'Attendance is blocked for this approved leave day.'}
             {submission.leave_request_id
               ? ` · Request #${submission.leave_request_id}`
               : ''}
           </p>
         </div>
+          );
+        })()
       ) : null}
 
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs">

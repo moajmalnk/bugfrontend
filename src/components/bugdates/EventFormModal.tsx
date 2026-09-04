@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Loader2, X } from 'lucide-react';
+import { Loader2, Search, X } from 'lucide-react';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -31,6 +31,9 @@ import {
   type BugDatesEvent,
   type BugDatesEventInput,
 } from '@/services/bugDatesService';
+import { grantOfficialLeave } from '@/services/leaveService';
+import { userService } from '@/services/userService';
+import type { User } from '@/types';
 
 const pickerClass =
   'h-11 w-full bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 rounded-xl shadow-sm hover:shadow-md transition-all duration-300';
@@ -77,6 +80,12 @@ export function EventFormModal({ open, initial, onClose, onSaved }: Props) {
   const [saving, setSaving] = useState(false);
   const [dirty, setDirty] = useState(false);
   const [unsavedOpen, setUnsavedOpen] = useState(false);
+  const [creditOfficialLeave, setCreditOfficialLeave] = useState(false);
+  const [leaveScope, setLeaveScope] = useState<'all' | 'users'>('all');
+  const [leaveUsers, setLeaveUsers] = useState<User[]>([]);
+  const [leaveSelectedIds, setLeaveSelectedIds] = useState<Set<string>>(new Set());
+  const [leaveUserQuery, setLeaveUserQuery] = useState('');
+  const [loadingLeaveUsers, setLoadingLeaveUsers] = useState(false);
 
   useEffect(() => {
     if (!open) {
@@ -105,14 +114,66 @@ export function EventFormModal({ open, initial, onClose, onSaved }: Props) {
       const hooks = (initial.auto_hooks || {}) as Record<string, unknown>;
       setCreativeHook(!!hooks.creative);
       setTodoHook(typeof hooks.todo === 'string' ? hooks.todo : '');
+      setCreditOfficialLeave(false);
+      setLeaveScope('all');
+      setLeaveSelectedIds(new Set());
+      setLeaveUserQuery('');
     } else {
       setForm({ ...INITIAL, start_date: new Date().toISOString().slice(0, 10) });
       setDays([]);
       setCreativeHook(false);
       setTodoHook('');
+      setCreditOfficialLeave(false);
+      setLeaveScope('all');
+      setLeaveSelectedIds(new Set());
+      setLeaveUserQuery('');
     }
     setDirty(false);
   }, [open, initial]);
+
+  const showOfficialLeaveOptions =
+    String(form.category || '') === 'holiday' && !!form.is_office_closed;
+
+  useEffect(() => {
+    if (!open || !showOfficialLeaveOptions || !creditOfficialLeave || leaveScope !== 'users') {
+      return;
+    }
+    if (leaveUsers.length > 0) return;
+    let cancelled = false;
+    (async () => {
+      setLoadingLeaveUsers(true);
+      try {
+        const list = await userService.getUsers();
+        if (!cancelled) {
+          setLeaveUsers(
+            list.filter((u) => {
+              const active =
+                u.account_active === undefined || u.account_active === null
+                  ? true
+                  : Number(u.account_active) === 1;
+              return active;
+            })
+          );
+        }
+      } catch {
+        if (!cancelled) setLeaveUsers([]);
+      } finally {
+        if (!cancelled) setLoadingLeaveUsers(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [open, showOfficialLeaveOptions, creditOfficialLeave, leaveScope, leaveUsers.length]);
+
+  const filteredLeaveUsers = useMemo(() => {
+    const q = leaveUserQuery.trim().toLowerCase();
+    if (!q) return leaveUsers;
+    return leaveUsers.filter((u) => {
+      const hay = `${u.username || ''} ${u.name || ''} ${u.role || ''}`.toLowerCase();
+      return hay.includes(q);
+    });
+  }, [leaveUsers, leaveUserQuery]);
 
   useEffect(() => {
     if (!open) return;
@@ -147,6 +208,19 @@ export function EventFormModal({ open, initial, onClose, onSaved }: Props) {
 
   const handleSave = async () => {
     if (!isValid || saving) return;
+    if (
+      showOfficialLeaveOptions &&
+      creditOfficialLeave &&
+      leaveScope === 'users' &&
+      leaveSelectedIds.size === 0
+    ) {
+      toast({
+        title: 'Select users',
+        description: 'Pick at least one user for Official Leave, or choose All users.',
+        variant: 'destructive',
+      });
+      return;
+    }
     setSaving(true);
     try {
       const auto_hooks: Record<string, unknown> = {};
@@ -171,6 +245,35 @@ export function EventFormModal({ open, initial, onClose, onSaved }: Props) {
         await createBugDatesEvent(payload);
         toast({ title: 'Event created' });
       }
+
+      if (showOfficialLeaveOptions && creditOfficialLeave && form.start_date) {
+        try {
+          const result = await grantOfficialLeave({
+            start_date: form.start_date,
+            end_date: form.end_date || form.start_date,
+            title: form.title.trim().slice(0, 255),
+            scope: leaveScope,
+            user_ids: leaveScope === 'users' ? Array.from(leaveSelectedIds) : undefined,
+            notify: true,
+            replace_admin_hours: true,
+          });
+          const skipN = Array.isArray(result.skipped) ? result.skipped.length : 0;
+          toast({
+            title: 'Official Leave credited',
+            description: `${result.created} user${result.created === 1 ? '' : 's'} · 8h/day${
+              skipN ? ` · ${skipN} skipped` : ''
+            }.`,
+          });
+        } catch (leaveErr) {
+          toast({
+            title: 'Holiday saved, but Official Leave failed',
+            description:
+              leaveErr instanceof Error ? leaveErr.message : 'Grant leave from Official Leave page',
+            variant: 'destructive',
+          });
+        }
+      }
+
       setDirty(false);
       onSaved();
       onClose();
@@ -373,6 +476,115 @@ export function EventFormModal({ open, initial, onClose, onSaved }: Props) {
               </span>
             </span>
           </label>
+
+          {showOfficialLeaveOptions ? (
+            <div className="col-span-12 space-y-3 rounded-xl border border-amber-200/70 dark:border-amber-800/50 bg-amber-50/50 dark:bg-amber-950/20 p-3">
+              <label className="flex items-start gap-3 cursor-pointer">
+                <Checkbox
+                  checked={creditOfficialLeave}
+                  onCheckedChange={(v) => {
+                    setCreditOfficialLeave(v === true);
+                    setDirty(true);
+                  }}
+                  className="mt-0.5 h-5 w-5 rounded-md border-amber-500/70 data-[state=checked]:bg-amber-600 data-[state=checked]:border-amber-600 data-[state=checked]:text-white"
+                  aria-label="Credit Official Leave"
+                />
+                <span className="text-sm font-medium leading-snug text-amber-950 dark:text-amber-100">
+                  Credit Official Leave (8h)
+                  <span className="block text-xs font-normal text-amber-800/80 dark:text-amber-300/80 mt-0.5">
+                    Grant company leave hours for this holiday date range
+                  </span>
+                </span>
+              </label>
+              {creditOfficialLeave ? (
+                <div className="space-y-2 pl-8">
+                  <div className="grid grid-cols-12 gap-2">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setLeaveScope('all');
+                        setDirty(true);
+                      }}
+                      className={`col-span-6 rounded-xl border px-3 py-2 text-left text-xs ${
+                        leaveScope === 'all'
+                          ? 'border-amber-400 bg-amber-100/80 dark:border-amber-600 dark:bg-amber-900/40'
+                          : 'border-gray-200 dark:border-gray-700'
+                      }`}
+                    >
+                      All users
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setLeaveScope('users');
+                        setDirty(true);
+                      }}
+                      className={`col-span-6 rounded-xl border px-3 py-2 text-left text-xs ${
+                        leaveScope === 'users'
+                          ? 'border-amber-400 bg-amber-100/80 dark:border-amber-600 dark:bg-amber-900/40'
+                          : 'border-gray-200 dark:border-gray-700'
+                      }`}
+                    >
+                      Selected users ({leaveSelectedIds.size})
+                    </button>
+                  </div>
+                  {leaveScope === 'users' ? (
+                    <div className="space-y-2">
+                      <div className="relative">
+                        <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
+                        <Input
+                          value={leaveUserQuery}
+                          onChange={(e) => setLeaveUserQuery(e.target.value)}
+                          placeholder="Search users…"
+                          className="pl-8 h-9 rounded-xl text-xs"
+                        />
+                      </div>
+                      <div className="max-h-40 overflow-y-auto rounded-xl border border-amber-200/50 dark:border-amber-800/40 bg-white/70 dark:bg-gray-900/50">
+                        {loadingLeaveUsers ? (
+                          <p className="text-xs text-muted-foreground p-3 flex items-center gap-2">
+                            <Loader2 className="h-3.5 w-3.5 animate-spin" /> Loading…
+                          </p>
+                        ) : filteredLeaveUsers.length === 0 ? (
+                          <p className="text-xs text-muted-foreground p-3">No users</p>
+                        ) : (
+                          filteredLeaveUsers.map((u) => {
+                            const id = String(u.id);
+                            const checked = leaveSelectedIds.has(id);
+                            return (
+                              <label
+                                key={id}
+                                className="flex items-center gap-2 px-2.5 py-1.5 cursor-pointer hover:bg-amber-50/60 dark:hover:bg-amber-950/30"
+                              >
+                                <Checkbox
+                                  checked={checked}
+                                  onCheckedChange={() => {
+                                    setLeaveSelectedIds((prev) => {
+                                      const next = new Set(prev);
+                                      if (next.has(id)) next.delete(id);
+                                      else next.add(id);
+                                      return next;
+                                    });
+                                    setDirty(true);
+                                  }}
+                                  className="rounded-md"
+                                />
+                                <span className="text-xs truncate">
+                                  {u.username || u.name || id}
+                                  <span className="text-muted-foreground ml-1 uppercase">
+                                    {u.role || ''}
+                                  </span>
+                                </span>
+                              </label>
+                            );
+                          })
+                        )}
+                      </div>
+                    </div>
+                  ) : null}
+                </div>
+              ) : null}
+            </div>
+          ) : null}
 
           <label className="col-span-12 md:col-span-6 flex items-start gap-3 cursor-pointer group rounded-xl border border-gray-200/60 dark:border-gray-700/60 bg-white/60 dark:bg-gray-800/40 px-3 py-3 transition-colors hover:bg-blue-50/40 dark:hover:bg-blue-950/20">
             <Checkbox

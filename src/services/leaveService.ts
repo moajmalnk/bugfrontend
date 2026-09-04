@@ -185,6 +185,45 @@ export async function reviewLeaveRequest(body: {
   return data.data;
 }
 
+export type OfficialLeaveGrantResult = {
+  title: string;
+  start_date: string;
+  end_date: string;
+  leave_type_code: string;
+  credited_hours_per_day: number;
+  created: number;
+  skipped: Array<{ user_id: string; reason: string }>;
+  requests: Array<{
+    id: number;
+    user_id: string;
+    start_date: string;
+    end_date: string;
+    days_count: number;
+  }>;
+  admin_hours_removed?: number;
+  notify?: boolean;
+};
+
+/** Admin: grant Official Leave (8h/day) to all or selected users. */
+export async function grantOfficialLeave(body: {
+  date?: string;
+  start_date?: string;
+  end_date?: string;
+  title: string;
+  scope: 'all' | 'users';
+  user_ids?: string[];
+  notify?: boolean;
+  replace_admin_hours?: boolean;
+}): Promise<OfficialLeaveGrantResult> {
+  const res = await fetch(`${API}/admin_grant_official_leave.php`, {
+    method: 'POST',
+    headers: authHeaders(),
+    body: JSON.stringify(body),
+  });
+  const data = await parseJson(res);
+  return data.data as OfficialLeaveGrantResult;
+}
+
 export async function getAttendanceStatus(userId: string, date: string): Promise<AttendanceStatus> {
   const params = new URLSearchParams({ user_id: userId, date });
   const res = await fetch(`${API}/attendance_status.php?${params}`, { headers: authHeaders() });

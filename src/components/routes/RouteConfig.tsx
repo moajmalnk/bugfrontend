@@ -197,6 +197,7 @@ const DailyWorkUpdate = lazy(() => import("@/pages/DailyWorkUpdate"));
 const LeaveRequests = lazy(() => import("@/pages/LeaveRequests"));
 const AdminLeaveRequests = lazy(() => import("@/pages/AdminLeaveRequests"));
 const AdminLeaveUserDetail = lazy(() => import("@/pages/AdminLeaveUserDetail"));
+const AdminOfficialLeave = lazy(() => import("@/pages/AdminOfficialLeave"));
 const AdminAttendanceExceptions = lazy(() => import("@/pages/AdminAttendanceExceptions"));
 const AdminAttendanceExceptionUserDetail = lazy(() => import("@/pages/AdminAttendanceExceptionUserDetail"));
 const FeedbackStats = lazy(() => import("@/pages/FeedbackStats"));
@@ -384,6 +385,7 @@ const RouteConfig = () => {
       <Route path="/overtime-requests" element={<RolePathRedirect suffix="overtime-requests" />} />
       <Route path="/leave" element={<RolePathRedirect suffix="leave" />} />
       <Route path="/leave-requests" element={<RolePathRedirect suffix="leave-requests" />} />
+      <Route path="/official-leave" element={<RolePathRedirect suffix="official-leave" />} />
       <Route path="/attendance-exceptions" element={<RolePathRedirect suffix="attendance-exceptions" />} />
       <Route path="/feedback-stats" element={<RolePathRedirect suffix="feedback-stats" />} />
       <Route path="/performance-reviews/template" element={<RolePathRedirect suffix="performance-reviews/template" />} />
@@ -468,6 +470,7 @@ const RouteConfig = () => {
           <Route path="overtime-requests" element={<AdminOvertimeRequests />} />
           <Route path="leave-requests/:userId" element={<AdminLeaveUserDetail />} />
           <Route path="leave-requests" element={<AdminLeaveRequests />} />
+          <Route path="official-leave" element={<AdminOfficialLeave />} />
           <Route path="attendance-exceptions/:userId" element={<AdminAttendanceExceptionUserDetail />} />
           <Route path="attendance-exceptions" element={<AdminAttendanceExceptions />} />
           <Route path="feedback-stats" element={<FeedbackStats />} />

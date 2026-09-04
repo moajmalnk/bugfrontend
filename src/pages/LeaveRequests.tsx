@@ -143,10 +143,11 @@ export default function LeaveRequests() {
         getLeaveTypes(month),
         getMyLeaveRequests(),
       ]);
-      // Policy: Paid 1 + Sick 1 + Unpaid max 5. Personal Leave is retired.
-      const activeBalances = (typesRes.types || []).filter(
-        (t) => String(t.code || '').toLowerCase() !== 'personal'
-      );
+      // Policy: Paid 1 + Sick 1 + Unpaid max 5. Personal retired; Official Leave admin-only.
+      const activeBalances = (typesRes.types || []).filter((t) => {
+        const code = String(t.code || '').toLowerCase();
+        return code !== 'personal' && code !== 'corporate' && code !== 'on_duty';
+      });
       setBalances(activeBalances);
       setRequests(mine);
       setLeaveTypeId((prev) => {
