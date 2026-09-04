@@ -46,6 +46,9 @@ export type BugDatesCalendarItem = BugDatesEvent & {
   is_half_day?: boolean;
   half_day_type?: string | null;
   reason?: string | null;
+  /** Hours credited toward work stats for this leave day (e.g. Official Leave = 8). */
+  credited_hours?: number | null;
+  is_official_leave?: boolean;
   project_id?: string;
   project_name?: string | null;
   milestone_key?: string;
@@ -257,6 +260,7 @@ export const BUGDATES_LAYER_COLORS: Record<string, string> = {
   company_event: 'bg-indigo-500/90 text-white',
   milestone: 'bg-violet-500/90 text-white',
   leave: 'bg-sky-500/90 text-white',
+  official_leave: 'bg-amber-500/90 text-white',
   wfh: 'bg-cyan-600/90 text-white',
   birthday: 'bg-pink-500/90 text-white',
   anniversary: 'bg-fuchsia-500/90 text-white',

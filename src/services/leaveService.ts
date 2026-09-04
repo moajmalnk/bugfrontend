@@ -22,6 +22,8 @@ export type LeaveRequest = {
   start_date: string;
   end_date: string;
   days_count: number;
+  /** Per-day hours credited (Official Leave); null = type default (8h for corporate/paid). */
+  hours_per_day?: number | null;
   is_half_day?: boolean;
   half_day_type?: 'first_half' | 'second_half' | string | null;
   reason?: string | null;
@@ -214,6 +216,7 @@ export async function grantOfficialLeave(body: {
   user_ids?: string[];
   notify?: boolean;
   replace_admin_hours?: boolean;
+  hours_per_day?: number;
 }): Promise<OfficialLeaveGrantResult> {
   const res = await fetch(`${API}/admin_grant_official_leave.php`, {
     method: 'POST',
@@ -222,6 +225,137 @@ export async function grantOfficialLeave(body: {
   });
   const data = await parseJson(res);
   return data.data as OfficialLeaveGrantResult;
+}
+
+export type OfficialLeaveListResult = {
+  items: LeaveRequest[];
+  total: number;
+  page: number;
+  limit: number;
+};
+
+/** Admin: list Official Leave history. */
+export async function listOfficialLeave(opts?: {
+  status?: LeaveStatus | '';
+  q?: string;
+  title?: string;
+  start_date?: string;
+  end_date?: string;
+  page?: number;
+  limit?: number;
+}): Promise<OfficialLeaveListResult> {
+  const params = new URLSearchParams();
+  if (opts?.status) params.set('status', opts.status);
+  if (opts?.q) params.set('q', opts.q);
+  if (opts?.title) params.set('title', opts.title);
+  if (opts?.start_date) params.set('start_date', opts.start_date);
+  if (opts?.end_date) params.set('end_date', opts.end_date);
+  if (opts?.page) params.set('page', String(opts.page));
+  if (opts?.limit) params.set('limit', String(opts.limit));
+  const qs = params.toString();
+  const res = await fetch(`${API}/admin_list_official_leave.php${qs ? `?${qs}` : ''}`, {
+    headers: authHeaders(),
+  });
+  const data = await parseJson(res);
+  const payload = data.data || {};
+  return {
+    items: Array.isArray(payload.items) ? payload.items : [],
+    total: Number(payload.total || 0),
+    page: Number(payload.page || 1),
+    limit: Number(payload.limit || 30),
+  };
+}
+
+export type OfficialLeaveGroup = {
+  title: string;
+  start_date: string;
+  end_date: string;
+  user_count: number;
+  active_count: number;
+  cancelled_count: number;
+  hours_per_day: number;
+  days_count: number;
+  total_hours_per_user: number;
+  last_granted_at?: string | null;
+  first_granted_at?: string | null;
+};
+
+export type OfficialLeaveGroupsResult = {
+  items: OfficialLeaveGroup[];
+  total: number;
+  page: number;
+  limit: number;
+};
+
+/** Admin: list Official Leave celebrations (grouped by title + dates). */
+export async function listOfficialLeaveGroups(opts?: {
+  status?: LeaveStatus | '';
+  q?: string;
+  page?: number;
+  limit?: number;
+}): Promise<OfficialLeaveGroupsResult> {
+  const params = new URLSearchParams();
+  if (opts?.status) params.set('status', opts.status);
+  if (opts?.q) params.set('q', opts.q);
+  if (opts?.page) params.set('page', String(opts.page));
+  if (opts?.limit) params.set('limit', String(opts.limit));
+  const qs = params.toString();
+  const res = await fetch(`${API}/admin_list_official_leave_groups.php${qs ? `?${qs}` : ''}`, {
+    headers: authHeaders(),
+  });
+  const data = await parseJson(res);
+  const payload = data.data || {};
+  return {
+    items: Array.isArray(payload.items) ? payload.items : [],
+    total: Number(payload.total || 0),
+    page: Number(payload.page || 1),
+    limit: Number(payload.limit || 30),
+  };
+}
+
+/** Build path to Official Leave celebration detail. */
+export function officialLeaveBatchPath(
+  role: string,
+  group: Pick<OfficialLeaveGroup, 'title' | 'start_date' | 'end_date'>
+): string {
+  const params = new URLSearchParams({
+    title: group.title,
+    start: group.start_date,
+    end: group.end_date,
+  });
+  return `/${role}/official-leave/batch?${params.toString()}`;
+}
+
+/** Admin: update Official Leave dates / title. */
+export async function updateOfficialLeave(body: {
+  id: number;
+  start_date: string;
+  end_date: string;
+  title: string;
+  hours_per_day?: number;
+}): Promise<LeaveRequest> {
+  const res = await fetch(`${API}/admin_update_official_leave.php`, {
+    method: 'POST',
+    headers: authHeaders(),
+    body: JSON.stringify(body),
+  });
+  const data = await parseJson(res);
+  return data.data as LeaveRequest;
+}
+
+/** Admin: cancel Official Leave grant(s). */
+export async function deleteOfficialLeave(body: {
+  id?: number;
+  ids?: number[];
+  admin_note?: string;
+}): Promise<{ cancelled: number; skipped: Array<{ id: number; reason: string }> }> {
+  const res = await fetch(`${API}/admin_delete_official_leave.php`, {
+    method: 'POST',
+    headers: authHeaders(),
+    body: JSON.stringify(body),
+  });
+  const data = await parseJson(res);
+  return data.data as { cancelled: number; skipped: Array<{ id: number; reason: string }> };
 }
 
 export async function getAttendanceStatus(userId: string, date: string): Promise<AttendanceStatus> {

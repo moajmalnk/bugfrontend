@@ -32,7 +32,6 @@ import {
 import { EventFormModal } from '@/components/bugdates/EventFormModal';
 import { DayDrawer } from '@/components/bugdates/DayDrawer';
 import {
-  BUGDATES_LAYER_COLORS,
   deleteBugDatesEvent,
   getBugDatesCalendar,
   listGrowthSessions,
@@ -40,6 +39,7 @@ import {
   type BugDatesEvent,
   type GrowthProgramSession,
 } from '@/services/bugDatesService';
+import { bugDatesItemChipClass } from '@/lib/bugDatesUi';
 import { cn, getEffectiveRole, hasPermissionOrAdmin } from '@/lib/utils';
 
 const FILTERS: { key: string; label: string; dot: string }[] = [
@@ -407,13 +407,12 @@ export default function BugDates() {
                     </div>
                     <div className="flex flex-col gap-1">
                       {dayItems.slice(0, 3).map((item, idx) => {
-                        const layer = item.layer || item.category || 'company_event';
                         return (
                           <span
                             key={`${key}-${idx}`}
                             className={cn(
                               'truncate rounded-lg px-1 sm:px-1.5 py-0.5 text-[9px] sm:text-[10px] font-semibold shadow-sm',
-                              BUGDATES_LAYER_COLORS[layer] || 'bg-slate-500 text-white'
+                              bugDatesItemChipClass(item)
                             )}
                             title={item.title}
                           >

@@ -198,6 +198,7 @@ const LeaveRequests = lazy(() => import("@/pages/LeaveRequests"));
 const AdminLeaveRequests = lazy(() => import("@/pages/AdminLeaveRequests"));
 const AdminLeaveUserDetail = lazy(() => import("@/pages/AdminLeaveUserDetail"));
 const AdminOfficialLeave = lazy(() => import("@/pages/AdminOfficialLeave"));
+const AdminOfficialLeaveBatch = lazy(() => import("@/pages/AdminOfficialLeaveBatch"));
 const AdminAttendanceExceptions = lazy(() => import("@/pages/AdminAttendanceExceptions"));
 const AdminAttendanceExceptionUserDetail = lazy(() => import("@/pages/AdminAttendanceExceptionUserDetail"));
 const FeedbackStats = lazy(() => import("@/pages/FeedbackStats"));
@@ -470,6 +471,7 @@ const RouteConfig = () => {
           <Route path="overtime-requests" element={<AdminOvertimeRequests />} />
           <Route path="leave-requests/:userId" element={<AdminLeaveUserDetail />} />
           <Route path="leave-requests" element={<AdminLeaveRequests />} />
+          <Route path="official-leave/batch" element={<AdminOfficialLeaveBatch />} />
           <Route path="official-leave" element={<AdminOfficialLeave />} />
           <Route path="attendance-exceptions/:userId" element={<AdminAttendanceExceptionUserDetail />} />
           <Route path="attendance-exceptions" element={<AdminAttendanceExceptions />} />

@@ -1,6 +1,15 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link, Navigate } from 'react-router-dom';
-import { Building2, CalendarDays, Loader2, Save, Search, Users } from 'lucide-react';
+import {
+  Building2,
+  CalendarDays,
+  ChevronRight,
+  History,
+  Loader2,
+  Save,
+  Search,
+  Users,
+} from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -8,15 +17,24 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { DatePicker } from '@/components/ui/DatePicker';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Skeleton } from '@/components/ui/skeleton';
 import { toast } from '@/components/ui/use-toast';
-import { grantOfficialLeave } from '@/services/leaveService';
+import {
+  grantOfficialLeave,
+  listOfficialLeaveGroups,
+  officialLeaveBatchPath,
+  type LeaveStatus,
+  type OfficialLeaveGroup,
+} from '@/services/leaveService';
 import { userService } from '@/services/userService';
 import { getEffectiveRole, hasPermissionOrAdmin } from '@/lib/utils';
 import { usePermissions } from '@/hooks/usePermissions';
+import { formatDay, formatDayShort } from '@/pages/adminAttendanceShared';
 import type { User } from '@/types';
 
 type Scope = 'all' | 'users';
 type RoleFilter = 'all' | 'developer' | 'tester' | 'admin' | 'creator';
+type HistoryStatusFilter = '' | 'approved' | 'cancelled';
 
 const ROLE_FILTERS: Array<{ key: RoleFilter; label: string }> = [
   { key: 'all', label: 'All roles' },
@@ -33,8 +51,15 @@ const ROLE_SORT_ORDER: Record<string, number> = {
   creator: 3,
 };
 
+const HISTORY_PAGE_SIZE = 30;
+
 function roleKey(u: User): string {
   return String(u.role || 'user').toLowerCase();
+}
+
+function dateRangeLabel(start: string, end: string) {
+  if (start === end) return formatDay(start);
+  return `${formatDayShort(start)} → ${formatDayShort(end)}`;
 }
 
 export default function AdminOfficialLeave() {
@@ -56,6 +81,15 @@ export default function AdminOfficialLeave() {
   const [saving, setSaving] = useState(false);
   const [notifyUsers, setNotifyUsers] = useState(true);
   const [replaceAdminHours, setReplaceAdminHours] = useState(true);
+  const [grantHours, setGrantHours] = useState('8');
+
+  const [history, setHistory] = useState<OfficialLeaveGroup[]>([]);
+  const [historyTotal, setHistoryTotal] = useState(0);
+  const [historyPage, setHistoryPage] = useState(1);
+  const [historyStatus, setHistoryStatus] = useState<HistoryStatusFilter>('approved');
+  const [historyQuery, setHistoryQuery] = useState('');
+  const [historySearch, setHistorySearch] = useState('');
+  const [loadingHistory, setLoadingHistory] = useState(false);
 
   useEffect(() => {
     if (!canManage) return;
@@ -85,6 +119,47 @@ export default function AdminOfficialLeave() {
       cancelled = true;
     };
   }, [canManage]);
+
+  const loadHistory = useCallback(
+    async (opts?: { page?: number }) => {
+      if (!canManage) return;
+      const page = opts?.page ?? historyPage;
+      setLoadingHistory(true);
+      try {
+        const result = await listOfficialLeaveGroups({
+          status: (historyStatus || undefined) as LeaveStatus | undefined,
+          q: historySearch.trim() || undefined,
+          page,
+          limit: HISTORY_PAGE_SIZE,
+        });
+        setHistory(result.items);
+        setHistoryTotal(result.total);
+      } catch (e) {
+        setHistory([]);
+        setHistoryTotal(0);
+        toast({
+          title: 'Failed to load history',
+          description: e instanceof Error ? e.message : 'Please try again',
+          variant: 'destructive',
+        });
+      } finally {
+        setLoadingHistory(false);
+      }
+    },
+    [canManage, historyStatus, historySearch, historyPage]
+  );
+
+  useEffect(() => {
+    void loadHistory();
+  }, [loadHistory]);
+
+  useEffect(() => {
+    const t = window.setTimeout(() => {
+      setHistoryPage(1);
+      setHistorySearch(historyQuery);
+    }, 300);
+    return () => window.clearTimeout(t);
+  }, [historyQuery]);
 
   const roleCounts = useMemo(() => {
     const counts: Record<string, number> = {
@@ -136,6 +211,8 @@ export default function AdminOfficialLeave() {
     return groups;
   }, [filteredUsers]);
 
+  const historyPages = Math.max(1, Math.ceil(historyTotal / HISTORY_PAGE_SIZE));
+
   const toggleUser = (id: string) => {
     setSelectedIds((prev) => {
       const next = new Set(prev);
@@ -167,11 +244,19 @@ export default function AdminOfficialLeave() {
 
   const clearSelected = () => setSelectedIds(new Set());
 
+  const grantHoursNum = (() => {
+    const n = Number(grantHours);
+    return Number.isFinite(n) ? n : NaN;
+  })();
+
   const isValid =
     !!startDate &&
     !!endDate &&
     endDate >= startDate &&
     title.trim().length > 0 &&
+    Number.isFinite(grantHoursNum) &&
+    grantHoursNum >= 0 &&
+    grantHoursNum <= 24 &&
     (scope === 'all' || selectedIds.size > 0);
 
   const handleSubmit = async () => {
@@ -186,6 +271,7 @@ export default function AdminOfficialLeave() {
     }
     setSaving(true);
     try {
+      const hoursPerDay = Math.round(grantHoursNum * 100) / 100;
       const result = await grantOfficialLeave({
         start_date: startDate,
         end_date: endDate,
@@ -194,19 +280,23 @@ export default function AdminOfficialLeave() {
         user_ids: scope === 'users' ? Array.from(selectedIds) : undefined,
         notify: notifyUsers,
         replace_admin_hours: replaceAdminHours,
+        hours_per_day: hoursPerDay,
       });
       const skipN = Array.isArray(result.skipped) ? result.skipped.length : 0;
       const removed = Number(result.admin_hours_removed || 0);
       toast({
         title: 'Official Leave granted',
-        description: `${result.created} user${result.created === 1 ? '' : 's'} · 8h/day${
+        description: `${result.created} user${result.created === 1 ? '' : 's'} · ${hoursPerDay}h/day${
           removed ? ` · ${removed} admin-hour entr${removed === 1 ? 'y' : 'ies'} removed` : ''
         }${notifyUsers ? ' · push + WhatsApp + email queued' : ''}${
           skipN ? ` · ${skipN} skipped` : ''
         }.`,
       });
       setTitle('');
+      setGrantHours('8');
       if (scope === 'users') clearSelected();
+      setHistoryPage(1);
+      await loadHistory({ page: 1 });
     } catch (e) {
       toast({
         title: 'Failed to grant Official Leave',
@@ -260,7 +350,7 @@ export default function AdminOfficialLeave() {
             Grant Official Leave
           </CardTitle>
           <CardDescription>
-            Credits 8h per day on Daily Update and work stats. Does not use personal leave balances.
+            Credits work hours on Daily Update and work stats. Does not use personal leave balances.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">
@@ -286,7 +376,7 @@ export default function AdminOfficialLeave() {
                 className="h-11 rounded-xl"
               />
             </div>
-            <div className="col-span-12 space-y-2">
+            <div className="col-span-12 md:col-span-8 space-y-2">
               <Label htmlFor="official-leave-title" className="text-sm font-semibold">
                 Title / reason
               </Label>
@@ -299,8 +389,48 @@ export default function AdminOfficialLeave() {
                 className="h-11 rounded-xl"
               />
             </div>
+            <div className="col-span-12 md:col-span-4 space-y-2">
+              <Label htmlFor="official-leave-hours" className="text-sm font-semibold">
+                How many hours?
+              </Label>
+              <Input
+                id="official-leave-hours"
+                type="text"
+                inputMode="decimal"
+                maxLength={5}
+                value={grantHours}
+                onChange={(e) => {
+                  const raw = e.target.value.replace(/[^\d.]/g, '');
+                  const parts = raw.split('.');
+                  const cleaned =
+                    parts.length > 1
+                      ? `${parts[0].slice(0, 2)}.${parts.slice(1).join('').slice(0, 2)}`
+                      : parts[0].slice(0, 2);
+                  setGrantHours(cleaned);
+                }}
+                onBlur={() => {
+                  const n = Number(grantHours);
+                  if (!Number.isFinite(n) || grantHours.trim() === '') {
+                    setGrantHours('8');
+                    return;
+                  }
+                  const clamped = Math.min(24, Math.max(0, Math.round(n * 100) / 100));
+                  setGrantHours(String(clamped));
+                }}
+                placeholder="8"
+                className="h-11 rounded-xl"
+                aria-describedby="official-leave-hours-hint"
+              />
+              <p id="official-leave-hours-hint" className="text-xs text-muted-foreground">
+                Per day, for each user (0–24). Default 8.
+              </p>
+            </div>
             <div className="col-span-12 rounded-xl border border-amber-200/70 dark:border-amber-800/50 bg-amber-50/70 dark:bg-amber-950/30 px-3 py-2.5 text-sm text-amber-900 dark:text-amber-200">
-              Hours credited: <strong>8.0h</strong> per day for each granted user.
+              Will credit{' '}
+              <strong>
+                {Number.isFinite(grantHoursNum) ? grantHoursNum.toFixed(1) : '8.0'}h
+              </strong>{' '}
+              per day on Daily Update and work stats.
             </div>
             <label className="col-span-12 flex items-start gap-3 cursor-pointer rounded-xl border border-gray-200/60 dark:border-gray-700/60 bg-white/60 dark:bg-gray-800/40 px-3 py-3">
               <Checkbox
@@ -513,6 +643,129 @@ export default function AdminOfficialLeave() {
           </div>
         </CardContent>
       </Card>
+
+      <Card className="rounded-2xl border-gray-200/50 dark:border-gray-700/50 bg-white/70 dark:bg-gray-900/70">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2 text-xl">
+            <History className="h-5 w-5 text-amber-600 dark:text-amber-400" />
+            Official Leave history
+          </CardTitle>
+          <CardDescription>
+            Celebrations like Onam or Independence Day. Open one to see users, edit, or cancel.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="grid grid-cols-12 gap-3 items-center">
+            <div className="col-span-12 md:col-span-6 relative">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Input
+                value={historyQuery}
+                onChange={(e) => setHistoryQuery(e.target.value)}
+                placeholder="Search celebration title…"
+                className="pl-9 h-10 rounded-xl"
+              />
+            </div>
+            <div className="col-span-12 md:col-span-6 flex flex-wrap gap-2 md:justify-end">
+              {(
+                [
+                  { key: 'approved' as const, label: 'Active' },
+                  { key: 'cancelled' as const, label: 'Cancelled' },
+                  { key: '' as const, label: 'All' },
+                ] as const
+              ).map((f) => {
+                const active = historyStatus === f.key;
+                return (
+                  <button
+                    key={f.label}
+                    type="button"
+                    onClick={() => {
+                      setHistoryStatus(f.key);
+                      setHistoryPage(1);
+                    }}
+                    className={`rounded-xl border px-3 py-1.5 text-xs font-medium transition-colors ${
+                      active
+                        ? 'border-amber-400 bg-amber-100 text-amber-950 dark:border-amber-600 dark:bg-amber-950/50 dark:text-amber-100'
+                        : 'border-gray-200 dark:border-gray-700 text-muted-foreground hover:bg-muted/40'
+                    }`}
+                  >
+                    {f.label}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          {loadingHistory ? (
+            <div className="flex flex-col gap-3">
+              {Array.from({ length: 4 }).map((_, i) => (
+                <Skeleton key={i} className="h-20 rounded-xl" />
+              ))}
+            </div>
+          ) : history.length === 0 ? (
+            <div className="rounded-xl border border-dashed border-gray-300 dark:border-gray-700 px-4 py-10 text-center text-sm text-muted-foreground">
+              No Official Leave celebrations yet.
+            </div>
+          ) : (
+            <div className="flex flex-col gap-3">
+              {history.map((group) => (
+                <Link
+                  key={`${group.title}|${group.start_date}|${group.end_date}`}
+                  to={officialLeaveBatchPath(role, group)}
+                  className="group flex items-center gap-3 rounded-xl border border-gray-200/60 dark:border-gray-700/60 bg-white/80 dark:bg-gray-900/60 px-4 py-3.5 hover:border-amber-400/70 hover:bg-amber-50/40 dark:hover:bg-amber-950/20 transition-colors"
+                >
+                  <div className="min-w-0 flex-1 space-y-1">
+                    <div className="font-semibold text-base truncate text-foreground group-hover:text-amber-900 dark:group-hover:text-amber-100">
+                      {group.title}
+                    </div>
+                    <div className="flex flex-wrap gap-x-3 gap-y-1 text-xs text-muted-foreground">
+                      <span>{dateRangeLabel(group.start_date, group.end_date)}</span>
+                      <span>
+                        {group.user_count} user{group.user_count === 1 ? '' : 's'}
+                        {group.active_count > 0 ? ` · ${group.active_count} active` : ''}
+                      </span>
+                      <span className="tabular-nums">
+                        {Number(group.hours_per_day).toFixed(1)}h/day
+                      </span>
+                    </div>
+                  </div>
+                  <ChevronRight className="h-5 w-5 shrink-0 text-muted-foreground group-hover:text-amber-600" />
+                </Link>
+              ))}
+            </div>
+          )}
+
+          {historyTotal > HISTORY_PAGE_SIZE ? (
+            <div className="flex flex-wrap items-center justify-between gap-3 text-sm text-muted-foreground">
+              <span>
+                Page {historyPage} of {historyPages} · {historyTotal} celebrations
+              </span>
+              <div className="flex gap-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="rounded-xl"
+                  disabled={historyPage <= 1 || loadingHistory}
+                  onClick={() => setHistoryPage((p) => Math.max(1, p - 1))}
+                >
+                  Previous
+                </Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="rounded-xl"
+                  disabled={historyPage >= historyPages || loadingHistory}
+                  onClick={() => setHistoryPage((p) => p + 1)}
+                >
+                  Next
+                </Button>
+              </div>
+            </div>
+          ) : null}
+        </CardContent>
+      </Card>
     </div>
   );
 }
+

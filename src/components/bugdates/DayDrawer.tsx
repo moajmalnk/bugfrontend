@@ -15,13 +15,13 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { toast } from '@/components/ui/use-toast';
 import {
-  BUGDATES_LAYER_COLORS,
   generateBugCreativeCard,
   generateBugDatesTodo,
   saveGrowthSession,
   type BugDatesCalendarItem,
   type GrowthProgramSession,
 } from '@/services/bugDatesService';
+import { bugDatesItemChipClass } from '@/lib/bugDatesUi';
 import { format, parseISO } from 'date-fns';
 
 const MILESTONE_LABELS: Record<string, string> = {
@@ -39,9 +39,14 @@ function getDayItemTitle(item: BugDatesCalendarItem): string {
 
   const layer = item.layer || item.category || '';
   const name = String(item.username ?? '').trim();
+  const isOfficial =
+    item.is_official_leave === true ||
+    String(item.leave_type_code || '').toLowerCase() === 'corporate';
 
   if (layer === 'leave') {
-    const typeName = String(item.leave_type_name ?? 'Leave').trim();
+    const typeName = isOfficial
+      ? 'Official Leave'
+      : String(item.leave_type_name ?? 'Leave').trim();
     return name ? `${name} — ${typeName}` : typeName;
   }
   if (layer === 'wfh') {
@@ -55,7 +60,11 @@ function getDayItemTitle(item: BugDatesCalendarItem): string {
   return 'Scheduled item';
 }
 
-function getLayerLabel(layer: string): string {
+function getLayerLabel(item: BugDatesCalendarItem, layer: string): string {
+  const isOfficial =
+    item.is_official_leave === true ||
+    String(item.leave_type_code || '').toLowerCase() === 'corporate';
+  if (isOfficial) return 'Official';
   switch (layer) {
     case 'project_milestone':
       return 'Milestone';
@@ -265,19 +274,30 @@ export function DayDrawer({
 
           {items.map((item, idx) => {
             const layer = item.layer || item.category || 'company_event';
-            const chip = BUGDATES_LAYER_COLORS[layer] || 'bg-slate-500 text-white';
+            const chip = bugDatesItemChipClass(item);
             const displayTitle = getDayItemTitle(item);
+            const credited =
+              item.credited_hours != null && Number(item.credited_hours) > 0
+                ? Number(item.credited_hours)
+                : null;
+            const isOfficial =
+              item.is_official_leave === true ||
+              String(item.leave_type_code || '').toLowerCase() === 'corporate';
             const key = `${item.source || 'x'}-${item.id || item.project_id || idx}-${item.occurrence_date}-${idx}`;
             return (
               <article
                 key={key}
-                className="rounded-2xl border border-gray-200/60 bg-white p-3 shadow-md dark:border-gray-700/60 dark:bg-gray-900 sm:p-4"
+                className={`rounded-2xl border p-3 shadow-md sm:p-4 ${
+                  isOfficial
+                    ? 'border-amber-300/70 bg-amber-50/80 dark:border-amber-800/50 dark:bg-amber-950/30'
+                    : 'border-gray-200/60 bg-white dark:border-gray-700/60 dark:bg-gray-900'
+                }`}
               >
                 <div className="flex min-w-0 items-start gap-3">
                   <span
                     className={`mt-0.5 shrink-0 rounded-xl px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide sm:px-2.5 sm:py-1 ${chip}`}
                   >
-                    {getLayerLabel(layer)}
+                    {getLayerLabel(item, layer)}
                   </span>
                   <div className="min-w-0 flex-1 space-y-1.5">
                     <p className="break-words text-sm font-bold leading-snug text-gray-900 dark:text-white sm:text-base">
@@ -291,6 +311,17 @@ export function DayDrawer({
                     {item.description && (
                       <p className="break-words text-sm text-gray-600 dark:text-gray-400 whitespace-pre-wrap">
                         {item.description}
+                      </p>
+                    )}
+                    {credited != null && (
+                      <p
+                        className={`text-xs font-semibold ${
+                          isOfficial
+                            ? 'text-amber-800 dark:text-amber-200'
+                            : 'text-sky-700 dark:text-sky-300'
+                        }`}
+                      >
+                        {credited.toFixed(1)}h credited toward work hours
                       </p>
                     )}
                     {item.is_half_day && (
