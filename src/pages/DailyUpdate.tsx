@@ -229,7 +229,13 @@ export default function DailyUpdate() {
     }, 0);
   }
 
+  function isAdminHoursSubmission(s: any): boolean {
+    return String(s?.notes || '').includes('[ADMIN HOURS ENTRY');
+  }
+
   function formatSubmissionText(s: any) {
+    const isLeave = String(s.day_status || '').toLowerCase() === 'leave';
+    const leaveName = String(s.leave_type_name || s.leave_type_code || 'Leave').trim();
     const d = new Date(s.submission_date);
     const weekday = d.toLocaleDateString('en-IN', { weekday: 'long', timeZone: 'Asia/Kolkata' });
     const dateText = `${d.getDate()}/${d.getMonth()+1}/${d.getFullYear()} ${weekday}`;
@@ -265,6 +271,30 @@ export default function DailyUpdate() {
     })();
     const breakLines = breaksFromRow.length > 0 ? breaksFromRow : parseBreakLinesFromNotes(s.notes);
     const totalBreakMinutes = Number(s.total_break_minutes || 0) > 0 ? Number(s.total_break_minutes || 0) : getBreakMinutes(breakLines);
+
+    if (isLeave) {
+      const since = getCalendarMonthStart(s.submission_date);
+      const to = s.submission_date;
+      const { days, hours } = computeTotalsInRange(submissions, since, to);
+      const periodLabel = formatWorkingDaysPeriodLabel(s.submission_date);
+      const credited = Number(s.hours_today || 0);
+      const leaveCode = String(s.leave_type_code || '').toLowerCase();
+      const creditNote =
+        leaveCode === 'paid' || leaveCode === 'personal'
+          ? 'Leave credited as 8 work hours for this day.'
+          : 'Attendance blocked for this approved leave day.';
+      return (
+        `🧾 CODO Daily Work Update — User\n` +
+        `📅 Date: ${dateText}\n` +
+        `🏖 Leave day · ${leaveName}\n` +
+        `⏱ Today's Working Hours: ${credited} Hours\n` +
+        `✅ ${creditNote}` +
+        (s.leave_request_id ? ` · Request #${s.leave_request_id}` : '') +
+        `\n📊 Total Working Days (${periodLabel}): ${days} ${days === 1 ? 'Day' : 'Days'}` +
+        `\n🧮 Total Hours Completed : ${hours} hours`
+      );
+    }
+
     let body =
       `🧾 CODO Daily Work Update — User\n` +
       `📅 Date: ${dateText}\n` +
@@ -886,12 +916,33 @@ export default function DailyUpdate() {
               <div className={`grid grid-cols-1 gap-4 sm:gap-6 lg:gap-8 ${activeTab === "today-submissions" ? "lg:grid-cols-1" : "lg:grid-cols-2"}`}>
                     {visibleSubmissions.map((s) => {
                       const checkInLabel = formatCheckInTime(s.check_in_time);
+                      const isLeave = String(s.day_status || '').toLowerCase() === 'leave';
+                      const isAdminEntry = !isLeave && isAdminHoursSubmission(s);
+                      const leaveName = String(s.leave_type_name || s.leave_type_code || 'Leave').trim();
+                      const leaveOnly = isLeave && !s.id;
+                      const cardKey = s.id ?? `leave-${s.leave_request_id ?? 'x'}-${s.submission_date}`;
                       return (
-                  <div key={s.id ?? s.submission_date} className="bg-white/60 dark:bg-gray-800/60 border border-gray-200/60 dark:border-gray-700/60 rounded-2xl p-4 sm:p-6 hover:shadow-lg hover:border-gray-300 dark:hover:border-gray-600 transition-all duration-200 min-w-0">
+                  <div key={cardKey} className={`bg-white/60 dark:bg-gray-800/60 border rounded-2xl p-4 sm:p-6 hover:shadow-lg transition-all duration-200 min-w-0 ${
+                    isLeave
+                      ? 'border-teal-200/70 dark:border-teal-800/50 hover:border-teal-300 dark:hover:border-teal-700'
+                      : isAdminEntry
+                        ? 'border-red-200/70 dark:border-red-800/50 hover:border-red-300 dark:hover:border-red-700'
+                        : 'border-gray-200/60 dark:border-gray-700/60 hover:border-gray-300 dark:hover:border-gray-600'
+                  }`}>
                     <div className="flex flex-col gap-3 xl:flex-row xl:items-start xl:justify-between mb-3 min-w-0">
                       <div className="min-w-0 flex-1">
-                        <div className="font-semibold text-sm text-gray-900 dark:text-white break-words">
-                          {s.submission_date}
+                        <div className="font-semibold text-sm text-gray-900 dark:text-white break-words flex flex-wrap items-center gap-2">
+                          <span>{s.submission_date}</span>
+                          {isLeave ? (
+                            <span className="inline-flex items-center rounded-xl border border-teal-200 bg-teal-100 px-2 py-0.5 text-[10px] font-medium text-teal-900 dark:border-teal-800 dark:bg-teal-950/50 dark:text-teal-200">
+                              On leave{leaveName ? ` (${leaveName})` : ''}
+                            </span>
+                          ) : null}
+                          {isAdminEntry ? (
+                            <span className="inline-flex items-center rounded-xl border border-red-200 bg-red-100 px-2 py-0.5 text-[10px] font-medium text-red-900 dark:border-red-800 dark:bg-red-950/50 dark:text-red-200">
+                              Admin entry
+                            </span>
+                          ) : null}
                         </div>
                         {currentUser?.role === 'admin' && showRequestsOnly && (
                           <div className="text-xs text-blue-600 dark:text-blue-300 font-medium mt-0.5">
@@ -899,18 +950,22 @@ export default function DailyUpdate() {
                           </div>
                         )}
                         <div className="text-xs text-gray-500 dark:text-gray-400 break-words mt-1">
-                          {checkInLabel
-                            ? `Checked in at ${checkInLabel}`
-                            : s.start_time
-                              ? `Started at ${s.start_time}`
-                              : 'No check-in time'}{' '}
-                          • {s.hours_today ?? 0} hours
-                          {Number(s.overtime_hours || 0) > 0 && (
+                          {isLeave
+                            ? `Leave day · ${leaveName}`
+                            : isAdminEntry
+                              ? 'Admin hours entry'
+                              : checkInLabel
+                                ? `Checked in at ${checkInLabel}`
+                                : s.start_time
+                                  ? `Started at ${s.start_time}`
+                                  : 'No check-in time'}{' '}
+                          • {Number(s.hours_today ?? 0).toFixed(2)} hours
+                          {!isLeave && Number(s.overtime_hours || 0) > 0 && (
                             <span className="ml-2 px-2 py-0.5 bg-orange-100 dark:bg-orange-900/30 text-orange-700 dark:text-orange-300 rounded-full text-xs font-medium">
                               +{s.overtime_hours}h OT
                             </span>
                           )}
-                          {hasApprovalRequest(s) && (
+                          {!isLeave && !isAdminEntry && hasApprovalRequest(s) && (
                             <span
                               className={`ml-2 px-2 py-0.5 rounded-full text-xs font-medium capitalize ${
                                 String(s.extra_hours_approval_status || '').toLowerCase() === 'pending'
@@ -926,8 +981,8 @@ export default function DailyUpdate() {
                         </div>
                       </div>
                       <div className="flex flex-wrap items-center gap-1 sm:justify-end shrink-0">
-                        {/* Edit button - only for today */}
-                        {!(currentUser?.role === 'admin' && showRequestsOnly) && isToday(s.submission_date) && (
+                        {/* Edit button - only for today (not leave-only rows) */}
+                        {!leaveOnly && !(currentUser?.role === 'admin' && showRequestsOnly) && isToday(s.submission_date) && (
                           <Button 
                             variant="outline" 
                             size="sm" 
@@ -956,7 +1011,7 @@ export default function DailyUpdate() {
                         >
                           <ClipboardCopy className="h-3 w-3" />
                         </Button>
-                        {!(currentUser?.role === 'admin' && showRequestsOnly) ? (
+                        {!leaveOnly && !(currentUser?.role === 'admin' && showRequestsOnly) ? (
                           <Button 
                             variant="destructive" 
                             size="sm" 
@@ -968,7 +1023,13 @@ export default function DailyUpdate() {
                         ) : null}
                       </div>
                     </div>
-                    <div className="max-h-48 min-w-0 overflow-y-auto overflow-x-hidden rounded-lg bg-gray-50 dark:bg-gray-800 p-3 no-scrollbar">
+                    <div className={`max-h-48 min-w-0 overflow-y-auto overflow-x-hidden rounded-xl p-3 no-scrollbar ${
+                      isLeave
+                        ? 'bg-teal-50/80 dark:bg-teal-950/30 border border-teal-200/60 dark:border-teal-800/40'
+                        : isAdminEntry
+                          ? 'bg-red-50/80 dark:bg-red-950/30 border border-red-200/60 dark:border-red-800/40'
+                          : 'bg-gray-50 dark:bg-gray-800'
+                    }`}>
                       <pre className="max-w-full min-w-0 text-xs whitespace-pre-wrap break-words [overflow-wrap:anywhere] text-gray-700 dark:text-gray-300 leading-relaxed">
                         {formatSubmissionText(s)}
                       </pre>

@@ -389,8 +389,10 @@ export function DailySubmissionDetailCard({
             {submission.leave_type_name ? ` · ${submission.leave_type_name}` : ''}
           </div>
           <p className="text-teal-700/90 dark:text-teal-300/90">
-            {String(submission.leave_type_code || '').toLowerCase() === 'paid'
-              ? 'Paid leave credited as 8 work hours for this day.'
+            {['paid', 'personal'].includes(
+              String(submission.leave_type_code || '').toLowerCase()
+            )
+              ? 'Leave credited as 8 work hours for this day.'
               : 'Attendance is blocked for this approved leave day.'}
             {submission.leave_request_id
               ? ` · Request #${submission.leave_request_id}`
