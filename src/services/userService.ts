@@ -24,6 +24,14 @@ export interface UserAnalyticsMember {
   current_period: {
     days: number;
     hours: number;
+    work_hours?: number;
+    leave_hours?: number;
+    leave_days?: number;
+    official_leave_hours?: number;
+    official_leave_days?: number;
+    other_leave_hours?: number;
+    other_leave_days?: number;
+    net_hours?: number;
     avg_hours_per_day: number;
     tasks_completed: number;
     tasks_pending: number;
@@ -68,6 +76,13 @@ export interface UsersAnalyticsPayload {
     avg_tasks_completed: number;
     avg_overtime_hours: number;
     total_hours: number;
+    total_work_hours?: number;
+    total_leave_hours?: number;
+    total_official_leave_hours?: number;
+    total_leave_days?: number;
+    total_official_leave_days?: number;
+    total_overtime_hours?: number;
+    total_net_hours?: number;
   };
   roles: Record<
     'admin' | 'developer' | 'tester',

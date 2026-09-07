@@ -105,6 +105,8 @@ function normalizeSource(value?: string | null): CreativeSource {
 type Props = {
   open: boolean;
   assetId?: string | null;
+  /** Destination folder when creating a new asset from the current browse location. */
+  folderId?: string | null;
   canManage: boolean;
   canReview: boolean;
   canCreate: boolean;
@@ -155,6 +157,7 @@ function formatDate(value?: string | null): string {
 export function AssetFormModal({
   open,
   assetId,
+  folderId = null,
   canManage,
   canReview,
   canCreate,
@@ -295,6 +298,7 @@ export function AssetFormModal({
     uploaded_file_path: form.uploaded_file_path || null,
     preview_thumbnail_url: form.preview_thumbnail_url || null,
     project_id: form.project_id || null,
+    ...(isNew ? { folder_id: folderId ?? null } : {}),
     scheduled_date: form.scheduled_date || null,
     published_date: form.published_date || null,
     ...extra,

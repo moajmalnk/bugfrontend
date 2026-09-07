@@ -17,6 +17,7 @@ import { useQuery } from "@tanstack/react-query";
 import {
   BarChart3,
   Bug,
+  CalendarDays,
   Check,
   CheckCircle2,
   ChevronDown,
@@ -28,6 +29,7 @@ import {
   FileText,
   Filter,
   Loader2,
+  Palmtree,
   Search,
   Shield,
   Timer,
@@ -83,6 +85,7 @@ function hasActivity(user: UserAnalyticsMember): boolean {
   return (
     Number(current.hours || 0) > 0 ||
     Number(current.days || 0) > 0 ||
+    Number(current.leave_hours || 0) > 0 ||
     Number(current.tasks_completed || 0) > 0 ||
     Number(current.overtime_hours || 0) > 0 ||
     Number(current.bugs_reported || 0) > 0 ||
@@ -655,6 +658,10 @@ function AllUsersOverview({
     let tasksCompleted = 0;
     let breakMinutes = 0;
     let overtimeHours = 0;
+    let leaveHours = 0;
+    let officialLeaveHours = 0;
+    let leaveDays = 0;
+    let officialLeaveDays = 0;
     let active = 0;
     let lookbackHours = 0;
     let lookbackDays = 0;
@@ -670,6 +677,10 @@ function AllUsersOverview({
       tasksCompleted += Number(c.tasks_completed || 0);
       breakMinutes += Number(c.break_minutes || 0);
       overtimeHours += Number(c.overtime_hours || 0);
+      leaveHours += Number(c.leave_hours || 0);
+      officialLeaveHours += Number(c.official_leave_hours || 0);
+      leaveDays += Number(c.leave_days || 0);
+      officialLeaveDays += Number(c.official_leave_days || 0);
       if (hasActivity(user)) active += 1;
       lookbackHours += Number(l.avg_hours_per_day || 0);
       lookbackDays += Number(l.avg_days_per_month || 0);
@@ -685,6 +696,11 @@ function AllUsersOverview({
       tasksCompleted,
       breakHours: breakMinutes / 60,
       overtimeHours,
+      leaveHours,
+      officialLeaveHours,
+      leaveDays,
+      officialLeaveDays,
+      personalLeaveHours: Math.max(0, leaveHours - officialLeaveHours),
       active,
       inactive: allUsers.length - active,
       lookbackAvgHDay: lookbackHours / n,
@@ -767,16 +783,16 @@ function AllUsersOverview({
           icon={<Users className="h-3.5 w-3.5" />}
         />
         <MetricTile
-          label="Bugs reported"
-          value={`${aggregates.bugsReported}`}
-          detail="Period total"
-          icon={<Bug className="h-3.5 w-3.5" />}
+          label="Official leave"
+          value={`${aggregates.officialLeaveHours.toFixed(0)}h`}
+          detail={`${aggregates.officialLeaveDays} holiday day(s)`}
+          icon={<CalendarDays className="h-3.5 w-3.5" />}
         />
         <MetricTile
-          label="Bugs fixed"
-          value={`${aggregates.bugsFixed}`}
-          detail="Period total"
-          icon={<Wrench className="h-3.5 w-3.5" />}
+          label="Personal leave"
+          value={`${aggregates.personalLeaveHours.toFixed(0)}h`}
+          detail={`${Math.max(0, aggregates.leaveDays - aggregates.officialLeaveDays)} leave day(s)`}
+          icon={<Palmtree className="h-3.5 w-3.5" />}
         />
         <MetricTile
           label="Tasks done"
@@ -785,9 +801,9 @@ function AllUsersOverview({
           icon={<CheckCircle2 className="h-3.5 w-3.5" />}
         />
         <MetricTile
-          label="Total OT"
+          label="Approved OT"
           value={`${aggregates.overtimeHours.toFixed(1)}h`}
-          detail="Tracked OT"
+          detail="Period OT"
           icon={<Timer className="h-3.5 w-3.5" />}
         />
         <MetricTile
@@ -1037,15 +1053,15 @@ function AllUsersOverview({
                 <th className="py-2 pr-3 font-medium">User</th>
                 <th className="py-2 pr-3 font-medium">Role</th>
                 <th className="py-2 pr-3 font-medium">Hours</th>
+                <th className="py-2 pr-3 font-medium">Leave</th>
+                <th className="py-2 pr-3 font-medium">Official</th>
                 <th className="py-2 pr-3 font-medium">Avg h/day</th>
                 <th className="py-2 pr-3 font-medium">Days</th>
                 <th className="py-2 pr-3 font-medium">Tasks</th>
-                <th className="py-2 pr-3 font-medium">Pending</th>
                 <th className="py-2 pr-3 font-medium">OT</th>
                 <th className="py-2 pr-3 font-medium">Check-in</th>
                 <th className="py-2 pr-3 font-medium">Bugs</th>
-                <th className="py-2 pr-3 font-medium">Fixes</th>
-                <th className="py-2 font-medium">Lookback h/day</th>
+                <th className="py-2 font-medium">Fixes</th>
               </tr>
             </thead>
             <tbody>
@@ -1069,11 +1085,16 @@ function AllUsersOverview({
                   <td className="py-2 pr-3 text-xs capitalize">{user.role}</td>
                   <td className="py-2 pr-3 tabular-nums">{user.current_period.hours.toFixed(1)}h</td>
                   <td className="py-2 pr-3 tabular-nums">
+                    {Number(user.current_period.other_leave_hours || 0).toFixed(1)}h
+                  </td>
+                  <td className="py-2 pr-3 tabular-nums">
+                    {Number(user.current_period.official_leave_hours || 0).toFixed(1)}h
+                  </td>
+                  <td className="py-2 pr-3 tabular-nums">
                     {user.current_period.avg_hours_per_day.toFixed(1)}h
                   </td>
                   <td className="py-2 pr-3 tabular-nums">{user.current_period.days}</td>
                   <td className="py-2 pr-3 tabular-nums">{user.current_period.tasks_completed}</td>
-                  <td className="py-2 pr-3 tabular-nums">{user.current_period.tasks_pending}</td>
                   <td className="py-2 pr-3 tabular-nums">
                     {user.current_period.overtime_hours.toFixed(1)}h
                   </td>
@@ -1081,8 +1102,7 @@ function AllUsersOverview({
                     {user.current_period.avg_check_in_label || "—"}
                   </td>
                   <td className="py-2 pr-3 tabular-nums">{user.current_period.bugs_reported}</td>
-                  <td className="py-2 pr-3 tabular-nums">{user.current_period.bugs_fixed}</td>
-                  <td className="py-2 tabular-nums">{user.lookback.avg_hours_per_day.toFixed(1)}h</td>
+                  <td className="py-2 tabular-nums">{user.current_period.bugs_fixed}</td>
                 </tr>
               ))}
               {roster.length === 0 ? (
@@ -1625,32 +1645,36 @@ export function UserAnalytics({ rolePath = "admin" }: UserAnalyticsProps) {
           </div>
         </CardHeader>
         <CardContent className="relative space-y-6">
-          <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-5">
+          <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-6">
+            <MetricTile
+              label="Credited hours"
+              value={`${data.team_summary.total_hours.toFixed(0)}h`}
+              detail={`Work ${(data.team_summary.total_work_hours ?? data.team_summary.total_hours).toFixed(0)}h · ${data.team_summary.user_count} members`}
+            />
+            <MetricTile
+              label="Official leave"
+              value={`${(data.team_summary.total_official_leave_hours ?? 0).toFixed(0)}h`}
+              detail={`${data.team_summary.total_official_leave_days ?? 0} holiday day(s)`}
+            />
+            <MetricTile
+              label="Personal leave"
+              value={`${Math.max(0, (data.team_summary.total_leave_hours ?? 0) - (data.team_summary.total_official_leave_hours ?? 0)).toFixed(0)}h`}
+              detail={`${Math.max(0, (data.team_summary.total_leave_days ?? 0) - (data.team_summary.total_official_leave_days ?? 0))} leave day(s)`}
+            />
+            <MetricTile
+              label="Approved OT"
+              value={`${(data.team_summary.total_overtime_hours ?? data.team_summary.avg_overtime_hours * data.team_summary.user_count).toFixed(1)}h`}
+              detail={`Avg ${data.team_summary.avg_overtime_hours.toFixed(1)}h / member`}
+            />
             <MetricTile
               label="Team avg h/day"
               value={`${data.team_summary.avg_hours_per_day.toFixed(1)}h`}
-              detail="Across admins, devs, testers"
+              detail={`${data.team_summary.avg_work_days.toFixed(1)} avg days`}
             />
             <MetricTile
-              label="Team avg days"
-              value={`${data.team_summary.avg_work_days.toFixed(1)}`}
-              detail={monthFilter === "all" ? "Work days in window" : "Work days this month"}
-            />
-            <MetricTile
-              label="Team avg tasks"
-              value={`${data.team_summary.avg_tasks_completed.toFixed(1)}`}
-              detail="Completed tasks"
-            />
-            <MetricTile
-              label="Team overtime"
-              value={`${data.team_summary.avg_overtime_hours.toFixed(1)}h`}
-              detail="Per member average"
-            />
-            <MetricTile
-              label="Total hours"
-              value={`${data.team_summary.total_hours.toFixed(0)}h`}
-              detail={`${data.team_summary.user_count} tracked members`}
-              className="sm:col-span-2 lg:col-span-1"
+              label="Net hours"
+              value={`${(data.team_summary.total_net_hours ?? data.team_summary.total_hours + (data.team_summary.total_overtime_hours ?? 0)).toFixed(0)}h`}
+              detail="Credited + approved OT"
             />
           </div>
 

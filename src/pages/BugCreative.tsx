@@ -28,7 +28,12 @@ import {
   LIST_TABS_CONTENT,
 } from '@/components/layout/list-page';
 import { AssetFormModal } from '@/components/creative/AssetFormModal';
+import { CreativeClipboardBar } from '@/components/creative/CreativeClipboardBar';
+import type { CreativeClipboard } from '@/components/creative/CreativeClipboardBar';
+import { CreativeFolderCard } from '@/components/creative/CreativeFolderCard';
+import { CreateFolderModal } from '@/components/creative/CreateFolderModal';
 import { CreativeMediaPreview } from '@/components/creative/CreativeMediaPreview';
+import { MoveToFolderModal } from '@/components/creative/MoveToFolderModal';
 import { useAuth } from '@/context/AuthContext';
 import { usePermissions } from '@/hooks/usePermissions';
 import {
@@ -40,6 +45,7 @@ import { projectService } from '@/services/projectService';
 import { notifyAdminNavCountsChanged } from '@/services/adminNavCountsService';
 import type {
   CreativeAsset,
+  CreativeFolder,
   CreativeMaterialType,
   CreativePlatform,
   CreativeStats,
@@ -49,15 +55,24 @@ import {
   CREATIVE_MATERIALS,
   CREATIVE_PLATFORMS,
   CREATIVE_STATUSES,
+  copyCreativeAssets,
+  createCreativeFolder,
   deleteCreativeAsset,
+  deleteCreativeFolder,
   getCreativeStats,
   listCreativeAssets,
+  listCreativeFolders,
+  moveCreativeAssets,
+  updateCreativeFolder,
 } from '@/services/creativeService';
 import {
   CheckCircle2,
+  ChevronRight,
   FileEdit,
   FolderOpen,
+  FolderPlus,
   Globe2,
+  Home,
   ImageIcon,
   LayoutGrid,
   Loader2,
@@ -73,6 +88,7 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 
 const ASSET_PARAM = 'asset';
 const STATUS_PARAM = 'tab';
+const FOLDER_PARAM = 'folder';
 const PAGE_SIZES = [12, 24, 48];
 
 const PERIOD_PRESETS: WorkPeriodPreset[] = [
@@ -180,14 +196,37 @@ function AssetCard({
   onOpen,
   onDelete,
   canDelete,
+  selectable,
+  selected,
+  onToggleSelect,
 }: {
   asset: CreativeAsset;
   onOpen: () => void;
   onDelete: () => void;
   canDelete: boolean;
+  selectable: boolean;
+  selected: boolean;
+  onToggleSelect: () => void;
 }) {
   return (
-    <div className="group flex h-full min-w-0 flex-col overflow-hidden rounded-2xl border border-border/60 bg-card shadow-sm transition-all duration-300 hover:border-fuchsia-300/60 hover:shadow-md dark:hover:border-fuchsia-700/50">
+    <div
+      className={cn(
+        'group relative flex h-full min-w-0 flex-col overflow-hidden rounded-2xl border bg-card shadow-sm transition-all duration-300 hover:border-fuchsia-300/60 hover:shadow-md dark:hover:border-fuchsia-700/50',
+        selected ? 'border-fuchsia-500 ring-2 ring-fuchsia-500/30' : 'border-border/60'
+      )}
+    >
+      {selectable ? (
+        <label className="absolute left-3 top-3 z-10 flex h-8 w-8 cursor-pointer items-center justify-center rounded-xl bg-background/90 shadow-sm">
+          <input
+            type="checkbox"
+            checked={selected}
+            onChange={onToggleSelect}
+            className="h-4 w-4 accent-fuchsia-600"
+            aria-label={`Select ${asset.title}`}
+            onClick={(e) => e.stopPropagation()}
+          />
+        </label>
+      ) : null}
       <button
         type="button"
         onClick={onOpen}
@@ -203,7 +242,7 @@ function AssetCard({
           />
           <span
             className={cn(
-              'absolute left-3 top-3 inline-flex rounded-full px-2.5 py-1 text-[11px] font-semibold shadow-sm',
+              'absolute right-3 top-3 inline-flex rounded-full px-2.5 py-1 text-[11px] font-semibold shadow-sm',
               STATUS_PILL[asset.status]
             )}
           >
@@ -258,11 +297,15 @@ export default function BugCreative() {
   const canCreate = hasPermissionOrAdmin(role, hasPermission, 'CREATIVE_CREATE');
   const canManage = hasPermissionOrAdmin(role, hasPermission, 'CREATIVE_MANAGE');
   const canReview = hasPermissionOrAdmin(role, hasPermission, 'CREATIVE_REVIEW');
+  const canOrganize = canCreate || canManage;
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
 
   const assetParam = searchParams.get(ASSET_PARAM);
   const statusTab = parseStatusTab(searchParams.get(STATUS_PARAM));
+  const folderParam = searchParams.get(FOLDER_PARAM);
+  const currentFolderId =
+    folderParam && /^[0-9a-f-]{36}$/i.test(folderParam) ? folderParam : null;
   const customFrom = searchParams.get('from') || '';
   const customTo = searchParams.get('to') || '';
   const periodPreset = parsePeriodPreset(
@@ -289,13 +332,43 @@ export default function BugCreative() {
   const [stats, setStats] = useState<CreativeStats | null>(null);
   const [loading, setLoading] = useState(true);
   const [projects, setProjects] = useState<Array<{ id: string; name: string }>>([]);
+  const [allFolders, setAllFolders] = useState<CreativeFolder[]>([]);
+  const [childFolders, setChildFolders] = useState<CreativeFolder[]>([]);
   const [deleteTarget, setDeleteTarget] = useState<CreativeAsset | null>(null);
   const [deleting, setDeleting] = useState(false);
   const [unsavedBackOpen, setUnsavedBackOpen] = useState(false);
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  const [clipboard, setClipboard] = useState<CreativeClipboard>(null);
+  const [organizeBusy, setOrganizeBusy] = useState(false);
+  const [createFolderOpen, setCreateFolderOpen] = useState(false);
+  const [renameFolder, setRenameFolder] = useState<CreativeFolder | null>(null);
+  const [deleteFolderTarget, setDeleteFolderTarget] = useState<CreativeFolder | null>(null);
+  const [moveModalOpen, setMoveModalOpen] = useState(false);
+  const [folderBusy, setFolderBusy] = useState(false);
   const formDirtyRef = useRef(false);
 
   const formOpen = Boolean(assetParam) && canView;
   const tabs = useMemo(() => ['all', ...CREATIVE_STATUSES] as const, []);
+  const searching = Boolean(debouncedQ);
+
+  const folderById = useMemo(() => {
+    const map = new Map<string, CreativeFolder>();
+    for (const f of allFolders) map.set(f.id, f);
+    return map;
+  }, [allFolders]);
+
+  const breadcrumb = useMemo(() => {
+    const trail: CreativeFolder[] = [];
+    let cursor = currentFolderId;
+    const guard = new Set<string>();
+    while (cursor && folderById.has(cursor) && !guard.has(cursor)) {
+      guard.add(cursor);
+      const folder = folderById.get(cursor)!;
+      trail.unshift(folder);
+      cursor = folder.parent_id ?? null;
+    }
+    return trail;
+  }, [currentFolderId, folderById]);
 
   const hasActiveFilters =
     Boolean(debouncedQ) ||
@@ -371,23 +444,44 @@ export default function BugCreative() {
     }
     setLoading(true);
     try {
-      const [result, nextStats] = await Promise.all([
+      const folderFilter = searching
+        ? undefined
+        : currentFolderId
+          ? currentFolderId
+          : 'root';
+      const [result, nextStats, folders, children] = await Promise.all([
         listCreativeAssets({
           q: debouncedQ,
           status: statusTab,
           material_type: material,
           platform,
           project_id: projectId,
+          folder_id: folderFilter,
           from: periodFrom,
           to: periodTo,
           page,
           limit,
         }),
-        getCreativeStats({ from: periodFrom, to: periodTo }).catch(() => null),
+        getCreativeStats({
+          from: periodFrom,
+          to: periodTo,
+          folder_id: searching ? undefined : folderFilter,
+        }).catch(() => null),
+        listCreativeFolders({ parent_id: 'all' }).catch(() => [] as CreativeFolder[]),
+        searching
+          ? Promise.resolve([] as CreativeFolder[])
+          : listCreativeFolders({
+              parent_id: currentFolderId ?? 'root',
+            }).catch(() => [] as CreativeFolder[]),
       ]);
       setItems(result.items);
       setTotal(result.total);
       if (nextStats) setStats(nextStats);
+      setAllFolders(folders);
+      setChildFolders(children);
+      setSelectedIds((prev) =>
+        prev.filter((id) => result.items.some((a) => a.id === id))
+      );
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : 'Try again';
       toast({
@@ -401,6 +495,8 @@ export default function BugCreative() {
   }, [
     canView,
     debouncedQ,
+    searching,
+    currentFolderId,
     statusTab,
     material,
     platform,
@@ -425,6 +521,19 @@ export default function BugCreative() {
     window.addEventListener('popstate', onPop);
     return () => window.removeEventListener('popstate', onPop);
   }, []);
+
+  const openFolder = (id: string | null, pushHistory = true) => {
+    const params = new URLSearchParams(searchParams);
+    if (id) params.set(FOLDER_PARAM, id);
+    else params.delete(FOLDER_PARAM);
+    params.delete('page');
+    setPage(1);
+    setSelectedIds([]);
+    setSearchParams(params);
+    if (pushHistory) {
+      window.history.pushState({ folder: id ?? 'root' }, '');
+    }
+  };
 
   const openAsset = (id: string) => {
     const params = new URLSearchParams(searchParams);
@@ -459,6 +568,147 @@ export default function BugCreative() {
     setPage(1);
   };
 
+  const canSelectAsset = (asset: CreativeAsset) =>
+    canOrganize &&
+    (canManage || asset.creator_id === currentUser?.id);
+
+  const toggleSelect = (asset: CreativeAsset) => {
+    if (!canSelectAsset(asset)) return;
+    setSelectedIds((prev) =>
+      prev.includes(asset.id)
+        ? prev.filter((id) => id !== asset.id)
+        : [...prev, asset.id]
+    );
+  };
+
+  const handleCopySelection = () => {
+    if (selectedIds.length === 0) return;
+    setClipboard({ mode: 'copy', assetIds: [...selectedIds] });
+    toast({ title: `Copied ${selectedIds.length} asset(s)` });
+  };
+
+  const handleCutSelection = () => {
+    if (selectedIds.length === 0) return;
+    setClipboard({ mode: 'cut', assetIds: [...selectedIds] });
+    toast({ title: `Cut ${selectedIds.length} asset(s)` });
+  };
+
+  const handlePaste = async () => {
+    if (!clipboard || organizeBusy || !canOrganize) return;
+    setOrganizeBusy(true);
+    try {
+      if (clipboard.mode === 'copy') {
+        await copyCreativeAssets({
+          asset_ids: clipboard.assetIds,
+          folder_id: currentFolderId,
+        });
+        toast({ title: 'Assets pasted' });
+      } else {
+        await moveCreativeAssets({
+          asset_ids: clipboard.assetIds,
+          folder_id: currentFolderId,
+        });
+        toast({ title: 'Assets moved' });
+        setClipboard(null);
+      }
+      setSelectedIds([]);
+      notifyAdminNavCountsChanged();
+      await load();
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'Paste failed';
+      toast({ title: 'Paste failed', description: message, variant: 'destructive' });
+    } finally {
+      setOrganizeBusy(false);
+    }
+  };
+
+  const handleMoveTo = async (folderId: string | null) => {
+    if (selectedIds.length === 0 || organizeBusy) return;
+    setOrganizeBusy(true);
+    try {
+      await moveCreativeAssets({
+        asset_ids: selectedIds,
+        folder_id: folderId,
+      });
+      toast({ title: 'Assets moved' });
+      setSelectedIds([]);
+      setMoveModalOpen(false);
+      if (clipboard?.mode === 'cut') setClipboard(null);
+      await load();
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'Move failed';
+      toast({ title: 'Move failed', description: message, variant: 'destructive' });
+    } finally {
+      setOrganizeBusy(false);
+    }
+  };
+
+  const handleCreateFolder = async (name: string) => {
+    if (folderBusy) return;
+    setFolderBusy(true);
+    try {
+      await createCreativeFolder({
+        name,
+        parent_id: currentFolderId,
+      });
+      toast({ title: 'Folder created' });
+      setCreateFolderOpen(false);
+      await load();
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'Could not create folder';
+      toast({
+        title: 'Create failed',
+        description: message,
+        variant: 'destructive',
+      });
+    } finally {
+      setFolderBusy(false);
+    }
+  };
+
+  const handleRenameFolder = async (name: string) => {
+    if (!renameFolder || folderBusy) return;
+    setFolderBusy(true);
+    try {
+      await updateCreativeFolder({ id: renameFolder.id, name });
+      toast({ title: 'Folder renamed' });
+      setRenameFolder(null);
+      await load();
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'Could not rename';
+      toast({
+        title: 'Rename failed',
+        description: message,
+        variant: 'destructive',
+      });
+    } finally {
+      setFolderBusy(false);
+    }
+  };
+
+  const handleDeleteFolder = async () => {
+    if (!deleteFolderTarget || folderBusy) return;
+    setFolderBusy(true);
+    try {
+      await deleteCreativeFolder(deleteFolderTarget.id);
+      toast({ title: 'Folder deleted' });
+      setDeleteFolderTarget(null);
+      if (currentFolderId === deleteFolderTarget.id) {
+        openFolder(deleteFolderTarget.parent_id ?? null, false);
+      }
+      await load();
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'Could not delete folder';
+      toast({
+        title: 'Delete failed',
+        description: message,
+        variant: 'destructive',
+      });
+    } finally {
+      setFolderBusy(false);
+    }
+  };
+
   const handleDelete = async () => {
     if (!deleteTarget || deleting) return;
     setDeleting(true);
@@ -466,13 +716,18 @@ export default function BugCreative() {
       await deleteCreativeAsset(deleteTarget.id);
       setItems((prev) => prev.filter((a) => a.id !== deleteTarget.id));
       setTotal((n) => Math.max(0, n - 1));
+      setSelectedIds((prev) => prev.filter((id) => id !== deleteTarget.id));
       notifyAdminNavCountsChanged();
       toast({ title: 'Asset deleted' });
       setDeleteTarget(null);
       if (assetParam === deleteTarget.id) {
         closeAsset();
       }
-      void getCreativeStats({ from: periodFrom, to: periodTo })
+      void getCreativeStats({
+        from: periodFrom,
+        to: periodTo,
+        folder_id: searching ? undefined : currentFolderId ?? 'root',
+      })
         .then(setStats)
         .catch(() => {});
     } catch (err: unknown) {
@@ -502,6 +757,8 @@ export default function BugCreative() {
   const totalPages = Math.max(1, Math.ceil(total / limit));
   const rangeStart = total === 0 ? 0 : (page - 1) * limit + 1;
   const rangeEnd = Math.min(page * limit, total);
+  const showFolders = !searching && childFolders.length > 0;
+  const gridEmpty = !loading && items.length === 0 && (!showFolders || searching);
 
   const filterTriggerClass =
     'w-full min-w-0 h-11 bg-background border-border/70 rounded-xl shadow-sm hover:shadow-md transition-all duration-300 focus:ring-2 focus:ring-fuchsia-500/40 focus:ring-offset-0 data-[state=open]:ring-2 data-[state=open]:ring-fuchsia-500/40';
@@ -546,6 +803,18 @@ export default function BugCreative() {
               isFetching={loading}
               className="lg:ml-0"
             />
+            {canOrganize ? (
+              <Button
+                size="lg"
+                variant="outline"
+                className="h-11 w-full px-6 font-semibold sm:h-12 sm:w-auto rounded-xl"
+                onClick={() => setCreateFolderOpen(true)}
+                disabled={searching}
+              >
+                <FolderPlus className="mr-2 h-5 w-5" />
+                New folder
+              </Button>
+            ) : null}
             {canCreate ? (
               <Button
                 size="lg"
@@ -560,6 +829,43 @@ export default function BugCreative() {
         }
       />
 
+      <div className="mb-4 flex min-w-0 flex-wrap items-center gap-2 rounded-2xl border border-border/50 bg-muted/20 px-3 py-2 sm:px-4">
+        <button
+          type="button"
+          onClick={() => openFolder(null)}
+          className={cn(
+            'inline-flex items-center gap-1.5 rounded-xl px-2.5 py-1.5 text-sm font-medium transition-colors',
+            !currentFolderId
+              ? 'bg-fuchsia-600 text-white'
+              : 'text-muted-foreground hover:bg-muted hover:text-foreground'
+          )}
+        >
+          <Home className="h-4 w-4" />
+          All files
+        </button>
+        {breadcrumb.map((folder) => (
+          <div key={folder.id} className="flex min-w-0 items-center gap-2">
+            <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground" />
+            <button
+              type="button"
+              onClick={() => openFolder(folder.id)}
+              className={cn(
+                'max-w-[10rem] truncate rounded-xl px-2.5 py-1.5 text-sm font-medium transition-colors sm:max-w-xs',
+                currentFolderId === folder.id
+                  ? 'bg-fuchsia-600 text-white'
+                  : 'text-muted-foreground hover:bg-muted hover:text-foreground'
+              )}
+            >
+              {folder.name}
+            </button>
+          </div>
+        ))}
+        {searching ? (
+          <span className="ms-auto text-xs text-muted-foreground">
+            Searching all folders
+          </span>
+        ) : null}
+      </div>
       <Tabs value={statusTab} onValueChange={setStatusTab} className="w-full">
         <BottomSheetTabs
           items={tabs.map((tab) => {
@@ -767,7 +1073,7 @@ export default function BugCreative() {
                 />
               ))}
             </div>
-          ) : items.length === 0 ? (
+          ) : gridEmpty ? (
             <div className="rounded-2xl border border-dashed border-border/70 bg-muted/20 px-6 py-14 text-center">
               <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-fuchsia-500/10">
                 <Palette className="h-7 w-7 text-fuchsia-600 dark:text-fuchsia-400" />
@@ -775,22 +1081,35 @@ export default function BugCreative() {
               <h3 className="text-lg font-semibold text-foreground">
                 {hasActiveFilters || statusTab !== 'all'
                   ? 'No matching assets'
-                  : 'No creative assets yet'}
+                  : currentFolderId
+                    ? 'This folder is empty'
+                    : 'No creative assets yet'}
               </h3>
               <p className="mx-auto mt-2 max-w-md text-sm text-muted-foreground">
                 {hasActiveFilters
                   ? 'Try clearing filters or switching tabs.'
-                  : canCreate
-                    ? 'Create the first poster, reel, or mockup to start the pipeline.'
+                  : canOrganize
+                    ? 'Create a folder or add a poster, reel, or mockup here.'
                     : 'Assets will appear here once creators submit work.'}
               </p>
-              {canCreate && !hasActiveFilters && statusTab === 'all' ? (
-                <Button
-                  className="mt-5 h-11 rounded-xl bg-gradient-to-r from-fuchsia-600 to-violet-700 text-white hover:from-fuchsia-700 hover:to-violet-800"
-                  onClick={() => openAsset('new')}
-                >
-                  <Plus className="mr-2 h-4 w-4" /> New asset
-                </Button>
+              {canOrganize && !hasActiveFilters && statusTab === 'all' ? (
+                <div className="mt-5 flex flex-wrap items-center justify-center gap-3">
+                  <Button
+                    variant="outline"
+                    className="h-11 rounded-xl"
+                    onClick={() => setCreateFolderOpen(true)}
+                  >
+                    <FolderPlus className="mr-2 h-4 w-4" /> New folder
+                  </Button>
+                  {canCreate ? (
+                    <Button
+                      className="h-11 rounded-xl bg-gradient-to-r from-fuchsia-600 to-violet-700 text-white hover:from-fuchsia-700 hover:to-violet-800"
+                      onClick={() => openAsset('new')}
+                    >
+                      <Plus className="mr-2 h-4 w-4" /> New asset
+                    </Button>
+                  ) : null}
+                </div>
               ) : hasActiveFilters ? (
                 <Button
                   variant="outline"
@@ -803,6 +1122,22 @@ export default function BugCreative() {
             </div>
           ) : (
             <div className="grid grid-cols-12 gap-4">
+              {!searching
+                ? childFolders.map((folder) => (
+                    <div
+                      key={folder.id}
+                      className="col-span-12 min-w-0 sm:col-span-6 xl:col-span-4"
+                    >
+                      <CreativeFolderCard
+                        folder={folder}
+                        onOpen={() => openFolder(folder.id)}
+                        canManage={canOrganize}
+                        onRename={() => setRenameFolder(folder)}
+                        onDelete={() => setDeleteFolderTarget(folder)}
+                      />
+                    </div>
+                  ))
+                : null}
               {items.map((asset) => (
                 <div
                   key={asset.id}
@@ -813,12 +1148,27 @@ export default function BugCreative() {
                     onOpen={() => openAsset(asset.id)}
                     onDelete={() => setDeleteTarget(asset)}
                     canDelete={canDeleteAsset(asset)}
+                    selectable={canSelectAsset(asset)}
+                    selected={selectedIds.includes(asset.id)}
+                    onToggleSelect={() => toggleSelect(asset)}
                   />
                 </div>
               ))}
             </div>
           )}
 
+          <CreativeClipboardBar
+            selectedCount={selectedIds.length}
+            clipboard={clipboard}
+            busy={organizeBusy}
+            canOrganize={canOrganize}
+            onCopy={handleCopySelection}
+            onCut={handleCutSelection}
+            onPaste={() => void handlePaste()}
+            onMoveTo={() => setMoveModalOpen(true)}
+            onClearSelection={() => setSelectedIds([])}
+            onClearClipboard={() => setClipboard(null)}
+          />
           {totalPages > 1 ? (
             <div className="flex flex-col items-center justify-between gap-4 rounded-xl border border-border/40 p-4 sm:flex-row sm:p-5">
               <p className="text-sm text-muted-foreground">
@@ -857,6 +1207,7 @@ export default function BugCreative() {
         <AssetFormModal
           open={formOpen}
           assetId={assetParam}
+          folderId={currentFolderId}
           canManage={canManage}
           canReview={canReview}
           canCreate={canCreate}
@@ -873,6 +1224,32 @@ export default function BugCreative() {
           }}
         />
       ) : null}
+
+      <CreateFolderModal
+        open={createFolderOpen}
+        mode="create"
+        busy={folderBusy}
+        onClose={() => setCreateFolderOpen(false)}
+        onSubmit={handleCreateFolder}
+      />
+
+      <CreateFolderModal
+        open={!!renameFolder}
+        mode="rename"
+        initialName={renameFolder?.name ?? ''}
+        busy={folderBusy}
+        onClose={() => setRenameFolder(null)}
+        onSubmit={handleRenameFolder}
+      />
+
+      <MoveToFolderModal
+        open={moveModalOpen}
+        folders={allFolders}
+        busy={organizeBusy}
+        selectedCount={selectedIds.length}
+        onClose={() => setMoveModalOpen(false)}
+        onConfirm={handleMoveTo}
+      />
 
       <AlertDialog
         open={!!deleteTarget}
@@ -895,6 +1272,36 @@ export default function BugCreative() {
               onClick={() => void handleDelete()}
             >
               {deleting ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                'Delete'
+              )}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog
+        open={!!deleteFolderTarget}
+        onOpenChange={(o) => !o && setDeleteFolderTarget(null)}
+      >
+        <AlertDialogContent className="max-w-[400px] rounded-2xl">
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete folder?</AlertDialogTitle>
+            <AlertDialogDescription>
+              {deleteFolderTarget?.name} can only be deleted if it is empty.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel className="rounded-xl" disabled={folderBusy}>
+              Cancel
+            </AlertDialogCancel>
+            <AlertDialogAction
+              className="rounded-xl bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              disabled={folderBusy}
+              onClick={() => void handleDeleteFolder()}
+            >
+              {folderBusy ? (
                 <Loader2 className="h-4 w-4 animate-spin" />
               ) : (
                 'Delete'

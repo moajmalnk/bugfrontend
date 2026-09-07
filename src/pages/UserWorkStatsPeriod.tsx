@@ -29,14 +29,17 @@ import { projectService } from "@/services/projectService";
 import { format } from "date-fns";
 import {
   AlertCircle,
+  Building2,
   Calendar,
   CalendarDays,
   CheckCircle2,
   Clock,
   FolderOpen,
   Loader2,
+  Palmtree,
   PlayCircle,
   PlusCircle,
+  Timer,
   TrendingUp,
 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
@@ -312,42 +315,72 @@ export default function UserWorkStatsPeriod() {
   }, [selectedPeriod?.period_range, periodDetails?.period_start, periodDetails?.period_end]);
 
   const periodSummary = useMemo(() => {
+    if (!periodDetails && !selectedPeriod) return null;
+
+    const tasks = periodDetails?.tasks || {};
+    const taskCounts = {
+      completed: tasks.completed?.length ?? 0,
+      pending: tasks.pending?.length ?? 0,
+      ongoing: tasks.ongoing?.length ?? 0,
+      upcoming: tasks.upcoming?.length ?? 0,
+    };
+    const apiSummary = periodDetails?.summary ?? {};
+
     if (viewScope === "team" && periodDetails?.scope === "team") {
       const subs = Array.isArray(periodDetails.submissions) ? periodDetails.submissions : [];
-      const tasks = periodDetails.tasks || {};
       const uniqueDays = new Set(
         subs.map((s: any) => normalizeYmdDateString(s.date ?? s.submission_date)).filter(Boolean)
       );
+      const hoursFromSubs = subs.reduce((sum: number, s: any) => sum + Number(s.hours || 0), 0);
       return {
-        hours: subs.reduce((sum: number, s: any) => sum + Number(s.hours || 0), 0),
-        days: uniqueDays.size,
-        overtime_hours: periodDetails.summary?.overtime_hours ?? 0,
-        requested_extra_hours: periodDetails.summary?.requested_extra_hours ?? 0,
-        break_minutes: periodDetails.summary?.break_minutes ?? 0,
-        task_counts: {
-          completed: tasks.completed?.length ?? 0,
-          pending: tasks.pending?.length ?? 0,
-          ongoing: tasks.ongoing?.length ?? 0,
-          upcoming: tasks.upcoming?.length ?? 0,
-        },
+        hours: Number(apiSummary.hours ?? hoursFromSubs),
+        days: Number(apiSummary.submission_days ?? uniqueDays.size),
+        work_hours: Number(apiSummary.work_hours ?? hoursFromSubs),
+        leave_hours: Number(apiSummary.leave_hours ?? 0),
+        leave_days: Number(apiSummary.leave_days ?? 0),
+        official_leave_hours: Number(apiSummary.official_leave_hours ?? 0),
+        official_leave_days: Number(apiSummary.official_leave_days ?? 0),
+        other_leave_hours: Number(apiSummary.other_leave_hours ?? 0),
+        other_leave_days: Number(apiSummary.other_leave_days ?? 0),
+        overtime_hours: Number(apiSummary.overtime_hours ?? 0),
+        requested_extra_hours: Number(apiSummary.requested_extra_hours ?? 0),
+        break_minutes: Number(apiSummary.break_minutes ?? 0),
+        net_hours: Number(
+          apiSummary.net_hours ??
+            Number(apiSummary.hours ?? hoursFromSubs) + Number(apiSummary.overtime_hours ?? 0)
+        ),
+        task_counts: taskCounts,
       };
     }
-    if (selectedPeriod) return selectedPeriod;
-    if (!periodDetails) return null;
-    const subs = Array.isArray(periodDetails.submissions) ? periodDetails.submissions : [];
-    const tasks = periodDetails.tasks || {};
+
+    const subs = Array.isArray(periodDetails?.submissions) ? periodDetails.submissions : [];
+    const hoursFromSubs = subs.reduce((sum: number, s: any) => sum + Number(s.hours || 0), 0);
+    const trendHours = selectedPeriod ? Number(selectedPeriod.hours || 0) : null;
+    const trendDays = selectedPeriod ? Number(selectedPeriod.days || 0) : null;
+
     return {
-      hours: subs.reduce((sum: number, s: any) => sum + Number(s.hours || 0), 0),
-      days: subs.length,
-      overtime_hours: periodDetails.summary?.overtime_hours ?? 0,
-      requested_extra_hours: periodDetails.summary?.requested_extra_hours ?? 0,
-      break_minutes: periodDetails.summary?.break_minutes ?? 0,
-      task_counts: {
-        completed: tasks.completed?.length ?? 0,
-        pending: tasks.pending?.length ?? 0,
-        ongoing: tasks.ongoing?.length ?? 0,
-        upcoming: tasks.upcoming?.length ?? 0,
-      },
+      hours: Number(apiSummary.hours ?? trendHours ?? hoursFromSubs),
+      days: Number(apiSummary.days ?? trendDays ?? subs.length),
+      work_hours: Number(apiSummary.work_hours ?? hoursFromSubs),
+      leave_hours: Number(apiSummary.leave_hours ?? 0),
+      leave_days: Number(apiSummary.leave_days ?? 0),
+      official_leave_hours: Number(apiSummary.official_leave_hours ?? 0),
+      official_leave_days: Number(apiSummary.official_leave_days ?? 0),
+      other_leave_hours: Number(apiSummary.other_leave_hours ?? 0),
+      other_leave_days: Number(apiSummary.other_leave_days ?? 0),
+      overtime_hours: Number(
+        apiSummary.overtime_hours ?? selectedPeriod?.overtime_hours ?? 0
+      ),
+      requested_extra_hours: Number(
+        apiSummary.requested_extra_hours ?? selectedPeriod?.requested_extra_hours ?? 0
+      ),
+      break_minutes: Number(apiSummary.break_minutes ?? selectedPeriod?.break_minutes ?? 0),
+      net_hours: Number(
+        apiSummary.net_hours ??
+          Number(apiSummary.hours ?? trendHours ?? hoursFromSubs) +
+            Number(apiSummary.overtime_hours ?? selectedPeriod?.overtime_hours ?? 0)
+      ),
+      task_counts: selectedPeriod?.task_counts ?? taskCounts,
     };
   }, [selectedPeriod, periodDetails, viewScope]);
 
@@ -520,14 +553,44 @@ export default function UserWorkStatsPeriod() {
         .filter(Boolean)
     );
 
+    const hours = filteredSubmissions.reduce((sum: number, s: any) => sum + Number(s.hours || 0), 0);
+    const overtime = filteredSubmissions.reduce(
+      (sum: number, s: any) => sum + Number(s.overtime_hours || 0),
+      0
+    );
+
     return {
       ...periodSummary,
-      hours: filteredSubmissions.reduce((sum: number, s: any) => sum + Number(s.hours || 0), 0),
+      hours,
       days: uniqueDays.size,
-      overtime_hours: filteredSubmissions.reduce(
-        (sum: number, s: any) => sum + Number(s.overtime_hours || 0),
-        0
-      ),
+      work_hours: filteredSubmissions
+        .filter((s: any) => String(s.day_status || "").toLowerCase() !== "leave")
+        .reduce((sum: number, s: any) => sum + Number(s.hours || 0), 0),
+      leave_hours: filteredSubmissions
+        .filter((s: any) => String(s.day_status || "").toLowerCase() === "leave")
+        .reduce((sum: number, s: any) => sum + Number(s.hours || 0), 0),
+      leave_days: filteredSubmissions.filter(
+        (s: any) => String(s.day_status || "").toLowerCase() === "leave"
+      ).length,
+      official_leave_hours: filteredSubmissions
+        .filter((s: any) => String(s.leave_type_code || "").toLowerCase() === "corporate")
+        .reduce((sum: number, s: any) => sum + Number(s.hours || 0), 0),
+      official_leave_days: filteredSubmissions.filter(
+        (s: any) => String(s.leave_type_code || "").toLowerCase() === "corporate"
+      ).length,
+      other_leave_hours: filteredSubmissions
+        .filter(
+          (s: any) =>
+            String(s.day_status || "").toLowerCase() === "leave" &&
+            String(s.leave_type_code || "").toLowerCase() !== "corporate"
+        )
+        .reduce((sum: number, s: any) => sum + Number(s.hours || 0), 0),
+      other_leave_days: filteredSubmissions.filter(
+        (s: any) =>
+          String(s.day_status || "").toLowerCase() === "leave" &&
+          String(s.leave_type_code || "").toLowerCase() !== "corporate"
+      ).length,
+      overtime_hours: overtime,
       requested_extra_hours: filteredSubmissions.reduce(
         (sum: number, s: any) => sum + Number(s.requested_extra_hours || 0),
         0
@@ -536,6 +599,7 @@ export default function UserWorkStatsPeriod() {
         (sum: number, s: any) => sum + Math.max(0, Number(s.break_minutes || 0)),
         0
       ),
+      net_hours: hours + overtime,
       task_counts: {
         completed: filteredTasks.completed.length,
         pending: filteredTasks.pending.length,
@@ -672,70 +736,96 @@ export default function UserWorkStatsPeriod() {
                 Filtered view — stats and lists below reflect your current search and filters.
               </div>
             ) : null}
-            {/* Summary Cards */}
+            {/* Summary Cards — work + leave/holiday + OT */}
             <div className="grid grid-cols-12 gap-4">
-              <Card className="col-span-12 sm:col-span-4 border-0 shadow-sm bg-gradient-to-br from-blue-50 to-blue-100/50 dark:from-blue-950/30 dark:to-blue-900/20">
+              <Card className="col-span-12 sm:col-span-6 xl:col-span-3 border border-border/60 shadow-sm rounded-2xl bg-card">
                 <CardContent className="p-5">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-sm font-medium text-gray-600 dark:text-gray-400 mb-1">
-                        Total Hours
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground mb-1">
+                        Credited hours
                       </p>
-                      <p className="text-3xl font-bold text-blue-700 dark:text-blue-300">
+                      <p className="text-3xl font-bold tabular-nums text-foreground">
                         {Number(displaySummary.hours || 0).toFixed(1)}h
                       </p>
-                      <p className="text-xs text-gray-500 dark:text-gray-500 mt-1">
-                        Worked during this period
+                      <p className="text-xs text-muted-foreground mt-1.5">
+                        Work {Number(displaySummary.work_hours || 0).toFixed(1)}h
+                        {Number(displaySummary.leave_hours || 0) > 0
+                          ? ` + leave ${Number(displaySummary.leave_hours || 0).toFixed(1)}h`
+                          : ""}
                       </p>
                     </div>
-                    <div className="p-3 bg-blue-200/50 dark:bg-blue-900/40 rounded-xl">
-                      <Clock className="h-6 w-6 text-blue-600 dark:text-blue-400" />
+                    <div className="p-3 rounded-xl bg-primary/10 shrink-0">
+                      <Clock className="h-5 w-5 text-primary" />
                     </div>
                   </div>
                 </CardContent>
               </Card>
 
-              <Card className="col-span-12 sm:col-span-4 border-0 shadow-sm bg-gradient-to-br from-green-50 to-green-100/50 dark:from-green-950/30 dark:to-green-900/20">
+              <Card className="col-span-12 sm:col-span-6 xl:col-span-3 border border-border/60 shadow-sm rounded-2xl bg-card">
                 <CardContent className="p-5">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-sm font-medium text-gray-600 dark:text-gray-400 mb-1">
-                        Active Days
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground mb-1">
+                        Active days
                       </p>
-                      <p className="text-3xl font-bold text-green-700 dark:text-green-300">
+                      <p className="text-3xl font-bold tabular-nums text-foreground">
                         {Number(displaySummary.days || 0)}d
                       </p>
-                      <p className="text-xs text-gray-500 dark:text-gray-500 mt-1">
-                        Days with work submissions
+                      <p className="text-xs text-muted-foreground mt-1.5">
+                        Work + credited leave days
                       </p>
                     </div>
-                    <div className="p-3 bg-green-200/50 dark:bg-green-900/40 rounded-xl">
-                      <Calendar className="h-6 w-6 text-green-600 dark:text-green-400" />
+                    <div className="p-3 rounded-xl bg-emerald-500/10 shrink-0">
+                      <Calendar className="h-5 w-5 text-emerald-600 dark:text-emerald-400" />
                     </div>
                   </div>
                 </CardContent>
               </Card>
 
-              <Card className="col-span-12 sm:col-span-4 border-0 shadow-sm bg-gradient-to-br from-violet-50 to-purple-100/50 dark:from-violet-950/30 dark:to-purple-900/20">
+              <Card className="col-span-12 sm:col-span-6 xl:col-span-3 border border-border/60 shadow-sm rounded-2xl bg-card">
                 <CardContent className="p-5">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-sm font-medium text-gray-600 dark:text-gray-400 mb-1">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground mb-1">
+                        Official leave
+                      </p>
+                      <p className="text-3xl font-bold tabular-nums text-amber-700 dark:text-amber-300">
+                        {Number(displaySummary.official_leave_hours || 0).toFixed(1)}h
+                      </p>
+                      <p className="text-xs text-muted-foreground mt-1.5">
+                        {Number(displaySummary.official_leave_days || 0)} holiday day
+                        {Number(displaySummary.official_leave_days || 0) === 1 ? "" : "s"}
+                      </p>
+                    </div>
+                    <div className="p-3 rounded-xl bg-amber-500/10 shrink-0">
+                      <Building2 className="h-5 w-5 text-amber-600 dark:text-amber-400" />
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+
+              <Card className="col-span-12 sm:col-span-6 xl:col-span-3 border border-border/60 shadow-sm rounded-2xl bg-card">
+                <CardContent className="p-5">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground mb-1">
                         Net hours
                       </p>
-                      <p className="text-3xl font-bold text-violet-700 dark:text-violet-300 tabular-nums">
-                        {(
-                          Number(displaySummary.hours || 0) +
-                          Number(displaySummary.overtime_hours || 0)
+                      <p className="text-3xl font-bold tabular-nums text-violet-700 dark:text-violet-300">
+                        {Number(
+                          displaySummary.net_hours ??
+                            Number(displaySummary.hours || 0) +
+                              Number(displaySummary.overtime_hours || 0)
                         ).toFixed(1)}
                         h
                       </p>
-                      <p className="text-xs text-gray-500 dark:text-gray-500 mt-1">
-                        Total hours + approved OT
+                      <p className="text-xs text-muted-foreground mt-1.5">
+                        Credited + approved OT
                       </p>
                     </div>
-                    <div className="p-3 bg-violet-200/50 dark:bg-violet-900/40 rounded-xl">
-                      <PlusCircle className="h-6 w-6 text-violet-600 dark:text-violet-400" />
+                    <div className="p-3 rounded-xl bg-violet-500/10 shrink-0">
+                      <PlusCircle className="h-5 w-5 text-violet-600 dark:text-violet-400" />
                     </div>
                   </div>
                 </CardContent>
@@ -743,32 +833,50 @@ export default function UserWorkStatsPeriod() {
             </div>
 
             <div className="grid grid-cols-12 gap-4">
-              <Card className="col-span-12 sm:col-span-4 border-0 shadow-sm bg-gradient-to-br from-orange-50 to-orange-100/40 dark:from-orange-950/20 dark:to-orange-900/10">
+              <Card className="col-span-12 sm:col-span-6 lg:col-span-3 border border-border/60 shadow-sm rounded-2xl">
                 <CardContent className="p-4">
-                  <p className="text-xs text-gray-600 dark:text-gray-400 mb-1">
-                    Overtime Hours
+                  <div className="flex items-center gap-2 mb-1">
+                    <Palmtree className="h-3.5 w-3.5 text-sky-600 dark:text-sky-400" />
+                    <p className="text-xs text-muted-foreground">Personal leave</p>
+                  </div>
+                  <p className="text-2xl font-bold tabular-nums text-sky-700 dark:text-sky-300">
+                    {Number(displaySummary.other_leave_hours || 0).toFixed(1)}h
                   </p>
-                  <p className="text-2xl font-bold text-orange-700 dark:text-orange-300">
+                  <p className="text-[11px] text-muted-foreground mt-1">
+                    {Number(displaySummary.other_leave_days || 0)} day
+                    {Number(displaySummary.other_leave_days || 0) === 1 ? "" : "s"} credited
+                  </p>
+                </CardContent>
+              </Card>
+              <Card className="col-span-12 sm:col-span-6 lg:col-span-3 border border-border/60 shadow-sm rounded-2xl">
+                <CardContent className="p-4">
+                  <div className="flex items-center gap-2 mb-1">
+                    <Timer className="h-3.5 w-3.5 text-orange-600 dark:text-orange-400" />
+                    <p className="text-xs text-muted-foreground">Approved OT</p>
+                  </div>
+                  <p className="text-2xl font-bold tabular-nums text-orange-700 dark:text-orange-300">
                     {Number(displaySummary.overtime_hours || 0).toFixed(1)}h
                   </p>
                 </CardContent>
               </Card>
-              <Card className="col-span-12 sm:col-span-4 border-0 shadow-sm bg-gradient-to-br from-amber-50 to-amber-100/40 dark:from-amber-950/20 dark:to-amber-900/10">
+              <Card className="col-span-12 sm:col-span-6 lg:col-span-3 border border-border/60 shadow-sm rounded-2xl">
                 <CardContent className="p-4">
-                  <p className="text-xs text-gray-600 dark:text-gray-400 mb-1">
-                    OT Requested
-                  </p>
-                  <p className="text-2xl font-bold text-amber-700 dark:text-amber-300">
+                  <div className="flex items-center gap-2 mb-1">
+                    <TrendingUp className="h-3.5 w-3.5 text-amber-600 dark:text-amber-400" />
+                    <p className="text-xs text-muted-foreground">OT requested</p>
+                  </div>
+                  <p className="text-2xl font-bold tabular-nums text-amber-700 dark:text-amber-300">
                     {Number(displaySummary.requested_extra_hours || 0).toFixed(1)}h
                   </p>
                 </CardContent>
               </Card>
-              <Card className="col-span-12 sm:col-span-4 border-0 shadow-sm bg-gradient-to-br from-cyan-50 to-cyan-100/40 dark:from-cyan-950/20 dark:to-cyan-900/10">
+              <Card className="col-span-12 sm:col-span-6 lg:col-span-3 border border-border/60 shadow-sm rounded-2xl">
                 <CardContent className="p-4">
-                  <p className="text-xs text-gray-600 dark:text-gray-400 mb-1">
-                    Break Time
-                  </p>
-                  <p className="text-2xl font-bold text-cyan-700 dark:text-cyan-300">
+                  <div className="flex items-center gap-2 mb-1">
+                    <Clock className="h-3.5 w-3.5 text-cyan-600 dark:text-cyan-400" />
+                    <p className="text-xs text-muted-foreground">Break time</p>
+                  </div>
+                  <p className="text-2xl font-bold tabular-nums text-cyan-700 dark:text-cyan-300">
                     {Math.max(0, Number(displaySummary.break_minutes || 0))}m
                   </p>
                 </CardContent>

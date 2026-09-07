@@ -30,6 +30,8 @@ export type CreativeAsset = {
   id: string;
   project_id?: string | null;
   project_name?: string | null;
+  folder_id?: string | null;
+  folder_name?: string | null;
   creator_id: string;
   creator_name?: string | null;
   title: string;
@@ -49,6 +51,18 @@ export type CreativeAsset = {
   reviews?: CreativeReview[] | null;
 };
 
+export type CreativeFolder = {
+  id: string;
+  parent_id?: string | null;
+  name: string;
+  created_by: string;
+  created_by_name?: string | null;
+  created_at?: string | null;
+  updated_at?: string | null;
+  asset_count?: number | null;
+  child_count?: number | null;
+};
+
 export type CreativeAssetPayload = {
   id?: string;
   title: string;
@@ -60,6 +74,7 @@ export type CreativeAssetPayload = {
   uploaded_file_path?: string | null;
   preview_thumbnail_url?: string | null;
   project_id?: string | null;
+  folder_id?: string | null;
   creator_id?: string | null;
   scheduled_date?: string | null;
   published_date?: string | null;
@@ -74,6 +89,8 @@ export type CreativeListParams = {
   material_type?: CreativeMaterialType | 'all' | '';
   platform?: CreativePlatform | 'all' | '';
   project_id?: string;
+  /** `root` = Unfiled; omit when searching globally. */
+  folder_id?: string | 'root' | null;
   from?: string;
   to?: string;
   page?: number;
@@ -151,6 +168,11 @@ export async function listCreativeAssets(
   }
   if (params.platform && params.platform !== 'all') qs.set('platform', params.platform);
   if (params.project_id && params.project_id !== 'all') qs.set('project_id', params.project_id);
+  if (params.folder_id === 'root' || params.folder_id === null) {
+    qs.set('folder_id', 'root');
+  } else if (params.folder_id) {
+    qs.set('folder_id', params.folder_id);
+  }
   if (params.from) qs.set('from', params.from);
   if (params.to) qs.set('to', params.to);
   qs.set('page', String(params.page ?? 1));
@@ -251,13 +273,92 @@ export async function uploadCreativeFile(
 export async function getCreativeStats(params?: {
   from?: string;
   to?: string;
+  folder_id?: string | 'root' | null;
 }): Promise<CreativeStats> {
   const qs = new URLSearchParams();
   if (params?.from) qs.set('from', params.from);
   if (params?.to) qs.set('to', params.to);
+  if (params?.folder_id === 'root' || params?.folder_id === null) {
+    qs.set('folder_id', 'root');
+  } else if (params?.folder_id) {
+    qs.set('folder_id', params.folder_id);
+  }
   const res = await fetch(`${ENV.API_URL}/creative/stats.php?${qs}`, {
     headers: authHeaders(),
   });
   const data = await parseJson(res);
   return data.data as CreativeStats;
+}
+
+export async function listCreativeFolders(params?: {
+  parent_id?: string | 'root' | 'all';
+}): Promise<CreativeFolder[]> {
+  const qs = new URLSearchParams();
+  qs.set('parent_id', params?.parent_id ?? 'all');
+  const res = await fetch(`${ENV.API_URL}/creative/folders/list.php?${qs}`, {
+    headers: authHeaders(),
+  });
+  const data = await parseJson(res);
+  return data.data?.items ?? [];
+}
+
+export async function createCreativeFolder(payload: {
+  name: string;
+  parent_id?: string | null;
+}): Promise<CreativeFolder> {
+  const res = await fetch(`${ENV.API_URL}/creative/folders/create.php`, {
+    method: 'POST',
+    headers: authHeaders(),
+    body: JSON.stringify(payload),
+  });
+  const data = await parseJson(res);
+  return data.data as CreativeFolder;
+}
+
+export async function updateCreativeFolder(payload: {
+  id: string;
+  name?: string;
+  parent_id?: string | null;
+}): Promise<CreativeFolder> {
+  const res = await fetch(`${ENV.API_URL}/creative/folders/update.php`, {
+    method: 'PUT',
+    headers: authHeaders(),
+    body: JSON.stringify(payload),
+  });
+  const data = await parseJson(res);
+  return data.data as CreativeFolder;
+}
+
+export async function deleteCreativeFolder(id: string): Promise<void> {
+  const res = await fetch(
+    `${ENV.API_URL}/creative/folders/delete.php?id=${encodeURIComponent(id)}`,
+    { method: 'DELETE', headers: authHeaders() }
+  );
+  await parseJson(res);
+}
+
+export async function moveCreativeAssets(payload: {
+  asset_ids: string[];
+  folder_id?: string | null;
+}): Promise<{ moved: number; folder_id: string | null }> {
+  const res = await fetch(`${ENV.API_URL}/creative/move.php`, {
+    method: 'POST',
+    headers: authHeaders(),
+    body: JSON.stringify(payload),
+  });
+  const data = await parseJson(res);
+  return data.data;
+}
+
+export async function copyCreativeAssets(payload: {
+  asset_ids: string[];
+  folder_id?: string | null;
+}): Promise<{ items: CreativeAsset[]; copied: number; folder_id: string | null }> {
+  const res = await fetch(`${ENV.API_URL}/creative/copy.php`, {
+    method: 'POST',
+    headers: authHeaders(),
+    body: JSON.stringify(payload),
+  });
+  const data = await parseJson(res);
+  return data.data;
 }
