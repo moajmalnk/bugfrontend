@@ -456,17 +456,17 @@ function EditMessageDialog({
           if (!next) requestClose();
         }}
       >
-        <DialogContent className="max-w-[600px] rounded-2xl">
-          <DialogHeader>
+        <DialogContent className="w-[calc(100%-2rem)] max-w-[min(600px,calc(100vw-2rem))] min-w-0 overflow-x-hidden rounded-2xl">
+          <DialogHeader className="min-w-0">
             <DialogTitle>
               Edit {message?.kind === "reply" ? "reply" : "doubt"}
             </DialogTitle>
-            <DialogDescription>
+            <DialogDescription className="min-w-0 break-words">
               Update the text and voice. Empty messages are not allowed.
             </DialogDescription>
           </DialogHeader>
-          <form onSubmit={handleSave} className="grid grid-cols-12 gap-4">
-            <div className="col-span-12 flex flex-col gap-2">
+          <form onSubmit={handleSave} className="grid min-w-0 grid-cols-12 gap-4 overflow-x-hidden">
+            <div className="col-span-12 flex min-w-0 flex-col gap-2">
               <Label htmlFor="edit-doubt-body">Description</Label>
               <Textarea
                 id="edit-doubt-body"
@@ -474,13 +474,13 @@ function EditMessageDialog({
                 maxLength={BODY_MAX}
                 disabled={saving}
                 onChange={(e) => setBody(e.target.value.slice(0, BODY_MAX))}
-                className="min-h-[100px] rounded-xl"
+                className="min-h-[100px] w-full max-w-full min-w-0 rounded-xl"
               />
               <p className="text-right text-xs text-muted-foreground">
                 {body.length}/{BODY_MAX}
               </p>
             </div>
-            <div className="col-span-12 flex flex-col gap-2">
+            <div className="col-span-12 flex min-w-0 flex-col gap-2 overflow-hidden">
               <Label>Voice message</Label>
               {keptAttachments.length > 0 ? (
                 <VoiceList

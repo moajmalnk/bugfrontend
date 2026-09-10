@@ -367,11 +367,14 @@ export function WhatsAppVoiceMessage({
         ? 0.08
         : 0;
 
-  const waveValues = useMemo(
-    () =>
-      waveform && waveform.length > 0 ? waveform : placeholderWaveform(),
-    [waveform]
-  );
+  const waveValues = useMemo(() => {
+    const raw =
+      waveform && waveform.length > 0 ? waveform : placeholderWaveform();
+    // Why: Long recordings can ship 100+ bars; clamp so form layouts stay inside modals.
+    if (raw.length <= 48) return raw;
+    const step = raw.length / 48;
+    return Array.from({ length: 48 }, (_, i) => raw[Math.floor(i * step)] ?? 0.4);
+  }, [waveform]);
 
   const bars = useMemo(() => {
     const activeCount = Math.floor(waveValues.length * progress);
@@ -382,7 +385,7 @@ export function WhatsAppVoiceMessage({
         <div
           key={`${id}-bar-${index}`}
           className={cn(
-            "w-[2.5px] rounded-full pointer-events-none",
+            "w-[2.5px] shrink-0 rounded-full pointer-events-none",
             !isScrubbing && "transition-[background-color,height] duration-75",
             accent === "sent"
               ? isBarActive
@@ -404,15 +407,15 @@ export function WhatsAppVoiceMessage({
   return (
     <div
       className={cn(
-        "flex w-full min-w-0 max-w-full items-center",
+        "flex w-full min-w-0 max-w-full items-center overflow-hidden",
         isForm || !isSent ? "justify-start" : "justify-end"
       )}
     >
       <div
         className={cn(
-          "flex min-w-0 items-center gap-2.5 rounded-2xl px-2.5 py-2 shadow-sm sm:gap-3 sm:px-3",
+          "flex min-w-0 max-w-full items-center gap-2.5 overflow-hidden rounded-2xl px-2.5 py-2 shadow-sm sm:gap-3 sm:px-3",
           isForm
-            ? "w-full max-w-full flex-1 rounded-xl border border-border/60"
+            ? "w-full rounded-xl border border-border/60"
             : "w-full max-w-[min(100%,22rem)]",
           isSent
             ? "bg-emerald-600 text-white dark:bg-emerald-600"
@@ -501,7 +504,7 @@ export function WhatsAppVoiceMessage({
                 : "cursor-default opacity-80"
             )}
           >
-            <div className="flex h-8 w-full items-end gap-[2px] overflow-hidden px-0.5">
+            <div className="flex h-8 w-full min-w-0 items-end gap-[2px] overflow-hidden px-0.5">
               {bars}
             </div>
           </div>

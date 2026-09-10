@@ -148,24 +148,24 @@ export function AskDoubtDialog({
         }}
       >
         <DialogContent
-          className="sm:max-w-[600px] rounded-2xl gap-4"
+          className="w-[calc(100%-2rem)] max-w-[min(600px,calc(100vw-2rem))] min-w-0 overflow-x-hidden rounded-2xl gap-4"
           showCloseButton={!submitting}
         >
-          <DialogHeader className="text-left space-y-2">
-            <DialogTitle className="flex items-center gap-2">
-              <span className="inline-flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-violet-500 to-indigo-600 text-white shadow-sm">
+          <DialogHeader className="min-w-0 text-left space-y-2">
+            <DialogTitle className="flex min-w-0 items-center gap-2">
+              <span className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-violet-500 to-indigo-600 text-white shadow-sm">
                 <CircleHelp className="h-4 w-4" />
               </span>
               Ask a doubt
             </DialogTitle>
-            <DialogDescription>
+            <DialogDescription className="min-w-0 break-words">
               Describe what is unclear. You can also add a voice message. This
               is sent to the person who raised the bug.
             </DialogDescription>
           </DialogHeader>
 
-          <form onSubmit={handleSubmit} className="flex flex-col gap-4">
-            <div className="flex flex-col gap-2">
+          <form onSubmit={handleSubmit} className="flex min-w-0 w-full flex-col gap-4 overflow-x-hidden">
+            <div className="flex min-w-0 w-full flex-col gap-2">
               <Label htmlFor="doubt-body">Description</Label>
               <Textarea
                 id="doubt-body"
@@ -174,14 +174,14 @@ export function AskDoubtDialog({
                 disabled={submitting}
                 placeholder="What do you need clarified?"
                 onChange={(e) => setBody(e.target.value.slice(0, BODY_MAX))}
-                className="min-h-[120px] rounded-xl"
+                className="min-h-[120px] w-full max-w-full min-w-0 rounded-xl"
               />
               <span className="text-xs text-muted-foreground tabular-nums self-end">
                 {body.length}/{BODY_MAX}
               </span>
             </div>
 
-            <div className="flex flex-col gap-2">
+            <div className="flex min-w-0 w-full flex-col gap-2 overflow-hidden">
               <Label>Voice message</Label>
               {voice ? (
                 <WhatsAppVoiceMessage
@@ -202,7 +202,7 @@ export function AskDoubtDialog({
               )}
             </div>
 
-            <DialogFooter className="w-full gap-2 sm:gap-2 sm:space-x-0">
+            <DialogFooter className="w-full min-w-0 gap-2 sm:gap-2 sm:space-x-0">
               <Button
                 type="button"
                 variant="outline"

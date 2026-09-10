@@ -154,7 +154,8 @@ export function WhatsAppVoiceRecorder({
   };
 
   const generateFallbackWaveform = (duration: number) => {
-    const samples = Math.max(20, Math.floor(duration * 6));
+    // Why: Cap bar count so long recordings cannot force form modals wider than the viewport.
+    const samples = Math.min(48, Math.max(24, Math.floor(duration * 2)));
     return new Array(samples).fill(0).map(() => Math.random() * 0.6 + 0.2);
   };
 
@@ -174,11 +175,11 @@ export function WhatsAppVoiceRecorder({
     <div
       className={cn(
         // Match visual style of attachment cards (Add Screenshots / Attach Files)
-        "w-full h-28 sm:h-28 rounded-xl border-2 border-dashed border-gray-300 bg-slate-900/60 px-4 py-3 shadow-sm transition-all dark:border-gray-600",
+        "h-28 w-full min-w-0 max-w-full rounded-xl border-2 border-dashed border-gray-300 bg-slate-900/60 px-4 py-3 shadow-sm transition-all dark:border-gray-600 sm:h-28",
         isRecording && "border-emerald-400 shadow-[0_0_0_1px_rgba(16,185,129,0.4)]"
       )}
     >
-      <div className="flex h-full w-full items-center justify-center gap-4">
+      <div className="flex h-full w-full min-w-0 items-center justify-center gap-4 overflow-hidden">
         <Button
           type="button"
           disabled={disabled || isProcessing}

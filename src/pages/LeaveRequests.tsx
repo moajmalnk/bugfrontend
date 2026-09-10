@@ -11,6 +11,7 @@ import {
 import { useAuth } from '@/context/AuthContext';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
+import { Switch } from '@/components/ui/switch';
 import { Textarea } from '@/components/ui/textarea';
 import { Skeleton } from '@/components/ui/skeleton';
 import { DatePicker } from '@/components/ui/DatePicker';
@@ -22,6 +23,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { toast } from '@/components/ui/use-toast';
+import { cn } from '@/lib/utils';
 import {
   cancelLeaveRequest,
   getLeaveTypes,
@@ -497,20 +499,38 @@ export default function LeaveRequests() {
                   />
                 </div>
 
-                <label className="flex items-center gap-2 text-sm font-medium">
-                  <input
-                    type="checkbox"
+                <div
+                  className={cn(
+                    'flex w-full min-w-0 items-center justify-between gap-3 rounded-xl border px-3 py-3 transition-colors',
+                    'border-gray-200/70 bg-white/70 dark:border-gray-700/70 dark:bg-gray-800/70',
+                    isHalfDay &&
+                      'border-teal-500/70 bg-teal-50/80 dark:border-teal-500/50 dark:bg-teal-950/30'
+                  )}
+                >
+                  <div className="min-w-0 flex-1">
+                    <Label
+                      htmlFor="half-day-leave-toggle"
+                      className="cursor-pointer text-sm font-semibold text-foreground"
+                    >
+                      Half-day leave
+                    </Label>
+                    <p className="mt-0.5 text-xs text-muted-foreground">
+                      Uses 0.5 day on the start date only
+                    </p>
+                  </div>
+                  <Switch
+                    id="half-day-leave-toggle"
                     checked={isHalfDay}
-                    onChange={(e) => {
-                      const on = e.target.checked;
+                    onCheckedChange={(on) => {
                       setIsHalfDay(on);
                       if (on && startDate) setEndDate(startDate);
                     }}
+                    aria-label="Half-day leave"
+                    className="shrink-0 data-[state=checked]:bg-teal-600"
                   />
-                  Half-day leave
-                </label>
+                </div>
 
-                {isHalfDay && (
+                {isHalfDay ? (
                   <div className="space-y-2">
                     <Label className="text-sm font-semibold">Half</Label>
                     <Select
@@ -528,19 +548,17 @@ export default function LeaveRequests() {
                       </SelectContent>
                     </Select>
                   </div>
-                )}
-
-                {!isHalfDay && (
-                <div className="space-y-2">
-                  <Label className="text-sm font-semibold">End date</Label>
-                  <DatePicker
-                    value={endDate}
-                    onChange={setEndDate}
-                    placeholder="Pick end date"
-                    disableFuture={false}
-                    className="h-11 rounded-xl border-gray-200/70 dark:border-gray-700/70 bg-white/70 dark:bg-gray-800/70"
-                  />
-                </div>
+                ) : (
+                  <div className="space-y-2">
+                    <Label className="text-sm font-semibold">End date</Label>
+                    <DatePicker
+                      value={endDate}
+                      onChange={setEndDate}
+                      placeholder="Pick end date"
+                      disableFuture={false}
+                      className="h-11 rounded-xl border-gray-200/70 dark:border-gray-700/70 bg-white/70 dark:bg-gray-800/70"
+                    />
+                  </div>
                 )}
 
                 <div className="space-y-2">
