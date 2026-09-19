@@ -1,6 +1,7 @@
 import React from "react";
 import {
   Document,
+  Font,
   Image,
   Page,
   StyleSheet,
@@ -8,6 +9,7 @@ import {
   View,
   pdf,
 } from "@react-pdf/renderer";
+import { parseTipDescription } from "@/lib/cursorTips/parseTipDescription";
 
 export type CursorTipPdfItem = {
   phase: string;
@@ -35,11 +37,53 @@ type DownloadCursorTipsPdfOptions = {
   filePrefix?: string;
 };
 
+let fontsRegistered = false;
+
+/**
+ * Why: Default Helvetica has no Malayalam glyphs, so ML text collapses into
+ * overlapping tofu. Self-hosted Noto TTFs keep PDF bilingual and offline-safe.
+ */
+const ensurePdfFonts = () => {
+  if (fontsRegistered) return;
+  const origin =
+    typeof window !== "undefined" ? window.location.origin : "";
+  Font.register({
+    family: "NotoSans",
+    fonts: [
+      { src: `${origin}/fonts/NotoSans-Regular.ttf`, fontWeight: 400 },
+      { src: `${origin}/fonts/NotoSans-Bold.ttf`, fontWeight: 700 },
+    ],
+  });
+  Font.register({
+    family: "NotoSansMalayalam",
+    fonts: [
+      {
+        src: `${origin}/fonts/NotoSansMalayalam-Regular.ttf`,
+        fontWeight: 400,
+      },
+      { src: `${origin}/fonts/NotoSansMalayalam-Bold.ttf`, fontWeight: 700 },
+    ],
+  });
+  Font.registerHyphenationCallback((word) => [word]);
+  fontsRegistered = true;
+};
+
+const hasMalayalam = (value?: string | null) =>
+  /[\u0D00-\u0D7F]/.test(value || "");
+
+const compactText = (value?: string | null, max = 420) => {
+  const normalized = (value || "").replace(/\s+/g, " ").trim();
+  if (!normalized) return "";
+  if (normalized.length <= max) return normalized;
+  return `${normalized.slice(0, max - 1)}…`;
+};
+
 const styles = StyleSheet.create({
   page: {
     paddingHorizontal: 20,
     paddingVertical: 18,
     fontSize: 10,
+    fontFamily: "NotoSans",
     color: "#111827",
     backgroundColor: "#ffffff",
   },
@@ -62,6 +106,7 @@ const styles = StyleSheet.create({
   },
   reportTitle: {
     fontSize: 12,
+    fontFamily: "NotoSans",
     fontWeight: 700,
     color: "#111827",
   },
@@ -69,6 +114,7 @@ const styles = StyleSheet.create({
     marginTop: 2,
     fontSize: 10,
     color: "#4b5563",
+    lineHeight: 1.45,
   },
   metaRow: {
     marginTop: 8,
@@ -106,6 +152,7 @@ const styles = StyleSheet.create({
   summaryValue: {
     marginTop: 2,
     fontSize: 12,
+    fontFamily: "NotoSans",
     fontWeight: 700,
     color: "#111827",
   },
@@ -113,7 +160,7 @@ const styles = StyleSheet.create({
     border: "1 solid #e5e7eb",
     borderRadius: 6,
     padding: 10,
-    marginBottom: 8,
+    marginBottom: 10,
     backgroundColor: "#fafafa",
   },
   tipHeader: {
@@ -125,6 +172,7 @@ const styles = StyleSheet.create({
   tipTitle: {
     flex: 1,
     fontSize: 11,
+    fontFamily: "NotoSans",
     fontWeight: 700,
     color: "#111827",
   },
@@ -136,20 +184,35 @@ const styles = StyleSheet.create({
   tipKey: {
     fontSize: 8,
     color: "#9ca3af",
-    marginBottom: 4,
+    marginBottom: 6,
   },
-  tipBody: {
-    fontSize: 9,
-    color: "#374151",
-    lineHeight: 1.4,
-    marginBottom: 3,
+  block: {
+    marginBottom: 6,
   },
   sectionLabel: {
     fontSize: 8,
+    fontFamily: "NotoSans",
     fontWeight: 700,
     color: "#111827",
-    marginTop: 4,
-    marginBottom: 1,
+    marginBottom: 2,
+  },
+  bodyEn: {
+    fontSize: 9,
+    fontFamily: "NotoSans",
+    color: "#374151",
+    lineHeight: 1.5,
+  },
+  bodyMl: {
+    fontSize: 9,
+    fontFamily: "NotoSansMalayalam",
+    color: "#1f2937",
+    lineHeight: 1.75,
+  },
+  mutedEn: {
+    fontSize: 9,
+    fontFamily: "NotoSans",
+    color: "#6b7280",
+    lineHeight: 1.45,
   },
   footer: {
     marginTop: 14,
@@ -158,12 +221,6 @@ const styles = StyleSheet.create({
     textAlign: "right",
   },
 });
-
-const compactText = (value?: string | null, max = 220) => {
-  const normalized = (value || "-").replace(/\s+/g, " ").trim();
-  if (normalized.length <= max) return normalized;
-  return `${normalized.slice(0, max - 1)}…`;
-};
 
 const phaseLabel = (phase: string) => {
   const map: Record<string, string> = {
@@ -181,6 +238,130 @@ const getSummaryLayout = (count: number) => {
   if (count === 2) return { columns: 2, width: "49%", gap: "2%" };
   if (count === 3) return { columns: 3, width: "32%", gap: "2%" };
   return { columns: 4, width: "23.5%", gap: "2%" };
+};
+
+const PdfText = ({
+  value,
+  style,
+  max = 420,
+}: {
+  value?: string | null;
+  style?: object | object[];
+  max?: number;
+}) => {
+  const text = compactText(value, max);
+  if (!text) return null;
+  const ml = hasMalayalam(text);
+  return (
+    <Text style={[ml ? styles.bodyMl : styles.bodyEn, style as object]}>
+      {text}
+    </Text>
+  );
+};
+
+const LabeledBlock = ({
+  label,
+  en,
+  ml,
+  enMax = 320,
+  mlMax = 320,
+}: {
+  label: string;
+  en?: string | null;
+  ml?: string | null;
+  enMax?: number;
+  mlMax?: number;
+}) => {
+  const enText = compactText(en, enMax);
+  const mlText = compactText(ml, mlMax);
+  if (!enText && !mlText) return null;
+  return (
+    <View style={styles.block} wrap={false}>
+      <Text style={styles.sectionLabel}>{label}</Text>
+      {enText ? <Text style={styles.bodyEn}>{enText}</Text> : null}
+      {mlText ? (
+        <Text style={[styles.bodyMl, { marginTop: enText ? 3 : 0 }]}>
+          {mlText}
+        </Text>
+      ) : null}
+    </View>
+  );
+};
+
+const TipCard = ({ tip, index }: { tip: CursorTipPdfItem; index: number }) => {
+  const { requirement, malayalam } = parseTipDescription(tip.description || "");
+  const req = compactText(requirement, 480);
+  const ml = compactText(malayalam, 480);
+
+  return (
+    <View style={styles.tipCard} wrap>
+      <View style={styles.tipHeader} wrap={false}>
+        <Text style={styles.tipTitle}>
+          {tip.sortOrder != null ? `${tip.sortOrder}. ` : `${index + 1}. `}
+          {compactText(tip.title, 90)}
+        </Text>
+        <Text style={styles.tipMeta}>{phaseLabel(tip.phase)}</Text>
+      </View>
+      <Text style={styles.tipKey}>{tip.tipKey}</Text>
+      {tip.subtitle ? (
+        <Text style={[styles.mutedEn, { marginBottom: 4 }]}>
+          {compactText(tip.subtitle, 120)}
+        </Text>
+      ) : null}
+
+      {req ? (
+        <View style={styles.block} wrap={false}>
+          <Text style={styles.sectionLabel}>Requirement</Text>
+          <Text style={styles.bodyEn}>{req}</Text>
+        </View>
+      ) : null}
+
+      {ml ? (
+        <View style={styles.block} wrap={false}>
+          <Text style={styles.sectionLabel}>Malayalam</Text>
+          <Text style={styles.bodyMl}>{ml}</Text>
+        </View>
+      ) : null}
+
+      <LabeledBlock
+        label="Analogy"
+        en={tip.analogyEn}
+        ml={tip.analogyMl}
+        enMax={220}
+        mlMax={220}
+      />
+
+      {tip.whenToUse ? (
+        <View style={styles.block} wrap={false}>
+          <Text style={styles.sectionLabel}>Use when</Text>
+          <PdfText value={tip.whenToUse} max={220} />
+        </View>
+      ) : null}
+
+      {tip.whenNotToUse ? (
+        <View style={styles.block} wrap={false}>
+          <Text style={styles.sectionLabel}>Avoid when</Text>
+          <PdfText value={tip.whenNotToUse} max={220} />
+        </View>
+      ) : null}
+
+      {tip.exampleBad ? (
+        <View style={styles.block} wrap={false}>
+          <Text style={styles.sectionLabel}>Weak</Text>
+          <PdfText value={tip.exampleBad} max={260} />
+        </View>
+      ) : null}
+
+      {tip.exampleGood ? (
+        <View style={styles.block} wrap={false}>
+          <Text style={styles.sectionLabel}>
+            Strong{tip.exampleLanguage ? ` (${tip.exampleLanguage})` : ""}
+          </Text>
+          <PdfText value={tip.exampleGood} max={280} />
+        </View>
+      ) : null}
+    </View>
+  );
 };
 
 const CursorTipsDocument = ({
@@ -202,8 +383,8 @@ const CursorTipsDocument = ({
 
   return (
     <Document>
-      <Page size="A4" style={styles.page}>
-        <View style={styles.header}>
+      <Page size="A4" style={styles.page} wrap>
+        <View style={styles.header} fixed={false}>
           <Image src={letterHeadSrc} style={styles.letterHeadImage} />
           <View style={styles.reportMetaCard}>
             <Text style={styles.reportTitle}>{reportTitle}</Text>
@@ -240,59 +421,7 @@ const CursorTipsDocument = ({
         </View>
 
         {tips.map((tip, index) => (
-          <View key={`${tip.tipKey}-${index}`} style={styles.tipCard} wrap={false}>
-            <View style={styles.tipHeader}>
-              <Text style={styles.tipTitle}>
-                {tip.sortOrder != null ? `${tip.sortOrder}. ` : ""}
-                {compactText(tip.title, 90)}
-              </Text>
-              <Text style={styles.tipMeta}>{phaseLabel(tip.phase)}</Text>
-            </View>
-            <Text style={styles.tipKey}>{tip.tipKey}</Text>
-            {tip.subtitle ? (
-              <Text style={[styles.tipBody, { color: "#6b7280" }]}>
-                {compactText(tip.subtitle, 120)}
-              </Text>
-            ) : null}
-            <Text style={styles.tipBody}>{compactText(tip.description, 420)}</Text>
-            {tip.analogyEn || tip.analogyMl ? (
-              <>
-                <Text style={styles.sectionLabel}>Analogy</Text>
-                {tip.analogyEn ? (
-                  <Text style={styles.tipBody}>{compactText(tip.analogyEn, 180)}</Text>
-                ) : null}
-                {tip.analogyMl ? (
-                  <Text style={styles.tipBody}>{compactText(tip.analogyMl, 180)}</Text>
-                ) : null}
-              </>
-            ) : null}
-            {tip.whenToUse ? (
-              <>
-                <Text style={styles.sectionLabel}>Use when</Text>
-                <Text style={styles.tipBody}>{compactText(tip.whenToUse, 160)}</Text>
-              </>
-            ) : null}
-            {tip.whenNotToUse ? (
-              <>
-                <Text style={styles.sectionLabel}>Avoid when</Text>
-                <Text style={styles.tipBody}>{compactText(tip.whenNotToUse, 160)}</Text>
-              </>
-            ) : null}
-            {tip.exampleBad ? (
-              <>
-                <Text style={styles.sectionLabel}>Weak</Text>
-                <Text style={styles.tipBody}>{compactText(tip.exampleBad, 200)}</Text>
-              </>
-            ) : null}
-            {tip.exampleGood ? (
-              <>
-                <Text style={styles.sectionLabel}>
-                  Strong{tip.exampleLanguage ? ` (${tip.exampleLanguage})` : ""}
-                </Text>
-                <Text style={styles.tipBody}>{compactText(tip.exampleGood, 220)}</Text>
-              </>
-            ) : null}
-          </View>
+          <TipCard key={`${tip.tipKey}-${index}`} tip={tip} index={index} />
         ))}
 
         <Text style={styles.footer}>
@@ -306,6 +435,7 @@ const CursorTipsDocument = ({
 export const downloadCursorTipsPdf = async (
   options: DownloadCursorTipsPdfOptions
 ) => {
+  ensurePdfFonts();
   const blob = await pdf(<CursorTipsDocument {...options} />).toBlob();
   const url = URL.createObjectURL(blob);
   const link = document.createElement("a");
