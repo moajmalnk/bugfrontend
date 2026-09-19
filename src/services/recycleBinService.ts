@@ -19,7 +19,8 @@ export type RecycleBinEntityType =
   | 'work_submission'
   | 'shared_task'
   | 'user_task'
-  | 'codo_rule';
+  | 'codo_rule'
+  | 'cursor_tip';
 
 export type RecycleBinItem = {
   id: string;
@@ -173,4 +174,5 @@ export const RECYCLE_BIN_ENTITY_LABELS: Record<string, string> = {
   shared_task: 'Shared tasks',
   user_task: 'Tasks',
   codo_rule: 'CODO rules',
+  cursor_tip: 'Cursor tips',
 };

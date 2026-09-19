@@ -201,6 +201,7 @@ export type ReferralSource =
 
 export interface ClientSummary {
   id: string;
+  client_code?: string | null;
   corporate_name: string;
   website?: string | null;
   market_industry?: MarketIndustry | null;

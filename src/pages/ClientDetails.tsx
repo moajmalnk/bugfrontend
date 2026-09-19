@@ -20,9 +20,11 @@ import {
   getReferralSourceLabel,
 } from '@/lib/utils/clientUtils';
 import { getProjectStatusLabel } from '@/lib/utils/projectUtils';
-import { cn, getEffectiveRole } from '@/lib/utils';
+import { cn, getEffectiveRole, hasPermissionOrAdmin } from '@/lib/utils';
 import { clientService } from '@/services/clientService';
+import { assetsService } from '@/services/assetsService';
 import { Client } from '@/types';
+import type { ClientAssetGraph } from '@/types/assets';
 import { format } from 'date-fns';
 import {
   ArrowLeft,
@@ -39,10 +41,12 @@ import {
   Phone,
   Trash2,
   UserRound,
+  Server,
 } from 'lucide-react';
 import { useCallback, useEffect, useState } from 'react';
 import { Link, useLocation, useNavigate, useParams } from 'react-router-dom';
 import { getReturnPathFromState } from '@/hooks/useUrlPagination';
+import { usePermissions } from '@/hooks/usePermissions';
 
 const statusColors: Record<string, string> = {
   lead: 'bg-amber-500 text-white',
@@ -140,12 +144,15 @@ const ClientDetails = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const { currentUser } = useAuth();
+  const { hasPermission } = usePermissions(null);
   const role = getEffectiveRole(currentUser || {});
+  const canViewAssets = hasPermissionOrAdmin(role, hasPermission, 'ASSETS_VIEW');
   const clientsBackPath = getReturnPathFromState(
     location.state,
     `/${role}/clients`
   );
   const [client, setClient] = useState<Client | null>(null);
+  const [assetGraph, setAssetGraph] = useState<ClientAssetGraph | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [deleteOpen, setDeleteOpen] = useState(false);
 
@@ -155,6 +162,13 @@ const ClientDetails = () => {
     try {
       const data = await clientService.getClient(clientId);
       setClient(data);
+      if (canViewAssets) {
+        try {
+          setAssetGraph(await assetsService.clientGraph(clientId));
+        } catch {
+          setAssetGraph(null);
+        }
+      }
     } catch (err) {
       toast({
         title: 'Failed to load client',
@@ -164,7 +178,7 @@ const ClientDetails = () => {
     } finally {
       setIsLoading(false);
     }
-  }, [clientId]);
+  }, [clientId, canViewAssets]);
 
   useEffect(() => {
     void loadClient();
@@ -383,11 +397,12 @@ const ClientDetails = () => {
                 iconClass="bg-gradient-to-br from-blue-500 to-indigo-600"
               >
                 <div className="space-y-3">
+                  <DetailField label="Client ID" value={client.client_code} icon={IdCard} />
                   <DetailField label="Corporate Name" value={client.corporate_name} icon={Building2} />
                   <DetailField label="Website" value={client.website} icon={Globe} />
                   <DetailField label="Industry" value={industryLabel} icon={IdCard} />
                   <DetailField label="GST / Tax ID" value={client.gst_tax_id} icon={IdCard} />
-                  {!client.website && !industryLabel && !client.gst_tax_id && (
+                  {!client.client_code && !client.website && !industryLabel && !client.gst_tax_id && (
                     <p className="text-sm text-muted-foreground">Only corporate name is set.</p>
                   )}
                 </div>
@@ -504,6 +519,52 @@ const ClientDetails = () => {
                   </div>
                 </CardContent>
               </Card>
+            )}
+
+            {canViewAssets && (
+              <SectionCard
+                title="Infrastructure"
+                icon={Server}
+                iconClass="bg-gradient-to-br from-slate-600 to-cyan-600"
+              >
+                <div className="grid grid-cols-12 gap-3">
+                  {(
+                    [
+                      ['Domains', assetGraph?.counts.domains ?? 0],
+                      ['Subdomains', assetGraph?.counts.subdomains ?? 0],
+                      ['Mailboxes', assetGraph?.counts.mailboxes ?? 0],
+                      ['VPS', assetGraph?.counts.servers ?? 0],
+                      ['Hosting', assetGraph?.counts.hosting ?? 0],
+                      ['Vercel', assetGraph?.counts.vercel ?? 0],
+                    ] as Array<[string, number]>
+                  ).map(([label, value]) => (
+                    <div
+                      key={label}
+                      className="col-span-6 sm:col-span-4 rounded-xl border border-border/50 bg-muted/20 p-3"
+                    >
+                      <div className="text-xs text-muted-foreground">{label}</div>
+                      <div className="text-lg font-semibold mt-0.5">{value}</div>
+                    </div>
+                  ))}
+                </div>
+                {(assetGraph?.domains?.length ?? 0) > 0 && (
+                  <div className="flex flex-col gap-2 mt-2">
+                    {assetGraph?.domains.slice(0, 5).map((d) => (
+                      <Link
+                        key={d.id}
+                        to={`/${role}/bugassets/domains/${d.id}`}
+                        className="text-sm font-medium text-primary hover:underline truncate"
+                      >
+                        {d.fqdn}
+                        {d.expires_at ? ` · expires ${d.expires_at}` : ''}
+                      </Link>
+                    ))}
+                  </div>
+                )}
+                <Button variant="outline" size="sm" className="rounded-xl mt-2" asChild>
+                  <Link to={`/${role}/bugassets`}>Open BugAssets</Link>
+                </Button>
+              </SectionCard>
             )}
 
             {/* Linked projects */}

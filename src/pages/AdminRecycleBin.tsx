@@ -93,6 +93,7 @@ import {
   ClipboardList,
   ListTodo,
   BookOpen,
+  Sparkles,
 } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
@@ -218,6 +219,8 @@ function entityIcon(type: string) {
       return ListTodo;
     case 'codo_rule':
       return BookOpen;
+    case 'cursor_tip':
+      return Sparkles;
     default:
       return Trash2;
   }

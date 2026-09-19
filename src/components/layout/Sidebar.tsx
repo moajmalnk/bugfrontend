@@ -28,6 +28,7 @@ import {
   CalendarDays,
   Database,
   Timer,
+  Sparkles,
   Repeat,
   ShieldCheck,
   Search,
@@ -41,6 +42,7 @@ import {
   ClipboardList,
   UserRoundSearch,
   Palette,
+  Server,
 } from "lucide-react";
 import { Link, useLocation } from "react-router-dom";
 import { NotificationPopover } from "@/components/notifications/NotificationPopover";
@@ -429,6 +431,16 @@ export const Sidebar = ({ className, closeSidebar }: SidebarProps) => {
               />
             )}
 
+            {can("CURSOR_TIPS_VIEW") && (
+              <NavLink
+                to="/cursor-tips"
+                icon={<Sparkles className="h-5 w-5" />}
+                label="Cursor Tips"
+                badge={formatNavCount(navCounts.cursorTips)}
+                badgeTitle={`${navCounts.cursorTips} tip${navCounts.cursorTips === 1 ? "" : "s"}`}
+              />
+            )}
+
             <NavLink
               to="/help"
               icon={<LifeBuoy className="h-5 w-5" />}
@@ -443,6 +455,7 @@ export const Sidebar = ({ className, closeSidebar }: SidebarProps) => {
           {(() => {
             const hasUsersView = can("USERS_VIEW");
             const hasClientsView = can("CLIENTS_VIEW");
+            const hasAssetsView = can("ASSETS_VIEW");
             const hasOvertimeManage = can("OVERTIME_MANAGE");
             const hasLeaveManage = can("LEAVE_MANAGE");
             const hasAttendanceManage = can("ATTENDANCE_MANAGE");
@@ -465,6 +478,7 @@ export const Sidebar = ({ className, closeSidebar }: SidebarProps) => {
             const hasAnyAdminLinks =
               hasUsersView ||
               hasClientsView ||
+              hasAssetsView ||
               hasOvertimeManage ||
               hasLeaveManage ||
               hasAttendanceManage ||
@@ -512,6 +526,17 @@ export const Sidebar = ({ className, closeSidebar }: SidebarProps) => {
                       label="Clients"
                       badge={formatNavCount(navCounts.clients)}
                       badgeTitle={`${navCounts.clients} client${navCounts.clients === 1 ? "" : "s"}`}
+                    />
+                  )}
+
+                  {hasAssetsView && (
+                    <NavLink
+                      to="/bugassets"
+                      icon={<Server className="h-5 w-5" />}
+                      label="BugAssets"
+                      badge={formatNavCount(navCounts.assets)}
+                      badgeTone={navCounts.assets > 0 ? "alert" : "default"}
+                      badgeTitle={`${navCounts.assets} renewal${navCounts.assets === 1 ? "" : "s"} within 30 days`}
                     />
                   )}
 

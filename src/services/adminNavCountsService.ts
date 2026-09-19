@@ -20,6 +20,7 @@ import {
 import { MessagingService } from '@/services/messagingService';
 import { sharedTaskService } from '@/services/sharedTaskService';
 import { listCodoRules } from '@/services/codoRulesService';
+import { listCursorTips } from '@/services/cursorTipsService';
 import { commonBugsService } from '@/services/commonBugsService';
 import { googleDocsService } from '@/services/googleDocsService';
 import { googleSheetsService } from '@/services/googleSheetsService';
@@ -48,6 +49,7 @@ export type AdminNavCounts = {
   messages: number;
   commonBugs: number;
   codo: number;
+  cursorTips: number;
   users: number;
   clients: number;
   ot: number;
@@ -63,6 +65,7 @@ export type AdminNavCounts = {
   backup: number;
   recycleBin: number;
   creative: number;
+  assets: number;
 };
 
 export const EMPTY_ADMIN_NAV_COUNTS: AdminNavCounts = {
@@ -83,6 +86,7 @@ export const EMPTY_ADMIN_NAV_COUNTS: AdminNavCounts = {
   messages: 0,
   commonBugs: 0,
   codo: 0,
+  cursorTips: 0,
   users: 0,
   clients: 0,
   ot: 0,
@@ -98,6 +102,7 @@ export const EMPTY_ADMIN_NAV_COUNTS: AdminNavCounts = {
   backup: 0,
   recycleBin: 0,
   creative: 0,
+  assets: 0,
 };
 
 export const ADMIN_NAV_COUNTS_QUERY_KEY = ['admin-nav-counts'] as const;
@@ -269,6 +274,7 @@ function normalizeCounts(payload: Partial<AdminNavCounts>): AdminNavCounts {
     messages: asCount(payload.messages),
     commonBugs: asCount(payload.commonBugs),
     codo: asCount(payload.codo),
+    cursorTips: asCount(payload.cursorTips),
     users: asCount(payload.users),
     clients: asCount(payload.clients),
     ot: asCount(payload.ot),
@@ -284,6 +290,7 @@ function normalizeCounts(payload: Partial<AdminNavCounts>): AdminNavCounts {
     backup: asCount(payload.backup),
     recycleBin: asCount(payload.recycleBin),
     creative: asCount(payload.creative),
+    assets: asCount(payload.assets),
   };
 }
 
@@ -401,6 +408,11 @@ async function fetchAdminNavCountsFallback(): Promise<AdminNavCounts> {
     listCodoRules()
       .then((payload) => {
         counts.codo = asCount(payload.counts?.all) || payload.rules.length;
+      })
+      .catch(() => {}),
+    listCursorTips()
+      .then((payload) => {
+        counts.cursorTips = asCount(payload.counts?.all) || payload.tips.length;
       })
       .catch(() => {}),
     listPendingWfhRequests()

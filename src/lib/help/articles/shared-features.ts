@@ -315,4 +315,83 @@ export const sharedFeatureArticles: HelpArticle[] = [
       },
     ],
   },
+  {
+    id: "cursor-tips-playbook",
+    categoryId: "getting-started",
+    title: "Cursor Tips — Engineering Craft",
+    description:
+      "Bilingual playbook for using Cursor (modes, commands, skills, workflow, review) alongside Common CODO.",
+    roles: ["all"],
+    keywords: [
+      "cursor",
+      "cursor tips",
+      "ask",
+      "plan",
+      "agent",
+      "goal",
+      "engineering craft",
+      "prompt",
+    ],
+    readMinutes: 4,
+    relatedIds: ["search-and-shortcuts"],
+    sections: [
+      {
+        id: "overview",
+        heading: "Overview",
+        blocks: [
+          {
+            type: "paragraph",
+            text: "Cursor Tips is BugRicer’s internal knowledge base for how the team uses Cursor. Common CODO remains production law (how we ship code). Cursor Tips is operating craft (how we use Cursor to ship that code).",
+          },
+          {
+            type: "paragraph",
+            text: "English is the canonical instruction. Malayalam is a full parallel explanation. Tips never override Common CODO requirements such as hard state reset, confirmation modals, or permission checks.",
+          },
+        ],
+      },
+      {
+        id: "categories",
+        heading: "Categories",
+        blocks: [
+          {
+            type: "list",
+            items: [
+              "Modes — Ask, Plan, Agent, Debug, Multitask",
+              "Commands — /goal, /side, /loop, /in-cloud, worktrees, /best-of-n",
+              "Skills — review agents, create-rule, create-skill, autopilot",
+              "Workflow — mode vs model, scope, Ask-then-Agent, rules, checkpoints",
+              "Review — diff hygiene, verify in product, CODO still governs",
+            ],
+          },
+        ],
+      },
+      {
+        id: "how-to-use",
+        heading: "How to use",
+        blocks: [
+          {
+            type: "steps",
+            steps: [
+              {
+                title: "Open Cursor Tips",
+                body: "Use the sidebar item under CODO Rules, or search “Cursor Tips” with ⌘K.",
+              },
+              {
+                title: "Filter and copy",
+                body: "Use category tabs and search. Copy Requirement or Strong prompt examples from each tip card.",
+              },
+              {
+                title: "Export PDF",
+                body: "Managers and viewers can download a bilingual onboarding PDF from the page header.",
+              },
+              {
+                title: "Manage (admins)",
+                body: "Users with CURSOR_TIPS_MANAGE can add, edit, reorder, deactivate, or soft-delete tips (recycle bin).",
+              },
+            ],
+          },
+        ],
+      },
+    ],
+  },
 ];

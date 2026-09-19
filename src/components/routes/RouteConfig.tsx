@@ -125,6 +125,10 @@ const BugBackup = lazy(() => import("@/pages/BugBackup"));
 const AdminRecycleBin = lazy(() => import("@/pages/AdminRecycleBin"));
 const BugRecruitment = lazy(() => import("@/pages/BugRecruitment"));
 const BugCreative = lazy(() => import("@/pages/BugCreative"));
+const BugAssets = lazy(() => import("@/pages/BugAssets"));
+const BugAssetDomainDetail = lazy(() => import("@/pages/BugAssetDomainDetail"));
+const BugAssetNodeDetail = lazy(() => import("@/pages/BugAssetNodeDetail"));
+const BugAssetHardwareDetail = lazy(() => import("@/pages/BugAssetHardwareDetail"));
 const BugDates = lazy(() => import("@/pages/BugDates"));
 const Profile = lazy(() => import("@/pages/Profile"));
 const Reports = lazy(() => import("@/pages/Reports"));
@@ -207,6 +211,7 @@ const PerformanceReviewForm = lazy(() => import("@/pages/PerformanceReviewForm")
 const PerformanceReviewTemplate = lazy(() => import("@/pages/PerformanceReviewTemplate"));
 const CommonBugs = lazy(() => import("@/pages/CommonBugs"));
 const CommonCodoRules = lazy(() => import("@/pages/CommonCodoRules"));
+const CursorTips = lazy(() => import("@/pages/CursorTips"));
 const DocsSetupSuccess = lazy(() => import("@/pages/DocsSetupSuccess"));
 const DocsSetupError = lazy(() => import("@/pages/DocsSetupError"));
 const BugDocsPage = lazy(() => import("@/pages/BugDocsPage"));
@@ -398,6 +403,7 @@ const RouteConfig = () => {
       <Route path="/shorts" element={<RolePathRedirect suffix="shorts" />} />
       <Route path="/common-bugs" element={<RolePathRedirect suffix="common-bugs" />} />
       <Route path="/common-codo" element={<RolePathRedirect suffix="common-codo" />} />
+      <Route path="/cursor-tips" element={<RolePathRedirect suffix="cursor-tips" />} />
       <Route path="/users/:userId" element={<RolePathRedirect suffix="users/:userId" />} />
       <Route path="/users" element={<RolePathRedirect suffix="users" />} />
       <Route path="/clients/:clientId/edit" element={<RolePathRedirect suffix="clients/:clientId/edit" />} />
@@ -407,6 +413,10 @@ const RouteConfig = () => {
       <Route path="/recycle-bin" element={<RolePathRedirect suffix="recycle-bin" />} />
       <Route path="/bug-recruitment" element={<RolePathRedirect suffix="bug-recruitment" />} />
       <Route path="/bugcreative" element={<RolePathRedirect suffix="bugcreative" />} />
+      <Route path="/bugassets/domains/:domainId" element={<RolePathRedirect suffix="bugassets/domains/:domainId" />} />
+      <Route path="/bugassets/hardware/:hardwareId" element={<RolePathRedirect suffix="bugassets/hardware/:hardwareId" />} />
+      <Route path="/bugassets/:kind/:nodeId" element={<RolePathRedirect suffix="bugassets/:kind/:nodeId" />} />
+      <Route path="/bugassets" element={<RolePathRedirect suffix="bugassets" />} />
       <Route path="/bugdates" element={<RolePathRedirect suffix="bugdates" />} />
       <Route path="/updates" element={<RolePathRedirect suffix="updates" />} />
       <Route path="/projects" element={<RolePathRedirect suffix="projects" />} />
@@ -450,6 +460,10 @@ const RouteConfig = () => {
           <Route path="recycle-bin" element={<AdminRecycleBin />} />
           <Route path="bug-recruitment" element={<BugRecruitment />} />
           <Route path="bugcreative" element={<BugCreative />} />
+          <Route path="bugassets/domains/:domainId" element={<BugAssetDomainDetail />} />
+          <Route path="bugassets/hardware/:hardwareId" element={<BugAssetHardwareDetail />} />
+          <Route path="bugassets/:kind/:nodeId" element={<BugAssetNodeDetail />} />
+          <Route path="bugassets" element={<BugAssets />} />
           <Route path="bugdates" element={<BugDates />} />
           <Route path="profile" element={<Profile />} />
           <Route path="reports" element={<Reports />} />
@@ -482,6 +496,7 @@ const RouteConfig = () => {
           <Route path="performance-reviews" element={<PerformanceReviews />} />
           <Route path="common-bugs" element={<CommonBugs />} />
           <Route path="common-codo" element={<CommonCodoRules />} />
+          <Route path="cursor-tips" element={<CursorTips />} />
           <Route path="bugdocs" element={<BugDocsPage />} />
           <Route path="bugdocs/project/:projectId" element={<ProjectDocumentsPage />} />
           <Route path="bugsheets" element={<BugSheetsPage />} />

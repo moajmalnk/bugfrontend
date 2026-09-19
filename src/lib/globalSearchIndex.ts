@@ -253,6 +253,30 @@ const PAGE_ENTRIES: PageSearchEntry[] = [
     permission: "CREATIVE_VIEW",
     subtitle: "Creative asset pipeline",
   },
+  {
+    id: "page-bugassets",
+    label: "BugAssets",
+    path: "/bugassets",
+    keywords: [
+      "bugassets",
+      "assets",
+      "domain",
+      "domains",
+      "dns",
+      "vps",
+      "server",
+      "hosting",
+      "vercel",
+      "mailbox",
+      "email",
+      "hardware",
+      "laptop",
+      "renewal",
+      "infrastructure",
+    ],
+    permission: "ASSETS_VIEW",
+    subtitle: "IT asset & infrastructure ERP",
+  },
 
   // —— Account & help ——
   {
@@ -298,6 +322,25 @@ const PAGE_ENTRIES: PageSearchEntry[] = [
       "standards",
     ],
     permission: "CODO_VIEW",
+  },
+  {
+    id: "page-cursor-tips",
+    label: "Cursor Tips",
+    path: "/cursor-tips",
+    keywords: [
+      "cursor",
+      "cursor tips",
+      "ask mode",
+      "plan mode",
+      "agent",
+      "multitask",
+      "goal",
+      "loop",
+      "worktree",
+      "engineering craft",
+      "prompt",
+    ],
+    permission: "CURSOR_TIPS_VIEW",
   },
 
   // —— Messaging ——
