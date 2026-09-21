@@ -193,8 +193,29 @@ function parseStatusTab(raw: string | null): StatusTab {
   return 'all';
 }
 
+/**
+ * Why: Grid/search must show where each asset lives without opening it.
+ */
+function buildFolderPath(
+  folderId: string | null | undefined,
+  folderById: Map<string, CreativeFolder>
+): string {
+  if (!folderId) return 'All files';
+  const parts: string[] = [];
+  let cursor: string | null = folderId;
+  const guard = new Set<string>();
+  while (cursor && folderById.has(cursor) && !guard.has(cursor)) {
+    guard.add(cursor);
+    parts.unshift(folderById.get(cursor)!.name);
+    cursor = folderById.get(cursor)?.parent_id ?? null;
+  }
+  if (parts.length === 0) return 'All files';
+  return `All files / ${parts.join(' / ')}`;
+}
+
 function AssetCard({
   asset,
+  folderPath,
   onOpen,
   onMove,
   onDelete,
@@ -205,6 +226,7 @@ function AssetCard({
   onToggleSelect,
 }: {
   asset: CreativeAsset;
+  folderPath: string;
   onOpen: () => void;
   onMove: () => void;
   onDelete: () => void;
@@ -282,6 +304,15 @@ function AssetCard({
         >
           <p className="truncate text-base font-semibold text-foreground">
             {asset.title}
+          </p>
+          <p
+            className="flex min-w-0 items-start gap-1.5 text-[11px] leading-snug text-muted-foreground sm:text-xs"
+            title={folderPath}
+          >
+            <FolderOpen className="mt-0.5 h-3.5 w-3.5 shrink-0 opacity-70" />
+            <span className="min-w-0 break-all line-clamp-2 sm:truncate sm:break-normal">
+              {folderPath}
+            </span>
           </p>
           <p className="truncate text-xs font-medium text-muted-foreground">
             {asset.material_type} · {asset.platform}
@@ -1310,6 +1341,7 @@ export default function BugCreative() {
                     >
                       <CreativeFolderCard
                         folder={folder}
+                        folderPath={buildFolderPath(folder.id, folderById)}
                         onOpen={() => openFolder(folder.id)}
                         canManage={canOrganize}
                         onRename={() => setRenameFolder(folder)}
@@ -1325,8 +1357,9 @@ export default function BugCreative() {
                 >
                   <AssetCard
                     asset={asset}
+                    folderPath={buildFolderPath(asset.folder_id, folderById)}
                     onOpen={() => openAsset(asset.id)}
-                    onMove={() => openMoveModal([asset.id])}
+                    onMove={() => openMoveModal([asset.id], [asset])}
                     onDelete={() => setDeleteTarget(asset)}
                     canMove={canSelectAsset(asset)}
                     canDelete={canDeleteAsset(asset)}
@@ -1395,6 +1428,7 @@ export default function BugCreative() {
           canCreate={canCreate}
           viewerUserId={currentUser?.id}
           projects={projects}
+          folders={allFolders}
           onClose={closeAsset}
           onDirtyChange={(dirty) => {
             formDirtyRef.current = dirty;

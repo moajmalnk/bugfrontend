@@ -38,6 +38,7 @@ import { cn } from '@/lib/utils';
 import type {
   CreativeAsset,
   CreativeAssetPayload,
+  CreativeFolder,
   CreativeMaterialType,
   CreativePlatform,
   CreativeReviewStatus,
@@ -66,7 +67,7 @@ import {
   Upload,
   UserRound,
 } from 'lucide-react';
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 
 const INITIAL = {
   title: '',
@@ -114,6 +115,8 @@ type Props = {
   /** Current user id — used to allow owner delete on Draft / In Review. */
   viewerUserId?: string | null;
   projects: ProjectOption[];
+  /** Full folder tree — used to render the asset location breadcrumb. */
+  folders?: CreativeFolder[];
   onClose: () => void;
   onSaved: (asset: CreativeAsset) => void;
   onRequestDelete?: (asset: CreativeAsset) => void;
@@ -167,6 +170,7 @@ export function AssetFormModal({
   canCreate,
   viewerUserId,
   projects,
+  folders = [],
   onClose,
   onSaved,
   onRequestDelete,
@@ -509,6 +513,25 @@ export function AssetFormModal({
     asset?.project_name ||
     projects.find((p) => p.id === (asset?.project_id || form.project_id))?.name ||
     null;
+  const folderPath = useMemo(() => {
+    const folderId = asset?.folder_id;
+    if (!folderId) return 'All files';
+    const byId = new Map(folders.map((f) => [f.id, f]));
+    const parts: string[] = [];
+    let cursor: string | null = folderId;
+    const guard = new Set<string>();
+    while (cursor && byId.has(cursor) && !guard.has(cursor)) {
+      guard.add(cursor);
+      parts.unshift(byId.get(cursor)!.name);
+      cursor = byId.get(cursor)?.parent_id ?? null;
+    }
+    if (parts.length === 0) {
+      return asset?.folder_name
+        ? `All files / ${asset.folder_name}`
+        : 'All files';
+    }
+    return `All files / ${parts.join(' / ')}`;
+  }, [asset?.folder_id, asset?.folder_name, folders]);
   const thumbPath = form.preview_thumbnail_url.trim();
   const mediaPath = form.uploaded_file_path || thumbPath;
   const mediaKind = creativeMediaKind(mediaPath);
@@ -619,6 +642,15 @@ export function AssetFormModal({
             <div className="min-w-0">
               <p className="text-xs text-muted-foreground">Creator</p>
               <p className="truncate font-medium">{asset?.creator_name || '—'}</p>
+            </div>
+          </div>
+          <div className="flex items-start gap-2 min-w-0">
+            <FolderOpen className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" />
+            <div className="min-w-0">
+              <p className="text-xs text-muted-foreground">Location</p>
+              <p className="break-all text-sm font-medium leading-snug sm:truncate sm:break-normal" title={folderPath}>
+                {folderPath}
+              </p>
             </div>
           </div>
           <div className="flex items-start gap-2 min-w-0">

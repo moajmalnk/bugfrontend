@@ -5,6 +5,7 @@ import { Folder, Pencil, Trash2 } from 'lucide-react';
 
 type Props = {
   folder: CreativeFolder;
+  folderPath?: string;
   onOpen: () => void;
   onRename?: () => void;
   onDelete?: () => void;
@@ -13,6 +14,7 @@ type Props = {
 
 export function CreativeFolderCard({
   folder,
+  folderPath,
   onOpen,
   onRename,
   onDelete,
@@ -20,6 +22,7 @@ export function CreativeFolderCard({
 }: Props) {
   const childCount = folder.child_count ?? 0;
   const assetCount = folder.asset_count ?? 0;
+  const pathLabel = folderPath || folder.name;
 
   return (
     <div className="group flex h-full min-w-0 flex-col overflow-hidden rounded-2xl border border-border/60 bg-card shadow-sm transition-all duration-300 hover:border-fuchsia-300/60 hover:shadow-md dark:hover:border-fuchsia-700/50">
@@ -39,6 +42,15 @@ export function CreativeFolderCard({
         <div className="flex min-w-0 flex-1 flex-col gap-2 p-4">
           <p className="truncate text-base font-semibold text-foreground">
             {folder.name}
+          </p>
+          <p
+            className="flex min-w-0 items-start gap-1.5 text-[11px] leading-snug text-muted-foreground sm:text-xs"
+            title={pathLabel}
+          >
+            <Folder className="mt-0.5 h-3.5 w-3.5 shrink-0 opacity-70" />
+            <span className="min-w-0 break-all line-clamp-2 sm:truncate sm:break-normal">
+              {pathLabel}
+            </span>
           </p>
           <p className="truncate text-xs font-medium text-muted-foreground">
             {assetCount} asset{assetCount === 1 ? '' : 's'}
