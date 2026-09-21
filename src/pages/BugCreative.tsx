@@ -66,6 +66,7 @@ import {
   updateCreativeFolder,
 } from '@/services/creativeService';
 import {
+  Check,
   CheckCircle2,
   ChevronRight,
   FileEdit,
@@ -75,6 +76,7 @@ import {
   Home,
   ImageIcon,
   LayoutGrid,
+  FolderInput,
   Loader2,
   Palette,
   Plus,
@@ -194,7 +196,9 @@ function parseStatusTab(raw: string | null): StatusTab {
 function AssetCard({
   asset,
   onOpen,
+  onMove,
   onDelete,
+  canMove,
   canDelete,
   selectable,
   selected,
@@ -202,7 +206,9 @@ function AssetCard({
 }: {
   asset: CreativeAsset;
   onOpen: () => void;
+  onMove: () => void;
   onDelete: () => void;
+  canMove: boolean;
   canDelete: boolean;
   selectable: boolean;
   selected: boolean;
@@ -216,40 +222,64 @@ function AssetCard({
       )}
     >
       {selectable ? (
-        <label className="absolute left-3 top-3 z-10 flex h-8 w-8 cursor-pointer items-center justify-center rounded-xl bg-background/90 shadow-sm">
-          <input
-            type="checkbox"
-            checked={selected}
-            onChange={onToggleSelect}
-            className="h-4 w-4 accent-fuchsia-600"
-            aria-label={`Select ${asset.title}`}
-            onClick={(e) => e.stopPropagation()}
-          />
-        </label>
+        <button
+          type="button"
+          className={cn(
+            'absolute left-2 top-2 z-30 flex h-10 w-10 items-center justify-center rounded-xl shadow-md ring-1 transition-colors',
+            selected
+              ? 'bg-fuchsia-600 text-white ring-fuchsia-500'
+              : 'bg-background/95 text-foreground ring-border hover:bg-background'
+          )}
+          aria-label={selected ? `Deselect ${asset.title}` : `Select ${asset.title}`}
+          aria-pressed={selected}
+          onPointerDown={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+          }}
+          onClick={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            onToggleSelect();
+          }}
+        >
+          {selected ? (
+            <Check className="h-5 w-5" strokeWidth={2.5} />
+          ) : (
+            <span className="h-4 w-4 rounded-md border-2 border-current opacity-70" />
+          )}
+        </button>
       ) : null}
-      <button
-        type="button"
-        onClick={onOpen}
-        className="flex min-w-0 flex-1 flex-col text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-fuchsia-500/40"
-      >
+      <div className="flex min-w-0 flex-1 flex-col">
         <div className="relative h-40 w-full overflow-hidden bg-muted">
-          <CreativeMediaPreview
-            path={asset.preview_thumbnail_url}
-            fallbackPath={asset.uploaded_file_path}
-            driveLink={asset.drive_link}
-            alt={asset.title}
-            className="transition-transform duration-300 group-hover:scale-[1.02]"
+          <button
+            type="button"
+            onClick={onOpen}
+            className="absolute inset-0 z-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-fuchsia-500/40"
+            aria-label={`Open ${asset.title}`}
           />
+          <div className="pointer-events-none relative z-[1] h-full [&_a]:pointer-events-auto">
+            <CreativeMediaPreview
+              path={asset.preview_thumbnail_url}
+              fallbackPath={asset.uploaded_file_path}
+              driveLink={asset.drive_link}
+              alt={asset.title}
+              className="h-full transition-transform duration-300 group-hover:scale-[1.02]"
+            />
+          </div>
           <span
             className={cn(
-              'absolute right-3 top-3 inline-flex rounded-full px-2.5 py-1 text-[11px] font-semibold shadow-sm',
+              'pointer-events-none absolute right-3 top-3 z-10 inline-flex rounded-full px-2.5 py-1 text-[11px] font-semibold shadow-sm',
               STATUS_PILL[asset.status]
             )}
           >
             {asset.status}
           </span>
         </div>
-        <div className="flex min-w-0 flex-1 flex-col gap-2 p-4">
+        <button
+          type="button"
+          onClick={onOpen}
+          className="flex min-w-0 flex-1 flex-col gap-2 p-4 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-fuchsia-500/40"
+        >
           <p className="truncate text-base font-semibold text-foreground">
             {asset.title}
           </p>
@@ -260,8 +290,8 @@ function AssetCard({
             {asset.creator_name || 'Creator'}
             {asset.project_name ? ` · ${asset.project_name}` : ''}
           </p>
-        </div>
-      </button>
+        </button>
+      </div>
       <div className="flex items-center gap-2 border-t border-border/50 p-2">
         <Button
           type="button"
@@ -272,6 +302,19 @@ function AssetCard({
         >
           Open
         </Button>
+        {canMove ? (
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            className="h-10 rounded-xl px-3"
+            onClick={onMove}
+            aria-label={`Move ${asset.title} to folder`}
+            title="Move to folder"
+          >
+            <FolderInput className="h-4 w-4" />
+          </Button>
+        ) : null}
         {canDelete ? (
           <Button
             type="button"
@@ -344,6 +387,7 @@ export default function BugCreative() {
   const [renameFolder, setRenameFolder] = useState<CreativeFolder | null>(null);
   const [deleteFolderTarget, setDeleteFolderTarget] = useState<CreativeFolder | null>(null);
   const [moveModalOpen, setMoveModalOpen] = useState(false);
+  const [moveTargetIds, setMoveTargetIds] = useState<string[]>([]);
   const [folderBusy, setFolderBusy] = useState(false);
   const formDirtyRef = useRef(false);
 
@@ -449,6 +493,8 @@ export default function BugCreative() {
         : currentFolderId
           ? currentFolderId
           : 'root';
+      // Why: Tab counts stay library-wide at root; inside a folder they cover the subtree.
+      const statsFolderId = searching ? undefined : currentFolderId ?? undefined;
       const [result, nextStats, folders, children] = await Promise.all([
         listCreativeAssets({
           q: debouncedQ,
@@ -465,7 +511,11 @@ export default function BugCreative() {
         getCreativeStats({
           from: periodFrom,
           to: periodTo,
-          folder_id: searching ? undefined : folderFilter,
+          q: searching ? debouncedQ : undefined,
+          material_type: material,
+          platform,
+          project_id: projectId,
+          folder_id: statsFolderId,
         }).catch(() => null),
         listCreativeFolders({ parent_id: 'all' }).catch(() => [] as CreativeFolder[]),
         searching
@@ -479,9 +529,7 @@ export default function BugCreative() {
       if (nextStats) setStats(nextStats);
       setAllFolders(folders);
       setChildFolders(children);
-      setSelectedIds((prev) =>
-        prev.filter((id) => result.items.some((a) => a.id === id))
-      );
+      // Why: keep multi-select across refresh/pagination; only folder navigate clears.
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : 'Try again';
       toast({
@@ -572,6 +620,16 @@ export default function BugCreative() {
     canOrganize &&
     (canManage || asset.creator_id === currentUser?.id);
 
+  const selectableOnPage = useMemo(
+    () => items.filter((asset) => canSelectAsset(asset)),
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- mirror canSelectAsset inputs
+    [items, canOrganize, canManage, currentUser?.id]
+  );
+
+  const allPageSelected =
+    selectableOnPage.length > 0 &&
+    selectableOnPage.every((asset) => selectedIds.includes(asset.id));
+
   const toggleSelect = (asset: CreativeAsset) => {
     if (!canSelectAsset(asset)) return;
     setSelectedIds((prev) =>
@@ -579,6 +637,20 @@ export default function BugCreative() {
         ? prev.filter((id) => id !== asset.id)
         : [...prev, asset.id]
     );
+  };
+
+  const toggleSelectAllOnPage = () => {
+    if (!canOrganize || selectableOnPage.length === 0) return;
+    if (allPageSelected) {
+      const pageIds = new Set(selectableOnPage.map((a) => a.id));
+      setSelectedIds((prev) => prev.filter((id) => !pageIds.has(id)));
+      return;
+    }
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      for (const asset of selectableOnPage) next.add(asset.id);
+      return [...next];
+    });
   };
 
   const handleCopySelection = () => {
@@ -622,18 +694,53 @@ export default function BugCreative() {
     }
   };
 
+  const openMoveModal = (ids: string[]) => {
+    if (!canOrganize || ids.length === 0) return;
+    setMoveTargetIds(ids);
+    setMoveModalOpen(true);
+  };
+
+  const closeMoveModal = () => {
+    if (organizeBusy) return;
+    setMoveModalOpen(false);
+    setMoveTargetIds([]);
+  };
+
+  const moveModalAssets = useMemo(
+    () => items.filter((asset) => moveTargetIds.includes(asset.id)),
+    [items, moveTargetIds]
+  );
+
+  const moveModalItemLabel =
+    moveModalAssets.length === 1 ? moveModalAssets[0].title : null;
+
+  const moveModalCurrentFolderId = useMemo(() => {
+    if (moveModalAssets.length === 0) return undefined;
+    const first = moveModalAssets[0].folder_id ?? null;
+    const same = moveModalAssets.every(
+      (asset) => (asset.folder_id ?? null) === first
+    );
+    return same ? first : undefined;
+  }, [moveModalAssets]);
+
   const handleMoveTo = async (folderId: string | null) => {
-    if (selectedIds.length === 0 || organizeBusy) return;
+    if (moveTargetIds.length === 0 || organizeBusy) return;
     setOrganizeBusy(true);
     try {
       await moveCreativeAssets({
-        asset_ids: selectedIds,
+        asset_ids: moveTargetIds,
         folder_id: folderId,
       });
-      toast({ title: 'Assets moved' });
-      setSelectedIds([]);
+      toast({
+        title:
+          moveTargetIds.length === 1 ? 'Asset moved' : 'Assets moved',
+      });
+      const moved = new Set(moveTargetIds);
+      setSelectedIds((prev) => prev.filter((id) => !moved.has(id)));
       setMoveModalOpen(false);
+      setMoveTargetIds([]);
       if (clipboard?.mode === 'cut') setClipboard(null);
+      notifyAdminNavCountsChanged();
       await load();
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : 'Move failed';
@@ -661,6 +768,43 @@ export default function BugCreative() {
         description: message,
         variant: 'destructive',
       });
+    } finally {
+      setFolderBusy(false);
+    }
+  };
+
+  /**
+   * Why: Move modal can spawn a folder/subfolder under the selected destination
+   * without closing the picker; caller selects the new folder when returned.
+   */
+  const handleCreateFolderInMove = async (
+    name: string,
+    parentId: string | null
+  ): Promise<CreativeFolder> => {
+    if (folderBusy) {
+      throw new Error('Busy');
+    }
+    setFolderBusy(true);
+    try {
+      const created = await createCreativeFolder({
+        name,
+        parent_id: parentId,
+      });
+      setAllFolders((prev) => {
+        if (prev.some((f) => f.id === created.id)) return prev;
+        return [...prev, created];
+      });
+      toast({ title: parentId ? 'Subfolder created' : 'Folder created' });
+      await load();
+      return created;
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'Could not create folder';
+      toast({
+        title: 'Create failed',
+        description: message,
+        variant: 'destructive',
+      });
+      throw err instanceof Error ? err : new Error(message);
     } finally {
       setFolderBusy(false);
     }
@@ -726,7 +870,11 @@ export default function BugCreative() {
       void getCreativeStats({
         from: periodFrom,
         to: periodTo,
-        folder_id: searching ? undefined : currentFolderId ?? 'root',
+        q: searching ? debouncedQ : undefined,
+        material_type: material,
+        platform,
+        project_id: projectId,
+        folder_id: searching ? undefined : currentFolderId ?? undefined,
       })
         .then(setStats)
         .catch(() => {});
@@ -1028,7 +1176,7 @@ export default function BugCreative() {
           {!loading && total > 0 ? (
             <div className="flex w-full min-w-0 flex-col gap-4 overflow-x-hidden rounded-xl border border-border/50 bg-gradient-to-r from-background via-background to-muted/10 shadow-sm backdrop-blur-sm transition-all duration-300 hover:shadow-md sm:gap-5">
               <div className="flex flex-col justify-between gap-3 p-4 sm:flex-row sm:items-center sm:gap-4 sm:p-5">
-                <div className="flex items-center gap-2">
+                <div className="flex min-w-0 flex-wrap items-center gap-2">
                   <div className="h-2 w-2 animate-pulse rounded-full bg-gradient-to-r from-fuchsia-500 to-violet-600" />
                   <span className="text-sm font-semibold text-foreground sm:text-base">
                     Showing{' '}
@@ -1045,6 +1193,17 @@ export default function BugCreative() {
                     </span>{' '}
                     assets
                   </span>
+                  {canOrganize && selectableOnPage.length > 0 ? (
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="h-9 rounded-xl"
+                      onClick={toggleSelectAllOnPage}
+                    >
+                      {allPageSelected ? 'Deselect page' : 'Select page'}
+                    </Button>
+                  ) : null}
                 </div>
                 <div className="flex items-center justify-center gap-3 sm:justify-end">
                   <span className="shrink-0 text-xs font-medium text-muted-foreground sm:text-sm">
@@ -1146,7 +1305,9 @@ export default function BugCreative() {
                   <AssetCard
                     asset={asset}
                     onOpen={() => openAsset(asset.id)}
+                    onMove={() => openMoveModal([asset.id])}
                     onDelete={() => setDeleteTarget(asset)}
+                    canMove={canSelectAsset(asset)}
                     canDelete={canDeleteAsset(asset)}
                     selectable={canSelectAsset(asset)}
                     selected={selectedIds.includes(asset.id)}
@@ -1165,7 +1326,7 @@ export default function BugCreative() {
             onCopy={handleCopySelection}
             onCut={handleCutSelection}
             onPaste={() => void handlePaste()}
-            onMoveTo={() => setMoveModalOpen(true)}
+            onMoveTo={() => openMoveModal(selectedIds)}
             onClearSelection={() => setSelectedIds([])}
             onClearClipboard={() => setClipboard(null)}
           />
@@ -1246,9 +1407,14 @@ export default function BugCreative() {
         open={moveModalOpen}
         folders={allFolders}
         busy={organizeBusy}
-        selectedCount={selectedIds.length}
-        onClose={() => setMoveModalOpen(false)}
+        creating={folderBusy}
+        canCreate={canOrganize}
+        selectedCount={moveTargetIds.length}
+        itemLabel={moveModalItemLabel}
+        currentFolderId={moveModalCurrentFolderId}
+        onClose={closeMoveModal}
         onConfirm={handleMoveTo}
+        onCreateFolder={handleCreateFolderInMove}
       />
 
       <AlertDialog

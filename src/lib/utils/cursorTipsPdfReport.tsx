@@ -9,6 +9,7 @@ import {
   View,
   pdf,
 } from "@react-pdf/renderer";
+import type { Style } from "@react-pdf/types";
 import { parseTipDescription } from "@/lib/cursorTips/parseTipDescription";
 
 export type CursorTipPdfItem = {
@@ -246,14 +247,15 @@ const PdfText = ({
   max = 420,
 }: {
   value?: string | null;
-  style?: object | object[];
+  style?: Style | Style[];
   max?: number;
 }) => {
   const text = compactText(value, max);
   if (!text) return null;
   const ml = hasMalayalam(text);
+  const baseStyle = ml ? styles.bodyMl : styles.bodyEn;
   return (
-    <Text style={[ml ? styles.bodyMl : styles.bodyEn, style as object]}>
+    <Text style={style ? [baseStyle, style as Style] : baseStyle}>
       {text}
     </Text>
   );

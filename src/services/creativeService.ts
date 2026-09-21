@@ -273,14 +273,27 @@ export async function uploadCreativeFile(
 export async function getCreativeStats(params?: {
   from?: string;
   to?: string;
-  folder_id?: string | 'root' | null;
+  q?: string;
+  material_type?: CreativeMaterialType | 'all';
+  platform?: CreativePlatform | 'all';
+  project_id?: string | 'all';
+  /** UUID = recursive subtree. Omit at root for library-wide tab counts. */
+  folder_id?: string | null;
 }): Promise<CreativeStats> {
   const qs = new URLSearchParams();
   if (params?.from) qs.set('from', params.from);
   if (params?.to) qs.set('to', params.to);
-  if (params?.folder_id === 'root' || params?.folder_id === null) {
-    qs.set('folder_id', 'root');
-  } else if (params?.folder_id) {
+  if (params?.q?.trim()) qs.set('q', params.q.trim());
+  if (params?.material_type && params.material_type !== 'all') {
+    qs.set('material_type', params.material_type);
+  }
+  if (params?.platform && params.platform !== 'all') {
+    qs.set('platform', params.platform);
+  }
+  if (params?.project_id && params.project_id !== 'all') {
+    qs.set('project_id', params.project_id);
+  }
+  if (params?.folder_id) {
     qs.set('folder_id', params.folder_id);
   }
   const res = await fetch(`${ENV.API_URL}/creative/stats.php?${qs}`, {

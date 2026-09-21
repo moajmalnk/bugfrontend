@@ -35,8 +35,8 @@ export function CreativeClipboardBar({
   if (selectedCount === 0 && !clipboard) return null;
 
   return (
-    <div className="sticky bottom-4 z-20 w-full min-w-0">
-      <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-fuchsia-200/70 bg-background/95 px-4 py-3 shadow-lg backdrop-blur-md dark:border-fuchsia-800/50">
+    <div className="pointer-events-none fixed inset-x-0 bottom-0 z-50 flex justify-center p-3 sm:p-4">
+      <div className="pointer-events-auto flex w-full max-w-3xl min-w-0 flex-col gap-3 rounded-2xl border border-fuchsia-200/70 bg-background/95 px-3 py-3 shadow-lg backdrop-blur-md dark:border-fuchsia-800/50 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between sm:px-4">
         <div className="min-w-0 text-sm font-medium text-foreground">
           {selectedCount > 0 ? (
             <span>
@@ -51,7 +51,7 @@ export function CreativeClipboardBar({
             </span>
           ) : null}
         </div>
-        <div className="flex flex-wrap items-center gap-2">
+        <div className="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap sm:items-center">
           {selectedCount > 0 ? (
             <>
               <Button
