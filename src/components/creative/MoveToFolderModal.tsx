@@ -100,27 +100,69 @@ export function MoveToFolderModal({
 
   const locked = busy || creating;
 
-  // Why: hard-reset picker + create form so prior state never bleeds into the next open.
+  // Why: reset only when the dialog opens — not when currentFolderId
+  // recalculates — so typing in search is never wiped mid-keystroke.
   useEffect(() => {
     if (!open) return;
     setQ('');
-    setTarget(currentFolderId ?? null);
+    setTarget(currentFolderId !== undefined ? currentFolderId : null);
     setCreateOpen(false);
     setNewName('');
     setCreateError('');
-  }, [open, currentFolderId]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- open-only reset
+  }, [open]);
 
-  const filtered = useMemo(() => {
+  /**
+   * Why: include every ancestor of a name match so nested hits (e.g. under
+   * Mockup → Zeeque…) stay reachable in the tree while searching.
+   */
+  const visibleIds = useMemo(() => {
     const term = q.trim().toLowerCase();
-    if (!term) return folders;
-    return folders.filter((f) => f.name.toLowerCase().includes(term));
+    if (!term) return null;
+    const matched = new Set<string>();
+    for (const f of folders) {
+      if ((f.name || '').toLowerCase().includes(term)) matched.add(f.id);
+    }
+    const visible = new Set<string>(matched);
+    for (const id of matched) {
+      let cursor = folderById.get(id)?.parent_id ?? null;
+      const guard = new Set<string>();
+      while (cursor && folderById.has(cursor) && !guard.has(cursor)) {
+        guard.add(cursor);
+        visible.add(cursor);
+        cursor = folderById.get(cursor)?.parent_id ?? null;
+      }
+    }
+    return visible;
+  }, [folders, folderById, q]);
+
+  const matchedFolders = useMemo(() => {
+    const term = q.trim().toLowerCase();
+    if (!term) return [] as CreativeFolder[];
+    return [...folders]
+      .filter((f) => (f.name || '').toLowerCase().includes(term))
+      .sort((a, b) => a.name.localeCompare(b.name));
   }, [folders, q]);
+
+  const folderPathLabel = (folderId: string) => {
+    const parts: string[] = [];
+    let cursor: string | null = folderId;
+    const guard = new Set<string>();
+    while (cursor && folderById.has(cursor) && !guard.has(cursor)) {
+      guard.add(cursor);
+      const folder = folderById.get(cursor)!;
+      parts.unshift(folder.name);
+      cursor = folder.parent_id ?? null;
+    }
+    return parts.join(' / ');
+  };
 
   const isSameLocation =
     currentFolderId !== undefined && target === (currentFolderId ?? null);
 
   const parentDepth = depthOf(target, folderById);
   const canCreateHere = canCreate && !!onCreateFolder && parentDepth < MAX_FOLDER_DEPTH;
+  const searching = Boolean(q.trim());
 
   const parentLabel =
     target === null
@@ -174,13 +216,7 @@ export function MoveToFolderModal({
   const renderTree = (parentId: string | null, depth: number): ReactNode => {
     const kids = childrenMap.get(parentId) ?? [];
     return kids.map((folder) => {
-      const visible =
-        !q.trim() ||
-        filtered.some((f) => f.id === folder.id) ||
-        (childrenMap.get(folder.id) ?? []).some((c) =>
-          filtered.some((f) => f.id === c.id)
-        );
-      if (!visible && q.trim()) return null;
+      if (visibleIds && !visibleIds.has(folder.id)) return null;
       const isCurrent = currentFolderId === folder.id;
       return (
         <div key={folder.id} className="flex flex-col gap-1">
@@ -360,8 +396,67 @@ export function MoveToFolderModal({
                 </span>
               ) : null}
             </button>
-            <div className="flex flex-col gap-1">{renderTree(null, 0)}</div>
-            {folders.length === 0 ? (
+            {searching ? (
+              <div className="flex flex-col gap-1">
+                {matchedFolders.map((folder) => {
+                  const isCurrent = currentFolderId === folder.id;
+                  const path = folderPathLabel(folder.id);
+                  return (
+                    <button
+                      key={folder.id}
+                      type="button"
+                      disabled={locked}
+                      onClick={() => setTarget(folder.id)}
+                      className={cn(
+                        'flex min-w-0 flex-col gap-0.5 rounded-xl px-3 py-2.5 text-left transition-colors sm:py-2',
+                        target === folder.id
+                          ? 'bg-fuchsia-600 text-white'
+                          : 'hover:bg-muted'
+                      )}
+                    >
+                      <span className="flex min-w-0 items-center gap-2 text-sm">
+                        <Folder className="h-4 w-4 shrink-0" />
+                        <span className="min-w-0 flex-1 truncate font-medium">
+                          {folder.name}
+                        </span>
+                        {isCurrent ? (
+                          <span
+                            className={cn(
+                              'shrink-0 rounded-lg px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide',
+                              target === folder.id
+                                ? 'bg-white/20 text-white'
+                                : 'bg-muted text-muted-foreground'
+                            )}
+                          >
+                            Current
+                          </span>
+                        ) : null}
+                      </span>
+                      {path.includes(' / ') ? (
+                        <span
+                          className={cn(
+                            'truncate pl-6 text-[11px]',
+                            target === folder.id
+                              ? 'text-white/80'
+                              : 'text-muted-foreground'
+                          )}
+                        >
+                          {path}
+                        </span>
+                      ) : null}
+                    </button>
+                  );
+                })}
+                {matchedFolders.length === 0 ? (
+                  <p className="px-3 py-6 text-center text-sm text-muted-foreground">
+                    No folders match “{q.trim()}”.
+                  </p>
+                ) : null}
+              </div>
+            ) : (
+              <div className="flex flex-col gap-1">{renderTree(null, 0)}</div>
+            )}
+            {!searching && folders.length === 0 ? (
               <p className="px-3 py-6 text-center text-sm text-muted-foreground">
                 No folders yet
                 {canCreate ? ' — use New folder above.' : '.'}

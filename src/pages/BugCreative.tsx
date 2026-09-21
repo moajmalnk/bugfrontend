@@ -388,6 +388,8 @@ export default function BugCreative() {
   const [deleteFolderTarget, setDeleteFolderTarget] = useState<CreativeFolder | null>(null);
   const [moveModalOpen, setMoveModalOpen] = useState(false);
   const [moveTargetIds, setMoveTargetIds] = useState<string[]>([]);
+  /** Why: detail-modal move may target an asset not on the current grid page. */
+  const [moveAssetsCache, setMoveAssetsCache] = useState<CreativeAsset[]>([]);
   const [folderBusy, setFolderBusy] = useState(false);
   const formDirtyRef = useRef(false);
 
@@ -694,9 +696,17 @@ export default function BugCreative() {
     }
   };
 
-  const openMoveModal = (ids: string[]) => {
+  const openMoveModal = (
+    ids: string[],
+    knownAssets?: CreativeAsset[]
+  ) => {
     if (!canOrganize || ids.length === 0) return;
     setMoveTargetIds(ids);
+    if (knownAssets && knownAssets.length > 0) {
+      setMoveAssetsCache(knownAssets);
+    } else {
+      setMoveAssetsCache(items.filter((asset) => ids.includes(asset.id)));
+    }
     setMoveModalOpen(true);
   };
 
@@ -704,12 +714,19 @@ export default function BugCreative() {
     if (organizeBusy) return;
     setMoveModalOpen(false);
     setMoveTargetIds([]);
+    setMoveAssetsCache([]);
   };
 
-  const moveModalAssets = useMemo(
-    () => items.filter((asset) => moveTargetIds.includes(asset.id)),
-    [items, moveTargetIds]
-  );
+  const moveModalAssets = useMemo(() => {
+    const byId = new Map<string, CreativeAsset>();
+    for (const asset of moveAssetsCache) byId.set(asset.id, asset);
+    for (const asset of items) {
+      if (moveTargetIds.includes(asset.id)) byId.set(asset.id, asset);
+    }
+    return moveTargetIds
+      .map((id) => byId.get(id))
+      .filter((asset): asset is CreativeAsset => Boolean(asset));
+  }, [items, moveAssetsCache, moveTargetIds]);
 
   const moveModalItemLabel =
     moveModalAssets.length === 1 ? moveModalAssets[0].title : null;
@@ -725,21 +742,25 @@ export default function BugCreative() {
 
   const handleMoveTo = async (folderId: string | null) => {
     if (moveTargetIds.length === 0 || organizeBusy) return;
+    const movingIds = [...moveTargetIds];
     setOrganizeBusy(true);
     try {
       await moveCreativeAssets({
-        asset_ids: moveTargetIds,
+        asset_ids: movingIds,
         folder_id: folderId,
       });
       toast({
-        title:
-          moveTargetIds.length === 1 ? 'Asset moved' : 'Assets moved',
+        title: movingIds.length === 1 ? 'Asset moved' : 'Assets moved',
       });
-      const moved = new Set(moveTargetIds);
+      const moved = new Set(movingIds);
       setSelectedIds((prev) => prev.filter((id) => !moved.has(id)));
       setMoveModalOpen(false);
       setMoveTargetIds([]);
+      setMoveAssetsCache([]);
       if (clipboard?.mode === 'cut') setClipboard(null);
+      if (assetParam && moved.has(assetParam)) {
+        closeAsset();
+      }
       notifyAdminNavCountsChanged();
       await load();
     } catch (err: unknown) {
@@ -1379,6 +1400,8 @@ export default function BugCreative() {
             formDirtyRef.current = dirty;
           }}
           onRequestDelete={(asset) => setDeleteTarget(asset)}
+          canMove={canOrganize}
+          onRequestMove={(asset) => openMoveModal([asset.id], [asset])}
           onSaved={() => {
             notifyAdminNavCountsChanged();
             void load();

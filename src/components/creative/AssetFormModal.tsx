@@ -56,6 +56,7 @@ import {
 import {
   Calendar,
   ExternalLink,
+  FolderInput,
   FolderOpen,
   ImagePlus,
   Link2,
@@ -116,6 +117,9 @@ type Props = {
   onClose: () => void;
   onSaved: (asset: CreativeAsset) => void;
   onRequestDelete?: (asset: CreativeAsset) => void;
+  /** Opens the shared move-to-folder picker for this asset. */
+  onRequestMove?: (asset: CreativeAsset) => void;
+  canMove?: boolean;
   onDirtyChange?: (dirty: boolean) => void;
 };
 
@@ -166,6 +170,8 @@ export function AssetFormModal({
   onClose,
   onSaved,
   onRequestDelete,
+  onRequestMove,
+  canMove = false,
   onDirtyChange,
 }: Props) {
   const [form, setForm] = useState<FormState>(INITIAL);
@@ -201,6 +207,13 @@ export function AssetFormModal({
     OWNER_DELETABLE_STATUSES.includes(asset.status);
   const showDelete =
     !isNew && !!asset && !!onRequestDelete && (canManage || ownerCanDelete);
+  const showMove =
+    !isNew &&
+    !!asset &&
+    !!onRequestMove &&
+    canMove &&
+    mode === 'view' &&
+    (canManage || isOwner);
 
   useEffect(() => {
     onDirtyChange?.(dirty);
@@ -1023,16 +1036,31 @@ export function AssetFormModal({
           <DialogFooter className="flex-col gap-2 border-t border-border/60 px-6 py-4 sm:flex-row sm:justify-end">
             {mode === 'view' && !isNew ? (
               <>
-                {showDelete ? (
-                  <Button
-                    type="button"
-                    variant="outline"
-                    className="rounded-xl text-destructive hover:bg-destructive/10 hover:text-destructive sm:mr-auto"
-                    onClick={() => asset && onRequestDelete?.(asset)}
-                  >
-                    <Trash2 className="mr-2 h-4 w-4" />
-                    Delete
-                  </Button>
+                {showDelete || showMove ? (
+                  <div className="flex w-full flex-wrap gap-2 sm:mr-auto sm:w-auto">
+                    {showMove ? (
+                      <Button
+                        type="button"
+                        variant="outline"
+                        className="rounded-xl"
+                        onClick={() => asset && onRequestMove?.(asset)}
+                      >
+                        <FolderInput className="mr-2 h-4 w-4" />
+                        Move
+                      </Button>
+                    ) : null}
+                    {showDelete ? (
+                      <Button
+                        type="button"
+                        variant="outline"
+                        className="rounded-xl text-destructive hover:bg-destructive/10 hover:text-destructive"
+                        onClick={() => asset && onRequestDelete?.(asset)}
+                      >
+                        <Trash2 className="mr-2 h-4 w-4" />
+                        Delete
+                      </Button>
+                    ) : null}
+                  </div>
                 ) : null}
                 <Button
                   type="button"
