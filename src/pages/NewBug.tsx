@@ -35,8 +35,8 @@ import { suggestedPriorityFromTypes } from "@/lib/bugMetaUtils";
 import { cn } from "@/lib/utils";
 import {
   sortProjectsForPicker,
+  type Project,
   type ProjectBugStatsLite,
-  type ProjectStatus,
   type ProjectUpdateStatsLite,
 } from "@/lib/utils/projectUtils";
 import {
@@ -48,7 +48,7 @@ import {
 import { broadcastNotificationService } from "@/services/broadcastNotificationService";
 import { bugTypeService } from "@/services/bugTypeService";
 import { sendNewBugNotification } from "@/services/emailService";
-import { BugLevel, BugPriority, Project } from "@/types";
+import { BugLevel, BugPriority } from "@/types";
 import { useQuery } from "@tanstack/react-query";
 import axios from "axios";
 import { apiClient } from "@/lib/axios";
@@ -86,7 +86,6 @@ import React, {
 import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
 
 type ProjectOption = Project & {
-  status?: ProjectStatus;
   bug_stats?: ProjectBugStatsLite;
   update_stats?: ProjectUpdateStatsLite;
 };
@@ -207,10 +206,7 @@ const NewBug = () => {
   const projects = useMemo(() => {
     const list = (projectsRaw as ProjectOption[]) || [];
     if (!isTesterPicker) return list;
-    return filterAssignedProjects(
-      list as unknown as Project[],
-      currentUser?.id
-    ) as unknown as ProjectOption[];
+    return filterAssignedProjects(list, currentUser?.id);
   }, [projectsRaw, isTesterPicker, currentUser?.id]);
 
   const { data: activeBugTypes = [] } = useQuery({

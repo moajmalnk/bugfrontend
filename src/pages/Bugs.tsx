@@ -63,15 +63,19 @@ const Bugs = () => {
   const listFromState = listReturnState(location.pathname, location.search);
   const [projects, setProjects] = useState<Project[]>([]);
   
-  // Use persisted filters hook
-  const [filters, setFilter, clearFilters] = usePersistedFilters("bugs_list_v2", {
-    searchTerm: "",
-    priorityFilter: "all",
-    statusFilter: "all",
-    projectFilter: "all",
-    bugTypeFilter: "all",
-    raisedByFilter: "all",
-  });
+  // Use persisted filters hook (scoped per acting user / impersonation)
+  const [filters, setFilter, clearFilters] = usePersistedFilters(
+    "bugs_list_v2",
+    {
+      searchTerm: "",
+      priorityFilter: "all",
+      statusFilter: "all",
+      projectFilter: "all",
+      bugTypeFilter: "all",
+      raisedByFilter: "all",
+    },
+    currentUser?.admin_id ? `imp:${currentUser.id}` : currentUser?.id
+  );
   const searchTerm = filters.searchTerm || "";
   const priorityFilter = filters.priorityFilter || "all";
   const statusFilter = filters.statusFilter || "all";

@@ -141,7 +141,8 @@ const Updates = () => {
 
   const [filters, setFilter, clearFilters] = usePersistedFilters(
     "updates",
-    UPDATES_FILTER_DEFAULTS
+    UPDATES_FILTER_DEFAULTS,
+    currentUser?.admin_id ? `imp:${currentUser.id}` : currentUser?.id
   );
   const searchTerm = filters.searchTerm || "";
   const projectFilter = filters.projectFilter || "all";

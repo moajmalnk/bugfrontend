@@ -30,6 +30,7 @@ import {
 } from "@/components/ui/table";
 import { Tabs, TabsContent } from "@/components/ui/tabs";
 import { useAuth } from "@/context/AuthContext";
+import { filterAssignedProjects } from "@/components/dashboard/roleDashboardShared";
 import { formatLocalDate } from "@/lib/utils/dateUtils";
 import { bugService, Bug as BugType } from "@/services/bugService";
 import { Project, projectService } from "@/services/projectService";
@@ -325,14 +326,18 @@ const Fixes = () => {
   const location = useLocation();
   const listFromState = listReturnState(location.pathname, location.search);
   
-  // Use persisted filters hook
-  const [filters, setFilter, clearFilters] = usePersistedFilters("fixes", {
-    searchTerm: "",
-    priorityFilter: "all",
-    projectFilter: "all",
-    bugTypeFilter: "all",
-    fixedByFilter: "all",
-  });
+  // Use persisted filters hook (scoped per acting user / impersonation)
+  const [filters, setFilter, clearFilters] = usePersistedFilters(
+    "fixes",
+    {
+      searchTerm: "",
+      priorityFilter: "all",
+      projectFilter: "all",
+      bugTypeFilter: "all",
+      fixedByFilter: "all",
+    },
+    currentUser?.admin_id ? `imp:${currentUser.id}` : currentUser?.id
+  );
   const searchTerm = filters.searchTerm || "";
   const priorityFilter = filters.priorityFilter || "all";
   const projectFilter = filters.projectFilter || "all";
@@ -431,10 +436,14 @@ const Fixes = () => {
   });
 
   const bugs = useMemo(() => data?.bugs ?? [], [data?.bugs]);
-  const visibleProjects = useMemo(
-    () => projectsData ?? [],
-    [projectsData]
-  );
+  const isGlobalAdmin =
+    String(currentUser?.role || "").toLowerCase() === "admin" &&
+    !currentUser?.admin_id;
+  const visibleProjects = useMemo(() => {
+    const all = projectsData ?? [];
+    if (isGlobalAdmin) return all;
+    return filterAssignedProjects(all, currentUser?.id);
+  }, [projectsData, isGlobalAdmin, currentUser?.id]);
 
   const uniqueFixers = useMemo(
     () =>

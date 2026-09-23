@@ -38,35 +38,45 @@ type DownloadCursorTipsPdfOptions = {
   filePrefix?: string;
 };
 
-let fontsRegistered = false;
+let fontsReady: Promise<void> | null = null;
 
 /**
- * Why: Default Helvetica has no Malayalam glyphs, so ML text collapses into
- * overlapping tofu. Self-hosted Noto TTFs keep PDF bilingual and offline-safe.
+ * Why: Noto Sans Malayalam crashes fontkit on virama clusters (xCoordinate null).
+ * Noto Serif Malayalam shapes the same text safely for @react-pdf.
  */
-const ensurePdfFonts = () => {
-  if (fontsRegistered) return;
-  const origin =
-    typeof window !== "undefined" ? window.location.origin : "";
-  Font.register({
-    family: "NotoSans",
-    fonts: [
-      { src: `${origin}/fonts/NotoSans-Regular.ttf`, fontWeight: 400 },
-      { src: `${origin}/fonts/NotoSans-Bold.ttf`, fontWeight: 700 },
-    ],
-  });
-  Font.register({
-    family: "NotoSansMalayalam",
-    fonts: [
-      {
-        src: `${origin}/fonts/NotoSansMalayalam-Regular.ttf`,
-        fontWeight: 400,
-      },
-      { src: `${origin}/fonts/NotoSansMalayalam-Bold.ttf`, fontWeight: 700 },
-    ],
-  });
-  Font.registerHyphenationCallback((word) => [word]);
-  fontsRegistered = true;
+const ensurePdfFonts = async () => {
+  if (!fontsReady) {
+    fontsReady = (async () => {
+      const origin =
+        typeof window !== "undefined" ? window.location.origin : "";
+      Font.register({
+        family: "NotoSans",
+        fonts: [
+          { src: `${origin}/fonts/NotoSans-Regular.ttf`, fontWeight: 400 },
+          { src: `${origin}/fonts/NotoSans-Bold.ttf`, fontWeight: 700 },
+        ],
+      });
+      Font.register({
+        family: "NotoSerifMalayalam",
+        fonts: [
+          {
+            src: `${origin}/fonts/NotoSerifMalayalam-Regular.ttf`,
+            fontWeight: 400,
+          },
+          {
+            src: `${origin}/fonts/NotoSerifMalayalam-Bold.ttf`,
+            fontWeight: 700,
+          },
+        ],
+      });
+      Font.registerHyphenationCallback((word) => [word]);
+      await Promise.all([
+        Font.load({ fontFamily: "NotoSans" }),
+        Font.load({ fontFamily: "NotoSerifMalayalam" }),
+      ]);
+    })();
+  }
+  await fontsReady;
 };
 
 const hasMalayalam = (value?: string | null) =>
@@ -77,6 +87,30 @@ const compactText = (value?: string | null, max = 420) => {
   if (!normalized) return "";
   if (normalized.length <= max) return normalized;
   return `${normalized.slice(0, max - 1)}…`;
+};
+
+/** Split mixed EN/ML so Latin stays on NotoSans and ML uses the serif face. */
+const splitScriptRuns = (value: string) => {
+  const runs: Array<{ ml: boolean; text: string }> = [];
+  let buf = "";
+  let ml = hasMalayalam(value[0] || "");
+  for (const ch of value) {
+    const nextMl = /[\u0D00-\u0D7F]/.test(ch)
+      ? true
+      : /[A-Za-z0-9]/.test(ch)
+        ? false
+        : ml;
+    if (nextMl !== ml && buf) {
+      runs.push({ ml, text: buf });
+      buf = ch;
+      ml = nextMl;
+    } else {
+      buf += ch;
+      ml = nextMl;
+    }
+  }
+  if (buf) runs.push({ ml, text: buf });
+  return runs;
 };
 
 const styles = StyleSheet.create({
@@ -94,9 +128,6 @@ const styles = StyleSheet.create({
   letterHeadImage: {
     width: "100%",
     height: 92,
-    objectFit: "cover",
-    objectPosition: "top",
-    borderRadius: 6,
     marginBottom: 10,
   },
   reportMetaCard: {
@@ -122,11 +153,11 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "flex-start",
-    gap: 8,
   },
   metaLeft: {
     flex: 1,
     color: "#4b5563",
+    paddingRight: 8,
   },
   metaRight: {
     flex: 1,
@@ -167,7 +198,6 @@ const styles = StyleSheet.create({
   tipHeader: {
     flexDirection: "row",
     justifyContent: "space-between",
-    gap: 8,
     marginBottom: 4,
   },
   tipTitle: {
@@ -176,6 +206,7 @@ const styles = StyleSheet.create({
     fontFamily: "NotoSans",
     fontWeight: 700,
     color: "#111827",
+    paddingRight: 8,
   },
   tipMeta: {
     fontSize: 8,
@@ -205,7 +236,7 @@ const styles = StyleSheet.create({
   },
   bodyMl: {
     fontSize: 9,
-    fontFamily: "NotoSansMalayalam",
+    fontFamily: "NotoSerifMalayalam",
     color: "#1f2937",
     lineHeight: 1.75,
   },
@@ -252,10 +283,25 @@ const PdfText = ({
 }) => {
   const text = compactText(value, max);
   if (!text) return null;
-  const ml = hasMalayalam(text);
-  const baseStyle = ml ? styles.bodyMl : styles.bodyEn;
+
+  if (hasMalayalam(text)) {
+    const runs = splitScriptRuns(text);
+    return (
+      <Text style={style}>
+        {runs.map((run, i) => (
+          <Text
+            key={`${i}-${run.ml ? "ml" : "en"}`}
+            style={run.ml ? styles.bodyMl : styles.bodyEn}
+          >
+            {run.text}
+          </Text>
+        ))}
+      </Text>
+    );
+  }
+
   return (
-    <Text style={style ? [baseStyle, style as Style] : baseStyle}>
+    <Text style={style ? [styles.bodyEn, style as Style] : styles.bodyEn}>
       {text}
     </Text>
   );
@@ -294,21 +340,24 @@ const TipCard = ({ tip, index }: { tip: CursorTipPdfItem; index: number }) => {
   const { requirement, malayalam } = parseTipDescription(tip.description || "");
   const req = compactText(requirement, 480);
   const ml = compactText(malayalam, 480);
+  const whenToUse = compactText(tip.whenToUse, 220);
+  const whenNotToUse = compactText(tip.whenNotToUse, 220);
+  const exampleBad = compactText(tip.exampleBad, 260);
+  const exampleGood = compactText(tip.exampleGood, 280);
+  const subtitle = compactText(tip.subtitle, 120);
 
   return (
     <View style={styles.tipCard} wrap>
       <View style={styles.tipHeader} wrap={false}>
         <Text style={styles.tipTitle}>
           {tip.sortOrder != null ? `${tip.sortOrder}. ` : `${index + 1}. `}
-          {compactText(tip.title, 90)}
+          {compactText(tip.title, 90) || "Untitled tip"}
         </Text>
         <Text style={styles.tipMeta}>{phaseLabel(tip.phase)}</Text>
       </View>
-      <Text style={styles.tipKey}>{tip.tipKey}</Text>
-      {tip.subtitle ? (
-        <Text style={[styles.mutedEn, { marginBottom: 4 }]}>
-          {compactText(tip.subtitle, 120)}
-        </Text>
+      <Text style={styles.tipKey}>{tip.tipKey || "—"}</Text>
+      {subtitle ? (
+        <Text style={[styles.mutedEn, { marginBottom: 4 }]}>{subtitle}</Text>
       ) : null}
 
       {req ? (
@@ -333,33 +382,33 @@ const TipCard = ({ tip, index }: { tip: CursorTipPdfItem; index: number }) => {
         mlMax={220}
       />
 
-      {tip.whenToUse ? (
+      {whenToUse ? (
         <View style={styles.block} wrap={false}>
           <Text style={styles.sectionLabel}>Use when</Text>
-          <PdfText value={tip.whenToUse} max={220} />
+          <PdfText value={whenToUse} max={220} />
         </View>
       ) : null}
 
-      {tip.whenNotToUse ? (
+      {whenNotToUse ? (
         <View style={styles.block} wrap={false}>
           <Text style={styles.sectionLabel}>Avoid when</Text>
-          <PdfText value={tip.whenNotToUse} max={220} />
+          <PdfText value={whenNotToUse} max={220} />
         </View>
       ) : null}
 
-      {tip.exampleBad ? (
+      {exampleBad ? (
         <View style={styles.block} wrap={false}>
           <Text style={styles.sectionLabel}>Weak</Text>
-          <PdfText value={tip.exampleBad} max={260} />
+          <PdfText value={exampleBad} max={260} />
         </View>
       ) : null}
 
-      {tip.exampleGood ? (
+      {exampleGood ? (
         <View style={styles.block} wrap={false}>
           <Text style={styles.sectionLabel}>
             Strong{tip.exampleLanguage ? ` (${tip.exampleLanguage})` : ""}
           </Text>
-          <PdfText value={tip.exampleGood} max={280} />
+          <PdfText value={exampleGood} max={280} />
         </View>
       ) : null}
     </View>
@@ -382,15 +431,19 @@ const CursorTipsDocument = ({
       ? `${window.location.origin}/letter%20pad%20.png`
       : "/letter%20pad%20.png";
   const summaryLayout = getSummaryLayout(summary.length);
+  // Why: Keep header subtitle Latin-only — mixed ML was a common crash source.
+  const safeSubtitle = compactText(subtitle.replace(/[\u0D00-\u0D7F]+/g, " "), 220);
 
   return (
     <Document>
       <Page size="A4" style={styles.page} wrap>
-        <View style={styles.header} fixed={false}>
+        <View style={styles.header}>
           <Image src={letterHeadSrc} style={styles.letterHeadImage} />
           <View style={styles.reportMetaCard}>
             <Text style={styles.reportTitle}>{reportTitle}</Text>
-            <Text style={styles.subtitle}>{subtitle}</Text>
+            {safeSubtitle ? (
+              <Text style={styles.subtitle}>{safeSubtitle}</Text>
+            ) : null}
             <View style={styles.metaRow}>
               <Text style={styles.metaLeft}>Generated: {printedAt}</Text>
               <Text style={styles.metaRight}>
@@ -437,7 +490,7 @@ const CursorTipsDocument = ({
 export const downloadCursorTipsPdf = async (
   options: DownloadCursorTipsPdfOptions
 ) => {
-  ensurePdfFonts();
+  await ensurePdfFonts();
   const blob = await pdf(<CursorTipsDocument {...options} />).toBlob();
   const url = URL.createObjectURL(blob);
   const link = document.createElement("a");

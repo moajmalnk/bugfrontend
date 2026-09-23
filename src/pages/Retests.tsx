@@ -29,6 +29,7 @@ import {
 import { Tabs, TabsContent } from "@/components/ui/tabs";
 import { useAuth } from "@/context/AuthContext";
 import { usePersistedFilters } from "@/hooks/usePersistedFilters";
+import { filterAssignedProjects } from "@/components/dashboard/roleDashboardShared";
 import {
   listReturnState,
   useClampUrlPage,
@@ -301,14 +302,21 @@ const Retests = () => {
   });
 
   const bugs = useMemo(() => data?.bugs ?? [], [data?.bugs]);
-  const visibleProjects = useMemo(() => projectsData ?? [], [projectsData]);
+  const isGlobalAdmin =
+    String(currentUser?.role || "").toLowerCase() === "admin" &&
+    !currentUser?.admin_id;
+  const visibleProjects = useMemo(() => {
+    const all = projectsData ?? [];
+    if (isGlobalAdmin) return all;
+    return filterAssignedProjects(all, currentUser?.id);
+  }, [projectsData, isGlobalAdmin, currentUser?.id]);
 
   // Why: Drop a project filter the acting user cannot see (common after impersonation).
   useEffect(() => {
-    if (!projectsData || projectFilter === "all") return;
-    const exists = projectsData.some((p) => p.id === projectFilter);
+    if (projectFilter === "all") return;
+    const exists = visibleProjects.some((p) => p.id === projectFilter);
     if (!exists) setFilter("projectFilter", "all");
-  }, [projectsData, projectFilter, setFilter]);
+  }, [visibleProjects, projectFilter, setFilter]);
 
   const uniqueFixers = useMemo(
     () =>
