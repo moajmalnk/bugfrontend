@@ -241,12 +241,18 @@ export default function BugDates() {
     );
   }
 
+  const isGlobalAdmin = role === 'admin' && !currentUser?.admin_id;
+
   return (
     <ListPageShell>
       <ListPageHeader
         icon={<CalendarDays className="h-5 w-5 sm:h-6 sm:w-6" />}
         title="BugDates"
-        description="Programs, observances, holidays, leave & team milestones"
+        description={
+          isGlobalAdmin
+            ? 'Programs, observances, holidays, leave & team milestones'
+            : 'Company calendar plus deadlines for your assigned projects only'
+        }
         accentBarClassName="from-blue-600 to-indigo-700"
         underlayClassName="from-blue-50/50 via-transparent to-indigo-50/50 dark:from-blue-950/20 dark:via-transparent dark:to-indigo-950/20"
         count={eventCount}
