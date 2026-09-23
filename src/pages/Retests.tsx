@@ -204,14 +204,20 @@ const Retests = () => {
   const initialTab = searchParams.get("tab") || "all-retests";
   const [activeTab, setActiveTab] = useState(initialTab);
 
-  const [filters, setFilter, clearFilters] = usePersistedFilters("retests", {
-    searchTerm: "",
-    priorityFilter: "all",
-    projectFilter: "all",
-    bugTypeFilter: "all",
-    fixedByFilter: "all",
-    reporterFilter: "all",
-  });
+  const [filters, setFilter, clearFilters] = usePersistedFilters(
+    "retests",
+    {
+      searchTerm: "",
+      priorityFilter: "all",
+      projectFilter: "all",
+      bugTypeFilter: "all",
+      fixedByFilter: "all",
+      reporterFilter: "all",
+    },
+    // Why: Scope by acting user so admin project filters do not carry into impersonation.
+    // Prefix impersonation scopes so they never share storage with the real user session.
+    currentUser?.admin_id ? `imp:${currentUser.id}` : currentUser?.id
+  );
 
   const searchTerm = filters.searchTerm || "";
   const priorityFilter = filters.priorityFilter || "all";
@@ -296,6 +302,13 @@ const Retests = () => {
 
   const bugs = useMemo(() => data?.bugs ?? [], [data?.bugs]);
   const visibleProjects = useMemo(() => projectsData ?? [], [projectsData]);
+
+  // Why: Drop a project filter the acting user cannot see (common after impersonation).
+  useEffect(() => {
+    if (!projectsData || projectFilter === "all") return;
+    const exists = projectsData.some((p) => p.id === projectFilter);
+    if (!exists) setFilter("projectFilter", "all");
+  }, [projectsData, projectFilter, setFilter]);
 
   const uniqueFixers = useMemo(
     () =>

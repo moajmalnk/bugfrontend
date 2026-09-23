@@ -27,6 +27,7 @@ import {
 } from "@/components/ui/command";
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "@/components/ui/use-toast";
+import { filterAssignedProjects } from "@/components/dashboard/roleDashboardShared";
 import { useAuth } from "@/context/AuthContext";
 import { useBugs } from "@/context/BugContext";
 import { ENV } from "@/lib/env";
@@ -176,7 +177,7 @@ const NewBug = () => {
   const filesRef = useRef<FileWithPreview[]>([]);
 
   const {
-    data: projects = [],
+    data: projectsRaw = [],
     isLoading,
     error,
   } = useQuery({
@@ -192,16 +193,25 @@ const NewBug = () => {
         }
       );
       if (response.data.success) {
-        // Backend already handles filtering:
-        // - Admins get all projects
-        // - Other users (developers, testers) get only projects they are assigned to via project_members table
-        // - Impersonation mode is handled correctly by backend
         return response.data.data;
       }
       throw new Error(response.data.message || "Failed to fetch projects");
     },
     enabled: !!currentUser, // Only fetch when user is available
   });
+
+  // Why: Testers (including when admin is impersonating) may only raise bugs on
+  // assigned projects — match TesterReportBug / Assigned projects UX.
+  const isTesterPicker =
+    String(currentUser?.role || "").toLowerCase() === "tester";
+  const projects = useMemo(() => {
+    const list = (projectsRaw as ProjectOption[]) || [];
+    if (!isTesterPicker) return list;
+    return filterAssignedProjects(
+      list as unknown as Project[],
+      currentUser?.id
+    ) as unknown as ProjectOption[];
+  }, [projectsRaw, isTesterPicker, currentUser?.id]);
 
   const { data: activeBugTypes = [] } = useQuery({
     queryKey: ["bug-types", "active"],
@@ -827,9 +837,19 @@ const NewBug = () => {
                           collisionPadding={16}
                         >
                           <Command>
-                            <CommandInput placeholder="Search project..." />
+                            <CommandInput
+                              placeholder={
+                                isTesterPicker
+                                  ? "Search assigned projects..."
+                                  : "Search project..."
+                              }
+                            />
                             <CommandList>
-                              <CommandEmpty>No project found.</CommandEmpty>
+                              <CommandEmpty>
+                                {isTesterPicker
+                                  ? "No assigned project found."
+                                  : "No project found."}
+                              </CommandEmpty>
                               {isLoading ? (
                                 <CommandGroup>
                                   <CommandItem disabled>Loading projects...</CommandItem>
