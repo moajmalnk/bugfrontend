@@ -5,6 +5,7 @@ import {
   HardwareFormModal,
   MailFormModal,
   NodeFormModal,
+  ToolFormModal,
 } from "@/components/assets/AssetModals";
 import { ItemsPerPageSelect } from "@/components/pagination/ItemsPerPageSelect";
 import { PageJumpSelect } from "@/components/pagination/PageJumpSelect";
@@ -40,6 +41,7 @@ import type {
   AssetHardware,
   AssetNode,
   AssetRenewalRow,
+  AssetTool,
   AssetsSummary,
   NodeKind,
 } from "@/types/assets";
@@ -52,12 +54,13 @@ import {
   Mail,
   Plus,
   Server,
+  Sparkles,
   TriangleAlert,
 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 
-type TabValue = "domains" | "mail" | "nodes" | "hardware" | "renewals";
+type TabValue = "domains" | "mail" | "nodes" | "hardware" | "tools" | "renewals";
 
 const NODE_KINDS: Array<{ value: NodeKind; label: string }> = [
   { value: "server", label: "VPS" },
@@ -73,10 +76,10 @@ function daysTone(days: number) {
 
 function statusTone(status?: string) {
   const s = (status || "").toLowerCase();
-  if (s === "active" || s === "assigned" || s === "in_stock") {
+  if (s === "active" || s === "assigned" || s === "in_stock" || s === "trial") {
     return "bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border-emerald-500/20";
   }
-  if (s === "pending" || s === "repair") {
+  if (s === "pending" || s === "repair" || s === "paused") {
     return "bg-amber-500/10 text-amber-700 dark:text-amber-300 border-amber-500/20";
   }
   if (s === "expired" || s === "retired" || s === "lost" || s === "cancelled") {
@@ -192,6 +195,7 @@ export default function BugAssets() {
   const role = getEffectiveRole(currentUser || {});
   const canView = hasPermissionOrAdmin(role, hasPermission, "ASSETS_VIEW");
   const canCreate = hasPermissionOrAdmin(role, hasPermission, "ASSETS_CREATE");
+  const canEdit = hasPermissionOrAdmin(role, hasPermission, "ASSETS_EDIT");
   const canDelete = hasPermissionOrAdmin(role, hasPermission, "ASSETS_DELETE");
   const showFinance = hasPermissionOrAdmin(role, hasPermission, "ASSETS_FINANCE_VIEW");
   const navigate = useNavigate();
@@ -206,12 +210,19 @@ export default function BugAssets() {
   const [emails, setEmails] = useState<PaginatedSafe<AssetEmail>>({ items: [], total: 0 });
   const [nodes, setNodes] = useState<PaginatedSafe<AssetNode>>({ items: [], total: 0 });
   const [hardware, setHardware] = useState<PaginatedSafe<AssetHardware>>({ items: [], total: 0 });
+  const [tools, setTools] = useState<PaginatedSafe<AssetTool>>({ items: [], total: 0 });
   const [renewals, setRenewals] = useState<AssetRenewalRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [domainOpen, setDomainOpen] = useState(false);
   const [mailOpen, setMailOpen] = useState(false);
   const [nodeOpen, setNodeOpen] = useState(false);
   const [hwOpen, setHwOpen] = useState(false);
+  const [toolOpen, setToolOpen] = useState(false);
+  const [editingDomain, setEditingDomain] = useState<AssetDomain | null>(null);
+  const [editingEmail, setEditingEmail] = useState<AssetEmail | null>(null);
+  const [editingNode, setEditingNode] = useState<AssetNode | null>(null);
+  const [editingHardware, setEditingHardware] = useState<AssetHardware | null>(null);
+  const [editingTool, setEditingTool] = useState<AssetTool | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<{ type: string; id: string; label: string } | null>(
     null
   );
@@ -227,12 +238,13 @@ export default function BugAssets() {
   const refresh = useCallback(async () => {
     setLoading(true);
     try {
-      const [sum, d, e, n, h, r] = await Promise.all([
+      const [sum, d, e, n, h, t, r] = await Promise.all([
         assetsService.summary(),
         assetsService.listDomains({ page, limit: pageSize, q }),
         assetsService.listEmails({ page, limit: pageSize, q }),
         assetsService.listNodes(nodeKind, { page, limit: pageSize, q }),
         assetsService.listHardware({ page, limit: pageSize, q }),
+        assetsService.listTools({ page, limit: pageSize, q }),
         assetsService.listRenewals(30),
       ]);
       setSummary(sum);
@@ -240,6 +252,7 @@ export default function BugAssets() {
       setEmails({ items: e.items || [], total: e.total || 0 });
       setNodes({ items: n.items || [], total: n.total || 0 });
       setHardware({ items: h.items || [], total: h.total || 0 });
+      setTools({ items: t.items || [], total: t.total || 0 });
       setRenewals(r.items || []);
       notifyAdminNavCountsChanged();
     } catch (err) {
@@ -286,6 +299,13 @@ export default function BugAssets() {
         shortLabel: "HW",
         icon: HardDrive,
         count: summary?.hardware ?? 0,
+      },
+      {
+        value: "tools",
+        label: "Premium Tools",
+        shortLabel: "Tools",
+        icon: Sparkles,
+        count: summary?.tools ?? 0,
       },
       {
         value: "renewals",
@@ -358,6 +378,13 @@ export default function BugAssets() {
           tab: "hardware" as TabValue,
         },
         {
+          key: "tools",
+          label: "Tools",
+          value: summary?.tools ?? 0,
+          icon: Sparkles,
+          tab: "tools" as TabValue,
+        },
+        {
           key: "renewals",
           label: "Due < 30d",
           value: summary?.renewals_30 ?? 0,
@@ -390,14 +417,49 @@ export default function BugAssets() {
           ? nodes.total
           : tab === "hardware"
             ? hardware.total
-            : renewals.length;
+            : tab === "tools"
+              ? tools.total
+              : renewals.length;
   const totalPages = Math.max(1, Math.ceil(totalForTab / pageSize));
 
   const openCreate = () => {
-    if (tab === "mail") setMailOpen(true);
-    else if (tab === "nodes") setNodeOpen(true);
-    else if (tab === "hardware") setHwOpen(true);
-    else setDomainOpen(true);
+    if (tab === "mail") {
+      setEditingEmail(null);
+      setMailOpen(true);
+    } else if (tab === "nodes") {
+      setEditingNode(null);
+      setNodeOpen(true);
+    } else if (tab === "hardware") {
+      setEditingHardware(null);
+      setHwOpen(true);
+    } else if (tab === "tools") {
+      setEditingTool(null);
+      setToolOpen(true);
+    } else {
+      setEditingDomain(null);
+      setDomainOpen(true);
+    }
+  };
+
+  const openEditDomain = (row: AssetDomain) => {
+    setEditingDomain(row);
+    setDomainOpen(true);
+  };
+  const openEditEmail = (row: AssetEmail) => {
+    setEditingEmail(row);
+    setMailOpen(true);
+  };
+  const openEditNode = (row: AssetNode) => {
+    setEditingNode(row);
+    setNodeOpen(true);
+  };
+  const openEditHardware = (row: AssetHardware) => {
+    setEditingHardware(row);
+    setHwOpen(true);
+  };
+  const openEditTool = (row: AssetTool) => {
+    setEditingTool(row);
+    setToolOpen(true);
   };
 
   const createLabel =
@@ -407,13 +469,16 @@ export default function BugAssets() {
         ? "Node"
         : tab === "hardware"
           ? "Hardware"
-          : "Domain";
+          : tab === "tools"
+            ? "Tool"
+            : "Domain";
 
   const runDelete = async () => {
     if (!deleteTarget) return;
     if (deleteTarget.type === "domain") await assetsService.deleteDomain(deleteTarget.id);
     if (deleteTarget.type === "email") await assetsService.deleteEmail(deleteTarget.id);
     if (deleteTarget.type === "hardware") await assetsService.deleteHardware(deleteTarget.id);
+    if (deleteTarget.type === "tool") await assetsService.deleteTool(deleteTarget.id);
     if (
       deleteTarget.type === "server" ||
       deleteTarget.type === "hosting" ||
@@ -433,7 +498,7 @@ export default function BugAssets() {
       <ListPageHeader
         icon={<Server className="h-5 w-5 sm:h-6 sm:w-6" />}
         title="BugAssets"
-        description="Domains, mail, cloud nodes, and office hardware — one inventory."
+        description="Domains, mail, cloud nodes, hardware, and premium SaaS tools — one inventory."
         accentBarClassName="from-slate-700 to-cyan-600"
         underlayClassName="from-slate-50/50 via-transparent to-cyan-50/50 dark:from-slate-950/20 dark:via-transparent dark:to-cyan-950/20"
         count={summary?.renewals_30 ?? 0}
@@ -494,7 +559,7 @@ export default function BugAssets() {
           title="BugAssets"
           description="Choose an inventory section"
           desktopBreakpoint="lg"
-          desktopGridClassName="grid-cols-5"
+          desktopGridClassName="grid-cols-3 xl:grid-cols-6"
           underlayClassName="from-slate-50/50 to-cyan-50/50 dark:from-slate-800/50 dark:to-cyan-900/50"
         />
 
@@ -505,7 +570,7 @@ export default function BugAssets() {
             description="Filter the active list by name, client, IP, or tag."
             searchValue={searchInput}
             onSearchChange={setSearchInput}
-            searchPlaceholder="Search domains, mail, nodes, hardware…"
+            searchPlaceholder="Search domains, mail, nodes, hardware, tools…"
             hasActiveFilters={Boolean(searchInput)}
             onClearAll={() => setSearchInput("")}
             headerExtra={
@@ -545,7 +610,13 @@ export default function BugAssets() {
               description="Add a registrar record to start tracking renewals and DNS."
               action={
                 canCreate ? (
-                  <Button className="rounded-xl" onClick={() => setDomainOpen(true)}>
+                  <Button
+                    className="rounded-xl"
+                    onClick={() => {
+                      setEditingDomain(null);
+                      setDomainOpen(true);
+                    }}
+                  >
                     <Plus className="h-4 w-4 mr-2" />
                     Add domain
                   </Button>
@@ -556,28 +627,63 @@ export default function BugAssets() {
             <>
               <div className="md:hidden flex flex-col gap-3">
                 {domains.items.map((row) => (
-                  <button
+                  <div
                     key={row.id}
-                    type="button"
-                    onClick={() => navigate(`/${role}/bugassets/domains/${row.id}`)}
-                    className="rounded-2xl border border-border/50 bg-background/80 p-4 text-left hover:border-cyan-500/40 transition-colors"
+                    className="rounded-2xl border border-border/50 bg-background/80 p-4"
                   >
-                    <div className="flex items-start justify-between gap-3 min-w-0">
-                      <div className="min-w-0">
-                        <div className="font-semibold truncate">{row.fqdn}</div>
-                        <div className="text-xs text-muted-foreground mt-1 truncate">
-                          {row.client_code || row.client_name || "No client"}
+                    <button
+                      type="button"
+                      onClick={() => navigate(`/${role}/bugassets/domains/${row.id}`)}
+                      className="w-full text-left"
+                    >
+                      <div className="flex items-start justify-between gap-3 min-w-0">
+                        <div className="min-w-0">
+                          <div className="font-semibold truncate">{row.fqdn}</div>
+                          <div className="text-xs text-muted-foreground mt-1 truncate">
+                            {row.client_code || row.client_name || "No client"}
+                          </div>
                         </div>
+                        <Badge
+                          variant="outline"
+                          className={cn("rounded-xl shrink-0", statusTone(row.status))}
+                        >
+                          {row.status}
+                        </Badge>
                       </div>
-                      <Badge variant="outline" className={cn("rounded-xl shrink-0", statusTone(row.status))}>
-                        {row.status}
-                      </Badge>
-                    </div>
-                    <div className="mt-3 flex items-center justify-between gap-2 text-xs text-muted-foreground">
-                      <span>Expires {row.expires_at || "—"}</span>
-                      {showFinance ? <span className="tabular-nums">Margin {row.margin_amount ?? "—"}</span> : null}
-                    </div>
-                  </button>
+                      <div className="mt-3 flex items-center justify-between gap-2 text-xs text-muted-foreground">
+                        <span>Expires {row.expires_at || "—"}</span>
+                        {showFinance ? (
+                          <span className="tabular-nums">Margin {row.margin_amount ?? "—"}</span>
+                        ) : null}
+                      </div>
+                    </button>
+                    {canEdit || canDelete ? (
+                      <div className="mt-2 flex items-center gap-1 -ms-2">
+                        {canEdit ? (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="rounded-xl"
+                            onClick={() => openEditDomain(row)}
+                          >
+                            Edit
+                          </Button>
+                        ) : null}
+                        {canDelete ? (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="rounded-xl text-red-600 hover:text-red-700 dark:text-red-400"
+                            onClick={() =>
+                              setDeleteTarget({ type: "domain", id: row.id, label: row.fqdn })
+                            }
+                          >
+                            Delete
+                          </Button>
+                        ) : null}
+                      </div>
+                    ) : null}
+                  </div>
                 ))}
               </div>
               <div className="hidden md:block">
@@ -613,19 +719,34 @@ export default function BugAssets() {
                           <TableCell className="tabular-nums">{row.margin_amount ?? "—"}</TableCell>
                         )}
                         <TableCell className="text-right">
-                          {canDelete && (
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              className="rounded-xl"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                setDeleteTarget({ type: "domain", id: row.id, label: row.fqdn });
-                              }}
-                            >
-                              Delete
-                            </Button>
-                          )}
+                          <div className="flex items-center justify-end gap-1">
+                            {canEdit && (
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="rounded-xl"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  openEditDomain(row);
+                                }}
+                              >
+                                Edit
+                              </Button>
+                            )}
+                            {canDelete && (
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="rounded-xl text-red-600 hover:text-red-700 dark:text-red-400"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setDeleteTarget({ type: "domain", id: row.id, label: row.fqdn });
+                                }}
+                              >
+                                Delete
+                              </Button>
+                            )}
+                          </div>
                         </TableCell>
                       </TableRow>
                     ))}
@@ -646,7 +767,13 @@ export default function BugAssets() {
               description="Track Google Workspace, Zoho, Hostinger, and other mailboxes per domain."
               action={
                 canCreate ? (
-                  <Button className="rounded-xl" onClick={() => setMailOpen(true)}>
+                  <Button
+                    className="rounded-xl"
+                    onClick={() => {
+                      setEditingEmail(null);
+                      setMailOpen(true);
+                    }}
+                  >
                     <Plus className="h-4 w-4 mr-2" />
                     Add mailbox
                   </Button>
@@ -666,19 +793,45 @@ export default function BugAssets() {
                       <Badge variant="outline" className="rounded-xl capitalize">
                         {row.provider}
                       </Badge>
+                      <Badge
+                        variant="outline"
+                        className={cn("rounded-xl capitalize", statusTone(row.status))}
+                      >
+                        {row.status}
+                      </Badge>
                       <span>{row.client_code || row.client_name || "—"}</span>
                     </div>
-                    {canDelete ? (
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        className="rounded-xl mt-2 -ms-2"
-                        onClick={() =>
-                          setDeleteTarget({ type: "email", id: row.id, label: row.address })
-                        }
-                      >
-                        Delete
-                      </Button>
+                    <div className="mt-1.5 text-xs text-muted-foreground">
+                      {row.assigned_user_name
+                        ? `Assigned · ${row.assigned_user_name}`
+                        : "Unassigned"}
+                      {row.signed_in_from ? ` · From ${row.signed_in_from}` : ""}
+                    </div>
+                    {canEdit || canDelete ? (
+                      <div className="mt-2 flex items-center gap-1 -ms-2">
+                        {canEdit ? (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="rounded-xl"
+                            onClick={() => openEditEmail(row)}
+                          >
+                            Edit
+                          </Button>
+                        ) : null}
+                        {canDelete ? (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="rounded-xl text-red-600 hover:text-red-700 dark:text-red-400"
+                            onClick={() =>
+                              setDeleteTarget({ type: "email", id: row.id, label: row.address })
+                            }
+                          >
+                            Delete
+                          </Button>
+                        ) : null}
+                      </div>
                     ) : null}
                   </div>
                 ))}
@@ -688,7 +841,9 @@ export default function BugAssets() {
                   <TableHeader>
                     <TableRow className="hover:bg-transparent">
                       <TableHead>Address</TableHead>
-                      <TableHead>Provider</TableHead>
+                      <TableHead>Status</TableHead>
+                      <TableHead>Assignee</TableHead>
+                      <TableHead>Signed in from</TableHead>
                       <TableHead>Client</TableHead>
                       <TableHead className="w-[1%]" />
                     </TableRow>
@@ -697,25 +852,55 @@ export default function BugAssets() {
                     {emails.items.map((row) => (
                       <TableRow key={row.id}>
                         <TableCell>
-                          <CopyValue value={row.address} label="address" />
+                          <div className="space-y-1">
+                            <CopyValue value={row.address} label="address" />
+                            <div className="text-xs text-muted-foreground capitalize">
+                              {row.provider}
+                            </div>
+                          </div>
                         </TableCell>
-                        <TableCell className="capitalize">{row.provider}</TableCell>
+                        <TableCell>
+                          <Badge
+                            variant="outline"
+                            className={cn("rounded-xl capitalize", statusTone(row.status))}
+                          >
+                            {row.status}
+                          </Badge>
+                        </TableCell>
+                        <TableCell className="text-muted-foreground">
+                          {row.assigned_user_name || "Unassigned"}
+                        </TableCell>
+                        <TableCell className="text-muted-foreground max-w-[180px] truncate">
+                          {row.signed_in_from || "—"}
+                        </TableCell>
                         <TableCell className="text-muted-foreground">
                           {row.client_code || row.client_name || "—"}
                         </TableCell>
                         <TableCell className="text-right">
-                          {canDelete && (
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              className="rounded-xl"
-                              onClick={() =>
-                                setDeleteTarget({ type: "email", id: row.id, label: row.address })
-                              }
-                            >
-                              Delete
-                            </Button>
-                          )}
+                          <div className="flex items-center justify-end gap-1">
+                            {canEdit && (
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="rounded-xl"
+                                onClick={() => openEditEmail(row)}
+                              >
+                                Edit
+                              </Button>
+                            )}
+                            {canDelete && (
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="rounded-xl text-red-600 hover:text-red-700 dark:text-red-400"
+                                onClick={() =>
+                                  setDeleteTarget({ type: "email", id: row.id, label: row.address })
+                                }
+                              >
+                                Delete
+                              </Button>
+                            )}
+                          </div>
                         </TableCell>
                       </TableRow>
                     ))}
@@ -822,19 +1007,34 @@ export default function BugAssets() {
                           </TableCell>
                           <TableCell className="tabular-nums">{row.expires_at || "—"}</TableCell>
                           <TableCell className="text-right">
-                            {canDelete && (
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                className="rounded-xl"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  setDeleteTarget({ type: nodeKind, id: row.id, label: name });
-                                }}
-                              >
-                                Delete
-                              </Button>
-                            )}
+                            <div className="flex items-center justify-end gap-1">
+                              {canEdit && (
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  className="rounded-xl"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    openEditNode(row);
+                                  }}
+                                >
+                                  Edit
+                                </Button>
+                              )}
+                              {canDelete && (
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  className="rounded-xl text-red-600 hover:text-red-700 dark:text-red-400"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setDeleteTarget({ type: nodeKind, id: row.id, label: name });
+                                  }}
+                                >
+                                  Delete
+                                </Button>
+                              )}
+                            </div>
                           </TableCell>
                         </TableRow>
                       );
@@ -924,23 +1124,180 @@ export default function BugAssets() {
                           </Badge>
                         </TableCell>
                         <TableCell className="text-right">
-                          {canDelete && (
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              className="rounded-xl"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                setDeleteTarget({
-                                  type: "hardware",
-                                  id: row.id,
-                                  label: row.asset_tag,
-                                });
-                              }}
-                            >
-                              Delete
-                            </Button>
-                          )}
+                          <div className="flex items-center justify-end gap-1">
+                            {canEdit && (
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="rounded-xl"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  openEditHardware(row);
+                                }}
+                              >
+                                Edit
+                              </Button>
+                            )}
+                            {canDelete && (
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="rounded-xl text-red-600 hover:text-red-700 dark:text-red-400"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setDeleteTarget({
+                                    type: "hardware",
+                                    id: row.id,
+                                    label: row.asset_tag,
+                                  });
+                                }}
+                              >
+                                Delete
+                              </Button>
+                            )}
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </AssetTable>
+              </div>
+            </>
+          )}
+        </TabsContent>
+
+        <TabsContent value="tools" className={LIST_TABS_CONTENT}>
+          {loading ? (
+            <TableSkeleton />
+          ) : tools.items.length === 0 ? (
+            <EmptyState
+              icon={Sparkles}
+              title="No premium tools yet"
+              description="Track shared SaaS subscriptions — seats, renewals, and vault logins."
+              action={
+                canCreate ? (
+                  <Button className="rounded-xl" onClick={() => setToolOpen(true)}>
+                    <Plus className="h-4 w-4 mr-2" />
+                    Add tool
+                  </Button>
+                ) : undefined
+              }
+            />
+          ) : (
+            <>
+              <div className="md:hidden flex flex-col gap-3">
+                {tools.items.map((row) => (
+                  <button
+                    key={row.id}
+                    type="button"
+                    onClick={() => navigate(`/${role}/bugassets/tools/${row.id}`)}
+                    className="rounded-2xl border border-border/50 bg-background/80 p-4 text-left hover:border-cyan-500/40 transition-colors"
+                  >
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <div className="font-semibold truncate">{row.name}</div>
+                        <div className="text-xs text-muted-foreground mt-1 capitalize">
+                          {row.category}
+                          {row.plan_name ? ` · ${row.plan_name}` : ""}
+                          {row.seats_total != null
+                            ? ` · ${row.seats_used ?? 0}/${row.seats_total} seats`
+                            : row.seats_used
+                              ? ` · ${row.seats_used} seats`
+                              : ""}
+                        </div>
+                      </div>
+                      <Badge variant="outline" className={cn("rounded-xl capitalize", statusTone(row.status))}>
+                        {row.status}
+                      </Badge>
+                    </div>
+                  </button>
+                ))}
+              </div>
+              <div className="hidden md:block">
+                <AssetTable>
+                  <TableHeader>
+                    <TableRow className="hover:bg-transparent">
+                      <TableHead>Name</TableHead>
+                      <TableHead>Category</TableHead>
+                      <TableHead>Plan</TableHead>
+                      <TableHead>Account</TableHead>
+                      <TableHead>Seats</TableHead>
+                      <TableHead>Status</TableHead>
+                      <TableHead>Expires</TableHead>
+                      <TableHead className="w-[1%]" />
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {tools.items.map((row) => (
+                      <TableRow
+                        key={row.id}
+                        className="cursor-pointer"
+                        onClick={() => navigate(`/${role}/bugassets/tools/${row.id}`)}
+                      >
+                        <TableCell className="font-medium">
+                          <span className="inline-flex items-center gap-2">
+                            {row.name}
+                            {row.has_secret ? (
+                              <Badge variant="secondary" className="rounded-xl text-[10px]">
+                                Vault
+                              </Badge>
+                            ) : null}
+                          </span>
+                        </TableCell>
+                        <TableCell className="capitalize text-muted-foreground">{row.category}</TableCell>
+                        <TableCell className="text-muted-foreground">{row.plan_name || "—"}</TableCell>
+                        <TableCell className="text-muted-foreground truncate max-w-[160px]">
+                          {row.account_email || "—"}
+                        </TableCell>
+                        <TableCell className="tabular-nums text-muted-foreground">
+                          {row.seats_total != null
+                            ? `${row.seats_used ?? 0}/${row.seats_total}`
+                            : (row.seats_used ?? 0)}
+                        </TableCell>
+                        <TableCell>
+                          <Badge
+                            variant="outline"
+                            className={cn("rounded-xl capitalize", statusTone(row.status))}
+                          >
+                            {row.status}
+                          </Badge>
+                        </TableCell>
+                        <TableCell className="tabular-nums text-muted-foreground">
+                          {row.expires_at || "—"}
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <div className="flex items-center justify-end gap-1">
+                            {canEdit && (
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="rounded-xl"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  openEditTool(row);
+                                }}
+                              >
+                                Edit
+                              </Button>
+                            )}
+                            {canDelete && (
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="rounded-xl text-destructive"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setDeleteTarget({
+                                    type: "tool",
+                                    id: row.id,
+                                    label: row.name,
+                                  });
+                                }}
+                              >
+                                Delete
+                              </Button>
+                            )}
+                          </div>
                         </TableCell>
                       </TableRow>
                     ))}
@@ -958,15 +1315,31 @@ export default function BugAssets() {
             <EmptyState
               icon={TriangleAlert}
               title="Nothing due in 30 days"
-              description="Renewal alerts for domains, SSL, VPS, hosting, Vercel, and hardware warranties will show here."
+              description="Renewal alerts for domains, SSL, VPS, hosting, Vercel, hardware warranties, and premium tools will show here."
             />
           ) : (
             <>
               <div className="md:hidden flex flex-col gap-3">
                 {renewals.map((row) => (
-                  <div
+                  <button
                     key={`${row.entity_type}-${row.entity_id}`}
-                    className="rounded-2xl border border-border/50 bg-background/80 p-4"
+                    type="button"
+                    className="rounded-2xl border border-border/50 bg-background/80 p-4 text-left hover:border-cyan-500/40 transition-colors"
+                    onClick={() => {
+                      if (row.entity_type === "tool") {
+                        navigate(`/${role}/bugassets/tools/${row.entity_id}`);
+                      } else if (row.entity_type === "domain") {
+                        navigate(`/${role}/bugassets/domains/${row.entity_id}`);
+                      } else if (row.entity_type === "hardware") {
+                        navigate(`/${role}/bugassets/hardware/${row.entity_id}`);
+                      } else if (
+                        row.entity_type === "server" ||
+                        row.entity_type === "hosting" ||
+                        row.entity_type === "vercel"
+                      ) {
+                        navigate(`/${role}/bugassets/${row.entity_type}/${row.entity_id}`);
+                      }
+                    }}
                   >
                     <div className="flex items-start justify-between gap-3">
                       <div className="min-w-0">
@@ -982,7 +1355,7 @@ export default function BugAssets() {
                     <div className="mt-2 text-xs text-muted-foreground tabular-nums">
                       Expires {row.expires_at}
                     </div>
-                  </div>
+                  </button>
                 ))}
               </div>
               <div className="hidden md:block">
@@ -998,7 +1371,25 @@ export default function BugAssets() {
                   </TableHeader>
                   <TableBody>
                     {renewals.map((row) => (
-                      <TableRow key={`${row.entity_type}-${row.entity_id}`}>
+                      <TableRow
+                        key={`${row.entity_type}-${row.entity_id}`}
+                        className="cursor-pointer"
+                        onClick={() => {
+                          if (row.entity_type === "tool") {
+                            navigate(`/${role}/bugassets/tools/${row.entity_id}`);
+                          } else if (row.entity_type === "domain") {
+                            navigate(`/${role}/bugassets/domains/${row.entity_id}`);
+                          } else if (row.entity_type === "hardware") {
+                            navigate(`/${role}/bugassets/hardware/${row.entity_id}`);
+                          } else if (
+                            row.entity_type === "server" ||
+                            row.entity_type === "hosting" ||
+                            row.entity_type === "vercel"
+                          ) {
+                            navigate(`/${role}/bugassets/${row.entity_type}/${row.entity_id}`);
+                          }
+                        }}
+                      >
                         <TableCell className="font-medium">{row.label}</TableCell>
                         <TableCell className="capitalize text-muted-foreground">
                           {row.entity_type}
@@ -1029,28 +1420,54 @@ export default function BugAssets() {
 
       <DomainFormModal
         open={domainOpen}
-        onClose={() => setDomainOpen(false)}
+        onClose={() => {
+          setDomainOpen(false);
+          setEditingDomain(null);
+        }}
         onSaved={() => void refresh()}
+        initial={editingDomain}
         showFinance={showFinance}
       />
       <MailFormModal
         open={mailOpen}
-        onClose={() => setMailOpen(false)}
+        onClose={() => {
+          setMailOpen(false);
+          setEditingEmail(null);
+        }}
         onSaved={() => void refresh()}
         domains={domains.items}
+        initial={editingEmail}
         showFinance={showFinance}
       />
       <NodeFormModal
         open={nodeOpen}
         kind={nodeKind}
-        onClose={() => setNodeOpen(false)}
+        onClose={() => {
+          setNodeOpen(false);
+          setEditingNode(null);
+        }}
         onSaved={() => void refresh()}
+        initial={editingNode}
         showFinance={showFinance}
       />
       <HardwareFormModal
         open={hwOpen}
-        onClose={() => setHwOpen(false)}
+        onClose={() => {
+          setHwOpen(false);
+          setEditingHardware(null);
+        }}
         onSaved={() => void refresh()}
+        initial={editingHardware}
+        showFinance={showFinance}
+      />
+      <ToolFormModal
+        open={toolOpen}
+        onClose={() => {
+          setToolOpen(false);
+          setEditingTool(null);
+        }}
+        onSaved={() => void refresh()}
+        initial={editingTool}
         showFinance={showFinance}
       />
       <ConfirmAssetDelete

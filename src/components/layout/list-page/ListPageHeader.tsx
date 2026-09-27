@@ -10,6 +10,8 @@ interface ListPageHeaderProps {
   icon: React.ReactNode;
   title: string;
   description: string;
+  /** Optional control rendered to the left of the icon (e.g. back button). */
+  leading?: React.ReactNode;
   /** Tailwind gradient classes, e.g. from-blue-600 to-emerald-600 */
   accentBarClassName?: string;
   /** Tailwind gradient for header underlay */
@@ -26,6 +28,7 @@ export function ListPageHeader({
   icon,
   title,
   description,
+  leading,
   accentBarClassName = "from-blue-600 to-emerald-600",
   underlayClassName = "from-blue-50/50 via-transparent to-emerald-50/50 dark:from-blue-950/20 dark:via-transparent dark:to-emerald-950/20",
   count,
@@ -47,6 +50,7 @@ export function ListPageHeader({
         <div className="flex flex-col gap-4 sm:gap-6 lg:flex-row lg:justify-between lg:items-center min-w-0">
           <div className="space-y-2 sm:space-y-3 min-w-0 flex-1">
             <div className="flex items-center gap-3 min-w-0">
+              {leading}
               <div
                 className={cn(
                   "p-2 rounded-xl shadow-lg shrink-0 bg-gradient-to-br text-white",

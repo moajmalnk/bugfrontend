@@ -95,6 +95,29 @@ export async function listCodoRules(opts?: {
   };
 }
 
+export async function fetchPendingCodoAcknowledgements(): Promise<{
+  required: boolean;
+  total_pending: number;
+  rules: CodoCommonRule[];
+}> {
+  const res = await fetch(`${API}/pending.php`, {
+    headers: authHeaders(),
+    cache: 'no-store',
+  });
+  const data = await parseJson(res);
+  const rules = (Array.isArray(data?.data?.rules) ? data.data.rules : [])
+    .slice()
+    .sort(
+      (a: CodoCommonRule, b: CodoCommonRule) =>
+        a.sort_order - b.sort_order || a.id - b.id
+    );
+  return {
+    required: Boolean(data?.data?.required),
+    total_pending: Number(data?.data?.total_pending ?? rules.length),
+    rules,
+  };
+}
+
 export async function acknowledgeCodoRule(
   ruleId: number,
   status: CodoAckStatus = 'acknowledged'

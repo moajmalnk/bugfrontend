@@ -129,6 +129,7 @@ const BugAssets = lazy(() => import("@/pages/BugAssets"));
 const BugAssetDomainDetail = lazy(() => import("@/pages/BugAssetDomainDetail"));
 const BugAssetNodeDetail = lazy(() => import("@/pages/BugAssetNodeDetail"));
 const BugAssetHardwareDetail = lazy(() => import("@/pages/BugAssetHardwareDetail"));
+const BugAssetToolDetail = lazy(() => import("@/pages/BugAssetToolDetail"));
 const BugDates = lazy(() => import("@/pages/BugDates"));
 const Profile = lazy(() => import("@/pages/Profile"));
 const Reports = lazy(() => import("@/pages/Reports"));
@@ -415,6 +416,7 @@ const RouteConfig = () => {
       <Route path="/bugcreative" element={<RolePathRedirect suffix="bugcreative" />} />
       <Route path="/bugassets/domains/:domainId" element={<RolePathRedirect suffix="bugassets/domains/:domainId" />} />
       <Route path="/bugassets/hardware/:hardwareId" element={<RolePathRedirect suffix="bugassets/hardware/:hardwareId" />} />
+      <Route path="/bugassets/tools/:toolId" element={<RolePathRedirect suffix="bugassets/tools/:toolId" />} />
       <Route path="/bugassets/:kind/:nodeId" element={<RolePathRedirect suffix="bugassets/:kind/:nodeId" />} />
       <Route path="/bugassets" element={<RolePathRedirect suffix="bugassets" />} />
       <Route path="/bugdates" element={<RolePathRedirect suffix="bugdates" />} />
@@ -462,6 +464,7 @@ const RouteConfig = () => {
           <Route path="bugcreative" element={<BugCreative />} />
           <Route path="bugassets/domains/:domainId" element={<BugAssetDomainDetail />} />
           <Route path="bugassets/hardware/:hardwareId" element={<BugAssetHardwareDetail />} />
+          <Route path="bugassets/tools/:toolId" element={<BugAssetToolDetail />} />
           <Route path="bugassets/:kind/:nodeId" element={<BugAssetNodeDetail />} />
           <Route path="bugassets" element={<BugAssets />} />
           <Route path="bugdates" element={<BugDates />} />

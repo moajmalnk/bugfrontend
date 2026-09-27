@@ -1,3 +1,13 @@
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -48,12 +58,14 @@ export function VaultRevealModal({
   const [revealed, setRevealed] = useState<{ id: string; secret: string } | null>(null);
   const [loading, setLoading] = useState(false);
   const [dirty, setDirty] = useState(false);
+  const [unsavedOpen, setUnsavedOpen] = useState(false);
 
   useEffect(() => {
     if (!open) {
       setForm(INITIAL);
       setRevealed(null);
       setDirty(false);
+      setUnsavedOpen(false);
       return;
     }
     assetsService
@@ -62,12 +74,21 @@ export function VaultRevealModal({
       .catch(() => setItems([]));
   }, [open, entityType, entityId]);
 
-  const handleClose = () => {
-    if (dirty && !window.confirm("You have unsaved changes.")) return;
+  const finishClose = () => {
     setForm(INITIAL);
     setRevealed(null);
     setDirty(false);
+    setUnsavedOpen(false);
     onOpenChange(false);
+  };
+
+  const requestClose = () => {
+    if (loading) return;
+    if (dirty) {
+      setUnsavedOpen(true);
+      return;
+    }
+    finishClose();
   };
 
   const store = async () => {
@@ -114,98 +135,117 @@ export function VaultRevealModal({
   };
 
   return (
-    <Dialog open={open} onOpenChange={(next) => (next ? onOpenChange(true) : handleClose())}>
-      <DialogContent className="max-w-[400px] rounded-xl">
-        <DialogHeader>
-          <DialogTitle>Credential vault</DialogTitle>
-          <DialogDescription>Secrets are encrypted at rest. Reveal is audited.</DialogDescription>
-        </DialogHeader>
-        <div className="flex flex-col gap-4">
-          {items.length === 0 ? (
-            <p className="text-sm text-muted-foreground">No secrets stored for this asset.</p>
-          ) : (
-            <div className="flex flex-col gap-2">
-              {items.map((item) => (
-                <div key={item.id} className="rounded-xl border border-border/60 p-3">
-                  <div className="text-sm font-medium">{item.label}</div>
-                  <div className="text-xs text-muted-foreground">
-                    {item.kind} · {item.fingerprint || "no fingerprint"}
-                  </div>
-                  {revealed?.id === item.id ? (
-                    <div className="mt-2">
-                      <CopyValue value={revealed.secret} label="secret" />
+    <>
+      <Dialog open={open} onOpenChange={(next) => (next ? onOpenChange(true) : requestClose())}>
+        <DialogContent className="max-w-[400px] rounded-xl">
+          <DialogHeader>
+            <DialogTitle>Credential vault</DialogTitle>
+            <DialogDescription>Secrets are encrypted at rest. Reveal is audited.</DialogDescription>
+          </DialogHeader>
+          <div className="flex flex-col gap-4">
+            {items.length === 0 ? (
+              <p className="text-sm text-muted-foreground">No secrets stored for this asset.</p>
+            ) : (
+              <div className="flex flex-col gap-2">
+                {items.map((item) => (
+                  <div key={item.id} className="rounded-xl border border-border/60 p-3">
+                    <div className="text-sm font-medium">{item.label}</div>
+                    <div className="text-xs text-muted-foreground">
+                      {item.kind} · {item.fingerprint || "no fingerprint"}
                     </div>
-                  ) : (
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      className="mt-2 rounded-xl"
-                      disabled={!canReveal || loading}
-                      onClick={() => reveal(item.id)}
-                    >
-                      Reveal
-                    </Button>
-                  )}
+                    {revealed?.id === item.id ? (
+                      <div className="mt-2">
+                        <CopyValue value={revealed.secret} label="secret" />
+                      </div>
+                    ) : (
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        className="mt-2 rounded-xl"
+                        disabled={!canReveal || loading}
+                        onClick={() => reveal(item.id)}
+                      >
+                        Reveal
+                      </Button>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+            {canEdit && (
+              <div className="grid grid-cols-12 gap-3">
+                <div className="col-span-12">
+                  <Label htmlFor="vault-label">Label</Label>
+                  <Input
+                    id="vault-label"
+                    maxLength={120}
+                    className="rounded-xl"
+                    value={form.label}
+                    onChange={(e) => {
+                      setForm((f) => ({ ...f, label: e.target.value.slice(0, 120) }));
+                      setDirty(true);
+                    }}
+                  />
                 </div>
-              ))}
-            </div>
-          )}
-          {canEdit && (
-            <div className="grid grid-cols-12 gap-3">
-              <div className="col-span-12">
-                <Label htmlFor="vault-label">Label</Label>
-                <Input
-                  id="vault-label"
-                  maxLength={120}
-                  className="rounded-xl"
-                  value={form.label}
-                  onChange={(e) => {
-                    setForm((f) => ({ ...f, label: e.target.value.slice(0, 120) }));
-                    setDirty(true);
-                  }}
-                />
+                <div className="col-span-12 space-y-1.5">
+                  <Label>Kind</Label>
+                  <AssetSelect
+                    value={form.kind}
+                    onValueChange={(v) => {
+                      setForm((f) => ({ ...f, kind: v as VaultKind }));
+                      setDirty(true);
+                    }}
+                    placeholder="Secret kind"
+                    searchable={false}
+                    options={VAULT_KINDS}
+                  />
+                </div>
+                <div className="col-span-12">
+                  <Label htmlFor="vault-secret">Secret</Label>
+                  <Input
+                    id="vault-secret"
+                    type="password"
+                    className="rounded-xl"
+                    value={form.secret}
+                    onChange={(e) => {
+                      setForm((f) => ({ ...f, secret: e.target.value }));
+                      setDirty(true);
+                    }}
+                  />
+                </div>
               </div>
-              <div className="col-span-12 space-y-1.5">
-                <Label>Kind</Label>
-                <AssetSelect
-                  value={form.kind}
-                  onValueChange={(v) => {
-                    setForm((f) => ({ ...f, kind: v as VaultKind }));
-                    setDirty(true);
-                  }}
-                  placeholder="Secret kind"
-                  searchable={false}
-                  options={VAULT_KINDS}
-                />
-              </div>
-              <div className="col-span-12">
-                <Label htmlFor="vault-secret">Secret</Label>
-                <Input
-                  id="vault-secret"
-                  type="password"
-                  className="rounded-xl"
-                  value={form.secret}
-                  onChange={(e) => {
-                    setForm((f) => ({ ...f, secret: e.target.value }));
-                    setDirty(true);
-                  }}
-                />
-              </div>
-            </div>
-          )}
-        </div>
-        <DialogFooter className="gap-2">
-          <Button variant="outline" className="rounded-xl" onClick={handleClose} disabled={loading}>
-            Close
-          </Button>
-          {canEdit && (
-            <Button className="rounded-xl" onClick={store} disabled={loading || !form.secret.trim()}>
-              {loading ? "Saving…" : "Store"}
+            )}
+          </div>
+          <DialogFooter className="gap-2">
+            <Button variant="outline" className="rounded-xl" onClick={requestClose} disabled={loading}>
+              Close
             </Button>
-          )}
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+            {canEdit && (
+              <Button className="rounded-xl" onClick={store} disabled={loading || !form.secret.trim()}>
+                {loading ? "Saving…" : "Store"}
+              </Button>
+            )}
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <AlertDialog open={unsavedOpen} onOpenChange={setUnsavedOpen}>
+        <AlertDialogContent className="max-w-[400px] rounded-2xl">
+          <AlertDialogHeader>
+            <AlertDialogTitle>Unsaved changes</AlertDialogTitle>
+            <AlertDialogDescription>
+              You have unsaved changes. Close anyway?
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter className="gap-2 sm:gap-2">
+            <AlertDialogCancel className="mt-0 rounded-xl">Keep editing</AlertDialogCancel>
+            <AlertDialogAction className="rounded-xl" onClick={finishClose}>
+              Discard
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </>
   );
 }

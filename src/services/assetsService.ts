@@ -8,6 +8,7 @@ import type {
   AssetRenewalRow,
   AssetServer,
   AssetSubdomain,
+  AssetTool,
   AssetVercel,
   AssetsSummary,
   ClientAssetGraph,
@@ -254,6 +255,63 @@ class AssetsService {
       headers: this.headers(),
     });
     await this.parse(response);
+  }
+
+  async listTools(params: Record<string, string | number | undefined>): Promise<Paginated<AssetTool>> {
+    const response = await fetch(`${this.baseUrl}/tools/list.php${this.qs(params)}`, {
+      headers: this.headers(),
+    });
+    return this.parse<Paginated<AssetTool>>(response);
+  }
+
+  async getTool(id: string): Promise<AssetTool> {
+    const response = await fetch(`${this.baseUrl}/tools/get.php${this.qs({ id })}`, {
+      headers: this.headers(),
+    });
+    return this.parse<AssetTool>(response);
+  }
+
+  async saveTool(payload: Record<string, unknown>, id?: string): Promise<AssetTool> {
+    const url = id ? `${this.baseUrl}/tools/update.php` : `${this.baseUrl}/tools/create.php`;
+    const response = await fetch(url, {
+      method: "POST",
+      headers: this.headers(),
+      body: JSON.stringify(id ? { id, ...payload } : payload),
+    });
+    return this.parse<AssetTool>(response);
+  }
+
+  async deleteTool(id: string): Promise<void> {
+    const response = await fetch(`${this.baseUrl}/tools/delete.php${this.qs({ id })}`, {
+      method: "DELETE",
+      headers: this.headers(),
+    });
+    await this.parse(response);
+  }
+
+  async assignToolSeat(payload: {
+    tool_id: string;
+    user_id?: string | null;
+    external_name?: string | null;
+    external_email?: string | null;
+    seat_role?: string | null;
+    notes?: string | null;
+  }): Promise<AssetTool> {
+    const response = await fetch(`${this.baseUrl}/tools/seats/assign.php`, {
+      method: "POST",
+      headers: this.headers(),
+      body: JSON.stringify(payload),
+    });
+    return this.parse<AssetTool>(response);
+  }
+
+  async unassignToolSeat(seatId: string): Promise<AssetTool> {
+    const response = await fetch(`${this.baseUrl}/tools/seats/unassign.php`, {
+      method: "POST",
+      headers: this.headers(),
+      body: JSON.stringify({ id: seatId }),
+    });
+    return this.parse<AssetTool>(response);
   }
 
   async listRenewals(days = 30): Promise<{ items: AssetRenewalRow[]; total: number }> {

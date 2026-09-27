@@ -773,6 +773,7 @@ export default function CommonCodoRules() {
         : 0;
     const allDone = ack ? ack.pending_count === 0 && ack.required_total > 0 : false;
     const canRespond = !!ack && (ack.current_user_must_acknowledge || !!userStatus);
+    const showChoiceButtons = !!ack?.current_user_must_acknowledge && !userStatus;
 
     return (
       <div
@@ -925,8 +926,9 @@ export default function CommonCodoRules() {
                       </div>
                     )}
 
+                    {showChoiceButtons || canViewAckDetails ? (
                     <div className="grid grid-cols-2 sm:flex sm:flex-wrap items-stretch sm:items-center gap-2 w-full lg:w-auto min-w-0">
-                      {canRespond
+                      {showChoiceButtons
                         ? (
                             ['acknowledged', 'doubt', 'not_required'] as CodoAckStatus[]
                           ).map((status) => {
@@ -985,6 +987,7 @@ export default function CommonCodoRules() {
                         </CollapsibleTrigger>
                       ) : null}
                     </div>
+                    ) : null}
                   </div>
 
                   {canViewAckDetails ? (

@@ -7,10 +7,11 @@ import { cn, getEffectiveRole } from "@/lib/utils";
 import { Sidebar } from "./Sidebar";
 import { MainLayoutSkeleton } from "./MainLayoutSkeleton";
 import { NotificationPopover } from "@/components/notifications/NotificationPopover";
+import { ImpersonateIndicator } from "@/components/ui/ImpersonateBanner";
 import { GlobalSearchProvider, useGlobalSearchModal } from "@/context/GlobalSearchContext";
 import { GlobalSearchDialog } from "@/components/search/GlobalSearchDialog";
 import { AdminActiveUsersStrip } from "@/components/users/AdminActiveUsersStrip";
-import { ImpersonateBanner } from "../ui/ImpersonateBanner";
+import CodoAcknowledgementGate from "@/components/codo/CodoAcknowledgementGate";
 
 // Non-critical widgets: loaded in separate chunks so they never block first paint.
 const FirebaseListener = lazy(() => import("../messaging/FirebaseListener"));
@@ -91,6 +92,7 @@ const MobileTopBar = memo(function MobileTopBar({
         >
           <RefreshCw className={cn("h-5 w-5", isRefreshing && "animate-spin")} />
         </Button>
+        <ImpersonateIndicator />
         <NotificationPopover />
       </div>
     </div>
@@ -150,10 +152,6 @@ export const MainLayout = ({ children }: MainLayoutProps) => {
   // Mount the mobile drawer (and its Sidebar with permission fetches) only after first open.
   const [drawerMounted, setDrawerMounted] = useState(false);
 
-  // Check if we're in impersonate mode
-  const isImpersonating =
-    currentUser?.admin_id && currentUser.admin_id !== currentUser.id;
-
   const openSidebar = () => {
     setDrawerMounted(true);
     setSidebarOpen(true);
@@ -183,14 +181,8 @@ export const MainLayout = ({ children }: MainLayoutProps) => {
   return (
     <GlobalSearchProvider onCloseSidebar={() => setSidebarOpen(false)}>
       <div className="flex h-screen supports-[height:100dvh]:h-[100dvh] min-w-0 overflow-hidden bg-background">
-        <ImpersonateBanner />
         {/* Sidebar for desktop */}
-        <aside
-          className={cn(
-            "hidden lg:block w-64 xl:w-72 shrink-0 min-w-0",
-            isImpersonating && "pt-16"
-          )}
-        >
+        <aside className="hidden lg:block w-64 xl:w-72 shrink-0 min-w-0">
           <Sidebar />
         </aside>
 
@@ -224,12 +216,7 @@ export const MainLayout = ({ children }: MainLayoutProps) => {
         )}
 
         {/* Main content */}
-        <div
-          className={cn(
-            "flex-1 flex flex-col min-w-0 min-h-0",
-            isImpersonating && "pt-16"
-          )}
-        >
+        <div className="flex-1 flex flex-col min-w-0 min-h-0">
           {/* Top bar with menu button on mobile/tablet */}
           <MobileTopBar onOpenSidebar={openSidebar} />
 
@@ -262,6 +249,7 @@ export const MainLayout = ({ children }: MainLayoutProps) => {
         </div>
       </div>
       <GlobalSearchDialog />
+      <CodoAcknowledgementGate />
       <Suspense fallback={null}>
         <FirebaseListener />
         <OnboardingGuard />

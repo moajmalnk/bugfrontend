@@ -4,6 +4,15 @@ export type BillingCycle = "monthly" | "yearly" | "biennial" | "one_time";
 export type NodeKind = "server" | "hosting" | "vercel";
 export type HardwareCategory = "laptop" | "test_phone" | "office_device" | "network" | "other";
 export type HardwareStatus = "in_stock" | "assigned" | "repair" | "retired" | "lost";
+export type ToolCategory =
+  | "ai"
+  | "design"
+  | "devops"
+  | "productivity"
+  | "marketing"
+  | "communication"
+  | "other";
+export type ToolStatus = "active" | "trial" | "expired" | "cancelled" | "paused";
 export type MailProvider = "hostinger" | "google" | "zoho" | "microsoft" | "other";
 export type RecordType = "A" | "AAAA" | "CNAME" | "ALIAS" | "MX" | "TXT" | "NS";
 export type TargetKind = "server" | "hosting" | "vercel" | "raw";
@@ -39,6 +48,7 @@ export interface AssetsSummary {
   hosting: number;
   vercel: number;
   hardware: number;
+  tools?: number;
   renewals_30: number;
   margin_total?: number;
 }
@@ -77,6 +87,10 @@ export interface AssetSubdomain {
   target_hosting_id?: string | null;
   target_vercel_id?: string | null;
   target_value?: string | null;
+  target_server_hostname?: string | null;
+  target_server_ipv4?: string | null;
+  target_hosting_label?: string | null;
+  target_vercel_project?: string | null;
   ttl?: number | null;
   status: "active" | "disabled";
   apex?: string;
@@ -95,6 +109,7 @@ export interface AssetEmail extends AssetBilling {
   assigned_user_id?: string | null;
   assigned_user_name?: string | null;
   assigned_contact?: string | null;
+  signed_in_from?: string | null;
   status: "active" | "suspended" | "deleted";
   domain_fqdn?: string;
   client_code?: string | null;
@@ -197,6 +212,37 @@ export interface AssetHardware extends AssetBilling {
   status: HardwareStatus;
   notes?: string | null;
   has_secret?: boolean;
+}
+
+export interface AssetToolSeat {
+  id: string;
+  tool_id: string;
+  user_id?: string | null;
+  user_name?: string | null;
+  user_email?: string | null;
+  external_name?: string | null;
+  external_email?: string | null;
+  seat_role?: string | null;
+  notes?: string | null;
+  assigned_at?: string;
+}
+
+export interface AssetTool extends AssetBilling {
+  id: string;
+  name: string;
+  slug: string;
+  category: ToolCategory;
+  plan_name?: string | null;
+  login_url?: string | null;
+  account_email?: string | null;
+  seats_total?: number | null;
+  seats_used?: number;
+  seats?: AssetToolSeat[];
+  status: ToolStatus;
+  notes?: string | null;
+  has_secret?: boolean;
+  secret_fingerprint?: string | null;
+  created_at?: string;
 }
 
 export interface AssetRenewalRow {

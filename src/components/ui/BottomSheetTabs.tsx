@@ -127,22 +127,23 @@ export function BottomSheetTabs({
         {/* Desktop: equal-width tab row */}
         <TabsList
           className={cn(
-            "h-14 w-full gap-1 bg-transparent p-1",
+            "h-auto min-h-14 w-full gap-1 bg-transparent p-1",
             desktopOnly,
             gridClass
           )}
         >
           {items.map((tab) => {
             const Icon = tab.icon;
+            const useShort = items.length >= 6 && Boolean(tab.shortLabel);
             return (
               <TabsTrigger
                 key={tab.value}
                 value={tab.value}
-                className="flex h-full min-w-0 items-center justify-center gap-1.5 rounded-xl px-1 text-sm font-semibold transition-all duration-300 data-[state=active]:border data-[state=active]:border-gray-200 data-[state=active]:bg-white data-[state=active]:shadow-lg dark:data-[state=active]:border-gray-700 dark:data-[state=active]:bg-gray-800 sm:gap-2 sm:px-2 sm:text-base"
+                className="flex h-12 min-w-0 items-center justify-center gap-1.5 rounded-xl px-1 text-sm font-semibold transition-all duration-300 data-[state=active]:border data-[state=active]:border-gray-200 data-[state=active]:bg-white data-[state=active]:shadow-lg dark:data-[state=active]:border-gray-700 dark:data-[state=active]:bg-gray-800 sm:gap-2 sm:px-2 sm:text-base"
               >
                 {Icon ? <Icon className="h-4 w-4 shrink-0 sm:h-5 sm:w-5" /> : null}
                 <span className="truncate">
-                  {items.length >= 7 && tab.shortLabel ? tab.shortLabel : tab.label}
+                  {useShort ? tab.shortLabel : tab.label}
                 </span>
                 {tab.count != null ? (
                   <span

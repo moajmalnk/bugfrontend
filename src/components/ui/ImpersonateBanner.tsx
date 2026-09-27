@@ -1,128 +1,79 @@
-import { Button } from "@/components/ui/button";
-import { X, Shield, AlertTriangle, User, Mail, UserCheck } from "lucide-react";
+import { useState } from "react";
+import { Loader2, LogOut, UserRound } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
-import { Badge } from "@/components/ui/badge";
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { Button } from "@/components/ui/button";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 
-export function ImpersonateBanner() {
+/**
+ * Why: Impersonation must stay visible without a full-width banner.
+ * A single icon sits beside notifications; identity and exit live in a small menu.
+ */
+export function ImpersonateIndicator() {
   const { currentUser, exitImpersonateMode } = useAuth();
+  const [open, setOpen] = useState(false);
+  const [exiting, setExiting] = useState(false);
 
-  // Check if we're in impersonate mode by looking for admin_id in the token payload
-  const isImpersonating = currentUser?.admin_id && currentUser.admin_id !== currentUser.id;
+  const isImpersonating = Boolean(
+    currentUser?.admin_id && currentUser.admin_id !== currentUser.id
+  );
 
   if (!isImpersonating) {
     return null;
   }
 
-  const handleExitImpersonate = () => {
-    if (exitImpersonateMode) {
-      exitImpersonateMode();
-    }
-  };
+  const displayName = currentUser?.name || currentUser?.username || "User";
+  const roleLabel = (currentUser?.role || "user").replace(/_/g, " ");
 
-  const getRoleColor = (role: string) => {
-    switch (role) {
-      case 'admin':
-        return 'bg-red-100 text-red-800 border-red-200';
-      case 'developer':
-        return 'bg-blue-100 text-blue-800 border-blue-200';
-      case 'tester':
-        return 'bg-orange-100 text-orange-800 border-orange-200';
-      default:
-        return 'bg-gray-100 text-gray-800 border-gray-200';
+  const handleExit = async () => {
+    if (exiting || !exitImpersonateMode) return;
+    setExiting(true);
+    try {
+      await exitImpersonateMode();
+    } finally {
+      setExiting(false);
+      setOpen(false);
     }
   };
 
   return (
-    <div className="bg-gradient-to-r from-orange-600 via-red-600 to-orange-600 text-white border-b border-orange-500/30 shadow-lg fixed top-0 left-0 right-0 z-30 animate-in slide-in-from-top duration-300">
-      <div className="max-w-7xl mx-auto px-4 py-4">
-        {/* Mobile Layout - Center aligned, single row */}
-        <div className="flex flex-col sm:hidden items-center justify-center gap-4">
-          <div className="flex items-center justify-center gap-4 w-full">
-            {/* Warning badge */}
-            <div className="flex items-center gap-2 bg-white text-orange-600 px-3 py-2 rounded-lg font-semibold shadow-sm border border-orange-200">
-              <AlertTriangle className="h-4 w-4" />
-              <span className="text-sm font-bold">IMPERSONATE MODE</span>
-            </div>
-            
-            {/* Exit button */}
-            <Button
-              onClick={handleExitImpersonate}
-              variant="outline"
-              size="sm"
-              className="bg-white/10 border-white/30 text-white hover:bg-white/20 hover:border-white/50 transition-all duration-200 font-medium shadow-sm hover:shadow-md"
-            >
-              <X className="h-4 w-4 mr-2" />
-              Exit
-            </Button>
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
+        <Button
+          type="button"
+          variant="ghost"
+          size="icon"
+          className="relative h-9 w-9 rounded-xl text-amber-700 hover:bg-amber-500/15 hover:text-amber-800 dark:text-amber-300 dark:hover:bg-amber-400/15 dark:hover:text-amber-200"
+          aria-label={`Viewing as ${displayName}. Open impersonation details`}
+          title={`Viewing as ${displayName}`}
+        >
+          <UserRound className="h-5 w-5" />
+          <span className="absolute right-1.5 top-1.5 h-2 w-2 rounded-full bg-amber-500 ring-2 ring-background" />
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent align="end" sideOffset={8} className="w-64 rounded-xl p-3">
+        <div className="flex flex-col gap-3">
+          <div className="min-w-0">
+            <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+              Viewing as
+            </p>
+            <p className="truncate text-sm font-semibold text-foreground">{displayName}</p>
+            {currentUser?.email ? (
+              <p className="truncate text-xs text-muted-foreground">{currentUser.email}</p>
+            ) : null}
+            <p className="mt-1 text-xs capitalize text-muted-foreground">{roleLabel}</p>
           </div>
+          <Button
+            type="button"
+            variant="outline"
+            className="h-9 w-full rounded-xl"
+            onClick={handleExit}
+            disabled={exiting}
+          >
+            {exiting ? <Loader2 className="animate-spin" /> : <LogOut />}
+            {exiting ? "Exiting…" : "Exit to admin"}
+          </Button>
         </div>
-
-        {/* Desktop Layout - Full details */}
-        <div className="hidden sm:flex lg:flex-row items-start lg:items-center justify-between gap-4">
-          {/* Left side - Warning and user info */}
-          <div className="flex flex-col lg:flex-row items-start lg:items-center gap-4 w-full lg:w-auto">
-            {/* Warning badge */}
-            <div className="flex items-center gap-2 bg-white text-orange-600 px-3 py-2 rounded-lg font-semibold shadow-sm border border-orange-200 flex-shrink-0">
-              <AlertTriangle className="h-4 w-4 flex-shrink-0" />
-              <span className="text-sm font-bold whitespace-nowrap">IMPERSONATE MODE</span>
-            </div>
-            
-            {/* User information */}
-            <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3 w-full lg:w-auto">
-              
-              <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4 w-full sm:w-auto">
-                {/* User avatar and name */}
-                <div className="flex items-center gap-2">
-                  <div className="w-8 h-8 rounded-full bg-gradient-to-br from-orange-400 to-red-400 flex items-center justify-center shadow-sm flex-shrink-0 border-2 border-white/20">
-                    <User className="h-4 w-4 text-white" />
-                  </div>
-                  <div className="flex flex-col min-w-0">
-                    <span className="text-sm font-semibold text-white truncate">
-                      {currentUser?.name || currentUser?.username}
-                    </span>
-                    <div className="flex items-center gap-1">
-                      <Mail className="h-3 w-3 text-orange-100 flex-shrink-0" />
-                      <span className="text-xs text-orange-100 truncate">
-                        {currentUser?.email}
-                      </span>
-                    </div>
-                  </div>
-                </div>
-                
-                {/* Role badge */}
-                <Badge 
-                  variant="outline" 
-                  className={`${getRoleColor(currentUser?.role || '')} border text-xs font-medium flex-shrink-0`}
-                >
-                  <UserCheck className="h-3 w-3 mr-1" />
-                  {currentUser?.role?.toUpperCase()}
-                </Badge>
-              </div>
-            </div>
-          </div>
-          
-          {/* Right side - Exit button */}
-          <TooltipProvider>
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button
-                  onClick={handleExitImpersonate}
-                  variant="outline"
-                  size="sm"
-                  className="bg-white/10 border-white/30 text-white hover:bg-white/20 hover:border-white/50 transition-all duration-200 font-medium shadow-sm hover:shadow-md"
-                >
-                  <X className="h-4 w-4 mr-2" />
-                  Exit
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent>
-                <p>Return to your admin dashboard</p>
-              </TooltipContent>
-            </Tooltip>
-          </TooltipProvider>
-        </div>
-      </div>
-    </div>
+      </PopoverContent>
+    </Popover>
   );
 }

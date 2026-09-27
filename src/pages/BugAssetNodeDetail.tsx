@@ -1,4 +1,5 @@
 import { CopyValue } from "@/components/assets/CopyValue";
+import { AssetSelect } from "@/components/assets/AssetFormFields";
 import { VaultRevealModal } from "@/components/assets/VaultRevealModal";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -13,7 +14,7 @@ import { clientService } from "@/services/clientService";
 import type { AssetHosting, AssetServer, AssetVercel, NodeKind } from "@/types/assets";
 import type { Client } from "@/types";
 import { ArrowLeft, KeyRound, Server } from "lucide-react";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 
 export default function BugAssetNodeDetail() {
@@ -52,6 +53,23 @@ export default function BugAssetNodeDetail() {
     void load();
   }, [load]);
 
+  const linked = node?.clients || [];
+  const linkedIds = useMemo(() => new Set(linked.map((c) => c.client_id)), [linked]);
+  const clientOptions = useMemo(
+    () =>
+      [...clients]
+        .filter((c) => !linkedIds.has(c.id))
+        .sort((a, b) => a.corporate_name.localeCompare(b.corporate_name))
+        .map((c) => {
+          const code = (c as Client & { client_code?: string | null }).client_code;
+          return {
+            value: c.id,
+            label: code ? `${code} · ${c.corporate_name}` : c.corporate_name,
+          };
+        }),
+    [clients, linkedIds]
+  );
+
   if (loading || !node) {
     return (
       <ListPageShell>
@@ -71,7 +89,6 @@ export default function BugAssetNodeDetail() {
           : node.id;
   const ip = "public_ipv4" in node ? node.public_ipv4 : null;
   const inbound = node.inbound_subdomains || [];
-  const linked = node.clients || [];
 
   const link = async () => {
     if (!linkClient || linking) return;
@@ -90,10 +107,19 @@ export default function BugAssetNodeDetail() {
 
   return (
     <ListPageShell>
-      <Button variant="ghost" className="rounded-xl" asChild>
-        <Link to={`/${role}/bugassets`}><ArrowLeft className="h-4 w-4 mr-2" />Back</Link>
-      </Button>
       <ListPageHeader
+        leading={
+          <Button
+            variant="outline"
+            size="icon"
+            className="h-11 w-11 rounded-xl shrink-0"
+            asChild
+          >
+            <Link to={`/${role}/bugassets`} aria-label="Back to BugAssets">
+              <ArrowLeft className="h-5 w-5" />
+            </Link>
+          </Button>
+        }
         icon={<Server className="h-6 w-6" />}
         title={title}
         description={`${nodeKind} · expires ${node.expires_at || "n/a"}`}
@@ -138,16 +164,27 @@ export default function BugAssetNodeDetail() {
               </div>
             )}
             {canEdit && (
-              <div className="flex gap-2">
-                <select className="flex-1 h-10 rounded-xl border bg-background px-3 text-sm" value={linkClient} onChange={(e) => setLinkClient(e.target.value)}>
-                  <option value="">Link a client</option>
-                  {clients.map((c) => (
-                    <option key={c.id} value={c.id}>{c.corporate_name}</option>
-                  ))}
-                </select>
-                <Button className="rounded-xl" disabled={!linkClient || linking} onClick={() => void link()}>
-                  {linking ? "Linking…" : "Link"}
-                </Button>
+              <div className="grid grid-cols-12 gap-2 items-end">
+                <div className="col-span-12 sm:col-span-8 space-y-1.5">
+                  <AssetSelect
+                    value={linkClient}
+                    onValueChange={setLinkClient}
+                    placeholder="Link a client"
+                    emptyLabel="Link a client"
+                    options={clientOptions}
+                    searchable
+                    disabled={linking}
+                  />
+                </div>
+                <div className="col-span-12 sm:col-span-4">
+                  <Button
+                    className="w-full rounded-xl"
+                    disabled={!linkClient || linking}
+                    onClick={() => void link()}
+                  >
+                    {linking ? "Linking…" : "Link"}
+                  </Button>
+                </div>
               </div>
             )}
           </CardContent>

@@ -210,28 +210,29 @@ const ClientDetails = () => {
             <div className="flex flex-col lg:flex-row justify-between lg:items-center gap-6">
               <div className="space-y-3 min-w-0">
                 <div className="flex items-center gap-3">
+                  <Button
+                    variant="outline"
+                    size="icon"
+                    className="h-11 w-11 rounded-xl shrink-0"
+                    onClick={() => navigate(clientsBackPath)}
+                    aria-label="Back to Clients"
+                  >
+                    <ArrowLeft className="h-5 w-5" />
+                  </Button>
                   <div className="p-2 bg-gradient-to-br from-blue-600 to-emerald-600 rounded-xl shadow-lg">
                     <Building2 className="h-6 w-6 text-white" />
                   </div>
                   <div className="min-w-0">
                     <h1 className="text-3xl sm:text-4xl lg:text-5xl font-bold bg-gradient-to-r from-gray-900 via-gray-800 to-gray-700 dark:from-white dark:via-gray-100 dark:to-gray-300 bg-clip-text text-transparent tracking-tight truncate">
-                      Client Details
+                      {client?.corporate_name || 'Client Details'}
                     </h1>
                     <div className="h-1 w-20 bg-gradient-to-r from-blue-600 to-emerald-600 rounded-full mt-2" />
                   </div>
                 </div>
                 <p className="text-gray-600 dark:text-gray-400 text-base lg:text-lg font-medium max-w-2xl">
-                  Profile, contacts, documents, and linked project history.
+                  Profile, contacts, documents, infrastructure, and linked project history.
                 </p>
               </div>
-              <Button
-                variant="outline"
-                className="h-11 rounded-xl border-gray-200/60 dark:border-gray-700/60 bg-white/60 dark:bg-gray-900/40 backdrop-blur hover:bg-white/80 dark:hover:bg-gray-900/60"
-                onClick={() => navigate(clientsBackPath)}
-              >
-                <ArrowLeft className="h-4 w-4 mr-2" />
-                Back to Clients
-              </Button>
             </div>
           </div>
         </div>
@@ -530,38 +531,144 @@ const ClientDetails = () => {
                 <div className="grid grid-cols-12 gap-3">
                   {(
                     [
-                      ['Domains', assetGraph?.counts.domains ?? 0],
-                      ['Subdomains', assetGraph?.counts.subdomains ?? 0],
-                      ['Mailboxes', assetGraph?.counts.mailboxes ?? 0],
-                      ['VPS', assetGraph?.counts.servers ?? 0],
-                      ['Hosting', assetGraph?.counts.hosting ?? 0],
-                      ['Vercel', assetGraph?.counts.vercel ?? 0],
-                    ] as Array<[string, number]>
-                  ).map(([label, value]) => (
+                      ['Domains', assetGraph?.counts.domains ?? 0, Globe],
+                      ['Subdomains', assetGraph?.counts.subdomains ?? 0, Server],
+                      ['Mailboxes', assetGraph?.counts.mailboxes ?? 0, Mail],
+                      ['VPS', assetGraph?.counts.servers ?? 0, Server],
+                      ['Hosting', assetGraph?.counts.hosting ?? 0, Server],
+                      ['Vercel', assetGraph?.counts.vercel ?? 0, Globe],
+                    ] as Array<[string, number, typeof Globe]>
+                  ).map(([label, value, Icon]) => (
                     <div
                       key={label}
                       className="col-span-6 sm:col-span-4 rounded-xl border border-border/50 bg-muted/20 p-3"
                     >
-                      <div className="text-xs text-muted-foreground">{label}</div>
-                      <div className="text-lg font-semibold mt-0.5">{value}</div>
+                      <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                        <Icon className="h-3.5 w-3.5" />
+                        {label}
+                      </div>
+                      <div className="text-lg font-semibold mt-0.5 tabular-nums">{value}</div>
                     </div>
                   ))}
                 </div>
+
+                {(assetGraph?.domains?.length ?? 0) === 0 &&
+                (assetGraph?.emails?.length ?? 0) === 0 &&
+                (assetGraph?.nodes?.length ?? 0) === 0 ? (
+                  <p className="text-sm text-muted-foreground mt-2">
+                    No BugAssets linked to this client yet.
+                  </p>
+                ) : null}
+
                 {(assetGraph?.domains?.length ?? 0) > 0 && (
-                  <div className="flex flex-col gap-2 mt-2">
-                    {assetGraph?.domains.slice(0, 5).map((d) => (
-                      <Link
-                        key={d.id}
-                        to={`/${role}/bugassets/domains/${d.id}`}
-                        className="text-sm font-medium text-primary hover:underline truncate"
-                      >
-                        {d.fqdn}
-                        {d.expires_at ? ` · expires ${d.expires_at}` : ''}
-                      </Link>
-                    ))}
+                  <div className="flex flex-col gap-3 mt-3">
+                    <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                      Domains & websites
+                    </div>
+                    {assetGraph?.domains.map((d) => {
+                      const subs = d.subdomains || [];
+                      const mails = d.emails || [];
+                      return (
+                        <div
+                          key={d.id}
+                          className="rounded-xl border border-border/60 bg-muted/10 p-3 space-y-2"
+                        >
+                          <div className="flex flex-wrap items-center justify-between gap-2">
+                            <Link
+                              to={`/${role}/bugassets/domains/${d.id}`}
+                              className="font-semibold text-sm hover:underline truncate"
+                            >
+                              {d.fqdn}
+                            </Link>
+                            <div className="flex flex-wrap items-center gap-1.5">
+                              <Badge variant="outline" className="rounded-xl capitalize text-xs">
+                                {d.status}
+                              </Badge>
+                              {d.expires_at ? (
+                                <span className="text-xs text-muted-foreground">
+                                  expires {d.expires_at}
+                                </span>
+                              ) : null}
+                            </div>
+                          </div>
+                          <div className="text-xs text-muted-foreground">
+                            {[d.registrar, d.dns_provider ? `DNS ${d.dns_provider}` : null]
+                              .filter(Boolean)
+                              .join(' · ') || 'Hostinger inventory'}
+                            {` · ${subs.length} site${subs.length === 1 ? '' : 's'}`}
+                            {` · ${mails.length} mailbox${mails.length === 1 ? '' : 'es'}`}
+                          </div>
+                          {subs.length > 0 ? (
+                            <div className="flex flex-col gap-1.5">
+                              {subs.map((s) => (
+                                <div
+                                  key={s.id}
+                                  className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-border/40 px-2.5 py-1.5 text-xs"
+                                >
+                                  <span className="font-mono truncate">{s.fqdn}</span>
+                                  <span className="text-muted-foreground capitalize shrink-0">
+                                    {s.record_type} → {s.target_kind}
+                                    {s.purpose ? ` · ${s.purpose}` : ''}
+                                  </span>
+                                </div>
+                              ))}
+                            </div>
+                          ) : null}
+                          {mails.length > 0 ? (
+                            <div className="flex flex-wrap gap-1.5">
+                              {mails.map((m) => (
+                                <Badge
+                                  key={m.id}
+                                  variant="outline"
+                                  className="rounded-xl font-mono text-[11px] font-normal"
+                                >
+                                  {m.address}
+                                  {m.status !== 'active' ? ` · ${m.status}` : ''}
+                                </Badge>
+                              ))}
+                            </div>
+                          ) : null}
+                        </div>
+                      );
+                    })}
                   </div>
                 )}
-                <Button variant="outline" size="sm" className="rounded-xl mt-2" asChild>
+
+                {(assetGraph?.nodes?.length ?? 0) > 0 && (
+                  <div className="flex flex-col gap-2 mt-3">
+                    <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                      Linked nodes
+                    </div>
+                    {assetGraph?.nodes.map((n) => {
+                      const kind = n.node_kind || 'server';
+                      const label =
+                        'hostname' in n && n.hostname
+                          ? String(n.hostname)
+                          : 'project_name' in n && n.project_name
+                            ? String(n.project_name)
+                            : 'label' in n
+                              ? String(n.label)
+                              : n.id;
+                      const pathKind =
+                        kind === 'hosting' ? 'hosting' : kind === 'vercel' ? 'vercel' : 'servers';
+                      return (
+                        <Link
+                          key={n.link_id || n.id}
+                          to={`/${role}/bugassets/${pathKind}/${n.id}`}
+                          className="flex items-center justify-between gap-2 rounded-xl border border-border/50 px-3 py-2 text-sm hover:bg-muted/30"
+                        >
+                          <span className="font-medium truncate">{label}</span>
+                          <span className="text-xs text-muted-foreground capitalize shrink-0">
+                            {kind}
+                            {n.expires_at ? ` · ${n.expires_at}` : ''}
+                          </span>
+                        </Link>
+                      );
+                    })}
+                  </div>
+                )}
+
+                <Button variant="outline" size="sm" className="rounded-xl mt-3" asChild>
                   <Link to={`/${role}/bugassets`}>Open BugAssets</Link>
                 </Button>
               </SectionCard>

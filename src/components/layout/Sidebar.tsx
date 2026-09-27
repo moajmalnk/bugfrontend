@@ -46,6 +46,7 @@ import {
 } from "lucide-react";
 import { Link, useLocation } from "react-router-dom";
 import { NotificationPopover } from "@/components/notifications/NotificationPopover";
+import { ImpersonateIndicator } from "@/components/ui/ImpersonateBanner";
 import { useGlobalSearchModal } from "@/context/GlobalSearchContext";
 import { useAdminNavCounts } from "@/hooks/useAdminNavCounts";
 import {
@@ -112,21 +113,21 @@ export const Sidebar = ({ className, closeSidebar }: SidebarProps) => {
   }) => {
     const destination = role ? `/${role}${to}` : to;
     const active = isActive(to);
-    
+
     // Production-safe navigation handler
     const handleClick = (e: React.MouseEvent) => {
       closeSidebar?.();
-      
+
       // In production, use window.location for reliable navigation from BugDetails
       if (import.meta.env.PROD && window.location.pathname.includes('/bugs/')) {
         e.preventDefault();
         window.location.href = destination;
         return;
       }
-      
+
       // In development, let React Router handle it
     };
-    
+
     return (
       <Link
         to={destination}
@@ -194,11 +195,11 @@ export const Sidebar = ({ className, closeSidebar }: SidebarProps) => {
           </div>
           <div className="min-w-0 flex-1">
             <h2 className="text-lg font-bold text-foreground truncate">BugRicer</h2>
-            <p className="text-xs text-muted-foreground">Bug Tracking System</p>
+            <p className="text-xs text-muted-foreground">Bug Tracking</p>
             </div>
           </div>
-          {/* Notification Icon - Desktop sidebar only */}
-          <div className="flex-shrink-0">
+          <div className="flex shrink-0 items-center gap-0.5">
+            <ImpersonateIndicator />
             <NotificationPopover />
           </div>
         </div>
@@ -448,7 +449,7 @@ export const Sidebar = ({ className, closeSidebar }: SidebarProps) => {
               badge={formatNavCount(helpCount)}
               badgeTitle={`${helpCount} article${helpCount === 1 ? "" : "s"}`}
             />
-            
+
           </div>
 
           {/* Administration Section — any admin-level permission */}

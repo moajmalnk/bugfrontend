@@ -12,7 +12,7 @@ export type CodoSopExample = {
 };
 
 export const CODO_SOP_EXAMPLES: Record<string, CodoSopExample> = {
-  // ── Developer Rules 1–32 ───────────────────────────────────────────────
+  // ── Developer Rules (builtin catalog) ──────────────────────────────────
   dev_rule_1: {
     bad: 'const closeModal = () => setShowModal(false); // State retained in background',
     good: `const closeModal = () => {
@@ -407,6 +407,64 @@ try {
   {/* …app routes… */}
   <Route path="*" element={<NotFoundPage />} />
 </Routes>`,
+    language: 'JavaScript',
+  },
+  dev_rule_44: {
+    bad: 'Safari shows 760 students and Chrome shows 260, so the team tells users to switch browsers.',
+    good: `// Same user, same query, same DB — compare before blaming the browser
+// URL, method, query, body, cookies, Authorization, status, body, timing
+const students = await api.getStudents({ page, status });
+// Response must match across Chrome, Safari, Edge, Firefox, and Brave`,
+    language: 'JavaScript',
+  },
+  dev_rule_45: {
+    bad: 'Ask the user to press Ctrl+Shift+R if the student count looks wrong.',
+    good: `// Correct current data arrives on a normal load
+// Cache-Control: private, no-cache
+// After mutation, invalidate ["students"] and refetch`,
+    language: 'JavaScript',
+  },
+  dev_rule_46: {
+    bad: 'fetch(`/api/students?t=${Date.now()}`)',
+    good: `header('Cache-Control: private, no-cache');
+header('Vary: Cookie, Authorization');
+// ETag / Last-Modified for safe revalidation
+// Never cache authenticated responses in a shared or public cache`,
+    language: 'PHP',
+  },
+  dev_rule_47: {
+    bad: 'await api.createStudent(payload); // students list stays stale',
+    good: `await api.createStudent(payload);
+await queryClient.invalidateQueries({ queryKey: ["students"] });
+// UI refetches and shows the new student`,
+    language: 'JavaScript',
+  },
+  dev_rule_48: {
+    bad: 'const [students, setStudents] = useState([]); // plus a second React Query cache of the same list',
+    good: `useQuery({
+  queryKey: ["students", filters],
+  queryFn: () => api.getStudents(filters),
+  staleTime: 30_000,
+});
+// One owner. Invalidate this key after create/update/delete.`,
+    language: 'JavaScript',
+  },
+  dev_rule_49: {
+    bad: 'caches.match("/api/students") // stale private API served as current data',
+    good: `// Network-only for /api/*
+// Cache versioned static assets only
+self.addEventListener("activate", (event) => {
+  event.waitUntil(caches.delete("app-v1"));
+});`,
+    language: 'JavaScript',
+  },
+  dev_rule_50: {
+    bad: 'fetch("/api/students") // cookies omitted in one browser, Bearer token in another',
+    good: `fetch("/api/students", {
+  credentials: "include",
+  headers: { Authorization: \`Bearer \${token}\` },
+});
+// Same cookie, CSRF, SameSite, Secure, and CORS policy in every client`,
     language: 'JavaScript',
   },
 

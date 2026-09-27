@@ -187,6 +187,8 @@ type SelectContentProps = React.ComponentPropsWithoutRef<
   searchable?: boolean
   searchPlaceholder?: string
   emptyMessage?: string
+  /** Sticky footer (e.g. Add action) below the options list. */
+  footer?: React.ReactNode
   /**
    * Called when the menu mounts (Select has no Radix onOpenAutoFocus).
    * Prefer preventDefault-style focus handling via the searchable input.
@@ -206,6 +208,7 @@ const SelectContent = React.forwardRef<
       searchable = true,
       searchPlaceholder = "Search...",
       emptyMessage = "No results found.",
+      footer,
       onCloseAutoFocus,
       onOpenAutoFocus,
       onKeyDown,
@@ -383,6 +386,17 @@ const SelectContent = React.forwardRef<
             )}
           </SelectPrimitive.Viewport>
           <SelectScrollDownButton />
+          {footer ? (
+            <div
+              className="sticky bottom-0 z-10 border-t border-border/70 bg-popover p-1.5"
+              onPointerDown={(event) => {
+                // Keep focus handling predictable for action buttons.
+                event.stopPropagation()
+              }}
+            >
+              {footer}
+            </div>
+          ) : null}
         </SelectPrimitive.Content>
       </SelectPrimitive.Portal>
     )
