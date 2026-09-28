@@ -16,14 +16,23 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import { toast } from '@/components/ui/use-toast';
 import { useAuth } from '@/context/AuthContext';
 import { usePermissions } from '@/hooks/usePermissions';
 import {
   backupService,
+  BackupDownload,
   BackupJob,
   BackupJobStatus,
   BackupMailStatus,
+  BackupStage,
 } from '@/services/backupService';
 import { cn } from '@/lib/utils';
 import { format, parseISO } from 'date-fns';
@@ -35,7 +44,9 @@ import {
   Clock3,
   Code2,
   Database,
+  Download,
   FileText,
+  Link2,
   FolderArchive,
   HardDrive,
   History,
@@ -51,20 +62,48 @@ import {
 const RESTORE_STEPS = [
   {
     title: 'Database',
-    description: 'Import the SQL dump to restore all tables, records, and relationships.',
+    description: 'Import the .sql.gz directly in phpMyAdmin (or gunzip | mysql) to restore every table.',
     icon: Database,
   },
   {
     title: 'Files',
-    description: 'Restore the uploads directory to recover attachments and media.',
+    description: 'Extract uploads/ from the files ZIP into backend/uploads to recover attachments and media.',
     icon: FolderArchive,
   },
   {
     title: 'Config',
-    description: 'Review manifest.json and config files before going live.',
+    description: 'Verify each download against its SHA-256, then review manifest.json and config before going live.',
     icon: Settings2,
   },
 ] as const;
+
+const PIPELINE_STEPS: { key: Exclude<BackupStage, 'queued' | 'completed' | 'failed'>; label: string }[] = [
+  { key: 'database', label: 'Database' },
+  { key: 'files', label: 'Files' },
+  { key: 'finalizing', label: 'Verify' },
+  { key: 'emailing', label: 'Email link' },
+];
+
+const RETENTION_DAYS = 7;
+
+function stageMeta(stage: BackupStage | null | undefined, recipient: string) {
+  switch (stage) {
+    case 'database':
+      return { title: 'Exporting database', detail: 'Streaming every table into a compressed SQL archive.' };
+    case 'files':
+      return { title: 'Archiving files', detail: 'Packing uploads and configuration into the files archive.' };
+    case 'finalizing':
+      return { title: 'Verifying archives', detail: 'Computing SHA-256 checksums and securing the download links.' };
+    case 'emailing':
+      return { title: 'Sending download link', detail: `Emailing a private download link to ${recipient}.` };
+    default:
+      return { title: 'Starting backup', detail: 'Launching the backup worker on the server.' };
+  }
+}
+
+function downloadIcon(type: BackupDownload['type']) {
+  return type === 'database' ? Database : FolderArchive;
+}
 
 function statusBadge(status: BackupJobStatus) {
   const map: Record<BackupJobStatus, { label: string; className: string }> = {
@@ -192,7 +231,8 @@ const BugBackup = () => {
       const hasActive = query.state.data?.some((job) =>
         ['queued', 'processing'].includes(job.status)
       );
-      return hasActive ? 5000 : false;
+      // Console download links are signed for 2h; refresh well before they lapse.
+      return hasActive ? 5000 : 30 * 60 * 1000;
     },
   });
 
@@ -203,6 +243,16 @@ const BugBackup = () => {
     [history, activeJobId]
   );
 
+  const downloadableJobs = useMemo(
+    () => history.filter((job) => job.status === 'completed' && (job.downloads?.length ?? 0) > 0),
+    [history]
+  );
+  const [selectedDownloadJobId, setSelectedDownloadJobId] = useState<string>('');
+  const selectedDownloadJob =
+    downloadableJobs.find((job) => String(job.id) === selectedDownloadJobId) ?? downloadableJobs[0];
+
+  const emailError = email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) ? 'Enter a valid email address' : '';
+
   const etaSeconds = stats?.estimate?.eta_seconds ?? 180;
   const etaLabel = stats?.estimate?.eta_label ?? 'about 3 minutes';
   const isBackupRunning =
@@ -211,30 +261,14 @@ const BugBackup = () => {
     activeJob?.status === 'queued' ||
     (stats?.jobs.active ?? 0) > 0;
 
-  const prepareStage = useMemo(() => {
-    if (progressValue < 25) {
-      return {
-        title: 'Collecting data',
-        detail: 'Exporting database tables and gathering selected files.',
-      };
-    }
-    if (progressValue < 55) {
-      return {
-        title: 'Building archive',
-        detail: 'Compressing your BugRicer snapshot into a secure ZIP.',
-      };
-    }
-    if (progressValue < 80) {
-      return {
-        title: 'Preparing email',
-        detail: `Attaching the archive for delivery to ${activeJob?.email || email || 'your inbox'}.`,
-      };
-    }
-    return {
-      title: 'Sending backup',
-      detail: 'Almost done — the ZIP will arrive in your inbox shortly.',
-    };
-  }, [progressValue, activeJob?.email, email]);
+  const recipient = activeJob?.email || email || 'your inbox';
+  const serverProgress = activeJob?.progress_percent ?? null;
+  const displayProgress = Math.min(
+    99,
+    serverProgress !== null && serverProgress > 0 ? serverProgress : progressValue
+  );
+  const prepareStage = stageMeta(activeJob?.stage, recipient);
+  const currentStepIndex = PIPELINE_STEPS.findIndex((step) => step.key === activeJob?.stage);
 
   useEffect(() => {
     if (!isBackupRunning || activeJob?.status === 'completed' || activeJob?.status === 'failed') {
@@ -258,25 +292,35 @@ const BugBackup = () => {
     if (activeJob?.status === 'completed') {
       setProgressValue(100);
       setIsStarting(false);
+      setSelectedDownloadJobId(String(activeJob.id));
       refetchStats();
-      toast({
-        title: 'Backup ready — email sent',
-        description: `Your archive was emailed to ${activeJob.email}. Check inbox and spam/promotions.`,
-      });
+      if (activeJob.mail_status === 'failed') {
+        toast({
+          title: 'Backup ready — email not sent',
+          description: 'Download it from the Download center below. Check SMTP settings for email delivery.',
+          variant: 'destructive',
+        });
+      } else {
+        toast({
+          title: 'Backup ready — download link sent',
+          description: `A private download link was emailed to ${activeJob.email}. You can also download it below.`,
+        });
+      }
     }
 
     if (activeJob?.status === 'failed') {
       setIsStarting(false);
       toast({
         title: 'Backup failed',
-        description: activeJob.error_message || 'Please try again. If this continues, check SMTP settings.',
+        description: activeJob.error_message || 'Please try again.',
         variant: 'destructive',
       });
     }
-  }, [activeJob?.status, activeJob?.email, activeJob?.error_message, refetchStats]);
+  }, [activeJob?.status, activeJob?.id, activeJob?.email, activeJob?.mail_status, activeJob?.error_message, refetchStats]);
 
   const handleBackup = async () => {
-    if (!email || !email.includes('@')) {
+    if (isStarting || isBackupRunning) return;
+    if (!email || emailError) {
       toast({
         title: 'Invalid email',
         description: 'Enter a valid delivery email address.',
@@ -304,7 +348,7 @@ const BugBackup = () => {
         include_database: includeDatabase,
         include_uploads: includeUploads,
         include_config: includeConfig,
-        delivery_method: 'email',
+        delivery_method: 'email_link',
       });
 
       setActiveJobId(result.job_id);
@@ -315,7 +359,7 @@ const BugBackup = () => {
 
       toast({
         title: 'We are preparing your backup',
-        description: `Estimated ${etaLabel}. When ready, the ZIP will be emailed to ${email}.`,
+        description: `Estimated ${etaLabel}. A secure download link will be emailed to ${email}.`,
       });
     } catch (error: unknown) {
       setIsStarting(false);
@@ -377,7 +421,8 @@ const BugBackup = () => {
                 </div>
                 <p className="max-w-3xl text-sm sm:text-base font-medium text-gray-600 dark:text-gray-400 xl:text-lg leading-relaxed break-words">
                   Enterprise-grade disaster recovery for BugRicer — snapshot your database,
-                  uploads, and configuration into a signed archive delivered securely by email.
+                  uploads, and configuration on the server, then receive private, expiring download
+                  links by email.
                 </p>
               </div>
 
@@ -391,20 +436,20 @@ const BugBackup = () => {
                       Archive
                     </div>
                     <div className="text-sm font-bold text-blue-700 dark:text-blue-300 truncate">
-                      ZIP + Manifest
+                      SQL.gz + ZIP
                     </div>
                   </div>
                 </div>
                 <div className="flex h-12 w-full sm:min-w-[11rem] sm:flex-1 xl:flex-none xl:w-44 items-center gap-3 rounded-xl border border-emerald-200 bg-gradient-to-r from-emerald-50 to-green-50 px-4 py-3 shadow-sm dark:border-emerald-800 dark:from-emerald-950/30 dark:to-green-950/30">
                   <div className="rounded-lg bg-emerald-600 p-1.5 shrink-0">
-                    <Mail className="h-5 w-5 text-white" />
+                    <Link2 className="h-5 w-5 text-white" />
                   </div>
                   <div className="min-w-0">
                     <div className="text-xs font-medium text-emerald-800/80 dark:text-emerald-200/80">
                       Delivery
                     </div>
                     <div className="text-sm font-bold text-emerald-700 dark:text-emerald-300 truncate">
-                      Secure Email
+                      Signed link · {RETENTION_DAYS}d
                     </div>
                   </div>
                 </div>
@@ -486,9 +531,9 @@ const BugBackup = () => {
                     We are preparing your backup
                   </h2>
                   <p className="text-sm text-blue-900/80 dark:text-blue-100/80 leading-relaxed">
-                    {prepareStage.detail} When the archive is ready, it will be emailed to{' '}
-                    <span className="font-semibold text-blue-700 dark:text-blue-300">
-                      {activeJob?.email || email || 'your inbox'}
+                    {prepareStage.detail} When it is ready, a private download link will be emailed to{' '}
+                    <span className="font-semibold text-blue-700 dark:text-blue-300 break-all">
+                      {recipient}
                     </span>
                     .
                   </p>
@@ -503,36 +548,134 @@ const BugBackup = () => {
               </Badge>
             </div>
 
-            <div className="mt-5 grid gap-2 sm:grid-cols-4">
-              {[
-                { key: 'collect', label: 'Collect', done: progressValue >= 25 },
-                { key: 'archive', label: 'Archive', done: progressValue >= 55 },
-                { key: 'email', label: 'Prepare mail', done: progressValue >= 80 },
-                { key: 'send', label: 'Send', done: progressValue >= 95 },
-              ].map((step) => (
-                <div
-                  key={step.key}
-                  className={cn(
-                    'rounded-xl border px-3 py-2 text-center text-xs font-semibold transition-colors',
-                    step.done
-                      ? 'border-emerald-300/80 bg-emerald-50/80 text-emerald-800 dark:border-emerald-800 dark:bg-emerald-950/30 dark:text-emerald-200'
-                      : 'border-blue-200/60 bg-white/50 text-blue-900/70 dark:border-blue-800/50 dark:bg-blue-950/20 dark:text-blue-200/70'
-                  )}
-                >
-                  {step.done ? '✓ ' : ''}
-                  {step.label}
-                </div>
-              ))}
+            <div className="mt-5 grid grid-cols-2 gap-2 sm:grid-cols-4">
+              {PIPELINE_STEPS.map((step, index) => {
+                const done = currentStepIndex > index;
+                const current = currentStepIndex === index;
+                return (
+                  <div
+                    key={step.key}
+                    className={cn(
+                      'flex items-center justify-center gap-1.5 rounded-xl border px-3 py-2 text-center text-xs font-semibold transition-colors',
+                      done
+                        ? 'border-emerald-300/80 bg-emerald-50/80 text-emerald-800 dark:border-emerald-800 dark:bg-emerald-950/30 dark:text-emerald-200'
+                        : current
+                          ? 'border-blue-400 bg-blue-100/80 text-blue-800 dark:border-blue-600 dark:bg-blue-900/40 dark:text-blue-100'
+                          : 'border-blue-200/60 bg-white/50 text-blue-900/70 dark:border-blue-800/50 dark:bg-blue-950/20 dark:text-blue-200/70'
+                    )}
+                  >
+                    {done ? (
+                      <CheckCircle2 className="h-3.5 w-3.5" />
+                    ) : current ? (
+                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                    ) : null}
+                    {step.label}
+                  </div>
+                );
+              })}
             </div>
 
             <div className="mt-4 space-y-2">
               <div className="flex items-center justify-between text-xs text-blue-900/80 dark:text-blue-100/80">
                 <span className="font-medium">{prepareStage.title}</span>
-                <span>{Math.min(progressValue, 99)}%</span>
+                <span>{displayProgress}%</span>
               </div>
-              <Progress value={Math.min(progressValue, 99)} className="h-2.5" />
+              <Progress value={displayProgress} className="h-2.5" />
               <p className="text-[11px] text-muted-foreground">
-                You can leave this page — delivery continues in the background. Check spam/promotions if the email is delayed.
+                You can leave this page — the backup keeps running on the server. The download link stays valid for {RETENTION_DAYS} days.
+              </p>
+            </div>
+          </div>
+        )}
+
+        {downloadableJobs.length > 0 && selectedDownloadJob && (
+          <div className="rounded-2xl border border-gray-200/50 bg-white/70 shadow-xl backdrop-blur-sm dark:border-gray-700/50 dark:bg-gray-900/70">
+            <div className="flex flex-col gap-3 border-b border-gray-200/60 px-4 py-5 dark:border-gray-700/60 sm:px-6 md:flex-row md:items-center md:justify-between min-w-0">
+              <div className="flex items-center gap-3 min-w-0">
+                <div className="rounded-lg bg-gradient-to-br from-emerald-500 to-blue-600 p-2 text-white shrink-0">
+                  <Download className="h-5 w-5" />
+                </div>
+                <div className="min-w-0">
+                  <h2 className="text-xl font-bold text-gray-900 dark:text-white">Download center</h2>
+                  <p className="text-sm text-muted-foreground">
+                    Download the database and files archives separately. Backups are kept for {RETENTION_DAYS} days.
+                  </p>
+                </div>
+              </div>
+              <div className="w-full md:w-72 shrink-0">
+                <Label htmlFor="backup-download-select" className="sr-only">
+                  Backup time
+                </Label>
+                <Select
+                  value={String(selectedDownloadJob.id)}
+                  onValueChange={setSelectedDownloadJobId}
+                >
+                  <SelectTrigger id="backup-download-select" className="h-11 rounded-xl border-2">
+                    <SelectValue placeholder="Select backup" />
+                  </SelectTrigger>
+                  <SelectContent className="rounded-xl">
+                    {downloadableJobs.map((job) => (
+                      <SelectItem key={job.id} value={String(job.id)}>
+                        {formatDateTime(job.completed_at || job.created_at)} · #{job.id}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-12 gap-4 p-4 sm:p-6">
+              {(selectedDownloadJob.downloads ?? []).map((download) => {
+                const Icon = downloadIcon(download.type);
+                return (
+                  <div
+                    key={download.type}
+                    className="col-span-12 md:col-span-6 flex flex-col gap-4 rounded-2xl border border-gray-200/70 bg-white/80 p-4 dark:border-gray-700/70 dark:bg-gray-900/80 sm:p-5 min-w-0"
+                  >
+                    <div className="flex items-start gap-3 min-w-0">
+                      <div
+                        className={cn(
+                          'rounded-xl p-2 text-white shadow-md shrink-0',
+                          download.type === 'database'
+                            ? 'bg-gradient-to-br from-blue-500 to-indigo-600'
+                            : 'bg-gradient-to-br from-violet-500 to-purple-600'
+                        )}
+                      >
+                        <Icon className="h-5 w-5" />
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <h3 className="font-semibold text-gray-900 dark:text-white">{download.label}</h3>
+                        <p className="text-sm text-muted-foreground">
+                          {download.size_label}
+                          {download.type === 'database' && selectedDownloadJob.table_count
+                            ? ` · ${selectedDownloadJob.table_count} tables`
+                            : ''}
+                        </p>
+                        <p className="mt-1 truncate text-xs text-muted-foreground" title={download.file}>
+                          {download.file}
+                        </p>
+                        {download.sha256 ? (
+                          <p
+                            className="mt-1 truncate font-mono text-[11px] text-muted-foreground"
+                            title={`SHA-256: ${download.sha256}`}
+                          >
+                            SHA-256 {download.sha256}
+                          </p>
+                        ) : null}
+                      </div>
+                    </div>
+                    <Button asChild className="h-11 w-full rounded-xl font-semibold">
+                      <a href={download.url} rel="noopener noreferrer" download>
+                        <Download className="mr-2 h-4 w-4" />
+                        Download {download.type === 'database' ? 'database' : 'files'}
+                      </a>
+                    </Button>
+                  </div>
+                );
+              })}
+              <p className="col-span-12 text-xs text-muted-foreground">
+                Expires {formatDateTime(selectedDownloadJob.expires_at)}. Links on this page refresh automatically;
+                emailed links stay valid until expiry.
               </p>
             </div>
           </div>
@@ -566,16 +709,19 @@ const BugBackup = () => {
                   id="backup-email"
                   type="email"
                   value={email}
-                  onChange={(e) => setEmail(e.target.value)}
+                  onChange={(e) => setEmail(e.target.value.slice(0, 255))}
+                  maxLength={255}
                   placeholder="admin@company.com"
                   disabled={isStarting}
-                  className="h-12 border-2 text-base"
+                  aria-invalid={Boolean(emailError)}
+                  className={cn('h-12 rounded-xl border-2 text-base', emailError && 'border-red-500')}
                 />
+                {emailError && <p className="mt-1 text-xs text-red-600 dark:text-red-400">{emailError}</p>}
                 <p className="mt-2 text-sm text-muted-foreground">
-                  We prepare the ZIP on the server, then email it to this address. Typical delivery takes{' '}
-                  {etaLabel} depending on archive size — check spam/promotions if it does not arrive.
+                  We build the archives on the server and email this address a private download link
+                  (valid {RETENTION_DAYS} days) — no attachment size limits. Typical preparation takes {etaLabel}.
                 </p>
-                {email && (
+                {email && !emailError && (
                   <p className="mt-1 text-xs font-medium text-blue-600 dark:text-blue-400">
                     Delivery target: {email}
                   </p>
@@ -634,16 +780,23 @@ const BugBackup = () => {
                   Archive contents
                 </h3>
                 <ul className="space-y-2 text-sm text-blue-900 dark:text-blue-100">
-                  {includeDatabase && <li>• SQL database dump with table structures and data</li>}
-                  {includeUploads && <li>• Uploads directory with attachments and media</li>}
-                  {includeConfig && <li>• Config snapshot for environment recovery</li>}
-                  <li>• manifest.json metadata and README restoration guide</li>
+                  {includeDatabase && <li>• Database backup (.sql.gz) — every table, structure, and record</li>}
+                  {(includeUploads || includeConfig) && (
+                    <li>
+                      • Files backup (.zip) —{' '}
+                      {[includeUploads && 'uploads & media', includeConfig && 'config snapshot']
+                        .filter(Boolean)
+                        .join(', ')}
+                      , manifest.json and README restoration guide
+                    </li>
+                  )}
+                  <li>• SHA-256 checksum for each download</li>
                 </ul>
               </div>
 
               <Button
                 onClick={handleBackup}
-                disabled={isBackupRunning || !email || !hasSelection}
+                disabled={isBackupRunning || !email || Boolean(emailError) || !hasSelection}
                 className="h-12 w-full bg-gradient-to-r from-blue-600 to-emerald-600 text-base font-semibold text-white shadow-lg hover:from-blue-700 hover:to-emerald-700"
               >
                 {isBackupRunning ? (
@@ -759,6 +912,7 @@ const BugBackup = () => {
                     <TableHead>Recipient</TableHead>
                     <TableHead>Mail</TableHead>
                     <TableHead>Size</TableHead>
+                    <TableHead>Downloads</TableHead>
                     <TableHead>Duration</TableHead>
                     <TableHead>Created</TableHead>
                   </TableRow>
@@ -780,6 +934,38 @@ const BugBackup = () => {
                         )}
                       </TableCell>
                       <TableCell>{job.file_size_label || '—'}</TableCell>
+                      <TableCell>
+                        {job.downloads && job.downloads.length > 0 ? (
+                          <div className="flex flex-wrap gap-2">
+                            {job.downloads.map((download) => {
+                              const Icon = downloadIcon(download.type);
+                              return (
+                                <Button
+                                  key={download.type}
+                                  asChild
+                                  variant="outline"
+                                  size="sm"
+                                  className="h-8 rounded-xl"
+                                >
+                                  <a
+                                    href={download.url}
+                                    rel="noopener noreferrer"
+                                    download
+                                    title={`${download.label} · ${download.size_label}`}
+                                  >
+                                    <Icon className="mr-1.5 h-3.5 w-3.5" />
+                                    {download.type === 'database' ? 'DB' : 'Files'}
+                                  </a>
+                                </Button>
+                              );
+                            })}
+                          </div>
+                        ) : job.status === 'completed' ? (
+                          <span className="text-xs text-muted-foreground">Expired</span>
+                        ) : (
+                          '—'
+                        )}
+                      </TableCell>
                       <TableCell>
                         {job.duration_seconds ? (
                           <span className="inline-flex items-center gap-1 text-sm">
@@ -805,18 +991,18 @@ const BugBackup = () => {
           {[
             {
               icon: CheckCircle2,
-              title: 'Verified manifest',
-              text: 'Every archive ships with manifest.json for component validation.',
+              title: 'Verified archives',
+              text: 'Every download carries a SHA-256 checksum plus manifest.json for component validation.',
             },
             {
               icon: Activity,
               title: 'Background execution',
-              text: 'Jobs run server-side so admins can continue working without blocking.',
+              text: 'Jobs run server-side with live progress, so admins can keep working or leave the page.',
             },
             {
               icon: XCircle,
-              title: 'Failure alerts',
-              text: 'Failed jobs are logged and trigger an error notification email.',
+              title: 'Private, expiring links',
+              text: `Signed download links expire after ${RETENTION_DAYS} days and archives are purged automatically.`,
             },
           ].map((item) => {
             const Icon = item.icon;

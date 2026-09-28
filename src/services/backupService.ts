@@ -4,6 +4,25 @@ export type BackupJobStatus = 'queued' | 'processing' | 'completed' | 'failed';
 
 export type BackupMailStatus = 'pending' | 'sent' | 'error_sent' | 'failed';
 
+export type BackupStage =
+  | 'queued'
+  | 'database'
+  | 'files'
+  | 'finalizing'
+  | 'emailing'
+  | 'completed'
+  | 'failed';
+
+export type BackupDownload = {
+  type: 'database' | 'files';
+  label: string;
+  file: string;
+  size_bytes: number;
+  size_label: string;
+  sha256: string | null;
+  url: string;
+};
+
 export type BackupJob = {
   id: number;
   email: string;
@@ -25,7 +44,17 @@ export type BackupJob = {
   completed_at: string | null;
   created_at: string;
   requested_by?: string | null;
+  stage?: BackupStage | null;
+  progress_percent?: number | null;
+  expires_at?: string | null;
+  downloads?: BackupDownload[];
 };
+
+function apiErrorMessage(error: unknown, fallback: string): string {
+  const message = (error as { response?: { data?: { message?: string } } } | null)?.response?.data?.message;
+  if (message) return message;
+  return error instanceof Error ? error.message : fallback;
+}
 
 export type BackupStats = {
   database: {
@@ -57,7 +86,7 @@ export type CreateBackupPayload = {
   include_database: boolean;
   include_uploads: boolean;
   include_config: boolean;
-  delivery_method: 'email';
+  delivery_method: 'email_link';
 };
 
 class BackupService {
@@ -90,11 +119,16 @@ class BackupService {
   }
 
   async createBackup(payload: CreateBackupPayload): Promise<{ job_id: number | null }> {
-    const response = await apiClient.post<{
-      success: boolean;
-      data?: { job_id?: number | null };
-      message?: string;
-    }>('/backup/create.php', payload);
+    let response;
+    try {
+      response = await apiClient.post<{
+        success: boolean;
+        data?: { job_id?: number | null };
+        message?: string;
+      }>('/backup/create.php', payload);
+    } catch (error) {
+      throw new Error(apiErrorMessage(error, 'Failed to start backup'));
+    }
 
     if (!response.data.success) {
       throw new Error(response.data.message || 'Failed to start backup');
