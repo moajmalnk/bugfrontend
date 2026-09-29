@@ -23,7 +23,13 @@ export function useTodaysBirthdays(enabled = true) {
     queryKey: ["todays-birthdays", istDate],
     queryFn: () => userService.getTodaysBirthdays(),
     enabled,
-    staleTime: 10 * 60 * 1000,
+    // Why: new wishes should appear on the celebrant's card without a reload,
+    // but only poll on days someone is actually celebrating.
+    staleTime: 30 * 1000,
+    gcTime: 30 * 60 * 1000,
+    refetchInterval: (query) =>
+      (query.state.data?.birthdays.length ?? 0) > 0 ? 60 * 1000 : false,
+    refetchIntervalInBackground: false,
     refetchOnWindowFocus: true,
   });
 }

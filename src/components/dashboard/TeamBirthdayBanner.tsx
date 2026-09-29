@@ -9,14 +9,19 @@ import {
 } from "@/hooks/useTodaysBirthdays";
 import { resolveAvatarUrl } from "@/lib/avatarUrl";
 import { cn, getEffectiveRole } from "@/lib/utils";
-import { userService, type BirthdayPerson } from "@/services/userService";
+import {
+  userService,
+  type BirthdayPerson,
+  type BirthdayWish,
+} from "@/services/userService";
+import type { TodaysBirthdaysData } from "@/hooks/useTodaysBirthdays";
+import { BirthdayWishComposer, BirthdayWishWall } from "./BirthdayWishes";
 import { useQueryClient } from "@tanstack/react-query";
 import {
   Cake,
   ChevronDown,
   ChevronUp,
   Heart,
-  Loader2,
   PartyPopper,
   UserRound,
 } from "lucide-react";
@@ -219,11 +224,11 @@ export function TeamBirthdayBanner({ className }: { className?: string }) {
   const queryClient = useQueryClient();
   const istDate = getIstTodayYmd();
   const { data, isLoading, isError } = useTodaysBirthdays(true);
-  const birthdays = data?.birthdays ?? [];
+  const birthdays = useMemo(() => data?.birthdays ?? [], [data]);
   const dateKey = data?.date || istDate;
 
   const [collapsed, setCollapsed] = useState(() => readCollapsed(istDate));
-  const [wishingId, setWishingId] = useState<string | null>(null);
+  const [composeFor, setComposeFor] = useState<BirthdayPerson | null>(null);
 
   useEffect(() => {
     setCollapsed(readCollapsed(dateKey));
@@ -264,34 +269,65 @@ export function TeamBirthdayBanner({ className }: { className?: string }) {
     }
   };
 
-  const handleWish = async (person: BirthdayPerson) => {
-    if (person.is_self || wishingId) return;
-    if (person.already_wished) {
-      toast({
-        title: "Already wished",
-        description: `You already wished ${person.username} today.`,
-      });
-      return;
-    }
+  const queryKey = ["todays-birthdays", dateKey];
 
-    setWishingId(person.id);
+  const myNoteFor = (person: BirthdayPerson) =>
+    person.wishes?.find((w) => w.is_mine)?.message ?? "";
+
+  /**
+   * Why: optimistic — the wish appears on the card instantly; if the API fails the
+   * cache is restored and the composer keeps the draft for a retry.
+   */
+  const sendWish = async (person: BirthdayPerson, message: string) => {
+    await queryClient.cancelQueries({ queryKey });
+    const previous = queryClient.getQueryData<TodaysBirthdaysData>(queryKey);
+    const wasWished = Boolean(person.already_wished);
+    const optimistic: BirthdayWish = {
+      id: `pending-${person.id}`,
+      from_user_id: String(currentUser?.id ?? ""),
+      username: currentUser?.username || "You",
+      avatar: (currentUser as { avatar?: string | null } | null)?.avatar ?? null,
+      message: message || null,
+      created_at: "",
+      is_mine: true,
+    };
+    queryClient.setQueryData<TodaysBirthdaysData>(queryKey, (old) =>
+      old
+        ? {
+            ...old,
+            birthdays: old.birthdays.map((p) => {
+              if (p.id !== person.id) return p;
+              const others = (p.wishes ?? []).filter((w) => !w.is_mine);
+              const mine = (p.wishes ?? []).find((w) => w.is_mine);
+              return {
+                ...p,
+                already_wished: true,
+                wish_count: (p.wish_count ?? 0) + (wasWished ? 0 : 1),
+                wishes: [{ ...(mine ?? optimistic), message: message || mine?.message || null }, ...others],
+              };
+            }),
+          }
+        : old
+    );
+
     try {
-      await userService.sendBirthdayWish(person.id);
-      await queryClient.invalidateQueries({
-        queryKey: ["todays-birthdays", dateKey],
-      });
+      await userService.sendBirthdayWish(person.id, message);
       toast({
-        title: "Wish sent",
-        description: `${person.username} will see your birthday wish.`,
+        title: wasWished ? "Note updated" : "Wish sent",
+        description: wasWished
+          ? `${person.username} will see your updated note.`
+          : `${person.username} will see your birthday wish.`,
       });
     } catch (err) {
+      queryClient.setQueryData(queryKey, previous);
       toast({
         title: "Could not send wish",
         description: err instanceof Error ? err.message : "Please try again.",
         variant: "destructive",
       });
+      throw err;
     } finally {
-      setWishingId(null);
+      void queryClient.invalidateQueries({ queryKey });
     }
   };
 
@@ -432,9 +468,15 @@ export function TeamBirthdayBanner({ className }: { className?: string }) {
               ))}
             </ul>
           ) : null}
-          <p className="text-xs text-muted-foreground">
-            Team celebration stays visible all day.
-          </p>
+          {featured && birthdays.length === 1 && (featured.wish_count ?? 0) > 0 ? (
+            <p className="text-xs font-medium text-rose-700 dark:text-rose-300">
+              {featured.wish_count} {featured.wish_count === 1 ? "wish" : "wishes"} from the team so far
+            </p>
+          ) : (
+            <p className="text-xs text-muted-foreground">
+              Team celebration stays visible all day.
+            </p>
+          )}
         </div>
 
         <div className="col-span-12 flex flex-col items-stretch justify-center gap-2 sm:col-span-3 sm:items-end">
@@ -451,33 +493,28 @@ export function TeamBirthdayBanner({ className }: { className?: string }) {
             </Button>
           ) : null}
           {wishTargets.map((person) => {
-            const busy = wishingId === person.id;
             const done = Boolean(person.already_wished);
             return (
               <Button
                 key={person.id}
                 type="button"
                 size="sm"
-                disabled={busy || done || wishingId !== null}
+                variant={done ? "outline" : "default"}
                 className={cn(
                   "rounded-xl",
                   done
-                    ? "border border-border bg-muted/40 text-muted-foreground hover:bg-muted/40"
+                    ? "border-rose-500/30 text-rose-700 hover:bg-rose-500/10 dark:text-rose-300"
                     : "bg-rose-600 text-white hover:bg-rose-600/90"
                 )}
-                onClick={() => void handleWish(person)}
+                onClick={() => setComposeFor(person)}
               >
-                {busy ? (
-                  <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
-                ) : (
-                  <Heart
-                    className={cn("mr-1.5 h-3.5 w-3.5", done && "fill-current")}
-                  />
-                )}
+                <Heart
+                  className={cn("mr-1.5 h-3.5 w-3.5", done && "fill-current")}
+                />
                 {done
-                  ? wishTargets.length > 1
-                    ? `Wished ${person.username}`
-                    : "Wished"
+                  ? myNoteFor(person)
+                    ? "Edit your note"
+                    : "Wished · add a note"
                   : wishTargets.length > 1
                     ? `Wish ${person.username}`
                     : "Send wish"}
@@ -495,7 +532,20 @@ export function TeamBirthdayBanner({ className }: { className?: string }) {
             Collapse
           </Button>
         </div>
+
+        <div className="col-span-12 flex flex-col gap-3">
+          {birthdays.map((person) => (
+            <BirthdayWishWall key={person.id} person={person} />
+          ))}
+        </div>
       </div>
+
+      <BirthdayWishComposer
+        person={composeFor}
+        initialMessage={composeFor ? myNoteFor(composeFor) : ""}
+        onClose={() => setComposeFor(null)}
+        onSend={sendWish}
+      />
     </div>
   );
 }

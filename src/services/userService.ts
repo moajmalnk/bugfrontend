@@ -4,6 +4,20 @@ import { sortUsersActiveFirst } from '@/lib/utils/userSort';
 import { User, UserRole } from '@/types';
 import axios from 'axios';
 
+export const BIRTHDAY_WISH_MAX_LENGTH = 280;
+
+export interface BirthdayWish {
+  id: string;
+  from_user_id: string;
+  username: string;
+  avatar?: string | null;
+  /** Only returned to the celebrant and the sender. */
+  message?: string | null;
+  /** IST wall-clock "YYYY-MM-DD HH:mm:ss". */
+  created_at: string;
+  is_mine?: boolean;
+}
+
 export interface BirthdayPerson {
   id: string;
   username: string;
@@ -13,6 +27,8 @@ export interface BirthdayPerson {
   avatar?: string | null;
   is_self?: boolean;
   already_wished?: boolean;
+  wish_count?: number;
+  wishes?: BirthdayWish[];
 }
 
 export interface UserAnalyticsMember {
@@ -499,6 +515,8 @@ class UserService {
           person.username || "User",
           (person.role || "user") as UserRole
         ),
+        wish_count: Number(person.wish_count ?? person.wishes?.length ?? 0),
+        wishes: Array.isArray(person.wishes) ? person.wishes : [],
       })
     );
     return {
@@ -507,12 +525,16 @@ class UserService {
     };
   }
 
-  async sendBirthdayWish(userId: string): Promise<{ already_wished: boolean }> {
+  async sendBirthdayWish(
+    userId: string,
+    message?: string
+  ): Promise<{ already_wished: boolean; id?: string; message?: string | null }> {
+    const trimmed = (message || "").trim().slice(0, BIRTHDAY_WISH_MAX_LENGTH);
     const response = await this.fetchWithAuth(
       `${this.baseUrl}/send_birthday_wish.php`,
       {
         method: "POST",
-        body: JSON.stringify({ user_id: userId }),
+        body: JSON.stringify({ user_id: userId, message: trimmed }),
       }
     );
     if (!response.success) {
@@ -520,6 +542,8 @@ class UserService {
     }
     return {
       already_wished: Boolean(response.data?.already_wished ?? true),
+      id: response.data?.id,
+      message: response.data?.message ?? null,
     };
   }
 

@@ -43,12 +43,21 @@ const ChartContainer = React.forwardRef<
 >(({ id, className, children, config, ...props }, ref) => {
   const uniqueId = React.useId();
   const chartId = `chart-${id || uniqueId.replace(/:/g, "")}`;
+  const { ref: sizeRef, hasSize } = useHasRenderableSize<HTMLDivElement>();
+  const setRefs = React.useCallback(
+    (node: HTMLDivElement | null) => {
+      sizeRef(node);
+      if (typeof ref === "function") ref(node);
+      else if (ref) ref.current = node;
+    },
+    [ref, sizeRef]
+  );
 
   return (
     <ChartContext.Provider value={{ config }}>
       <div
         data-chart={chartId}
-        ref={ref}
+        ref={setRefs}
         className={cn(
           "flex aspect-video justify-center text-xs [&_.recharts-cartesian-axis-tick_text]:fill-muted-foreground [&_.recharts-cartesian-grid_line[stroke='#ccc']]:stroke-border/50 [&_.recharts-curve.recharts-tooltip-cursor]:stroke-border [&_.recharts-dot[stroke='#fff']]:stroke-transparent [&_.recharts-layer]:outline-none [&_.recharts-polar-grid_[stroke='#ccc']]:stroke-border [&_.recharts-radial-bar-background-sector]:fill-muted [&_.recharts-rectangle.recharts-tooltip-cursor]:fill-muted [&_.recharts-reference-line_[stroke='#ccc']]:stroke-border [&_.recharts-sector[stroke='#fff']]:stroke-transparent [&_.recharts-sector]:outline-none [&_.recharts-surface]:outline-none",
           className
@@ -56,14 +65,52 @@ const ChartContainer = React.forwardRef<
         {...props}
       >
         <ChartStyle id={chartId} config={config} />
-        <RechartsPrimitive.ResponsiveContainer>
-          {children}
-        </RechartsPrimitive.ResponsiveContainer>
+        {hasSize ? (
+          <RechartsPrimitive.ResponsiveContainer width="100%" height="100%" minWidth={0}>
+            {children}
+          </RechartsPrimitive.ResponsiveContainer>
+        ) : null}
       </div>
     </ChartContext.Provider>
   );
 });
 ChartContainer.displayName = "Chart";
+
+/**
+ * Why: Recharts warns ("width(0) and height(0) of chart…") when a chart mounts inside
+ * a box that has no size yet — hidden tabs, collapsed panels, first layout pass.
+ * Mount the chart only once the wrapper actually has dimensions; the wrapper keeps
+ * its aspect ratio meanwhile, so there is no layout shift.
+ */
+function useHasRenderableSize<T extends HTMLElement>() {
+  const [hasSize, setHasSize] = React.useState(false);
+  const observerRef = React.useRef<ResizeObserver | null>(null);
+
+  const ref = React.useCallback((node: T | null) => {
+    observerRef.current?.disconnect();
+    observerRef.current = null;
+    if (!node) return;
+
+    const check = (width: number, height: number) => setHasSize(width > 0 && height > 0);
+    const rect = node.getBoundingClientRect();
+    check(rect.width, rect.height);
+
+    if (typeof ResizeObserver === "undefined") {
+      setHasSize(true);
+      return;
+    }
+    const observer = new ResizeObserver((entries) => {
+      const box = entries[0]?.contentRect;
+      if (box) check(box.width, box.height);
+    });
+    observer.observe(node);
+    observerRef.current = observer;
+  }, []);
+
+  React.useEffect(() => () => observerRef.current?.disconnect(), []);
+
+  return { ref, hasSize };
+}
 
 const ChartStyle = ({ id, config }: { id: string; config: ChartConfig }) => {
   const colorConfig = Object.entries(config).filter(
