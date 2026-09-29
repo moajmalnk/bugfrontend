@@ -17,6 +17,8 @@ import { formatDistanceToNowStrict } from "date-fns";
 import { Heart, Loader2, MessageCircleHeart, Send } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 
+const HISTORY_OVERLAY = "birthday-wish";
+
 const QUICK_WISHES = [
   "Happy birthday! Have a wonderful day.",
   "Wishing you a fantastic year ahead!",
@@ -187,16 +189,33 @@ export function BirthdayWishComposer({ person, initialMessage = "", onClose, onS
   closeRef.current = onClose;
   const dirtyRef = useRef(dirty);
   dirtyRef.current = dirty;
+  const ignoreNextPop = useRef(false);
 
   // Browser Back closes the composer instead of leaving the dashboard.
   useEffect(() => {
     if (!open) return;
-    window.history.pushState({ overlay: "birthday-wish" }, "");
-    const onPop = () => closeRef.current();
+    if (window.history.state?.overlay !== HISTORY_OVERLAY) {
+      window.history.pushState({ ...(window.history.state ?? {}), overlay: HISTORY_OVERLAY }, "");
+    }
+    const onPop = () => {
+      if (ignoreNextPop.current) {
+        ignoreNextPop.current = false;
+        return;
+      }
+      if (dirtyRef.current && !window.confirm("Discard your unsent birthday wish?")) {
+        window.history.pushState({ ...(window.history.state ?? {}), overlay: HISTORY_OVERLAY }, "");
+        return;
+      }
+      closeRef.current();
+    };
     window.addEventListener("popstate", onPop);
     return () => {
       window.removeEventListener("popstate", onPop);
-      if (window.history.state?.overlay === "birthday-wish") window.history.back();
+      if (window.history.state?.overlay === HISTORY_OVERLAY) {
+        // Our own back() also fires popstate; a remount (StrictMode) must not treat it as a close.
+        ignoreNextPop.current = true;
+        window.history.back();
+      }
     };
   }, [open]);
 
