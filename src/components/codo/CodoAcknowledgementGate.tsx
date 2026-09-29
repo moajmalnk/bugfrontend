@@ -22,6 +22,42 @@ const PHASE_LABEL: Record<string, string> = {
   project: 'Project',
 };
 
+const AUTO_RETRY_DELAYS_MS = [2000, 5000, 10000];
+const clearedKey = (userId: string) => `codo_ack_cleared:${userId}`;
+
+/**
+ * Why: once a user has answered every rule, a transient server error must not lock
+ * them out of the dashboard again. New rules still surface on the next successful check.
+ */
+function hasClearedCodo(userId: string): boolean {
+  if (!userId) return false;
+  try {
+    return localStorage.getItem(clearedKey(userId)) === '1';
+  } catch {
+    return false;
+  }
+}
+
+function markCodoCleared(userId: string, cleared: boolean): void {
+  if (!userId) return;
+  try {
+    if (cleared) localStorage.setItem(clearedKey(userId), '1');
+    else localStorage.removeItem(clearedKey(userId));
+  } catch {
+    // Storage unavailable (private mode) — gate simply re-checks every load.
+  }
+}
+
+function describeLoadError(message: string): string {
+  if (/invalid or expired token|authentication required/i.test(message)) {
+    return 'Your session has expired. Sign in again to continue.';
+  }
+  if (/database connection|server is busy|failed to fetch|network/i.test(message)) {
+    return 'The server is busy right now. We retry automatically — this usually clears within a few seconds.';
+  }
+  return message || 'We could not reach the server to check your pending CODO rules.';
+}
+
 /**
  * Why: A developer or tester must answer every active CODO rule for their role
  * before the dashboard is usable. New rules stay pending until that person responds.
@@ -38,38 +74,68 @@ export default function CodoAcknowledgementGate() {
     (role === 'developer' || role === 'tester') &&
     !userHasPendingOnboarding(currentUser);
 
-  const [status, setStatus] = useState<'loading' | 'error' | 'ready'>('loading');
+  const userId = currentUser?.id ? String(currentUser.id) : '';
+  const [status, setStatus] = useState<'loading' | 'error' | 'ready'>(() =>
+    userId && hasClearedCodo(userId) ? 'ready' : 'loading'
+  );
   const [rules, setRules] = useState<CodoCommonRule[]>([]);
   const [sessionTotal, setSessionTotal] = useState(0);
   const [saving, setSaving] = useState<CodoAckStatus | null>(null);
   const [loggingOut, setLoggingOut] = useState(false);
-  const [retryKey, setRetryKey] = useState(0);
+  const [retrying, setRetrying] = useState(false);
+  const [errorMessage, setErrorMessage] = useState('');
   const savingRef = useRef(false);
   const skipPathRefresh = useRef(true);
+  const autoRetryRef = useRef(0);
+  const retryTimerRef = useRef<number | null>(null);
   savingRef.current = !!saving;
 
   const loadPending = useCallback(
     (background: boolean) => {
       if (!gated || savingRef.current) return;
-      if (!background) setStatus('loading');
+      if (retryTimerRef.current) {
+        window.clearTimeout(retryTimerRef.current);
+        retryTimerRef.current = null;
+      }
+      // Users who already answered every rule keep working while we re-check quietly.
+      const quiet = background || hasClearedCodo(userId);
+      if (!quiet) setStatus('loading');
       fetchPendingCodoAcknowledgements()
         .then((data) => {
           if (savingRef.current) return;
+          autoRetryRef.current = 0;
           setRules(data.rules);
           setSessionTotal((prev) => Math.max(prev, data.total_pending, data.rules.length));
+          setErrorMessage('');
           setStatus('ready');
+          markCodoCleared(userId, data.rules.length === 0);
         })
-        .catch(() => {
-          if (!background) setStatus('error');
-        });
+        .catch((error: unknown) => {
+          if (quiet) return;
+          setErrorMessage(error instanceof Error ? error.message : '');
+          setStatus('error');
+          if (autoRetryRef.current < AUTO_RETRY_DELAYS_MS.length) {
+            const delay = AUTO_RETRY_DELAYS_MS[autoRetryRef.current];
+            autoRetryRef.current += 1;
+            retryTimerRef.current = window.setTimeout(() => loadPending(false), delay);
+          }
+        })
+        .finally(() => setRetrying(false));
     },
-    [gated]
+    [gated, userId]
   );
 
   useEffect(() => {
     if (!gated) return;
     loadPending(false);
-  }, [gated, currentUser?.id, retryKey, loadPending]);
+    return () => {
+      if (retryTimerRef.current) window.clearTimeout(retryTimerRef.current);
+    };
+  }, [gated, userId, loadPending]);
+
+  useEffect(() => {
+    if (status === 'ready' && rules.length === 0 && userId) markCodoCleared(userId, true);
+  }, [status, rules.length, userId]);
 
   useEffect(() => {
     if (!gated) return;
@@ -152,14 +218,18 @@ export default function CodoAcknowledgementGate() {
         {status === 'error' ? (
           <div className="col-span-12 space-y-4 rounded-2xl border border-border bg-card p-5">
             <h2 className="text-lg font-semibold text-foreground">Rules could not be loaded</h2>
-            <p className="text-sm text-muted-foreground">
-              The dashboard stays closed until your pending CODO rules can be checked.
-            </p>
+            <p className="text-sm text-muted-foreground">{describeLoadError(errorMessage)}</p>
             <Button
               type="button"
               className="rounded-xl"
-              onClick={() => setRetryKey((value) => value + 1)}
+              disabled={retrying}
+              onClick={() => {
+                setRetrying(true);
+                autoRetryRef.current = 0;
+                loadPending(false);
+              }}
             >
+              {retrying ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
               Try again
             </Button>
           </div>
