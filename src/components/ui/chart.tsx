@@ -32,6 +32,42 @@ function useChart() {
   return context;
 }
 
+/**
+ * Why: Recharts warns ("width(0) and height(0) of chart…") when a chart mounts inside
+ * a box that has no size yet — hidden tabs, collapsed panels, first layout pass.
+ * Mount the chart only once the wrapper actually has dimensions; the wrapper keeps
+ * its aspect ratio meanwhile, so there is no layout shift.
+ */
+function useHasRenderableSize<T extends HTMLElement>() {
+  const [hasSize, setHasSize] = React.useState(false);
+  const observerRef = React.useRef<ResizeObserver | null>(null);
+
+  const ref = React.useCallback((node: T | null) => {
+    observerRef.current?.disconnect();
+    observerRef.current = null;
+    if (!node) return;
+
+    const check = (width: number, height: number) => setHasSize(width > 0 && height > 0);
+    const rect = node.getBoundingClientRect();
+    check(rect.width, rect.height);
+
+    if (typeof ResizeObserver === "undefined") {
+      setHasSize(true);
+      return;
+    }
+    const observer = new ResizeObserver((entries) => {
+      const box = entries[0]?.contentRect;
+      if (box) check(box.width, box.height);
+    });
+    observer.observe(node);
+    observerRef.current = observer;
+  }, []);
+
+  React.useEffect(() => () => observerRef.current?.disconnect(), []);
+
+  return { ref, hasSize };
+}
+
 const ChartContainer = React.forwardRef<
   HTMLDivElement,
   React.ComponentProps<"div"> & {
@@ -75,42 +111,6 @@ const ChartContainer = React.forwardRef<
   );
 });
 ChartContainer.displayName = "Chart";
-
-/**
- * Why: Recharts warns ("width(0) and height(0) of chart…") when a chart mounts inside
- * a box that has no size yet — hidden tabs, collapsed panels, first layout pass.
- * Mount the chart only once the wrapper actually has dimensions; the wrapper keeps
- * its aspect ratio meanwhile, so there is no layout shift.
- */
-function useHasRenderableSize<T extends HTMLElement>() {
-  const [hasSize, setHasSize] = React.useState(false);
-  const observerRef = React.useRef<ResizeObserver | null>(null);
-
-  const ref = React.useCallback((node: T | null) => {
-    observerRef.current?.disconnect();
-    observerRef.current = null;
-    if (!node) return;
-
-    const check = (width: number, height: number) => setHasSize(width > 0 && height > 0);
-    const rect = node.getBoundingClientRect();
-    check(rect.width, rect.height);
-
-    if (typeof ResizeObserver === "undefined") {
-      setHasSize(true);
-      return;
-    }
-    const observer = new ResizeObserver((entries) => {
-      const box = entries[0]?.contentRect;
-      if (box) check(box.width, box.height);
-    });
-    observer.observe(node);
-    observerRef.current = observer;
-  }, []);
-
-  React.useEffect(() => () => observerRef.current?.disconnect(), []);
-
-  return { ref, hasSize };
-}
 
 const ChartStyle = ({ id, config }: { id: string; config: ChartConfig }) => {
   const colorConfig = Object.entries(config).filter(
