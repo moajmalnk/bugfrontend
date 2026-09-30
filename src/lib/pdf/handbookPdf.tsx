@@ -223,14 +223,13 @@ const styles = StyleSheet.create({
   statRow: {
     marginTop: 18,
     flexDirection: "row",
-    flexWrap: "wrap",
   },
   statTile: {
-    marginRight: 8,
-    marginBottom: 8,
-    minWidth: 78,
+    flexGrow: 1,
+    flexBasis: 0,
+    minWidth: 0,
     paddingVertical: 8,
-    paddingHorizontal: 10,
+    paddingHorizontal: 8,
     borderRadius: 8,
     border: `1 solid ${HAIRLINE}`,
     backgroundColor: "#F9FAFB",
@@ -721,12 +720,20 @@ const HandbookDocument = ({
         </View>
 
         <View style={styles.statRow}>
-          <View style={[styles.statTile, { backgroundColor: "#ECFDF5", borderColor: "#A7F3D0" }]}>
+          <View
+            style={[
+              styles.statTile,
+              { backgroundColor: "#ECFDF5", borderColor: "#A7F3D0", marginRight: 6 },
+            ]}
+          >
             <Text style={styles.statValue}>{total}</Text>
             <Text style={styles.statLabel}>Total {options.itemNoun.plural}</Text>
           </View>
-          {sections.map((s) => (
-            <View key={s.id} style={styles.statTile}>
+          {sections.map((s, i) => (
+            <View
+              key={s.id}
+              style={[styles.statTile, i < sections.length - 1 ? { marginRight: 6 } : {}]}
+            >
               <Text style={styles.statValue}>{s.items.length}</Text>
               <Text style={styles.statLabel}>{s.title}</Text>
             </View>
