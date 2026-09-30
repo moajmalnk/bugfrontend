@@ -229,6 +229,14 @@ export function CodoCompliancePanel({
   const devChecksMap = new Map(data?.developer_checks.map((c) => [c.rule_key, c]) ?? []);
   const qaChecksMap = new Map(data?.tester_checks.map((c) => [c.rule_key, c]) ?? []);
   const projectChecksMap = new Map(data?.project_checks.map((c) => [c.rule_key, c]) ?? []);
+  // Closed / admin-ready projects keep the checklist they were approved with, so
+  // builtin rules added later have no check row there and cannot be toggled.
+  const builtinDevRules = data
+    ? DEVELOPER_RULES.filter((r) => devChecksMap.has(r.key))
+    : DEVELOPER_RULES;
+  const builtinQaRules = data
+    ? QA_STRESS_RULES.filter((r) => qaChecksMap.has(r.key))
+    : QA_STRESS_RULES;
   const customDevRules = (data?.custom_rules ?? []).filter((r) => r.phase === 'developer');
   const customQaRules = (data?.custom_rules ?? []).filter((r) => r.phase === 'tester');
   const customProjectRules = (data?.custom_rules ?? []).filter((r) => r.phase === 'project');
@@ -339,7 +347,7 @@ export function CodoCompliancePanel({
                   )}
                 </div>
                 <div className="space-y-3">
-                  {DEVELOPER_RULES.map((rule) => {
+                  {builtinDevRules.map((rule) => {
                     const check = devChecksMap.get(rule.key);
                     const verified = check?.verified ?? false;
                     const { verifiedBy, verifiedAt } = getVerifiedMeta(check);
@@ -420,7 +428,7 @@ export function CodoCompliancePanel({
                   </div>
                 )}
                 <div className="space-y-3">
-                  {QA_STRESS_RULES.map((rule) => {
+                  {builtinQaRules.map((rule) => {
                     const check = qaChecksMap.get(rule.key);
                     const verified = check?.verified ?? false;
                     const canToggle = effectiveRole === 'tester' && devComplete;

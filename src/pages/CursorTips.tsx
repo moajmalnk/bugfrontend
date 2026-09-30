@@ -368,17 +368,9 @@ export default function CursorTips() {
         '@/lib/utils/cursorTipsPdfReport'
       );
       await downloadCursorTipsPdf({
-        reportTitle: 'Cursor Tips',
-        subtitle:
-          'Shared Cursor operating standards for developers, QA, and project leads.',
         generatedBy: currentUser?.username || currentUser?.name,
         generatedByRole: role,
-        summary: [
-          { label: 'Total', value: pdfTips.length },
-          { label: 'Modes', value: counts.modes },
-          { label: 'Commands', value: counts.commands },
-          { label: 'Skills', value: counts.skills },
-        ],
+        catalogTotal: tips.length,
         tips: pdfTips.map((t) => ({
           phase: t.phase,
           tipKey: t.tip_key,

@@ -1,3 +1,4 @@
+import { buildCodoStandardMarkdown } from '@/lib/codo/codoStandard';
 import { DEVELOPER_RULES, QA_STRESS_RULES } from '@/lib/codo/complianceRules';
 import {
   CODO_SOP_EXAMPLES,
@@ -116,7 +117,7 @@ const PHASE_LABEL: Record<CodoRulePhase, string> = {
 
 const PHASE_ORDER: CodoRulePhase[] = ['developer', 'tester', 'project'];
 
-/** Builtin catalog as CodoCommonRule-shaped rows (46 developer + 13 QA). */
+/** Builtin catalog as CodoCommonRule-shaped rows (63 developer + 34 QA). */
 export function getBuiltinCodoRulesForExport(): CodoCommonRule[] {
   const developer: CodoCommonRule[] = DEVELOPER_RULES.map((r) => ({
     id: r.number,
@@ -217,14 +218,14 @@ export function buildCodoAgentExportContent(
   formatId: CodoAgentExportId,
   rules: CodoCommonRule[]
 ): string {
-  const sections = buildMarkdownSections(rules);
+  const sections = `${buildCodoStandardMarkdown()}\n${buildMarkdownSections(rules)}`;
   const count = rules.length;
   const headerMeta = `Generated from BugRicer Common CODO · ${count} rule${count === 1 ? '' : 's'} · ${stamp()}`;
 
   switch (formatId) {
     case 'cursor':
       return `---
-description: BugRicer Common CODO engineering and QA rules (dev_rule_1–50, QA stress matrix)
+description: BugRicer Common CODO engineering and QA rules (dev_rule_1–67, QA stress matrix, Definition of Done)
 alwaysApply: true
 ---
 

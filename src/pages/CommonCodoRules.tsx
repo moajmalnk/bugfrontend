@@ -8,6 +8,7 @@ import {
   type AnalyticsRoleFilter,
 } from '@/components/codo/CodoAnalyticsPanel';
 import { CodoExportPanel } from '@/components/codo/CodoExportPanel';
+import { CodoStandardCard } from '@/components/codo/CodoStandardCard';
 import { CodoRuleBody } from '@/components/codo/CodoRuleBody';
 import { CodoRuleDialog } from '@/components/codo/CodoRuleDialog';
 import { Button } from '@/components/ui/button';
@@ -534,17 +535,10 @@ export default function CommonCodoRules() {
       setIsDownloadingReport(true);
       const { downloadCodoRulesPdf } = await import('@/lib/utils/codoRulesPdfReport');
       await downloadCodoRulesPdf({
-        reportTitle: 'Common CODO Rules',
-        subtitle: 'Shared production standards for developers, QA, and projects',
         generatedBy: currentUser?.username || currentUser?.name || 'System',
         generatedByRole: role,
         filePrefix: 'codo-common-rules',
-        summary: [
-          { label: 'Filtered Rules', value: pdfRules.length },
-          { label: 'Developer', value: counts.developer },
-          { label: 'Tester / QA', value: counts.tester },
-          { label: 'Project', value: counts.project },
-        ],
+        catalogTotal: rules.length,
         rules: pdfRules.map((r) => ({
           phase: r.phase,
           ruleKey: r.rule_key,
@@ -1262,6 +1256,7 @@ export default function CommonCodoRules() {
           </Drawer>
 
           <TabsContent value={activeTab} className="space-y-4 sm:space-y-6 md:space-y-8 mt-4 sm:mt-6 min-w-0 w-full overflow-x-hidden">
+            {!loading && !isAnalytics && !isExport && <CodoStandardCard />}
             {!loading && (
               <div className="relative min-w-0">
                 <div className="absolute inset-0 bg-gradient-to-r from-gray-50/30 to-cyan-50/30 dark:from-gray-800/30 dark:to-cyan-900/30 rounded-2xl" />
