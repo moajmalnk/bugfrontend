@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import {
   ClipboardCopy,
@@ -14,7 +14,9 @@ import {
   Pencil,
   Trash2,
   Loader2,
+  FilePlus2,
 } from 'lucide-react';
+import { WeeklyReportStep } from '@/components/daily-work/WeeklyReportStep';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -38,13 +40,6 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
 import { Skeleton } from '@/components/ui/skeleton';
 import { toast } from '@/components/ui/use-toast';
 import { useAuth } from '@/context/AuthContext';
@@ -56,9 +51,11 @@ import {
   clampWeeklyReportField,
   emptyWeeklyReportFields,
   formatWeeklyReportDocument,
+  isSaturdayYmd,
   isWeeklyReportValid,
   listWeeklyReports,
   recentMondaySaturdayWeeks,
+  todayYmdLocal,
   weeklyReportLines,
   type WeeklyReportFields,
   type WeeklyReportListItem,
@@ -66,6 +63,54 @@ import {
 
 const PAGE_SIZE = 20;
 const FIELD_MAX = 20000;
+const WEEK_WINDOW = 16;
+
+function weekRelativeTitle(index: number): string {
+  if (index === 0) return 'This week';
+  if (index === 1) return 'Last week';
+  return `${index} weeks ago`;
+}
+
+function shortWeekRange(weekStart: string, weekEnd: string): string {
+  const start = new Date(`${weekStart}T12:00:00`);
+  const end = new Date(`${weekEnd}T12:00:00`);
+  const fmt = (d: Date, withYear: boolean) =>
+    d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', ...(withYear ? { year: 'numeric' } : {}) });
+  const showYear = end.getFullYear() !== new Date().getFullYear();
+  return `${fmt(start, false)} – ${fmt(end, showYear)}`;
+}
+
+type WeekStatusTone = 'done' | 'due' | 'none';
+
+/**
+ * Why: Team view counts filed reports; personal view answers "did I file it?".
+ * The current week is never "missing" before Saturday checkout closes it.
+ */
+function weekStatus(
+  count: number,
+  isCurrentWeek: boolean,
+  scope: 'team' | 'mine',
+  todayIsSaturday: boolean
+): { label: string; tone: WeekStatusTone } {
+  if (count > 0) {
+    return scope === 'team'
+      ? { label: `${count} ${count === 1 ? 'report' : 'reports'}`, tone: 'done' }
+      : { label: 'Submitted', tone: 'done' };
+  }
+  if (isCurrentWeek) {
+    if (scope === 'team') return { label: todayIsSaturday ? 'Filing today' : 'Due Saturday', tone: 'due' };
+    return { label: todayIsSaturday ? 'Due today' : 'Due Saturday', tone: 'due' };
+  }
+  return scope === 'team'
+    ? { label: 'No reports', tone: 'none' }
+    : { label: 'Missed · file late', tone: 'due' };
+}
+
+const STATUS_DOT: Record<WeekStatusTone, string> = {
+  done: 'bg-emerald-500',
+  due: 'bg-amber-500',
+  none: 'bg-gray-400 dark:bg-gray-500',
+};
 
 function ReportCardSkeleton() {
   return (
@@ -139,9 +184,27 @@ export default function WeeklyReports() {
     ? (searchParams.get('tab') as 'team' | 'mine')
     : defaultTab;
 
-  const weeks = useMemo(() => recentMondaySaturdayWeeks(16), []);
+  const weeks = useMemo(() => recentMondaySaturdayWeeks(WEEK_WINDOW), []);
   const currentWeekStart = weeks[0]?.weekStart || '';
-  const [weekStart, setWeekStart] = useState(currentWeekStart);
+  const weekParam = searchParams.get('week') || '';
+  const weekStart = weeks.some((w) => w.weekStart === weekParam) ? weekParam : currentWeekStart;
+  const setWeekStart = useCallback(
+    (next: string) => {
+      setSearchParams(
+        (prev) => {
+          const p = new URLSearchParams(prev);
+          if (next === currentWeekStart) p.delete('week');
+          else p.set('week', next);
+          return p;
+        },
+        { replace: true }
+      );
+    },
+    [currentWeekStart, setSearchParams]
+  );
+  const [weekCounts, setWeekCounts] = useState<{ scope: string; counts: Record<string, number> } | null>(null);
+  const abortRef = useRef<AbortController | null>(null);
+  const weekCardRefs = useRef<Record<string, HTMLButtonElement | null>>({});
   const [query, setQuery] = useState('');
   const [page, setPage] = useState(1);
   const [loading, setLoading] = useState(true);
@@ -155,33 +218,56 @@ export default function WeeklyReports() {
   const [savingEdit, setSavingEdit] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<WeeklyReportListItem | null>(null);
   const [deleting, setDeleting] = useState(false);
+  const [lateWeek, setLateWeek] = useState<{ weekStart: string; label: string } | null>(null);
+  const [lateDirty, setLateDirty] = useState(false);
 
   const scope = canViewTeam && activeTab === 'team' ? 'team' : 'mine';
 
   const load = useCallback(async () => {
+    abortRef.current?.abort();
+    const controller = new AbortController();
+    abortRef.current = controller;
     setLoading(true);
     setError('');
     try {
-      const data = await listWeeklyReports({
-        scope,
-        week_start: weekStart || undefined,
-        page,
-        limit: PAGE_SIZE,
-      });
+      const data = await listWeeklyReports(
+        {
+          scope,
+          week_start: weekStart || undefined,
+          page,
+          limit: PAGE_SIZE,
+        },
+        controller.signal
+      );
+      if (controller.signal.aborted) return;
       setItems(data.items);
       setTotal(data.total);
+      setWeekCounts({ scope, counts: data.week_counts ?? {} });
     } catch (err) {
+      if (controller.signal.aborted) return;
       setItems([]);
       setTotal(0);
       setError(extractApiErrorMessage(err, 'Could not load weekly reports.'));
     } finally {
-      setLoading(false);
+      if (abortRef.current === controller) setLoading(false);
     }
   }, [scope, weekStart, page]);
 
   useEffect(() => {
     void load();
+    return () => abortRef.current?.abort();
   }, [load]);
+
+  useEffect(() => {
+    const card = weekCardRefs.current[weekStart];
+    const strip = card?.parentElement;
+    if (!card || !strip) return;
+    const left = card.offsetLeft - strip.offsetLeft;
+    const right = left + card.offsetWidth;
+    if (left < strip.scrollLeft || right > strip.scrollLeft + strip.clientWidth) {
+      strip.scrollTo({ left: Math.max(0, left - 16), behavior: 'smooth' });
+    }
+  }, [weekStart]);
 
   useEffect(() => {
     setPage(1);
@@ -195,6 +281,33 @@ export default function WeeklyReports() {
       return hay.includes(q);
     });
   }, [items, query]);
+
+  const counts = weekCounts?.scope === scope ? weekCounts.counts : null;
+  const weeksWithReports = counts ? weeks.filter((w) => (counts[w.weekStart] ?? 0) > 0).length : null;
+  const selectedIndex = Math.max(0, weeks.findIndex((w) => w.weekStart === weekStart));
+  const selectedWeek = weeks[selectedIndex];
+  const todayIsSaturday = isSaturdayYmd(todayYmdLocal());
+  const canFileLate =
+    scope === 'mine' &&
+    selectedIndex >= 1 &&
+    !loading &&
+    !error &&
+    items.length === 0 &&
+    counts !== null &&
+    (counts[weekStart] ?? 0) === 0;
+
+  const closeLateReport = () => {
+    if (lateDirty && !window.confirm('You have unsaved changes.')) return;
+    setLateWeek(null);
+    setLateDirty(false);
+  };
+
+  const handleLateFiled = () => {
+    toast({ title: 'Late weekly report filed', description: 'Admins have been notified.' });
+    setLateWeek(null);
+    setLateDirty(false);
+    void load();
+  };
 
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
   const selectedDoc = selected ? formatWeeklyReportDocument(selected) : '';
@@ -361,8 +474,8 @@ export default function WeeklyReports() {
         ) : null}
 
         <div className="rounded-2xl border border-gray-200/50 bg-white/80 p-4 backdrop-blur-sm dark:border-gray-700/50 dark:bg-gray-900/80 sm:p-5">
-          <div className="grid grid-cols-12 gap-4">
-            <div className={`relative col-span-12 ${canViewTeam && scope === 'team' ? 'md:col-span-7' : 'md:col-span-8'}`}>
+          <div className="flex flex-col gap-4">
+            <div className="relative">
               <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
               <Input
                 value={query}
@@ -372,19 +485,108 @@ export default function WeeklyReports() {
                 className="h-11 rounded-xl border-2 pl-9"
               />
             </div>
-            <div className={`col-span-12 ${canViewTeam && scope === 'team' ? 'md:col-span-5' : 'md:col-span-4'}`}>
-              <Select value={weekStart} onValueChange={setWeekStart}>
-                <SelectTrigger className="h-11 rounded-xl border-2">
-                  <SelectValue placeholder="Select week" />
-                </SelectTrigger>
-                <SelectContent className="rounded-xl">
-                  {weeks.map((week) => (
-                    <SelectItem key={week.weekStart} value={week.weekStart}>
-                      {week.weekStart === currentWeekStart ? `This week · ${week.label}` : week.label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div className="min-w-0">
+                <p className="text-sm font-semibold text-foreground">
+                  {selectedWeek ? `${weekRelativeTitle(selectedIndex)} · ${selectedWeek.label}` : 'Select a week'}
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  {weeksWithReports === null
+                    ? 'Mon – Sat work weeks'
+                    : scope === 'team'
+                      ? `${weeksWithReports} of ${weeks.length} recent weeks have reports`
+                      : `You filed ${weeksWithReports} of the last ${weeks.length} weeks`}
+                </p>
+              </div>
+              <div className="flex items-center gap-2">
+                {weekStart !== currentWeekStart ? (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="h-9 rounded-xl text-xs"
+                    onClick={() => setWeekStart(currentWeekStart)}
+                  >
+                    This week
+                  </Button>
+                ) : null}
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="icon"
+                  className="h-9 w-9 rounded-xl"
+                  aria-label="Older week"
+                  disabled={selectedIndex >= weeks.length - 1}
+                  onClick={() => setWeekStart(weeks[selectedIndex + 1].weekStart)}
+                >
+                  <ChevronLeft className="h-4 w-4" />
+                </Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="icon"
+                  className="h-9 w-9 rounded-xl"
+                  aria-label="Newer week"
+                  disabled={selectedIndex <= 0}
+                  onClick={() => setWeekStart(weeks[selectedIndex - 1].weekStart)}
+                >
+                  <ChevronRight className="h-4 w-4" />
+                </Button>
+              </div>
+            </div>
+
+            <div
+              role="group"
+              aria-label="Select week"
+              className="hide-scrollbar -mx-1 flex snap-x gap-3 overflow-x-auto px-1 py-1"
+            >
+              {weeks.map((week, index) => {
+                const active = week.weekStart === weekStart;
+                const count = counts?.[week.weekStart] ?? 0;
+                const status = weekStatus(count, index === 0, scope, todayIsSaturday);
+                return (
+                  <button
+                    key={week.weekStart}
+                    ref={(el) => {
+                      weekCardRefs.current[week.weekStart] = el;
+                    }}
+                    type="button"
+                    aria-pressed={active}
+                    title={week.label}
+                    onClick={() => setWeekStart(week.weekStart)}
+                    className={`flex w-40 shrink-0 snap-start flex-col gap-1 rounded-xl border-2 px-3.5 py-3 text-left transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-2 dark:focus-visible:ring-offset-gray-900 sm:w-44 ${
+                      active
+                        ? 'border-indigo-600 bg-gradient-to-br from-indigo-600 to-violet-600 text-white shadow-lg shadow-indigo-600/20'
+                        : 'border-gray-200 bg-white text-foreground hover:border-indigo-300 hover:bg-indigo-50/50 dark:border-gray-700 dark:bg-gray-800 dark:hover:border-indigo-700 dark:hover:bg-gray-800/70'
+                    }`}
+                  >
+                    <span
+                      className={`text-[11px] font-semibold uppercase tracking-wide ${
+                        active ? 'text-white/80' : 'text-muted-foreground'
+                      }`}
+                    >
+                      {weekRelativeTitle(index)}
+                    </span>
+                    <span className="truncate text-sm font-semibold tabular-nums">
+                      {shortWeekRange(week.weekStart, week.weekEnd)}
+                    </span>
+                    {counts ? (
+                      <span
+                        className={`flex items-center gap-1.5 text-xs font-medium ${
+                          active ? 'text-white/90' : 'text-muted-foreground'
+                        }`}
+                      >
+                        <span
+                          className={`h-2 w-2 shrink-0 rounded-full ${active ? 'bg-white' : STATUS_DOT[status.tone]}`}
+                        />
+                        <span className="truncate">{status.label}</span>
+                      </span>
+                    ) : (
+                      <Skeleton className={`h-4 w-20 rounded-xl ${active ? 'bg-white/30' : ''}`} />
+                    )}
+                  </button>
+                );
+              })}
             </div>
           </div>
         </div>
@@ -411,16 +613,30 @@ export default function WeeklyReports() {
               {items.length > 0
                 ? 'No matching reports'
                 : scope === 'team'
-                  ? 'No team reports this week'
-                  : 'No weekly report yet'}
+                  ? `No team reports for ${selectedIndex === 0 ? 'this week' : selectedIndex === 1 ? 'last week' : selectedWeek?.label ?? 'this week'}`
+                  : selectedIndex === 0
+                    ? 'No weekly report yet'
+                    : 'No report filed for this week'}
             </h2>
             <p className="mx-auto mt-2 max-w-md text-sm text-muted-foreground">
               {items.length > 0
                 ? 'Try a different name or clear the search.'
                 : scope === 'team'
                   ? 'Reports appear here after Saturday checkout. Try another week or search.'
-                  : 'File your weekly report during Saturday checkout. It will show here afterwards.'}
+                  : canFileLate
+                    ? `You missed the Saturday report for ${selectedWeek?.label ?? 'this week'}. You can still file it now — it will be marked as filed late and sent to admins.`
+                    : 'File your weekly report during Saturday checkout. It will show here afterwards.'}
             </p>
+            {canFileLate && selectedWeek ? (
+              <Button
+                type="button"
+                className="mt-6 h-11 rounded-2xl bg-gradient-to-r from-indigo-600 to-violet-600 px-6 font-semibold text-white hover:from-indigo-700 hover:to-violet-700"
+                onClick={() => setLateWeek({ weekStart: selectedWeek.weekStart, label: selectedWeek.label })}
+              >
+                <FilePlus2 className="mr-2 h-4 w-4" />
+                File late report
+              </Button>
+            ) : null}
           </div>
         ) : (
           <div className="flex flex-col gap-4">
@@ -432,8 +648,18 @@ export default function WeeklyReports() {
                 <div className="mb-5 flex flex-wrap items-start justify-between gap-3">
                   <div className="min-w-0">
                     <p className="truncate text-lg font-semibold text-foreground">{item.user_name}</p>
-                    <p className="text-sm text-muted-foreground">
-                      {item.date_label} · {item.week_label}
+                    <p className="flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
+                      <span>
+                        {item.date_label} · {item.week_label}
+                      </span>
+                      {item.filed_late ? (
+                        <span
+                          className="rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-semibold text-amber-800 dark:bg-amber-900/30 dark:text-amber-300"
+                          title={item.filed_on_label ? `Filed on ${item.filed_on_label}` : undefined}
+                        >
+                          Filed late{item.filed_on_label ? ` · ${item.filed_on_label}` : ''}
+                        </span>
+                      ) : null}
                     </p>
                   </div>
                   <div className="flex flex-wrap gap-2">
@@ -711,6 +937,40 @@ export default function WeeklyReports() {
               )}
             </Button>
           </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog
+        open={!!lateWeek}
+        onOpenChange={(open) => {
+          if (!open) closeLateReport();
+        }}
+      >
+        <DialogContent className="flex max-h-[92vh] w-[95vw] max-w-4xl flex-col gap-0 overflow-hidden rounded-2xl p-0">
+          <div className="bg-gradient-to-br from-indigo-600 via-violet-600 to-purple-700 p-6 text-white">
+            <DialogHeader className="space-y-2 pr-8 text-left">
+              <DialogTitle className="flex items-center gap-3 text-2xl font-bold">
+                <div className="rounded-xl bg-white/20 p-2">
+                  <FilePlus2 className="h-6 w-6" />
+                </div>
+                File late weekly report
+              </DialogTitle>
+              <DialogDescription className="text-base text-white/90">
+                {lateWeek?.label ?? ''}
+              </DialogDescription>
+            </DialogHeader>
+          </div>
+          {lateWeek ? (
+            <WeeklyReportStep
+              key={lateWeek.weekStart}
+              active
+              workDate={todayYmdLocal()}
+              fallbackName={currentUser?.username || 'User'}
+              lateWeekStart={lateWeek.weekStart}
+              onContinue={handleLateFiled}
+              onDirtyChange={setLateDirty}
+            />
+          ) : null}
         </DialogContent>
       </Dialog>
 

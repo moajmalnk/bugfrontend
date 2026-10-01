@@ -14,7 +14,7 @@ import {
   saveWeeklyReport,
   type WeeklyReportFields,
 } from '@/services/weeklyReportService';
-import { AlertTriangle, CheckCircle2, ClipboardList } from 'lucide-react';
+import { AlertTriangle, CheckCircle2, ClipboardList, Clock } from 'lucide-react';
 
 const INITIAL_FIELDS = emptyWeeklyReportFields();
 const FIELD_MAX = 20000;
@@ -24,8 +24,10 @@ type Props = {
   workDate: string;
   fallbackName: string;
   onContinue: () => void;
-  onSkipToCheckout: () => void;
+  onSkipToCheckout?: () => void;
   onDirtyChange: (dirty: boolean) => void;
+  /** Files a missed past week (Monday Y-m-d) instead of the Saturday checkout report. */
+  lateWeekStart?: string;
 };
 
 function countLines(text: string): number {
@@ -62,7 +64,10 @@ export function WeeklyReportStep({
   onContinue,
   onSkipToCheckout,
   onDirtyChange,
+  lateWeekStart,
 }: Props) {
+  const isLate = Boolean(lateWeekStart);
+  const [blocked, setBlocked] = useState(false);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
@@ -98,11 +103,21 @@ export function WeeklyReportStep({
       setLoading(true);
       setRevealed(false);
       setError('');
+      setBlocked(false);
       try {
-        const data = await getWeeklyReport(workDate);
+        const data = await getWeeklyReport(lateWeekStart || workDate);
         if (cancelled) return;
-        if (!data.required) {
-          onSkipToCheckout();
+        if (lateWeekStart) {
+          if (!data.can_file_late) {
+            setBlocked(true);
+            setError(
+              data.report
+                ? 'A weekly report is already filed for this week.'
+                : 'This week can no longer take a late report.'
+            );
+          }
+        } else if (!data.required) {
+          onSkipToCheckout?.();
           return;
         }
         const next: WeeklyReportFields = {
@@ -139,7 +154,7 @@ export function WeeklyReportStep({
     return () => {
       cancelled = true;
     };
-  }, [active, workDate, fallbackName, onSkipToCheckout]);
+  }, [active, workDate, fallbackName, onSkipToCheckout, lateWeekStart]);
 
   useEffect(() => {
     return () => {
@@ -153,15 +168,15 @@ export function WeeklyReportStep({
   const updateField = (key: keyof WeeklyReportFields, value: string) => {
     const next = clampWeeklyReportField(value);
     setFields((prev) => ({ ...prev, [key]: next }));
-    if (error) setError('');
+    if (error && !blocked) setError('');
   };
 
   const handleContinue = async () => {
-    if (saving || !isValid) return;
+    if (saving || !isValid || blocked) return;
     setSaving(true);
     setError('');
     try {
-      await saveWeeklyReport(fields, workDate);
+      await saveWeeklyReport(fields, workDate, lateWeekStart);
       notifyAdminNavCountsChanged();
       onDirtyChange(false);
       onContinue();
@@ -202,7 +217,9 @@ export function WeeklyReportStep({
                   <p className="mt-1 truncate text-sm font-semibold text-foreground">{userName || fallbackName}</p>
                 </div>
                 <div className="col-span-12 md:col-span-4">
-                  <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Date</p>
+                  <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                    {isLate ? 'Week ending' : 'Date'}
+                  </p>
                   <p className="mt-1 truncate text-sm font-semibold text-foreground">{dateLabel || workDate}</p>
                 </div>
                 <div className="col-span-12 md:col-span-4">
@@ -211,6 +228,21 @@ export function WeeklyReportStep({
                 </div>
               </div>
             </div>
+
+            {isLate && !blocked ? (
+              <div className="flex items-start gap-3 rounded-xl border border-amber-200 bg-amber-50 p-4 dark:border-amber-900/60 dark:bg-amber-950/25">
+                <div className="shrink-0 rounded-lg bg-amber-500 p-1.5">
+                  <Clock className="h-4 w-4 text-white" />
+                </div>
+                <div className="min-w-0">
+                  <p className="text-sm font-semibold text-amber-900 dark:text-amber-200">Late submission</p>
+                  <p className="text-sm leading-relaxed text-amber-800 dark:text-amber-300/90">
+                    This report is for {weekLabel || 'a past week'}. It will be marked as filed late today and sent
+                    to admins as soon as you submit. Attendance and daily notes for that week are filled in below.
+                  </p>
+                </div>
+              </div>
+            ) : null}
 
             {attendancePreview ? (
               <div className="rounded-xl border border-gray-200 bg-white p-5 shadow-sm dark:border-gray-700 dark:bg-gray-800">
@@ -323,7 +355,7 @@ export function WeeklyReportStep({
       <div className="border-t border-gray-200 bg-white p-5 dark:border-gray-700 dark:bg-gray-800 sm:px-6">
         <Button
           type="button"
-          disabled={!isValid || saving || loading}
+          disabled={!isValid || saving || loading || blocked}
           onClick={() => void handleContinue()}
           className="h-11 w-full rounded-2xl bg-gradient-to-r from-indigo-600 to-violet-600 font-semibold text-white hover:from-indigo-700 hover:to-violet-700"
         >
@@ -335,7 +367,7 @@ export function WeeklyReportStep({
           ) : (
             <span className="flex items-center gap-2">
               <CheckCircle2 className="h-4 w-4" />
-              Continue to Checkout
+              {isLate ? 'Submit late report' : 'Continue to Checkout'}
             </span>
           )}
         </Button>

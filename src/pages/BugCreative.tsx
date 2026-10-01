@@ -1476,15 +1476,51 @@ export default function BugCreative() {
 
       <AlertDialog
         open={!!deleteTarget}
-        onOpenChange={(o) => !o && setDeleteTarget(null)}
+        onOpenChange={(o) => !o && !deleting && setDeleteTarget(null)}
       >
         <AlertDialogContent className="max-w-[400px] rounded-2xl">
-          <AlertDialogHeader>
-            <AlertDialogTitle>Delete asset?</AlertDialogTitle>
+          <AlertDialogHeader className="items-center text-center sm:text-center">
+            <div className="mb-1 flex h-12 w-12 items-center justify-center rounded-full bg-destructive/10">
+              <Trash2 className="h-6 w-6 text-destructive" />
+            </div>
+            <AlertDialogTitle>Delete this asset?</AlertDialogTitle>
             <AlertDialogDescription>
-              {deleteTarget?.title} will be permanently removed.
+              This permanently removes the asset and its review history. This can’t be undone.
             </AlertDialogDescription>
           </AlertDialogHeader>
+
+          {deleteTarget ? (
+            <div className="flex flex-col gap-3">
+              <div className="flex min-w-0 items-center gap-3 rounded-xl border border-border/60 bg-muted/40 p-3">
+                {deleteTarget.preview_thumbnail_url ? (
+                  <img
+                    src={deleteTarget.preview_thumbnail_url}
+                    alt={deleteTarget.title}
+                    loading="lazy"
+                    decoding="async"
+                    className="h-12 w-12 shrink-0 rounded-xl object-cover"
+                  />
+                ) : (
+                  <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-muted">
+                    <Trash2 className="h-5 w-5 text-muted-foreground" />
+                  </div>
+                )}
+                <div className="min-w-0">
+                  <p className="truncate text-sm font-semibold text-foreground">{deleteTarget.title}</p>
+                  <p className="truncate text-xs text-muted-foreground">
+                    {deleteTarget.status} · {deleteTarget.material_type} · {deleteTarget.platform}
+                  </p>
+                </div>
+              </div>
+              {deleteTarget.status === 'Published' ? (
+                <p className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs leading-relaxed text-amber-800 dark:border-amber-900/60 dark:bg-amber-950/30 dark:text-amber-300">
+                  This asset is published. Deleting it here removes it from BugCreative only — the live
+                  post on {deleteTarget.platform} is not affected.
+                </p>
+              ) : null}
+            </div>
+          ) : null}
+
           <AlertDialogFooter>
             <AlertDialogCancel className="rounded-xl" disabled={deleting}>
               Cancel
@@ -1492,12 +1528,21 @@ export default function BugCreative() {
             <AlertDialogAction
               className="rounded-xl bg-destructive text-destructive-foreground hover:bg-destructive/90"
               disabled={deleting}
-              onClick={() => void handleDelete()}
+              onClick={(e) => {
+                e.preventDefault();
+                void handleDelete();
+              }}
             >
               {deleting ? (
-                <Loader2 className="h-4 w-4 animate-spin" />
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Deleting…
+                </>
               ) : (
-                'Delete'
+                <>
+                  <Trash2 className="mr-2 h-4 w-4" />
+                  Delete asset
+                </>
               )}
             </AlertDialogAction>
           </AlertDialogFooter>

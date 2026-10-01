@@ -112,7 +112,7 @@ type Props = {
   canManage: boolean;
   canReview: boolean;
   canCreate: boolean;
-  /** Current user id — used to allow owner delete on Draft / In Review. */
+  /** Current user id — creators may edit and delete their own assets. */
   viewerUserId?: string | null;
   projects: ProjectOption[];
   /** Full folder tree — used to render the asset location breadcrumb. */
@@ -134,8 +134,6 @@ const OWNER_EDITABLE_STATUSES: CreativeStatus[] = [
   'Published',
   'Rejected',
 ];
-
-const OWNER_DELETABLE_STATUSES: CreativeStatus[] = ['Draft', 'In Review'];
 
 const STATUS_PILL: Record<CreativeStatus, string> = {
   Draft:
@@ -204,11 +202,7 @@ export function AssetFormModal({
     !canManage;
   const canEdit =
     canManage || (canCreate && isOwner && (isNew || !locked));
-  const ownerCanDelete =
-    !!asset &&
-    isOwner &&
-    canCreate &&
-    OWNER_DELETABLE_STATUSES.includes(asset.status);
+  const ownerCanDelete = !!asset && isOwner && canCreate;
   const showDelete =
     !isNew && !!asset && !!onRequestDelete && (canManage || ownerCanDelete);
   const showMove =

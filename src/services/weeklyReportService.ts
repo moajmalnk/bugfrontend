@@ -18,6 +18,9 @@ export type WeeklyReportRecord = {
 
 export type WeeklyReportPayload = {
   required: boolean;
+  is_past_week?: boolean;
+  can_file_late?: boolean;
+  filed_late?: boolean;
   is_saturday: boolean;
   week_start: string;
   week_end: string;
@@ -150,15 +153,21 @@ export async function getWeeklyReport(date?: string): Promise<WeeklyReportPayloa
   return data.data;
 }
 
+/**
+ * Saturday filing passes `reportDate`; a missed past week passes `lateWeekStart`
+ * and the server files it as late against that week's Saturday.
+ */
 export async function saveWeeklyReport(
   fields: WeeklyReportFields,
-  reportDate?: string
+  reportDate?: string,
+  lateWeekStart?: string
 ): Promise<WeeklyReportPayload> {
   const res = await fetch(`${ENV.API_URL}/tasks/weekly_report.php`, {
     method: 'POST',
     headers: authHeaders(),
     body: JSON.stringify({
-      report_date: reportDate,
+      report_date: lateWeekStart ? undefined : reportDate,
+      week_start: lateWeekStart || undefined,
       work_completed: clampWeeklyReportField(fields.work_completed).trim(),
       work_in_progress: clampWeeklyReportField(fields.work_in_progress).trim(),
       issues_blockers: clampWeeklyReportField(fields.issues_blockers).trim(),
@@ -193,6 +202,8 @@ export type WeeklyReportListItem = {
   notified_at?: string | null;
   created_at?: string | null;
   updated_at?: string | null;
+  filed_late?: boolean;
+  filed_on_label?: string | null;
   counts?: {
     completed: number;
     wip: number;
@@ -216,6 +227,8 @@ export type WeeklyReportListPayload = {
   week_start: string | null;
   week_end: string | null;
   week_label: string | null;
+  /** Report count per recent week_start (Y-m-d) in the same scope; missing weeks have none. */
+  week_counts?: Record<string, number>;
 };
 
 export type ListWeeklyReportsParams = {
@@ -370,7 +383,8 @@ export function formatWeeklyReportDocument(item: {
 }
 
 export async function listWeeklyReports(
-  params: ListWeeklyReportsParams = {}
+  params: ListWeeklyReportsParams = {},
+  signal?: AbortSignal
 ): Promise<WeeklyReportListPayload> {
   const qs = new URLSearchParams();
   if (params.scope) qs.set('scope', params.scope);
@@ -381,6 +395,7 @@ export async function listWeeklyReports(
   const suffix = qs.toString() ? `?${qs.toString()}` : '';
   const res = await fetch(`${ENV.API_URL}/tasks/weekly_reports.php${suffix}`, {
     headers: authHeaders(),
+    signal,
   });
   const data = await readApiJson<{
     success?: boolean;
