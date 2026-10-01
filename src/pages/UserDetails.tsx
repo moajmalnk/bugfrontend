@@ -56,8 +56,10 @@ import {
   Loader2,
   Lock,
   Mail,
+  MessageCircle,
   Pencil,
   Phone,
+  Send,
   Timer,
   Trash2,
   Wallet,
@@ -184,6 +186,8 @@ async function handlePasswordChange(
   }
 }
 
+type InviteChannel = "email" | "whatsapp" | "both";
+
 export default function UserDetails() {
   const { userId } = useParams();
   const navigate = useNavigate();
@@ -236,6 +240,9 @@ export default function UserDetails() {
   }, [activeTab, isAdmin, searchParams, setSearchParams]);
 
   const [isGeneratingLink, setIsGeneratingLink] = useState(false);
+  const [isResendingWelcome, setIsResendingWelcome] = useState(false);
+  const [resendConfirmOpen, setResendConfirmOpen] = useState(false);
+  const [resendChannel, setResendChannel] = useState<InviteChannel>("email");
   const [isAccountToggleLoading, setIsAccountToggleLoading] = useState(false);
 
   const { data: user, isLoading, refetch } = useQuery({
@@ -276,6 +283,11 @@ export default function UserDetails() {
     Boolean(user?.id) &&
     (user?.role === "developer" || user?.role === "tester");
   const isAccountDeactivated = user?.account_active === 0;
+  const canResendWelcome =
+    Boolean(user?.id && (user?.email || user?.phone)) &&
+    currentUser?.id !== user?.id &&
+    !isAccountDeactivated &&
+    (effectiveRole === "admin" || hasPermission("USERS_CREATE"));
 
   const handleUserUpdate = (updated: User) => {
     toast({ title: "Updated", description: "User updated successfully" });
@@ -321,6 +333,30 @@ export default function UserDetails() {
       });
     } finally {
       setIsGeneratingLink(false);
+    }
+  };
+
+  const handleResendWelcome = async () => {
+    if (!user?.id || isResendingWelcome) return;
+    setIsResendingWelcome(true);
+    try {
+      const channels: Array<"email" | "whatsapp"> =
+        resendChannel === "both" ? ["email", "whatsapp"] : [resendChannel];
+      const { message, partial } = await userService.resendWelcomeInvite(user.id, channels);
+      setResendConfirmOpen(false);
+      toast({
+        title: partial ? "Invitation partly sent" : "Invitation sent",
+        description: message,
+        variant: partial ? "destructive" : "default",
+      });
+    } catch (err) {
+      toast({
+        title: "Invitation not sent",
+        description: err instanceof Error ? err.message : "Could not send the welcome email.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsResendingWelcome(false);
     }
   };
 
@@ -525,7 +561,112 @@ export default function UserDetails() {
                           )}
                         </div>
                       </div>
+
+                      {canResendWelcome && (
+                        <div className="shrink-0 sm:self-start">
+                          <Button
+                            type="button"
+                            variant="outline"
+                            onClick={() => {
+                              setResendChannel(
+                                user.email && user.phone ? "both" : user.email ? "email" : "whatsapp"
+                              );
+                              setResendConfirmOpen(true);
+                            }}
+                            disabled={isResendingWelcome}
+                            className="h-10 w-full rounded-xl gap-2 sm:w-auto"
+                            title="Send a fresh one-click sign-in link by email or WhatsApp"
+                          >
+                            {isResendingWelcome ? (
+                              <Loader2 className="h-4 w-4 shrink-0 animate-spin" />
+                            ) : (
+                              <Mail className="h-4 w-4 shrink-0" />
+                            )}
+                            {isResendingWelcome ? "Sending…" : "Resend invitation"}
+                          </Button>
+                        </div>
+                      )}
                     </div>
+
+                    <AlertDialog
+                      open={resendConfirmOpen}
+                      onOpenChange={(open) => {
+                        if (!isResendingWelcome) setResendConfirmOpen(open);
+                      }}
+                    >
+                      <AlertDialogContent className="max-w-[400px] rounded-2xl">
+                        <AlertDialogHeader>
+                          <AlertDialogTitle>Resend invitation?</AlertDialogTitle>
+                          <AlertDialogDescription>
+                            Send a fresh one-click sign-in link. Their password is not changed.
+                          </AlertDialogDescription>
+                        </AlertDialogHeader>
+                        <div role="radiogroup" aria-label="Send invitation via" className="grid grid-cols-12 gap-2">
+                          {(
+                            [
+                              { key: "email", label: "Email", icon: Mail, detail: user.email, available: Boolean(user.email) },
+                              { key: "whatsapp", label: "WhatsApp", icon: MessageCircle, detail: user.phone, available: Boolean(user.phone) },
+                              { key: "both", label: "Both", icon: Send, detail: "Email + WhatsApp", available: Boolean(user.email && user.phone) },
+                            ] as const
+                          ).map((opt) => {
+                            const selected = resendChannel === opt.key;
+                            const Icon = opt.icon;
+                            return (
+                              <button
+                                key={opt.key}
+                                type="button"
+                                role="radio"
+                                aria-checked={selected}
+                                disabled={!opt.available || isResendingWelcome}
+                                onClick={() => setResendChannel(opt.key)}
+                                className={cn(
+                                  "col-span-4 flex min-w-0 flex-col items-center gap-1.5 rounded-xl border p-3 text-center transition-colors disabled:cursor-not-allowed disabled:opacity-40",
+                                  selected
+                                    ? "border-primary bg-primary/10 text-foreground ring-1 ring-primary/40"
+                                    : "border-border/60 bg-muted/30 text-muted-foreground hover:border-primary/40 hover:text-foreground"
+                                )}
+                              >
+                                <Icon className="h-5 w-5" />
+                                <span className="text-sm font-medium">{opt.label}</span>
+                              </button>
+                            );
+                          })}
+                        </div>
+                        <p className="min-h-[1.25rem] text-xs text-muted-foreground break-all">
+                          {resendChannel === "email" && <>To {user.email}</>}
+                          {resendChannel === "whatsapp" && <>To {user.phone}</>}
+                          {resendChannel === "both" && <>To {user.email} and {user.phone}</>}
+                          {!user.phone ? " · Add a phone number to enable WhatsApp." : null}
+                          {!user.email ? " · Add an email to enable email." : null}
+                        </p>
+                        <AlertDialogFooter>
+                          <AlertDialogCancel className="rounded-xl" disabled={isResendingWelcome}>
+                            Cancel
+                          </AlertDialogCancel>
+                          <AlertDialogAction
+                            className="rounded-xl"
+                            disabled={isResendingWelcome}
+                            onClick={(e) => {
+                              e.preventDefault();
+                              void handleResendWelcome();
+                            }}
+                          >
+                            {isResendingWelcome ? (
+                              <>
+                                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                Sending…
+                              </>
+                            ) : (
+                              resendChannel === "both"
+                                ? "Send both"
+                                : resendChannel === "whatsapp"
+                                  ? "Send WhatsApp"
+                                  : "Send email"
+                            )}
+                          </AlertDialogAction>
+                        </AlertDialogFooter>
+                      </AlertDialogContent>
+                    </AlertDialog>
 
                     {/* Contact grid — full width so items never overlap */}
                     <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3 w-full">

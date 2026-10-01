@@ -32,6 +32,7 @@ import { AccessibilityProvider, SkipToContent } from "@/components/accessibility
 import { ModernErrorBoundary } from "@/components/error/ModernErrorBoundary";
 import { RouteSEO } from "@/components/seo/RouteSEO";
 import { ProfessionalRefreshButton } from '@/components/ui/ProfessionalRefreshButton';
+import { UpdateAvailablePrompt } from '@/components/UpdateAvailablePrompt';
 import { RefreshKeyboardShortcuts } from '@/components/ui/RefreshKeyboardShortcuts';
 import { WifiOff } from 'lucide-react';
 
@@ -107,91 +108,6 @@ const futureConfig = {
   v7_startTransition: true,
   v7_relativeSplatPath: true,
 };
-
-// Professional update notification component
-function UpdateNotificationModal({ show, onAccept, onDismiss }: {
-  show: boolean;
-  onAccept: () => void;
-  onDismiss: () => void;
-}) {
-  if (!show) return null;
-
-  return (
-    <div
-      style={{
-        position: "fixed",
-        top: 0, left: 0, right: 0, bottom: 0,
-        background: "rgba(0,0,0,0.6)",
-        zIndex: 9999,
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        backdropFilter: "blur(4px)"
-      }}
-    >
-      <div
-        style={{
-          background: "#fff",
-          borderRadius: 12,
-          padding: "2rem",
-          maxWidth: 420,
-          width: "90%",
-          boxShadow: "0 20px 64px rgba(0,0,0,0.15)",
-          textAlign: "center",
-          border: "1px solid #e5e7eb"
-        }}
-      >
-        <div style={{ marginBottom: 16, fontSize: 24 }}>🚀</div>
-        <h2 style={{ 
-          marginBottom: 12, 
-          color: "#111827",
-          fontSize: "1.25rem",
-          fontWeight: 600
-        }}>
-          New Version Available
-        </h2>
-        <p style={{ 
-          marginBottom: 24, 
-          color: "#6b7280",
-          lineHeight: 1.6
-        }}>
-          A new version of BugRicer is ready with improvements and bug fixes.
-          Would you like to update now?
-        </p>
-        <div style={{ display: "flex", gap: 12, justifyContent: "center", alignItems: "center" }}>
-          <button
-            style={{
-              background: "#f3f4f6",
-              color: "#374151",
-              border: "1px solid #d1d5db",
-              borderRadius: 6,
-              padding: "0.75rem 1.5rem",
-              fontWeight: 500,
-              cursor: "pointer",
-              transition: "all 0.2s"
-            }}
-            onClick={onDismiss}
-            onMouseOver={(e) => {
-              e.currentTarget.style.background = "#e5e7eb";
-            }}
-            onMouseOut={(e) => {
-              e.currentTarget.style.background = "#f3f4f6";
-            }}
-          >
-            Later
-          </button>
-          <ProfessionalRefreshButton
-            onHardRefresh={onAccept}
-            showDropdown={false}
-            label="Update Now"
-            variant="default"
-            className="bg-blue-600 hover:bg-blue-700 text-white border-0"
-          />
-        </div>
-      </div>
-    </div>
-  );
-}
 
 // Offline notification banner — subtle status bar (not a modal/toast)
 function OfflineBanner({ show }: { show: boolean }) {
@@ -338,9 +254,8 @@ function AppContent() {
   }, []);
 
   // Handle service worker update
-  const handleUpdateAccept = () => {
-    serviceWorkerManager.skipWaiting();
-    setShowUpdateModal(false);
+  const handleUpdateAccept = async () => {
+    await serviceWorkerManager.skipWaiting();
   };
 
   const handleUpdateDismiss = () => {
@@ -411,7 +326,7 @@ function AppContent() {
           mouseY={contextMenu.mouseY}
           onClose={() => setContextMenu({ mouseX: null, mouseY: null })}
         />
-        <UpdateNotificationModal
+        <UpdateAvailablePrompt
           show={showUpdateModal}
           onAccept={handleUpdateAccept}
           onDismiss={handleUpdateDismiss}

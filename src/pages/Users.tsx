@@ -432,7 +432,7 @@ const Users = () => {
       };
       const result = await userService.addUser(payload);
       toast({
-        title: result.emailSent === false ? "User created — email failed" : "Success",
+        title: result.emailSent === false ? "User created — email failed" : "User created",
         description: result.temporaryPassword
           ? `${result.message} Temporary password: ${result.temporaryPassword}`
           : result.message,
@@ -895,14 +895,6 @@ const Users = () => {
   function renderUsersContent() {
     return (
       <>
-        {!isLoading && leaderboardUsers.length > 0 ? (
-          <UsersTopLeaderboards
-            users={leaderboardUsers}
-            rolePath={effectiveRole}
-            listFromState={listFromState}
-          />
-        ) : null}
-
         {/* Professional Search and Filter Controls */}
         {!isLoading && (
         <div className="relative">
@@ -933,6 +925,14 @@ const Users = () => {
           </div>
         </div>
         )}
+
+        {!isLoading && leaderboardUsers.length > 0 ? (
+          <UsersTopLeaderboards
+            users={leaderboardUsers}
+            rolePath={effectiveRole}
+            listFromState={listFromState}
+          />
+        ) : null}
 
         {/* Professional Responsive Pagination Controls - Only show if there are multiple pages */}
         {!isLoading && totalFiltered > 0 && totalPages > 1 && (

@@ -289,9 +289,29 @@ class BugricerServiceWorkerManager implements ServiceWorkerManager {
     } catch {
       // ignore storage errors
     }
-    if (this.registration?.waiting) {
-      this.registration.waiting.postMessage({ type: 'SKIP_WAITING' });
+    const waiting = this.registration?.waiting;
+    if (!waiting) {
+      // Why: Another tab may already have activated the new worker — a plain reload
+      // picks up the new assets instead of leaving "Update now" doing nothing.
+      try {
+        sessionStorage.removeItem(BugricerServiceWorkerManager.RELOAD_PENDING_KEY);
+      } catch {
+        // ignore storage errors
+      }
+      window.location.reload();
+      return;
     }
+    waiting.postMessage({ type: 'SKIP_WAITING' });
+    // Fallback if controllerchange never fires (e.g. the worker ignores the message).
+    window.setTimeout(() => {
+      try {
+        if (sessionStorage.getItem(BugricerServiceWorkerManager.RELOAD_PENDING_KEY) !== '1') return;
+        sessionStorage.removeItem(BugricerServiceWorkerManager.RELOAD_PENDING_KEY);
+      } catch {
+        // ignore storage errors
+      }
+      window.location.reload();
+    }, 5000);
   }
 }
 

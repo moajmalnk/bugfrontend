@@ -475,10 +475,38 @@ class UserService {
     return data.emails;
   }
 
+  /**
+   * Resends the welcome invite (one-click sign-in link) over the chosen channels.
+   * Resolves when at least one channel succeeded; throws with per-channel errors otherwise.
+   */
+  async resendWelcomeInvite(
+    userId: string,
+    channels: Array<"email" | "whatsapp">
+  ): Promise<{ message: string; partial: boolean }> {
+    const response = await fetch(`${this.baseUrl}/resend_welcome.php`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${localStorage.getItem("token")}`,
+      },
+      body: JSON.stringify({ user_id: userId, channels }),
+    });
+    const data = await response.json().catch(() => null);
+    if (!response.ok || !data?.success) {
+      throw new Error(data?.message || "Could not send the invitation.");
+    }
+    return {
+      message: String(data.message || "Invitation sent."),
+      partial: data.data?.partial === true,
+    };
+  }
+
   async addUser(userData: NewUserData): Promise<{
     user: User;
     message: string;
+    /** Only set when the server reports a definite result; "queued" sends leave it undefined. */
     emailSent?: boolean;
+    welcomeQueued: boolean;
     temporaryPassword?: string;
   }> {
     const response = await fetch(`${this.baseUrl}/create.php`, {
@@ -497,7 +525,8 @@ class UserService {
     return {
       user: { ...data.data, phone: data.data.phone },
       message: data.message,
-      emailSent: data.data?.email_sent === true,
+      emailSent: typeof data.data?.email_sent === "boolean" ? data.data.email_sent : undefined,
+      welcomeQueued: data.data?.email_status === "queued",
       temporaryPassword: data.data?.temporary_password || undefined,
     };
   }

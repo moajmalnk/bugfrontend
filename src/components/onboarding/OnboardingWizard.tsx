@@ -774,6 +774,23 @@ export function OnboardingWizard({
   const [verifiedEmgBaselineAt, setVerifiedEmgBaselineAt] = useState<string | null>(null);
   const [verifiedMailBaseline, setVerifiedMailBaseline] = useState<string | null>(null);
   const [verifiedMailBaselineAt, setVerifiedMailBaselineAt] = useState<string | null>(null);
+  const accountEmail = employeeEmail.trim().toLowerCase();
+  const isAccountEmail =
+    accountEmail !== "" && form.contact_email.trim().toLowerCase() === accountEmail;
+
+  /**
+   * Why: The account email was proven when the employee signed in from the welcome
+   * link sent to it, so keeping it as the contact email needs no OTP. Any other
+   * address still goes through email OTP (the server applies the same rule).
+   */
+  useEffect(() => {
+    if (!isAccountEmail || form.contact_email_verified) return;
+    setForm((prev) => ({
+      ...prev,
+      contact_email_verified: true,
+      contact_email_verified_at: prev.contact_email_verified_at || new Date().toISOString(),
+    }));
+  }, [isAccountEmail, form.contact_email_verified]);
   const photoInputRef = useRef<HTMLInputElement>(null);
   const pinAbortRef = useRef<AbortController | null>(null);
   const pinTimerRef = useRef<number | null>(null);
@@ -2346,15 +2363,17 @@ export function OnboardingWizard({
                           const next = e.target.value.slice(0, 150);
                           const normalized = next.trim().toLowerCase();
                           const matchesBaseline =
-                            verifiedMailBaseline != null &&
-                            normalized === verifiedMailBaseline;
+                            (verifiedMailBaseline != null && normalized === verifiedMailBaseline) ||
+                            (accountEmail !== "" && normalized === accountEmail);
                           setMailConflictMsg(null);
                           setForm((prev) => ({
                             ...prev,
                             contact_email: next,
                             contact_email_verified: matchesBaseline,
                             contact_email_verified_at: matchesBaseline
-                              ? verifiedMailBaselineAt || prev.contact_email_verified_at
+                              ? verifiedMailBaselineAt ||
+                                prev.contact_email_verified_at ||
+                                new Date().toISOString()
                               : null,
                           }));
                           if (next !== form.contact_email) {
@@ -2378,10 +2397,18 @@ export function OnboardingWizard({
                           <p className="text-xs text-emerald-600 dark:text-emerald-400">
                             {skipEmployeeOtp
                               ? "Contact email accepted (admin — no OTP)"
-                              : "Contact email verified"}
+                              : isAccountEmail
+                                ? "Account email — already verified"
+                                : "Contact email verified"}
                           </p>
                         </div>
+                        {!skipEmployeeOtp && isAccountEmail ? (
+                          <p className="text-[11px] text-muted-foreground pl-6">
+                            Verified when you signed in from the invite sent to this address. No OTP needed.
+                          </p>
+                        ) : null}
                         {!skipEmployeeOtp &&
+                        !isAccountEmail &&
                         formatVerifiedAt(form.contact_email_verified_at) ? (
                           <p className="text-[11px] text-muted-foreground pl-6">
                             Verified {formatVerifiedAt(form.contact_email_verified_at)}
@@ -2389,7 +2416,9 @@ export function OnboardingWizard({
                         ) : null}
                         {!skipEmployeeOtp ? (
                           <p className="text-[11px] text-muted-foreground pl-6">
-                            Change the email to verify again with OTP
+                            {isAccountEmail
+                              ? "Using a different address? Change it and verify with OTP."
+                              : "Change the email to verify again with OTP"}
                           </p>
                         ) : null}
                       </div>
@@ -2460,7 +2489,9 @@ export function OnboardingWizard({
 
                     {!form.contact_email_verified && !mailOtpSent ? (
                       <p className="text-[11px] text-muted-foreground">
-                        Use your email or another personal address — not one already used by another employee
+                        {accountEmail
+                          ? `A different address needs a one-time code. Your account email (${accountEmail}) is accepted without OTP.`
+                          : "Use your email or another personal address — not one already used by another employee"}
                       </p>
                     ) : null}
                   </div>

@@ -27,10 +27,11 @@ import {
 } from "@/components/ui/select";
 import { toast } from "@/components/ui/use-toast";
 import { DatePicker } from "@/components/ui/DatePicker";
+import { Checkbox } from "@/components/ui/checkbox";
 import { UserRole } from "@/types";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Loader2, UserPlus } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { permissionService } from "@/services/permissionService";
@@ -41,11 +42,13 @@ const userFormSchema = z
   .object({
     username: z
       .string()
+      .trim()
       .min(3, { message: "Username must be at least 3 characters" })
+      .max(50, { message: "Username must be 50 characters or fewer" })
       .regex(/^[a-zA-Z0-9_]+$/, {
         message: "Username can only contain letters, numbers, and underscores",
       }),
-    email: z.string().email({ message: "Invalid email address" }),
+    email: z.string().trim().max(255).email({ message: "Invalid email address" }),
     role: z.string().min(1, {
       message: "Please select a role",
     }),
@@ -125,9 +128,13 @@ export function AddUserDialog({ onUserAdd }: AddUserDialogProps) {
   const [open, setOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [roles, setRoles] = useState<{ id: number; role_name: string }[]>([]);
+  const [addAnother, setAddAnother] = useState(false);
+  const [addedCount, setAddedCount] = useState(0);
+  const usernameRef = useRef<HTMLInputElement | null>(null);
 
   const form = useForm<UserFormValues>({
     resolver: zodResolver(userFormSchema),
+    mode: "onTouched",
     defaultValues: {
       username: "",
       email: "",
@@ -159,8 +166,7 @@ export function AddUserDialog({ onUserAdd }: AddUserDialogProps) {
         if (data.length > 0 && !form.getValues("role")) {
           form.setValue("role", data[data.length - 1].role_name.toLowerCase());
         }
-      } catch (error) {
-        console.error("Failed to load roles:", error);
+      } catch {
         const fallbackRoles = [
           { id: 1, role_name: "Admin" },
           { id: 2, role_name: "Developer" },
@@ -197,13 +203,39 @@ export function AddUserDialog({ onUserAdd }: AddUserDialogProps) {
     }
   };
 
+  const defaultRole = () =>
+    roles.length > 0 ? roles[roles.length - 1].role_name.toLowerCase() : "";
+
+  /**
+   * Why: Batch onboarding — keep role, tester type and joining date (usually shared
+   * across a hiring batch) and clear only the per-person fields.
+   */
+  const resetForNext = (prev: UserFormValues) => {
+    form.reset({
+      username: "",
+      email: "",
+      phone: "",
+      role: prev.role,
+      tester_type: prev.role === "tester" ? prev.tester_type : "",
+      joining_date: prev.joining_date || "",
+    });
+    requestAnimationFrame(() => usernameRef.current?.focus());
+  };
+
   const onSubmit = async (data: UserFormValues) => {
+    if (isSubmitting) return;
     setIsSubmitting(true);
     try {
       const result = await handleAddUser(data);
       if (result) {
-        form.reset();
-        setOpen(false);
+        if (addAnother) {
+          setAddedCount((n) => n + 1);
+          resetForNext(data);
+        } else {
+          form.reset({ ...form.formState.defaultValues, role: defaultRole() });
+          setAddedCount(0);
+          setOpen(false);
+        }
       }
     } catch {
       toast({
@@ -217,10 +249,22 @@ export function AddUserDialog({ onUserAdd }: AddUserDialogProps) {
   };
 
   const handleOpenChange = (next: boolean) => {
-    setOpen(next);
     if (!next) {
-      form.reset();
+      if (isSubmitting) return;
+      const { username, email, phone } = form.getValues();
+      const hasDraft = Boolean(username?.trim() || email?.trim() || phone?.trim());
+      if (hasDraft && !window.confirm("You have unsaved changes. Discard this user?")) return;
+      form.reset({
+        username: "",
+        email: "",
+        phone: "",
+        tester_type: "",
+        joining_date: "",
+        role: defaultRole(),
+      });
+      setAddedCount(0);
     }
+    setOpen(next);
   };
 
   return (
@@ -261,7 +305,17 @@ export function AddUserDialog({ onUserAdd }: AddUserDialogProps) {
                   <FormItem className="col-span-12 space-y-2">
                     <FormLabelDot>Username</FormLabelDot>
                     <FormControl>
-                      <Input placeholder="Username" {...field} className={fieldInputClass} />
+                      <Input
+                        placeholder="Username"
+                        autoComplete="off"
+                        maxLength={50}
+                        {...field}
+                        ref={(el) => {
+                          field.ref(el);
+                          usernameRef.current = el;
+                        }}
+                        className={fieldInputClass}
+                      />
                     </FormControl>
                     <FormDescription className="text-xs">
                       Letters, numbers, and underscores only
@@ -281,6 +335,8 @@ export function AddUserDialog({ onUserAdd }: AddUserDialogProps) {
                       <Input
                         type="email"
                         placeholder="Enter email address"
+                        autoComplete="off"
+                        maxLength={255}
                         {...field}
                         className={fieldInputClass}
                       />
@@ -380,7 +436,27 @@ export function AddUserDialog({ onUserAdd }: AddUserDialogProps) {
               />
             </div>
 
-            <DialogFooter className="border-t border-gray-200/50 dark:border-gray-700/50 px-6 py-4 gap-2 sm:gap-3 sm:justify-end">
+            <DialogFooter className="border-t border-gray-200/50 dark:border-gray-700/50 px-6 py-4 gap-3 sm:items-center sm:justify-between">
+              <label
+                htmlFor="add-user-another"
+                className="flex cursor-pointer items-center gap-2 text-sm text-muted-foreground sm:mr-auto"
+              >
+                <Checkbox
+                  id="add-user-another"
+                  checked={addAnother}
+                  onCheckedChange={(v) => setAddAnother(v === true)}
+                  disabled={isSubmitting}
+                />
+                <span>
+                  Add another
+                  {addedCount > 0 ? (
+                    <span className="ml-1 font-medium text-emerald-600 dark:text-emerald-400">
+                      · {addedCount} added
+                    </span>
+                  ) : null}
+                </span>
+              </label>
+              <div className="flex flex-col-reverse gap-2 sm:flex-row sm:gap-3">
               <Button
                 type="button"
                 variant="outline"
@@ -404,6 +480,7 @@ export function AddUserDialog({ onUserAdd }: AddUserDialogProps) {
                   "Add User"
                 )}
               </Button>
+              </div>
             </DialogFooter>
           </form>
         </Form>
