@@ -1,5 +1,5 @@
 import { Bug, Code2, Palette, Shield } from "lucide-react";
-import { cn } from "@/lib/utils";
+import { cn, getStandardsModeLabel, isStandardsConfigurable } from "@/lib/utils";
 
 /**
  * Why: One badge token set so Users, details, and dashboards stay consistent
@@ -64,6 +64,46 @@ export function TesterTypeBadge({
       title={isCodo ? "CODO Tester (in-house)" : "Client Tester (external)"}
     >
       {isCodo ? "CODO" : "Client"}
+    </span>
+  );
+}
+
+/**
+ * Why: shows an admin, at a glance, whether CODO Rules / Cursor Tips are
+ * mandatory, readable only, or hidden for this person. Rendered only for
+ * roles where the setting applies (developer, creator, CODO tester).
+ */
+export function StandardsModeBadge({
+  role,
+  testerType,
+  label,
+  mode,
+  className,
+}: {
+  role?: string | null;
+  testerType?: string | null;
+  label: string;
+  mode?: string | null;
+  className?: string;
+}) {
+  if (!role || !isStandardsConfigurable(role, testerType)) return null;
+  const tone =
+    mode === "required"
+      ? "border-cyan-500/30 bg-cyan-500/10 text-cyan-700 dark:text-cyan-300"
+      : mode === "hidden"
+        ? "border-red-500/30 bg-red-500/10 text-red-700 dark:text-red-300"
+        : "border-border bg-muted/50 text-muted-foreground";
+  const modeLabel = getStandardsModeLabel(mode);
+  return (
+    <span
+      className={cn(
+        "inline-flex items-center rounded-full border px-3 py-1 text-xs font-semibold whitespace-nowrap",
+        tone,
+        className
+      )}
+      title={`${label}: ${modeLabel}`}
+    >
+      {label} · {modeLabel}
     </span>
   );
 }

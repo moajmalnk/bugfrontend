@@ -1,7 +1,7 @@
 import { ENV } from '@/lib/env';
 import { resolveAvatarUrl } from '@/lib/avatarUrl';
 import { sortUsersActiveFirst } from '@/lib/utils/userSort';
-import { TesterType, User, UserRole } from '@/types';
+import { StandardsMode, TesterType, User, UserRole } from '@/types';
 import axios from 'axios';
 
 export const BIRTHDAY_WISH_MAX_LENGTH = 280;
@@ -144,6 +144,8 @@ interface NewUserData {
   password?: string;
   role: UserRole;
   tester_type?: TesterType | null;
+  codo_rules_mode?: StandardsMode;
+  cursor_tips_mode?: StandardsMode;
   joining_date?: string | null;
 }
 
@@ -154,6 +156,8 @@ interface UpdateUserData {
   role?: UserRole;
   role_id?: number;
   tester_type?: TesterType | null;
+  codo_rules_mode?: StandardsMode;
+  cursor_tips_mode?: StandardsMode;
   account_active?: boolean | number;
   joining_date?: string | null;
   employee_code?: string | null;

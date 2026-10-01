@@ -28,15 +28,16 @@ import {
 import { toast } from "@/components/ui/use-toast";
 import { DatePicker } from "@/components/ui/DatePicker";
 import { Checkbox } from "@/components/ui/checkbox";
-import { UserRole } from "@/types";
+import { StandardsMode, UserRole } from "@/types";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Loader2, UserPlus } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { permissionService } from "@/services/permissionService";
-import { cn } from "@/lib/utils";
+import { cn, isStandardsConfigurable, standardsModeDefault, type StandardsFeature } from "@/lib/utils";
 import { TesterTypeField } from "@/components/users/TesterTypeField";
+import { StandardsAccessField } from "@/components/users/StandardsAccessField";
 
 const userFormSchema = z
   .object({
@@ -53,6 +54,8 @@ const userFormSchema = z
       message: "Please select a role",
     }),
     tester_type: z.string().optional(),
+    codo_rules_mode: z.enum(["required", "optional", "hidden"]).optional(),
+    cursor_tips_mode: z.enum(["required", "optional", "hidden"]).optional(),
     phone: z.string().optional(),
     joining_date: z
       .string()
@@ -150,6 +153,19 @@ export function AddUserDialog({ onUserAdd }: AddUserDialogProps) {
   const isTesterRole = selectedRoleName === "tester";
   const testerTypeMissing =
     isTesterRole && selectedTesterType !== "codo" && selectedTesterType !== "client";
+  const standardsConfigurable = isStandardsConfigurable(selectedRoleName, selectedTesterType);
+  const standardsDefaults: Record<StandardsFeature, StandardsMode> = {
+    codo: standardsModeDefault(selectedRoleName, selectedTesterType, "codo"),
+    cursor_tips: standardsModeDefault(selectedRoleName, selectedTesterType, "cursor_tips"),
+  };
+  const codoMode = form.watch("codo_rules_mode") ?? standardsDefaults.codo;
+  const cursorTipsMode = form.watch("cursor_tips_mode") ?? standardsDefaults.cursor_tips;
+
+  // Why: modes follow the role — a role or tester type change re-applies that role's defaults.
+  useEffect(() => {
+    form.setValue("codo_rules_mode", undefined, { shouldDirty: false });
+    form.setValue("cursor_tips_mode", undefined, { shouldDirty: false });
+  }, [selectedRoleName, selectedTesterType, form]);
 
   useEffect(() => {
     if (!isTesterRole && form.getValues("tester_type")) {
@@ -194,6 +210,16 @@ export function AddUserDialog({ onUserAdd }: AddUserDialogProps) {
         role: userData.role,
         role_id: selectedRole?.id,
         tester_type: userData.role === "tester" ? userData.tester_type : undefined,
+        ...(isStandardsConfigurable(userData.role, userData.tester_type)
+          ? {
+              codo_rules_mode:
+                userData.codo_rules_mode ??
+                standardsModeDefault(userData.role, userData.tester_type, "codo"),
+              cursor_tips_mode:
+                userData.cursor_tips_mode ??
+                standardsModeDefault(userData.role, userData.tester_type, "cursor_tips"),
+            }
+          : {}),
         phone: userData.phone && userData.phone.trim() ? "+91" + userData.phone.trim() : undefined,
         joining_date: userData.joining_date?.trim() || undefined,
       };
@@ -217,6 +243,8 @@ export function AddUserDialog({ onUserAdd }: AddUserDialogProps) {
       phone: "",
       role: prev.role,
       tester_type: prev.role === "tester" ? prev.tester_type : "",
+      codo_rules_mode: prev.codo_rules_mode,
+      cursor_tips_mode: prev.cursor_tips_mode,
       joining_date: prev.joining_date || "",
     });
     requestAnimationFrame(() => usernameRef.current?.focus());
@@ -251,14 +279,18 @@ export function AddUserDialog({ onUserAdd }: AddUserDialogProps) {
   const handleOpenChange = (next: boolean) => {
     if (!next) {
       if (isSubmitting) return;
-      const { username, email, phone } = form.getValues();
-      const hasDraft = Boolean(username?.trim() || email?.trim() || phone?.trim());
+      const { username, email, phone, codo_rules_mode, cursor_tips_mode } = form.getValues();
+      const hasDraft = Boolean(
+        username?.trim() || email?.trim() || phone?.trim() || codo_rules_mode || cursor_tips_mode
+      );
       if (hasDraft && !window.confirm("You have unsaved changes. Discard this user?")) return;
       form.reset({
         username: "",
         email: "",
         phone: "",
         tester_type: "",
+        codo_rules_mode: undefined,
+        cursor_tips_mode: undefined,
         joining_date: "",
         role: defaultRole(),
       });
@@ -410,6 +442,29 @@ export function AddUserDialog({ onUserAdd }: AddUserDialogProps) {
                     </FormItem>
                   )}
                 />
+              )}
+
+              {standardsConfigurable && (
+                <div className="col-span-12 space-y-2">
+                  <p className="flex items-center gap-2 text-sm font-semibold text-gray-900 dark:text-white">
+                    <span className="h-2 w-2 shrink-0 rounded-full bg-cyan-500" />
+                    CODO standards access
+                  </p>
+                  <StandardsAccessField
+                    codoMode={codoMode}
+                    cursorTipsMode={cursorTipsMode}
+                    defaults={standardsDefaults}
+                    disabled={isSubmitting}
+                    onChange={(feature, mode) =>
+                      form.setValue(feature === "codo" ? "codo_rules_mode" : "cursor_tips_mode", mode, {
+                        shouldDirty: true,
+                      })
+                    }
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    Required asks them to acknowledge every item before the dashboard opens.
+                  </p>
+                </div>
               )}
 
               <FormField

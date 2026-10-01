@@ -23,7 +23,9 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { toast } from '@/components/ui/use-toast';
 import { useAuth } from '@/context/AuthContext';
 import { usePermissions } from '@/hooks/usePermissions';
-import { getEffectiveRole, hasPermissionOrAdmin } from '@/lib/utils';
+import { canViewStandards, getEffectiveRole, hasPermissionOrAdmin } from '@/lib/utils';
+import { StandardsUnavailable } from '@/components/standards/StandardsUnavailable';
+import { isStandardsDeniedError } from '@/lib/standardsErrors';
 import { parseTipDescription } from '@/lib/cursorTips/parseTipDescription';
 import {
   createCursorTip,
@@ -136,6 +138,9 @@ export default function CursorTips() {
     review: 0,
   });
   const [loading, setLoading] = useState(true);
+  const [serverDenied, setServerDenied] = useState(false);
+  const modeAllowsView = canViewStandards(currentUser, 'cursor_tips');
+  const standardsAvailable = modeAllowsView && !serverDenied;
   const [search, setSearch] = useState('');
   const [searchParams, setSearchParams] = useSearchParams();
   const tabParam = (searchParams.get('tab') || 'all') as TabKey;
@@ -151,13 +156,19 @@ export default function CursorTips() {
   const [isMobileTabSelectorOpen, setIsMobileTabSelectorOpen] = useState(false);
 
   const load = useCallback(async () => {
-    if (!canAccess) return;
+    if (!canAccess || !modeAllowsView) return;
     setLoading(true);
     try {
       const data = await listCursorTips();
       setTips(data.tips);
       setCounts(data.counts);
+      setServerDenied(false);
     } catch (e) {
+      if (isStandardsDeniedError(e)) {
+        setServerDenied(true);
+        setTips([]);
+        return;
+      }
       toast({
         title: 'Failed to load Cursor Tips',
         description: e instanceof Error ? e.message : 'Please try again',
@@ -167,7 +178,7 @@ export default function CursorTips() {
     } finally {
       setLoading(false);
     }
-  }, [canAccess]);
+  }, [canAccess, modeAllowsView]);
 
   useEffect(() => {
     load();
@@ -470,6 +481,10 @@ export default function CursorTips() {
       </div>
     );
   };
+
+  if (canAccess && !standardsAvailable) {
+    return <StandardsUnavailable feature="Cursor Tips" />;
+  }
 
   if (!canAccess) {
     return (

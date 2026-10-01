@@ -110,6 +110,9 @@ export type UserRole = 'admin' | 'developer' | 'tester' | 'creator';
 /** CODO = in-house tester (workforce); client = external reviewer (bug reporting only). */
 export type TesterType = 'codo' | 'client';
 
+/** Per-user CODO Rules / Cursor Tips access: forced acknowledgement, readable, or hidden. */
+export type StandardsMode = 'required' | 'optional' | 'hidden';
+
 export interface Permission {
   id: number;
   permission_key: string;
@@ -136,6 +139,10 @@ export interface User {
   phone?: string;
   role: UserRole;
   tester_type?: TesterType | null;
+  /** Effective CODO Rules mode resolved by the backend (role default when unset). */
+  codo_rules_mode?: StandardsMode;
+  /** Effective Cursor Tips mode resolved by the backend (role default when unset). */
+  cursor_tips_mode?: StandardsMode;
   role_id?: number | null;
   /** 1 = active, 0 = deactivated by admin (when column exists) */
   account_active?: number;

@@ -32,11 +32,11 @@ import { Tabs, TabsContent } from "@/components/ui/tabs";
 import { BottomSheetTabs } from "@/components/ui/BottomSheetTabs";
 import { useAuth } from "@/context/AuthContext";
 import { ENV } from "@/lib/env";
-import { userHasEmployeeRecords } from "@/lib/utils";
+import { getStandardsMode, userHasEmployeeRecords } from "@/lib/utils";
 import { usePermissions } from "@/hooks/usePermissions";
 import { useToast } from "@/hooks/use-toast";
 import { cn, getEffectiveRole } from "@/lib/utils";
-import { getRoleIcon as roleIcon, TesterTypeBadge } from "@/lib/roleBadge";
+import { getRoleIcon as roleIcon, StandardsModeBadge, TesterTypeBadge } from "@/lib/roleBadge";
 import { VerifiedBlueTick, isFullFledgedUser } from "@/components/ui/VerifiedBlueTick";
 import { userService } from "@/services/userService";
 import { onboardingService } from "@/services/onboardingService";
@@ -618,6 +618,18 @@ export default function UserDetails() {
                               status={user.onboarding_verification_status}
                             />
                           ) : null}
+                          <StandardsModeBadge
+                            role={user.role}
+                            testerType={user.tester_type}
+                            label="CODO Rules"
+                            mode={getStandardsMode(user, "codo")}
+                          />
+                          <StandardsModeBadge
+                            role={user.role}
+                            testerType={user.tester_type}
+                            label="Cursor Tips"
+                            mode={getStandardsMode(user, "cursor_tips")}
+                          />
                           {user.last_active_at && (
                             <span className="text-xs text-muted-foreground">
                               {formatDistanceToNow(new Date(user.last_active_at), {

@@ -29,14 +29,21 @@ import { toast } from "@/components/ui/use-toast";
 import { DatePicker } from "@/components/ui/DatePicker";
 import { userService } from "@/services/userService";
 import { permissionService } from "@/services/permissionService";
-import { TesterType, User, UserRole } from "@/types";
+import { StandardsMode, TesterType, User, UserRole } from "@/types";
 import { TesterTypeField } from "@/components/users/TesterTypeField";
+import { StandardsAccessField } from "@/components/users/StandardsAccessField";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Loader2, Pencil, RefreshCw } from "lucide-react";
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
-import { cn } from "@/lib/utils";
+import {
+  cn,
+  getStandardsMode,
+  isStandardsConfigurable,
+  standardsModeDefault,
+  type StandardsFeature,
+} from "@/lib/utils";
 
 const optionalDate = z
   .string()
@@ -56,6 +63,8 @@ const userFormSchema = z
   email: z.string().email({ message: "Invalid email address" }),
   role: z.string().min(1, { message: "Please select a role" }),
   tester_type: z.string().optional(),
+  codo_rules_mode: z.enum(["required", "optional", "hidden"]).optional(),
+  cursor_tips_mode: z.enum(["required", "optional", "hidden"]).optional(),
   phone: z.string().optional(),
   joining_date: optionalDate,
   employee_code: z.string().optional(),
@@ -160,6 +169,8 @@ function toFormValues(user: User): UserFormValues {
     role: user.role || "tester",
     tester_type:
       user.role === "tester" ? (user.tester_type === "codo" ? "codo" : "client") : "",
+    codo_rules_mode: getStandardsMode(user, "codo"),
+    cursor_tips_mode: getStandardsMode(user, "cursor_tips"),
     phone: user.phone ? user.phone.replace(/^\+91/, "") : "",
     joining_date: user.joining_date || "",
     employee_code: user.employee_code || "",
@@ -220,8 +231,11 @@ export function EditUserDialog({
     defaultValues: toFormValues(user),
   });
 
+  const roleKeyRef = useRef("");
   useEffect(() => {
-    form.reset(toFormValues(user));
+    const initial = toFormValues(user);
+    roleKeyRef.current = `${initial.role}:${initial.tester_type}`;
+    form.reset(initial);
   }, [user, form]);
 
   const isAdminEditor = String(loggedInUserRole || "").toLowerCase() === "admin";
@@ -238,11 +252,38 @@ export function EditUserDialog({
     }
   }, [isTesterRole, form]);
 
+  const standardsConfigurable = isStandardsConfigurable(selectedRoleName, selectedTesterType);
+  const standardsDefaults: Record<StandardsFeature, StandardsMode> = {
+    codo: standardsModeDefault(selectedRoleName, selectedTesterType, "codo"),
+    cursor_tips: standardsModeDefault(selectedRoleName, selectedTesterType, "cursor_tips"),
+  };
+  const codoMode = form.watch("codo_rules_mode") ?? standardsDefaults.codo;
+  const cursorTipsMode = form.watch("cursor_tips_mode") ?? standardsDefaults.cursor_tips;
+
+  // Why: modes follow the role — switching role or tester type re-applies that role's defaults.
+  useEffect(() => {
+    const key = `${selectedRoleName}:${selectedTesterType}`;
+    if (roleKeyRef.current === key) return;
+    roleKeyRef.current = key;
+    form.setValue("codo_rules_mode", standardsModeDefault(selectedRoleName, selectedTesterType, "codo"), {
+      shouldDirty: true,
+    });
+    form.setValue(
+      "cursor_tips_mode",
+      standardsModeDefault(selectedRoleName, selectedTesterType, "cursor_tips"),
+      { shouldDirty: true }
+    );
+  }, [selectedRoleName, selectedTesterType, form]);
+
   const handleOpenChange = (next: boolean) => {
-    setOpen(next);
     if (!next) {
-      form.reset(toFormValues(user));
+      if (isSubmitting) return;
+      if (form.formState.isDirty && !window.confirm("You have unsaved changes. Discard them?")) return;
+      const initial = toFormValues(user);
+      roleKeyRef.current = `${initial.role}:${initial.tester_type}`;
+      form.reset(initial);
     }
+    setOpen(next);
   };
 
   const onSubmit = async (data: UserFormValues) => {
@@ -262,6 +303,12 @@ export function EditUserDialog({
         payload.role_id = selectedRole?.id;
         payload.tester_type =
           data.role === "tester" ? (data.tester_type as TesterType) : null;
+        if (isStandardsConfigurable(data.role, data.tester_type)) {
+          payload.codo_rules_mode =
+            data.codo_rules_mode ?? standardsModeDefault(data.role, data.tester_type, "codo");
+          payload.cursor_tips_mode =
+            data.cursor_tips_mode ?? standardsModeDefault(data.role, data.tester_type, "cursor_tips");
+        }
         payload.joining_date = data.joining_date?.trim() || null;
         payload.employee_code = data.employee_code?.trim() || null;
         payload.job_title = data.job_title?.trim() || null;
@@ -480,6 +527,29 @@ export function EditUserDialog({
                     </FormItem>
                   )}
                 />
+              )}
+
+              {isAdminEditor && standardsConfigurable && (
+                <div className="col-span-12 space-y-2">
+                  <p className="flex items-center gap-2 text-sm font-semibold text-gray-900 dark:text-white">
+                    <span className="h-2 w-2 shrink-0 rounded-full bg-cyan-500" />
+                    CODO standards access
+                  </p>
+                  <StandardsAccessField
+                    codoMode={codoMode}
+                    cursorTipsMode={cursorTipsMode}
+                    defaults={standardsDefaults}
+                    disabled={isSubmitting}
+                    onChange={(feature, mode) =>
+                      form.setValue(feature === "codo" ? "codo_rules_mode" : "cursor_tips_mode", mode, {
+                        shouldDirty: true,
+                      })
+                    }
+                  />
+                  <p className="text-[11px] text-muted-foreground leading-snug">
+                    Switching to Required asks them to acknowledge every item the next time they open the dashboard.
+                  </p>
+                </div>
               )}
 
               {isAdminEditor ? (

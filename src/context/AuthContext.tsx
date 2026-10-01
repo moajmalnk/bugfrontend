@@ -255,6 +255,62 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return () => controller.abort();
   }, [testerTypePending, currentUser?.id]);
 
+  /**
+   * Why: an admin can switch a user's CODO Rules / Cursor Tips between
+   * Required, Optional and Hidden at any time. Logins other than /me return
+   * no modes, so hydrate them once, then re-read them (throttled) whenever the
+   * tab regains focus so the sidebar and gates follow without a hard refresh.
+   */
+  const standardsModesMissing = !!currentUser && currentUser.codo_rules_mode === undefined;
+  useEffect(() => {
+    if (!currentUser?.id) return;
+    const userId = currentUser.id;
+    let controller: AbortController | null = null;
+    let lastFetch = 0;
+
+    const refresh = () => {
+      const token = sessionStorage.getItem("token") || localStorage.getItem("token");
+      if (!token) return;
+      controller?.abort();
+      controller = new AbortController();
+      lastFetch = Date.now();
+      fetch(AUTH_ENDPOINTS.me, {
+        headers: { Accept: "application/json", Authorization: `Bearer ${token}` },
+        signal: controller.signal,
+      })
+        .then((res) => res.json())
+        .then((data) => {
+          const next = data?.data;
+          if (!data?.success || !next) return;
+          setCurrentUser((prev) =>
+            prev &&
+            prev.id === userId &&
+            (prev.codo_rules_mode !== next.codo_rules_mode ||
+              prev.cursor_tips_mode !== next.cursor_tips_mode)
+              ? {
+                  ...prev,
+                  codo_rules_mode: next.codo_rules_mode,
+                  cursor_tips_mode: next.cursor_tips_mode,
+                }
+              : prev
+          );
+        })
+        .catch(() => {
+          // Keep the last known modes; the backend still enforces access.
+        });
+    };
+
+    if (standardsModesMissing) refresh();
+    const onVisible = () => {
+      if (document.visibilityState === "visible" && Date.now() - lastFetch > 60_000) refresh();
+    };
+    document.addEventListener("visibilitychange", onVisible);
+    return () => {
+      document.removeEventListener("visibilitychange", onVisible);
+      controller?.abort();
+    };
+  }, [currentUser?.id, standardsModesMissing]);
+
   // Heartbeat system - send heartbeat every 30 seconds when user is authenticated
   useEffect(() => {
     if (!currentUser) return;

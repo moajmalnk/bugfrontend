@@ -3,7 +3,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
 import { useAuth } from "@/context/AuthContext";
 import { resolveAvatarUrl } from "@/lib/avatarUrl";
-import { canAccessCodoStandards, cn, getEffectiveRole, isWorkforceUser, showBugMessageInMainNav } from "@/lib/utils";
+import { canAccessCodoStandards, canViewStandards, cn, getEffectiveRole, isWorkforceUser, showBugMessageInMainNav } from "@/lib/utils";
 import { VerifiedBlueTick, isFullFledgedUser } from "@/components/ui/VerifiedBlueTick";
 import { usePermissions } from "@/hooks/usePermissions";
 import {
@@ -85,6 +85,8 @@ export const Sidebar = ({ className, closeSidebar }: SidebarProps) => {
   // Why: CODO testers keep BugUpdate / Weekly Report / Leave even before migration 115 seeds tester permissions.
   const isCodoTester = role === "tester" && isWorkforce;
   const hasCodoStandards = canAccessCodoStandards(currentUser);
+  const showCodoRules = canViewStandards(currentUser, "codo");
+  const showCursorTips = canViewStandards(currentUser, "cursor_tips");
 
   const isActive = (path: string) => {
     if (!role) return false;
@@ -446,7 +448,7 @@ export const Sidebar = ({ className, closeSidebar }: SidebarProps) => {
               />
             )}
 
-            {hasCodoStandards && can("CODO_VIEW") && (
+            {showCodoRules && can("CODO_VIEW") && (
               <NavLink
                 to="/common-codo"
                 icon={<ClipboardCheck className="h-5 w-5" />}
@@ -456,7 +458,7 @@ export const Sidebar = ({ className, closeSidebar }: SidebarProps) => {
               />
             )}
 
-            {hasCodoStandards && can("CURSOR_TIPS_VIEW") && (
+            {showCursorTips && can("CURSOR_TIPS_VIEW") && (
               <NavLink
                 to="/cursor-tips"
                 icon={<Sparkles className="h-5 w-5" />}

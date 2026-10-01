@@ -119,6 +119,71 @@ export const isWorkforceUser = (user: {
  */
 export const canAccessCodoStandards = isWorkforceUser;
 
+export type StandardsFeature = "codo" | "cursor_tips";
+type StandardsModeValue = "required" | "optional" | "hidden";
+
+type StandardsUser = {
+  role?: string;
+  role_id?: number | null;
+  tester_type?: string | null;
+  codo_rules_mode?: StandardsModeValue | null;
+  cursor_tips_mode?: StandardsModeValue | null;
+} | null | undefined;
+
+/** Developers, creators and CODO testers are the only roles an admin can configure. */
+export const isStandardsConfigurable = (role: string, testerType?: string | null): boolean =>
+  role === "developer" || role === "creator" || (role === "tester" && testerType === "codo");
+
+/**
+ * Why: a NULL mode on the server means "role default"; mirror
+ * br_standards_default_mode() so forms prefill correctly and the UI stays
+ * consistent before /me returns the effective value.
+ */
+export const standardsModeDefault = (
+  role: string,
+  testerType: string | null | undefined,
+  feature: StandardsFeature
+): StandardsModeValue => {
+  if (role === "admin") return "optional";
+  if (!isStandardsConfigurable(role, testerType)) return "hidden";
+  if (feature === "codo" && role !== "creator") return "required";
+  return "optional";
+};
+
+/** Effective mode for a user; the backend value wins when present. */
+export const getStandardsMode = (user: StandardsUser, feature: StandardsFeature): StandardsModeValue => {
+  if (!user || !canAccessCodoStandards(user)) return "hidden";
+  const role = getEffectiveRole(user);
+  const stored = feature === "codo" ? user.codo_rules_mode : user.cursor_tips_mode;
+  if (stored === "required" || stored === "optional" || stored === "hidden") return stored;
+  return standardsModeDefault(role, user.tester_type, feature);
+};
+
+/** Page + nav visibility for CODO Rules / Cursor Tips. The backend remains the authority. */
+export const canViewStandards = (user: StandardsUser, feature: StandardsFeature): boolean =>
+  getStandardsMode(user, feature) !== "hidden";
+
+export const STANDARDS_MODE_OPTIONS = [
+  {
+    value: "required",
+    label: "Required",
+    description: "Must acknowledge every item before using the dashboard.",
+  },
+  {
+    value: "optional",
+    label: "Optional",
+    description: "Can read the page. No acknowledgement is asked.",
+  },
+  {
+    value: "hidden",
+    label: "Hidden",
+    description: "Page and menu link are removed for this user.",
+  },
+] as const;
+
+export const getStandardsModeLabel = (mode: string | null | undefined): string =>
+  mode === "required" ? "Required" : mode === "hidden" ? "Hidden" : "Optional";
+
 /**
  * Why: some login flows return a user without tester_type; until AuthContext
  * hydrates it from /me, a tester's workforce access is unknown (not denied).

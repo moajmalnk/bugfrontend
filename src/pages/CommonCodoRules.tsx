@@ -40,7 +40,9 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { toast } from '@/components/ui/use-toast';
 import { useAuth } from '@/context/AuthContext';
-import { cn, getEffectiveRole, hasPermissionOrAdmin } from '@/lib/utils';
+import { canViewStandards, cn, getEffectiveRole, hasPermissionOrAdmin } from '@/lib/utils';
+import { StandardsUnavailable } from '@/components/standards/StandardsUnavailable';
+import { isStandardsDeniedError } from '@/lib/standardsErrors';
 import { usePermissions } from '@/hooks/usePermissions';
 import {
   Collapsible,
@@ -224,6 +226,9 @@ export default function CommonCodoRules() {
     project: 0,
   });
   const [loading, setLoading] = useState(true);
+  const [serverDenied, setServerDenied] = useState(false);
+  const modeAllowsView = canViewStandards(currentUser, 'codo');
+  const standardsAvailable = modeAllowsView && !serverDenied;
   const [search, setSearch] = useState('');
   const [phaseFilter, setPhaseFilter] = useState<AnalyticsPhaseFilter>('all');
   const [healthFilter, setHealthFilter] = useState<AnalyticsHealthFilter>('all');
@@ -257,13 +262,19 @@ export default function CommonCodoRules() {
   const [isMobileTabSelectorOpen, setIsMobileTabSelectorOpen] = useState(false);
 
   const load = useCallback(async () => {
-    if (!canAccess) return;
+    if (!canAccess || !modeAllowsView) return;
     setLoading(true);
     try {
       const data = await listCodoRules();
       setRules(data.rules);
       setCounts(data.counts);
+      setServerDenied(false);
     } catch (e) {
+      if (isStandardsDeniedError(e)) {
+        setServerDenied(true);
+        setRules([]);
+        return;
+      }
       toast({
         title: 'Failed to load CODO rules',
         description: e instanceof Error ? e.message : 'Please try again',
@@ -273,7 +284,7 @@ export default function CommonCodoRules() {
     } finally {
       setLoading(false);
     }
-  }, [canAccess]);
+  }, [canAccess, modeAllowsView]);
 
   const handleRespond = async (rule: CodoCommonRule, status: CodoAckStatus) => {
     if (acknowledgingId === rule.id) return;
@@ -665,6 +676,10 @@ export default function CommonCodoRules() {
     }
   };
 
+
+  if (canAccess && !standardsAvailable) {
+    return <StandardsUnavailable feature="CODO Rules" />;
+  }
 
   if (!canAccess) {
     return (

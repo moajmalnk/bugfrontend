@@ -11,7 +11,7 @@ import { ImpersonateIndicator } from "@/components/ui/ImpersonateBanner";
 import { GlobalSearchProvider, useGlobalSearchModal } from "@/context/GlobalSearchContext";
 import { GlobalSearchDialog } from "@/components/search/GlobalSearchDialog";
 import { AdminActiveUsersStrip } from "@/components/users/AdminActiveUsersStrip";
-import CodoAcknowledgementGate from "@/components/codo/CodoAcknowledgementGate";
+import StandardsGates from "@/components/standards/StandardsGates";
 import { WorkspaceLaunchSkeleton } from "@/components/onboarding/WorkspaceLaunchSkeleton";
 
 // Non-critical widgets: loaded in separate chunks so they never block first paint.
@@ -276,7 +276,7 @@ export const MainLayout = ({ children }: MainLayoutProps) => {
         </div>
       </div>
       <GlobalSearchDialog />
-      <CodoAcknowledgementGate />
+      <StandardsGates />
       <Suspense fallback={null}>
         <FirebaseListener />
         <OnboardingGuard />

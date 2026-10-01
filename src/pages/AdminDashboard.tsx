@@ -95,6 +95,7 @@ import {
   Rocket,
   Timer,
   Users,
+  UsersRound,
   type LucideIcon,
 } from "lucide-react";
 import { useMemo, useState, type ReactNode } from "react";
@@ -451,6 +452,11 @@ async function loadDashboardData() {
   };
 
   const activeUsers = users.filter((u) => u.account_active !== 0);
+  const userTotals = {
+    total: users.length,
+    active: activeUsers.length,
+    inactive: users.length - activeUsers.length,
+  };
   const trackableUsers = activeUsers.filter(
     (u) => (u.role === "developer" || u.role === "tester") && isWorkforceUser(u)
   );
@@ -475,6 +481,7 @@ async function loadDashboardData() {
     checkedIn,
     onlineNow,
     notCheckedIn,
+    userTotals,
     trackableCount: trackableProjects.length,
     updates: recentUpdates,
     updateStatusCounts,
@@ -2071,6 +2078,16 @@ export default function AdminDashboard() {
           valueClass: "text-cyan-700 dark:text-cyan-300",
           tab: "team" as DashboardTab,
         },
+        {
+          title: "Total users",
+          value: data.userTotals.total,
+          hint: `${data.userTotals.active.toLocaleString()} active · ${data.userTotals.inactive.toLocaleString()} inactive`,
+          icon: UsersRound,
+          gradient: "from-slate-500 to-gray-700",
+          chip: "from-slate-50 to-gray-50 dark:from-slate-950/30 dark:to-gray-950/30 border-slate-200 dark:border-slate-800",
+          valueClass: "text-slate-700 dark:text-slate-200",
+          href: `/${role}/users`,
+        },
       ]
     : [];
 
@@ -2117,8 +2134,8 @@ export default function AdminDashboard() {
 
         {isLoading ? (
           <div className="space-y-6">
-            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-7 gap-3 sm:gap-4">
-              {Array.from({ length: 7 }).map((_, i) => (
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 2xl:grid-cols-8 gap-3 sm:gap-4">
+              {Array.from({ length: 8 }).map((_, i) => (
                 <div
                   key={i}
                   className="rounded-2xl border border-gray-200/50 dark:border-gray-700/50 bg-white/80 dark:bg-gray-900/80 p-4 space-y-3"
@@ -2146,17 +2163,14 @@ export default function AdminDashboard() {
         ) : (
           <>
             {/* KPI cards */}
-            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-7 gap-3 sm:gap-4">
-              {kpiCards.map((card) => (
-                <button
-                  key={card.title}
-                  type="button"
-                  onClick={() => setActiveTab(card.tab)}
-                  className={cn(
-                    "group relative overflow-hidden rounded-2xl border bg-gradient-to-br p-4 sm:p-5 shadow-sm transition-all duration-300 hover:shadow-lg hover:-translate-y-0.5 text-left w-full min-w-0",
-                    card.chip
-                  )}
-                >
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 2xl:grid-cols-8 gap-3 sm:gap-4">
+              {kpiCards.map((card) => {
+                const cardClass = cn(
+                  "group relative overflow-hidden rounded-2xl border bg-gradient-to-br p-4 sm:p-5 shadow-sm transition-all duration-300 hover:shadow-lg hover:-translate-y-0.5 text-left w-full min-w-0",
+                  card.chip
+                );
+                const body = (
+                  <>
                   <div className="flex items-start justify-between gap-2 mb-3">
                     <span className="text-[10px] sm:text-[11px] font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400 leading-snug line-clamp-2 min-w-0">
                       {card.title}
@@ -2169,8 +2183,23 @@ export default function AdminDashboard() {
                     {typeof card.value === "number" ? card.value.toLocaleString() : card.value}
                   </p>
                   <p className="text-xs text-muted-foreground mt-1.5 line-clamp-1 font-medium">{card.hint}</p>
-                </button>
-              ))}
+                  </>
+                );
+                return "href" in card && card.href ? (
+                  <Link key={card.title} to={card.href} className={cardClass}>
+                    {body}
+                  </Link>
+                ) : (
+                  <button
+                    key={card.title}
+                    type="button"
+                    onClick={() => "tab" in card && card.tab && setActiveTab(card.tab)}
+                    className={cardClass}
+                  >
+                    {body}
+                  </button>
+                );
+              })}
             </div>
 
             <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6 sm:space-y-8">

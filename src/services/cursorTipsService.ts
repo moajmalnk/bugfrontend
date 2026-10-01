@@ -132,3 +132,40 @@ export async function deleteCursorTip(id: number): Promise<void> {
   });
   await parseJson(res);
 }
+
+export type CursorTipAckStatus = 'acknowledged' | 'doubt' | 'not_required';
+
+/**
+ * Tips the signed-in user still has to answer. Answers `required: false`
+ * unless an admin set this user's Cursor Tips access to Required.
+ */
+export async function fetchPendingCursorTipAcknowledgements(): Promise<{
+  required: boolean;
+  total_pending: number;
+  tips: CursorTip[];
+}> {
+  const res = await fetch(`${API}/pending.php`, {
+    headers: authHeaders(),
+    cache: 'no-store',
+  });
+  const data = await parseJson(res);
+  const tips: CursorTip[] = Array.isArray(data?.data?.tips) ? data.data.tips : [];
+  return {
+    required: Boolean(data?.data?.required),
+    total_pending: Number(data?.data?.total_pending ?? tips.length),
+    tips,
+  };
+}
+
+export async function acknowledgeCursorTip(
+  tipId: number,
+  status: CursorTipAckStatus = 'acknowledged'
+): Promise<{ tip_id: number; status: CursorTipAckStatus; acknowledged_at: string }> {
+  const res = await fetch(`${API}/acknowledge.php`, {
+    method: 'POST',
+    headers: authHeaders(),
+    body: JSON.stringify({ tip_id: tipId, status }),
+  });
+  const data = await parseJson(res);
+  return data.data;
+}

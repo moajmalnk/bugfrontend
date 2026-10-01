@@ -828,6 +828,18 @@ function ContactAvailabilityHint({ state }: { state: ContactAvailability }) {
   return null;
 }
 
+/**
+ * Why: Dirty checks must compare File fields by identity metadata — File objects
+ * serialize to {} and would make every attachment change look "clean".
+ */
+function formSignature(form: OnboardingFormState): string {
+  return JSON.stringify(form, (_key, value) =>
+    value instanceof File
+      ? `file:${value.name}:${value.size}:${value.lastModified}`
+      : value
+  );
+}
+
 export function OnboardingWizard({
   open,
   userId,
@@ -842,6 +854,17 @@ export function OnboardingWizard({
   onCompleted,
 }: OnboardingWizardProps) {
   const canCloseWizard = editMode || adminMode;
+  /**
+   * Why: Admin and edit drafts must not collide with the employee's own first-time
+   * draft (keyed by bare userId) on a shared browser.
+   */
+  const draftStoreKey = !userId
+    ? ""
+    : adminMode
+      ? `admin_${userId}`
+      : editMode
+        ? `edit_${userId}`
+        : userId;
   const skipEmployeeOtp = adminMode;
   const requirePassword = mustSetPassword && !editMode && !adminMode;
   const urlParam =
@@ -930,6 +953,12 @@ export function OnboardingWizard({
   const ifscAbortRef = useRef<AbortController | null>(null);
   const ifscTimerRef = useRef<number | null>(null);
   const skipUrlSync = useRef(false);
+  /** Signature of the server-loaded form; edit/admin drafts are only kept while the form differs. */
+  const baselineSigRef = useRef<string | null>(null);
+  const hasDraftRef = useRef(false);
+  /** Blocks a pending autosave from re-writing a draft the user just discarded or submitted. */
+  const draftDiscardRef = useRef(false);
+  const restoreNoticeRef = useRef<string | null>(null);
   const [perms, setPerms] = useState<{
     location: PermStatus;
     mic: PermStatus;
@@ -1002,6 +1031,7 @@ export function OnboardingWizard({
     setMailOtpSent(false);
     setMailOtp("");
     setHydrated(false);
+    draftDiscardRef.current = false;
     let cancelled = false;
     (async () => {
       const withProfileDefaults = (base: OnboardingFormState): OnboardingFormState => ({
@@ -1019,7 +1049,8 @@ export function OnboardingWizard({
           employeePhone.replace(/\D/g, "").slice(-10),
       });
 
-      // Why: Admin fill/edit loads the employee's saved row (no local draft, no OTP).
+      // Why: Admin fill/edit loads the employee's saved row, then layers any unsaved
+      // tab-scoped draft on top so a refresh mid-wizard keeps what was typed.
       if (editMode || adminMode) {
         try {
           const data = await onboardingService.get(userId);
@@ -1028,6 +1059,7 @@ export function OnboardingWizard({
           setHasExistingAadhaar(!!(details?.has_aadhaar_file || details?.aadhaar_file_path));
           setHasExistingPan(!!(details?.has_pan_file || details?.pan_file_path));
           setExistingAvatarUrl(resolveExistingAvatar(data?.user?.avatar));
+          let baseForm: OnboardingFormState;
           if (details) {
             const mapped = withProfileDefaults(
               mapDetailsToForm(details, {
@@ -1039,7 +1071,7 @@ export function OnboardingWizard({
                 trustSavedContacts: true,
               })
             );
-            setForm(mapped);
+            baseForm = mapped;
             if (mapped.emergency_contact_verified) {
               setVerifiedEmgBaseline(mapped.emergency_contact.replace(/\D/g, "").slice(-10));
               setVerifiedEmgBaselineAt(mapped.emergency_contact_verified_at);
@@ -1049,14 +1081,32 @@ export function OnboardingWizard({
               setVerifiedMailBaselineAt(mapped.contact_email_verified_at);
             }
           } else {
-            setForm(withProfileDefaults(INITIAL));
+            baseForm = withProfileDefaults(INITIAL);
+          }
+          const draft = draftStoreKey
+            ? await loadOnboardingDraft(draftStoreKey, INITIAL)
+            : null;
+          if (cancelled) return;
+          baselineSigRef.current = formSignature(baseForm);
+          hasDraftRef.current = !!draft;
+          const restored = draft
+            ? withProfileDefaults({ ...INITIAL, ...draft.form } as OnboardingFormState)
+            : null;
+          setForm(restored ?? baseForm);
+          if (restored && restoreNoticeRef.current !== draftStoreKey) {
+            restoreNoticeRef.current = draftStoreKey;
+            toast({
+              title: "Unsaved changes restored",
+              description: "Picked up where you left off. Cancel discards them.",
+            });
           }
           const urlSlug = searchParams.get(urlParam);
-          const nextStep = urlSlug ? slugToStep(urlSlug) : 0;
+          const nextStep = urlSlug ? slugToStep(urlSlug) : (draft?.step ?? 0);
           setStep(nextStep);
           syncStepToUrl(nextStep, true);
         } catch {
           if (cancelled) return;
+          baselineSigRef.current = formSignature(withProfileDefaults(INITIAL));
           setForm(withProfileDefaults(INITIAL));
           setStep(0);
           syncStepToUrl(0, true);
@@ -1101,12 +1151,31 @@ export function OnboardingWizard({
 
   const closeWizard = useCallback(() => {
     if (!canCloseWizard || loading) return;
+    const dirty =
+      hydrated &&
+      baselineSigRef.current !== null &&
+      formSignature(form) !== baselineSigRef.current;
+    if (dirty && !window.confirm("Discard unsaved onboarding changes?")) return;
+    draftDiscardRef.current = true;
+    hasDraftRef.current = false;
+    restoreNoticeRef.current = null;
+    if (draftStoreKey) void clearOnboardingDraft(draftStoreKey);
     // Why: Parent derives open from the step query — clearing the param closes the modal.
     const cleaned = new URLSearchParams(searchParams);
     cleaned.delete(urlParam);
     setSearchParams(cleaned, { replace: true });
     onOpenChange?.(false);
-  }, [canCloseWizard, loading, searchParams, setSearchParams, onOpenChange, urlParam]);
+  }, [
+    canCloseWizard,
+    loading,
+    hydrated,
+    form,
+    draftStoreKey,
+    searchParams,
+    setSearchParams,
+    onOpenChange,
+    urlParam,
+  ]);
   // Browser back/forward within onboarding steps
   useEffect(() => {
     if (!open || !hydrated) return;
@@ -1129,14 +1198,29 @@ export function OnboardingWizard({
     if (urlStep !== step) setStep(urlStep);
   }, [open, hydrated, searchParams, step, syncStepToUrl, canCloseWizard, onOpenChange, urlParam]);
 
-  // Persist quietly when files / key fields change after hydrate (first-time only)
+  // Persist quietly when files / key fields change after hydrate
   useEffect(() => {
-    if (!open || !hydrated || !userId || editMode || adminMode) return;
+    if (!open || !hydrated || !userId || !draftStoreKey) return;
     const t = window.setTimeout(() => {
-      void saveOnboardingDraft(userId, step, form);
+      if (!canCloseWizard) {
+        void saveOnboardingDraft(userId, step, form);
+        return;
+      }
+      if (draftDiscardRef.current) return;
+      // Why: Edit/admin only keep a draft while it differs from the server row, so an
+      // untouched open never shadows newer data saved elsewhere.
+      if (formSignature(form) === baselineSigRef.current) {
+        if (hasDraftRef.current) {
+          hasDraftRef.current = false;
+          void clearOnboardingDraft(draftStoreKey);
+        }
+        return;
+      }
+      hasDraftRef.current = true;
+      void saveOnboardingDraft(draftStoreKey, step, form);
     }, 400);
     return () => window.clearTimeout(t);
-  }, [form, step, open, hydrated, userId, editMode, adminMode]);
+  }, [form, step, open, hydrated, userId, draftStoreKey, canCloseWizard]);
 
   const setField = useCallback(<K extends keyof OnboardingFormState>(key: K, value: OnboardingFormState[K]) => {
     setForm((prev) => ({ ...prev, [key]: value }));
@@ -1891,7 +1975,7 @@ export function OnboardingWizard({
 
   // Prefill status when opening the permissions step (no prompts).
   useEffect(() => {
-    if (step !== 3 || typeof window === "undefined") return;
+    if (step !== 3 || adminMode || typeof window === "undefined") return;
 
     const sync = async () => {
       let notifications: PermStatus = "idle";
@@ -1934,7 +2018,7 @@ export function OnboardingWizard({
     };
 
     void sync();
-  }, [step]);
+  }, [step, adminMode]);
 
   // Why: First-time setup also links Google for Docs, Sheets, and Meet (employee session only).
   const refreshGoogleConnection = useCallback(async () => {
@@ -2134,6 +2218,10 @@ export function OnboardingWizard({
         const result = await onboardingService.submit(payload, {
           forUserId: adminMode ? userId : undefined,
         });
+        draftDiscardRef.current = true;
+        hasDraftRef.current = false;
+        restoreNoticeRef.current = null;
+        if (draftStoreKey) void clearOnboardingDraft(draftStoreKey);
         setForm(INITIAL);
         setPassword("");
         setConfirmPassword("");
@@ -2271,10 +2359,13 @@ export function OnboardingWizard({
               e.preventDefault();
               return;
             }
-            if (!canCloseWizard) e.preventDefault();
+            // Why: Toasts, permission prompts and stray clicks must never dismiss a
+            // multi-step form — close only via X, Cancel or Esc (with unsaved warning).
+            e.preventDefault();
           }}
           onEscapeKeyDown={(e) => {
-            if (!canCloseWizard) e.preventDefault();
+            e.preventDefault();
+            if (canCloseWizard) closeWizard();
           }}
         >
           <DialogHeader className="relative shrink-0 px-4 sm:px-8 pt-4 sm:pt-7 pb-3 sm:pb-5 border-b border-border/50 text-left space-y-0 overflow-hidden">
@@ -3338,6 +3429,44 @@ export function OnboardingWizard({
 
             {step === 3 && (
               <div className="grid grid-cols-12 gap-4 sm:gap-5">
+                {adminMode ? (
+                  <div className="col-span-12">
+                    <div className="rounded-2xl border border-border/60 bg-card/80 p-5 sm:p-6">
+                      <div className="flex flex-col gap-4">
+                        <div className="space-y-1">
+                          <h2 className="text-lg font-semibold tracking-tight text-foreground">
+                            Device access — nothing to do here
+                          </h2>
+                          <p className="text-sm text-muted-foreground leading-relaxed">
+                            Location, microphone and notifications belong to the employee&apos;s own
+                            device. BugRicer asks them on their login — your browser is not prompted.
+                            Continue to the next step.
+                          </p>
+                        </div>
+                        <div className="grid grid-cols-12 gap-3">
+                          {[
+                            { icon: MapPin, label: "Location", hint: "Check-ins & WFH" },
+                            { icon: Mic, label: "Microphone", hint: "Voice notes" },
+                            { icon: Bell, label: "Notifications", hint: "Alerts" },
+                          ].map(({ icon: Icon, label, hint }) => (
+                            <div
+                              key={label}
+                              className="col-span-12 sm:col-span-4 flex items-center gap-3 rounded-xl border border-border/60 bg-muted/30 px-3 py-2.5 min-w-0"
+                            >
+                              <Icon className="h-4 w-4 shrink-0 text-muted-foreground" />
+                              <div className="min-w-0">
+                                <p className="text-sm font-medium text-foreground truncate">{label}</p>
+                                <p className="text-xs text-muted-foreground truncate">
+                                  Employee grants · {hint}
+                                </p>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                ) : (
                 <div className="col-span-12">
                   <div className="rounded-2xl border border-border/60 bg-gradient-to-b from-primary/[0.07] via-card/80 to-card/80 p-6 sm:p-8">
                     <div className="flex flex-col items-center text-center gap-5 max-w-lg mx-auto">
@@ -3409,6 +3538,7 @@ export function OnboardingWizard({
                     </div>
                   </div>
                 </div>
+                )}
 
                 <div className="col-span-12">
                   <div className="rounded-2xl border border-border/60 bg-card/80 p-5 sm:p-6">
