@@ -1,6 +1,7 @@
 import { Link } from "react-router-dom";
 import {
   Bug,
+  CalendarClock,
   ListTodo,
   Plug,
   Rocket,
@@ -19,6 +20,7 @@ const ICON_MAP: Record<string, LucideIcon> = {
   Bug,
   Users,
   ListTodo,
+  CalendarClock,
   Plug,
   Shield,
 };

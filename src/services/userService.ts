@@ -1,10 +1,33 @@
 import { ENV } from '@/lib/env';
 import { resolveAvatarUrl } from '@/lib/avatarUrl';
 import { sortUsersActiveFirst } from '@/lib/utils/userSort';
-import { User, UserRole } from '@/types';
+import { TesterType, User, UserRole } from '@/types';
 import axios from 'axios';
 
 export const BIRTHDAY_WISH_MAX_LENGTH = 280;
+
+/**
+ * Why: work_stats.php runs dozens of queries per call and the hosting account caps
+ * concurrent MySQL connections (~20). The Users grid mounts one stats card per user,
+ * so unbounded parallel calls starve every other endpoint (users, projects,
+ * announcements) and they 500 at random. Cap in-flight work_stats calls per tab.
+ */
+const WORK_STATS_MAX_IN_FLIGHT = 3;
+let workStatsInFlight = 0;
+const workStatsWaiters: Array<() => void> = [];
+
+async function withWorkStatsSlot<T>(task: () => Promise<T>): Promise<T> {
+  if (workStatsInFlight >= WORK_STATS_MAX_IN_FLIGHT) {
+    await new Promise<void>((resolve) => workStatsWaiters.push(resolve));
+  }
+  workStatsInFlight += 1;
+  try {
+    return await task();
+  } finally {
+    workStatsInFlight -= 1;
+    workStatsWaiters.shift()?.();
+  }
+}
 
 export interface BirthdayWish {
   id: string;
@@ -120,6 +143,7 @@ interface NewUserData {
   phone?: string;
   password?: string;
   role: UserRole;
+  tester_type?: TesterType | null;
   joining_date?: string | null;
 }
 
@@ -129,6 +153,7 @@ interface UpdateUserData {
   phone?: string;
   role?: UserRole;
   role_id?: number;
+  tester_type?: TesterType | null;
   account_active?: boolean | number;
   joining_date?: string | null;
   employee_code?: string | null;
@@ -608,7 +633,9 @@ class UserService {
     const params = new URLSearchParams({ id: userId });
     if (opts?.full) params.set('full', '1');
     if (opts?.months && opts.months > 0) params.set('months', String(opts.months));
-    const response = await this.fetchWithAuth(`${ENV.API_URL}/users/work_stats.php?${params.toString()}`);
+    const response = await withWorkStatsSlot(() =>
+      this.fetchWithAuth(`${ENV.API_URL}/users/work_stats.php?${params.toString()}`)
+    );
     if (!response.success) {
       throw new Error(response.message || 'Failed to fetch work statistics');
     }
@@ -616,7 +643,9 @@ class UserService {
   }
 
   async getPeriodDetails(userId: string, periodStart: string, periodEnd: string): Promise<any> {
-    const response = await this.fetchWithAuth(`${ENV.API_URL}/users/work_stats.php?id=${userId}&period_start=${periodStart}&period_end=${periodEnd}`);
+    const response = await withWorkStatsSlot(() =>
+      this.fetchWithAuth(`${ENV.API_URL}/users/work_stats.php?id=${userId}&period_start=${periodStart}&period_end=${periodEnd}`)
+    );
     if (!response.success) {
       throw new Error(response.message || 'Failed to fetch period details');
     }

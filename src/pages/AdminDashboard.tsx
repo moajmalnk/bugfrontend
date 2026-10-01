@@ -43,7 +43,7 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useAuth } from "@/context/AuthContext";
 import { toLocalCalendarDateString } from "@/lib/dateUtils";
-import { cn, getEffectiveRole, hasPermissionOrAdmin } from "@/lib/utils";
+import { cn, getEffectiveRole, hasPermissionOrAdmin, isWorkforceUser } from "@/lib/utils";
 import { usePermissions } from "@/hooks/usePermissions";
 import {
   formatProjectDate,
@@ -452,7 +452,7 @@ async function loadDashboardData() {
 
   const activeUsers = users.filter((u) => u.account_active !== 0);
   const trackableUsers = activeUsers.filter(
-    (u) => u.role === "developer" || u.role === "tester"
+    (u) => (u.role === "developer" || u.role === "tester") && isWorkforceUser(u)
   );
   const checkedIn = activeUsers.filter((u) => u.checked_in_today);
   const onlineNow = activeUsers.filter((u) => u.status === "active" || u.status === "idle");

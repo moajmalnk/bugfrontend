@@ -162,11 +162,12 @@ export function UserWorkStats({
 
   const fetchStats = useCallback(
     async (full = false) => {
-      const data = await userService.getUserWorkStats(userId, full ? { full: true } : undefined);
+      const opts = full ? { full: true } : compact ? { months: 1 } : undefined;
+      const data = await userService.getUserWorkStats(userId, opts);
       setStats(data);
       return data as WorkStats;
     },
-    [userId]
+    [userId, compact]
   );
 
   useEffect(() => {

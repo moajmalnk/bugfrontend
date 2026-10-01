@@ -27,7 +27,7 @@ import {
   type OfficialLeaveGroup,
 } from '@/services/leaveService';
 import { userService } from '@/services/userService';
-import { getEffectiveRole, hasPermissionOrAdmin } from '@/lib/utils';
+import { getEffectiveRole, hasPermissionOrAdmin, isWorkforceUser } from '@/lib/utils';
 import { usePermissions } from '@/hooks/usePermissions';
 import { formatDay, formatDayShort } from '@/pages/adminAttendanceShared';
 import type { User } from '@/types';
@@ -105,7 +105,7 @@ export default function AdminOfficialLeave() {
                 u.account_active === undefined || u.account_active === null
                   ? true
                   : Number(u.account_active) === 1;
-              return active;
+              return active && isWorkforceUser(u);
             })
           );
         }

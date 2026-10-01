@@ -9,6 +9,9 @@ import { developerGuideArticles } from "./articles/developer-guides";
 import { adminGuideArticles } from "./articles/admin-guides";
 import { sharedFeatureArticles } from "./articles/shared-features";
 import { creatorGuideArticles } from "./articles/creator-guides";
+import { peopleHrArticles } from "./articles/people-hr";
+import { workToolsArticles } from "./articles/work-tools";
+import { adminOperationsArticles } from "./articles/admin-operations";
 import { articleMatchesRole } from "./searchIndex";
 import type { HelpArticle } from "./types";
 import type { HelpRoleFilter } from "./searchIndex";
@@ -26,6 +29,9 @@ export const ALL_HELP_ARTICLES: HelpArticle[] = [
   ...adminGuideArticles,
   ...creatorGuideArticles,
   ...sharedFeatureArticles,
+  ...peopleHrArticles,
+  ...workToolsArticles,
+  ...adminOperationsArticles,
 ];
 
 export function getArticleById(id: string): HelpArticle | undefined {

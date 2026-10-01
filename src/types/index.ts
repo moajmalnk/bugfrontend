@@ -107,6 +107,9 @@ export type CommonBugsSummary = {
 
 export type UserRole = 'admin' | 'developer' | 'tester' | 'creator';
 
+/** CODO = in-house tester (workforce); client = external reviewer (bug reporting only). */
+export type TesterType = 'codo' | 'client';
+
 export interface Permission {
   id: number;
   permission_key: string;
@@ -132,6 +135,7 @@ export interface User {
   email: string;
   phone?: string;
   role: UserRole;
+  tester_type?: TesterType | null;
   role_id?: number | null;
   /** 1 = active, 0 = deactivated by admin (when column exists) */
   account_active?: number;

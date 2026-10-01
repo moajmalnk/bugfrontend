@@ -588,8 +588,9 @@ const PerformanceReviews = () => {
         <div className="relative overflow-hidden">
           <div className="absolute inset-0 bg-gradient-to-r from-violet-50/50 via-transparent to-indigo-50/50 dark:from-violet-950/20 dark:via-transparent dark:to-indigo-950/20" />
           <div className="relative bg-white/80 dark:bg-gray-900/80 backdrop-blur-sm border border-gray-200/50 dark:border-gray-700/50 rounded-2xl p-4 sm:p-6 md:p-8">
-            <div className="flex flex-col lg:flex-row justify-between lg:items-center gap-4 sm:gap-6 min-w-0">
-              <div className="space-y-3 min-w-0 flex-1">
+            {/* Title column reserves 20rem; actions wrap below instead of squeezing it to zero width. */}
+            <div className="flex flex-wrap items-center justify-between gap-4 sm:gap-6 min-w-0">
+              <div className="space-y-3 min-w-0 flex-1 basis-full sm:basis-[20rem]">
                 <div className="flex items-center gap-3 min-w-0">
                   <div className="p-2 bg-gradient-to-br from-violet-500 to-indigo-600 rounded-xl shadow-lg shrink-0">
                     <ClipboardList className="h-5 w-5 sm:h-6 sm:w-6 text-white" />
@@ -605,11 +606,11 @@ const PerformanceReviews = () => {
                   Conduct monthly reviews for active team members.
                 </p>
               </div>
-              <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 sm:gap-4 shrink-0 w-full lg:w-auto">
+              <div className="flex flex-col sm:flex-row sm:flex-wrap items-stretch sm:items-center gap-3 sm:gap-4 min-w-0 w-full sm:w-auto max-w-full">
                 <Button
                   variant="outline"
                   size="lg"
-                  className="h-12 px-6 rounded-xl font-semibold"
+                  className="h-12 w-full sm:w-auto px-6 rounded-xl font-semibold"
                   onClick={() => navigate(`/${role}/performance-reviews/template`)}
                 >
                   <Settings2 className="mr-2 h-5 w-5" />
@@ -617,13 +618,13 @@ const PerformanceReviews = () => {
                 </Button>
                 <Button
                   size="lg"
-                  className="h-12 px-6 bg-gradient-to-r from-violet-600 to-indigo-700 hover:from-violet-700 hover:to-indigo-800 text-white font-semibold shadow-lg hover:shadow-xl transition-all duration-300 transform hover:scale-105"
+                  className="h-12 w-full sm:w-auto px-6 rounded-xl bg-gradient-to-r from-violet-600 to-indigo-700 hover:from-violet-700 hover:to-indigo-800 text-white font-semibold shadow-lg hover:shadow-xl transition-all duration-300 transform hover:scale-105"
                   onClick={() => navigate(`/${role}/performance-reviews/new`)}
                 >
                   <Plus className="mr-2 h-5 w-5" />
                   Conduct Review
                 </Button>
-                <div className="flex items-center gap-3 px-4 py-3 bg-gradient-to-r from-violet-50 to-indigo-50 dark:from-violet-950/30 dark:to-indigo-950/30 border border-violet-200 dark:border-violet-800 rounded-xl shadow-sm">
+                <div className="flex w-full sm:w-auto items-center justify-center sm:justify-start gap-3 px-4 py-3 bg-gradient-to-r from-violet-50 to-indigo-50 dark:from-violet-950/30 dark:to-indigo-950/30 border border-violet-200 dark:border-violet-800 rounded-xl shadow-sm">
                   <div className="p-1.5 bg-violet-500 rounded-lg">
                     <ClipboardList className="h-5 w-5 text-white" />
                   </div>

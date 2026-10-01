@@ -11,14 +11,14 @@ export const HELP_CATEGORIES: HelpCategory[] = [
   {
     id: "bug-tracking",
     title: "Bug Tracking",
-    description: "Projects, bugs, fixes, updates, compliance, and role workflows",
+    description: "Projects, bugs, retests, fixes, updates, compliance, and role workflows",
     icon: "Bug",
     order: 2,
   },
   {
     id: "collaboration",
     title: "Collaboration",
-    description: "Messaging, meetings, and feedback",
+    description: "Messaging, meetings, BugDates calendar, CODO rules, Shorts, and feedback",
     icon: "Users",
     order: 3,
   },
@@ -30,18 +30,25 @@ export const HELP_CATEGORIES: HelpCategory[] = [
     order: 4,
   },
   {
+    id: "people-hr",
+    title: "People & HR",
+    description: "Leave, attendance, WFH, hours, weekly reports, onboarding, reviews, and recruitment",
+    icon: "CalendarClock",
+    order: 5,
+  },
+  {
     id: "integrations",
     title: "Integrations",
     description: "BugDocs, BugSheets, and WhatsApp",
     icon: "Plug",
-    order: 5,
+    order: 6,
   },
   {
     id: "administration",
     title: "Administration",
-    description: "Users, OT, settings, backups, compliance pipeline, and audit",
+    description: "Users, assets, clients, recycle bin, push coverage, OT, settings, backups, and audit",
     icon: "Shield",
-    order: 6,
+    order: 7,
   },
 ];
 

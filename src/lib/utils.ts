@@ -57,25 +57,75 @@ export const getEffectiveRole = (user: { role?: string; role_id?: number | null 
 };
 
 /**
- * Why: Statutory/banking onboarding wizard is mandatory for developers only.
- * Testers, admins, and custom roles skip the lock-screen wizard.
+ * Why: Statutory/banking onboarding is mandatory for employees — developers and
+ * CODO testers. Client testers, admins, creators and custom roles skip it.
  */
 export const userRequiresOnboarding = (user: {
   role?: string;
   role_id?: number | null;
-} | null | undefined): boolean => getEffectiveRole(user || {}) === "developer";
+  tester_type?: string | null;
+} | null | undefined): boolean => {
+  const role = getEffectiveRole(user || {});
+  if (role === "developer") return true;
+  return role === "tester" && user?.tester_type === "codo";
+};
 
 /**
- * Incomplete mandatory onboarding — only developers are locked into the wizard.
+ * Incomplete mandatory onboarding — employees (developers + CODO testers) are
+ * locked into the wizard. Mirrors backend br_user_requires_onboarding().
  */
 export const userHasPendingOnboarding = (user: {
   role?: string;
   role_id?: number | null;
+  tester_type?: string | null;
   onboarding_completed?: number | null;
 } | null | undefined): boolean =>
   !!user &&
   userRequiresOnboarding(user) &&
   Number(user.onboarding_completed ?? 0) === 0;
+
+/**
+ * Why: Testers are either CODO in-house staff or external client reviewers.
+ * Only workforce users get BugUpdate, check-in/checkout, Weekly Report and
+ * My Leave. Mirrors backend br_user_is_workforce(); missing tester_type is
+ * treated as client (least privilege). The backend remains the authority.
+ */
+export const isWorkforceUser = (user: {
+  role?: string;
+  role_id?: number | null;
+  tester_type?: string | null;
+} | null | undefined): boolean => {
+  if (!user) return false;
+  if (getEffectiveRole(user) !== "tester") return true;
+  return user.tester_type === "codo";
+};
+
+/**
+ * Why: some login flows return a user without tester_type; until AuthContext
+ * hydrates it from /me, a tester's workforce access is unknown (not denied).
+ */
+export const isTesterTypePending = (user: {
+  role?: string;
+  role_id?: number | null;
+  tester_type?: string | null;
+} | null | undefined): boolean =>
+  !!user && getEffectiveRole(user) === "tester" && user.tester_type === undefined;
+
+export const TESTER_TYPE_OPTIONS = [
+  {
+    value: "codo",
+    label: "CODO Tester",
+    description: "In-house team. Gets work updates, check-in, weekly report and leave.",
+  },
+  {
+    value: "client",
+    label: "Client Tester",
+    description: "External client reviewer. Bug reporting and verification only.",
+  },
+] as const;
+
+export const getTesterTypeLabel = (testerType: string | null | undefined): string =>
+  testerType === "codo" ? "CODO Tester" : "Client Tester";
 
 /** Show BugMessage in the main sidebar (after BugUpdate) for admins and developers. */
 export const showBugMessageInMainNav = (role: string | undefined | null): boolean =>

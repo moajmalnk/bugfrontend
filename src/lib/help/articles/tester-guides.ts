@@ -11,7 +11,7 @@ export const testerGuideArticles: HelpArticle[] = [
     roles: ["tester"],
     keywords: ["tester", "workflow", "handbook", "qa", "testing"],
     readMinutes: 10,
-    relatedIds: ["bugs-reporting", "tester-verify-fixes", "fixes-guide", "projects-guide"],
+    relatedIds: ["bugs-reporting", "retests-guide", "tester-verify-fixes", "fixes-guide", "bug-media-tools", "tester-types"],
     sections: [
       {
         id: "overview",
@@ -19,7 +19,7 @@ export const testerGuideArticles: HelpArticle[] = [
         blocks: [
           {
             type: "paragraph",
-            text: "As a Tester on BugRicer, your primary job is to find issues, report them clearly, verify developer fixes, and keep the team informed. Your sidebar includes Projects, Bugs, Fixes, Updates, and Help & Support.",
+            text: "As a Tester on BugRicer, your primary job is to find issues, report them clearly, verify developer fixes, and keep the team informed. Your sidebar includes Projects, Bugs, Retests, Fixes, Updates, and Help & Support. CODO (in-house) Testers also get check-in, BugUpdate, Weekly Report, and My Leave; Client Testers focus on reporting and verification only.",
           },
         ],
       },
@@ -33,7 +33,7 @@ export const testerGuideArticles: HelpArticle[] = [
               "Open Projects → select your assigned project",
               "Review open bugs and any new assignments",
               "Test features and report new bugs (Ctrl+B)",
-              "Check Fixes page for bugs awaiting verification",
+              "Open Retests (or My Retests) and record a verification for each fixed bug",
               "Read Updates for release notes and sprint changes",
               "Respond to notifications about assigned bugs",
             ],
@@ -48,7 +48,7 @@ export const testerGuideArticles: HelpArticle[] = [
             type: "permission-table",
             rows: [
               { role: "Tester", access: "Report bugs", notes: "All assigned projects" },
-              { role: "Tester", access: "Verify fixes", notes: "Mark Fixed → Verified or Reopen" },
+              { role: "Tester", access: "Verify fixes", notes: "Save verification on Retests, or Reopen & move to Bugs" },
               { role: "Tester", access: "Comment on bugs", notes: "Add reproduction notes and screenshots" },
               { role: "Tester", access: "View Updates", notes: "Read-only project announcements" },
               { role: "Tester", access: "Profile & notifications", notes: "Manage your own account" },

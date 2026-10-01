@@ -7,7 +7,7 @@ import { Link } from "react-router-dom";
 /**
  * Why: After onboarding submit, HR still needs to verify docs — surface that
  * clearly without locking the employee out of the dashboard.
- * Only developers go through mandatory onboarding.
+ * Only employees (developers + CODO testers) go through mandatory onboarding.
  */
 export default function OnboardingVerificationBanner() {
   const { currentUser } = useAuth();

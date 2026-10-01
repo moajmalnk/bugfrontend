@@ -11,7 +11,16 @@ export const developerGuideArticles: HelpArticle[] = [
     roles: ["developer"],
     keywords: ["developer", "handbook", "workflow", "dev"],
     readMinutes: 12,
-    relatedIds: ["bugs-workflow", "daily-work-update", "bugtodo-guide", "developer-fixing-bugs"],
+    relatedIds: [
+      "bugs-workflow",
+      "developer-fixing-bugs",
+      "retests-guide",
+      "checkin-attendance",
+      "checkout-hours-breakdown",
+      "daily-work-update",
+      "bugtodo-guide",
+      "my-leave",
+    ],
     sections: [
       {
         id: "overview",
@@ -30,11 +39,12 @@ export const developerGuideArticles: HelpArticle[] = [
           {
             type: "list",
             items: [
-              "Check in via Daily Work Update or BugToDo",
+              "Check in (location or approved WFH)",
               "Review assigned bugs (Bugs → filter by assignee)",
               "Work on fixes and update bug status to In Progress",
-              "Submit fixes with clear descriptions",
-              "Log project hours and tasks before checkout",
+              "Submit fixes with clear descriptions — they move to Retests for a tester",
+              "Check Retests for anything reopened as still broken",
+              "Check out with your project hours breakdown",
               "Submit BugUpdate daily status if required by your team",
             ],
           },
@@ -48,7 +58,10 @@ export const developerGuideArticles: HelpArticle[] = [
             type: "table",
             headers: ["Tool", "Purpose"],
             rows: [
-              ["Bugs / Fixes", "Track and resolve issues"],
+              ["Bugs / Retests / Fixes", "Track, verify, and resolve issues"],
+              ["BugDates", "Holidays, events, leave, and project milestones"],
+              ["My Leave / WFH", "Apply for leave and work from home"],
+              ["Weekly Report", "Weekly summary of your work"],
               ["BugToDo / My Tasks", "Personal and shared task lists"],
               ["Daily Work Update", "Check-in, hours, OT requests"],
               ["BugUpdate", "Daily status narrative"],

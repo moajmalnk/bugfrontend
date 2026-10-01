@@ -9,6 +9,7 @@ import { lazy, Suspense } from "react";
 import { Navigate, Outlet, Route, Routes, useParams, useLocation } from "react-router-dom";
 import { HelpSupportRoute, HelpArticleRoute } from "@/pages/help/HelpRoutes";
 import { getEffectiveRole } from "@/lib/utils";
+import { WorkforceRoute } from "@/components/routes/WorkforceRoute";
 
 const APP_ROLES = new Set(["admin", "developer", "tester", "user", "creator"]);
 
@@ -479,10 +480,12 @@ const RouteConfig = () => {
           <Route path="meet" element={<MeetLobby />} />
           <Route path="meet/:code" element={<MeetRoom />} />
           <Route path="my-tasks" element={<MyTasks />} />
-          <Route path="daily-update" element={<DailyUpdate />} />
-          <Route path="weekly-report" element={<WeeklyReports />} />
-          <Route path="daily-work-update" element={<DailyWorkUpdate />} />
-          <Route path="leave" element={<LeaveRequests />} />
+          <Route element={<WorkforceRoute />}>
+            <Route path="daily-update" element={<DailyUpdate />} />
+            <Route path="weekly-report" element={<WeeklyReports />} />
+            <Route path="daily-work-update" element={<DailyWorkUpdate />} />
+            <Route path="leave" element={<LeaveRequests />} />
+          </Route>
           <Route path="overtime-requests/:userId/add-hours" element={<AdminAddWorkHours />} />
           <Route path="overtime-requests/:userId" element={<AdminOvertimeUserDetail />} />
           <Route path="overtime-requests" element={<AdminOvertimeRequests />} />

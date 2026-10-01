@@ -2528,7 +2528,7 @@ export function OnboardingWizard({
                 <div className="col-span-12 rounded-2xl border border-border/60 bg-muted/20 p-4 sm:p-5 space-y-4">
                   <div className="space-y-1">
                     <p className="text-[11px] uppercase tracking-[0.14em] text-muted-foreground font-medium">
-                      Developer profiles
+                      Professional profiles
                     </p>
                     <p className="text-sm text-muted-foreground leading-relaxed">
                       GitHub and LinkedIn profile links used across BugRicer.
@@ -3252,7 +3252,7 @@ export function OnboardingWizard({
                     </div>
                   </SummarySection>
 
-                  <SummarySection title="Developer profiles">
+                  <SummarySection title="Professional profiles">
                     <div className="col-span-12 sm:col-span-6">
                       <SummaryItem
                         label="GitHub"

@@ -991,7 +991,7 @@ export default function BugCreative() {
         countIcon={<Palette className="h-5 w-5" />}
         countClassName="from-fuchsia-50 to-violet-50 dark:from-fuchsia-950/30 dark:to-violet-950/30 border-fuchsia-200 dark:border-fuchsia-800 text-fuchsia-700 dark:text-fuchsia-300"
         actions={
-          <div className="flex w-full min-w-0 flex-col gap-3 sm:w-auto lg:flex-row lg:items-center">
+          <div className="flex w-full min-w-0 flex-col gap-3 sm:w-auto sm:flex-row sm:flex-wrap sm:items-center">
             <DashboardPeriodFilter
               preset={periodPreset}
               customFrom={customFrom}

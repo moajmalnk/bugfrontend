@@ -98,6 +98,27 @@ const PrivacyPolicy = () => {
               </div>
 
               <div>
+                <h2 className="text-xl font-semibold text-slate-900 dark:text-white mb-3">Google User Data</h2>
+                <p className="text-slate-700 dark:text-slate-300 mb-2">
+                  BugRicer offers optional Google integrations. We only access Google data after you choose to sign in with Google or connect your Google account, and only for the features below.
+                </p>
+                <ul className="list-disc list-inside space-y-2 text-slate-700 dark:text-slate-300">
+                  <li><strong>Sign in with Google (openid, email, profile):</strong> Your Google account ID, email address, name, and profile picture are used to create or sign in to your BugRicer account</li>
+                  <li><strong>Google Docs (documents):</strong> Create and edit BugDocs documents that you start from BugRicer</li>
+                  <li><strong>Google Sheets (spreadsheets):</strong> Create and edit BugSheets spreadsheets that you start from BugRicer</li>
+                  <li><strong>Google Drive (drive.file):</strong> Access only the files BugRicer creates or that you open with BugRicer; we cannot see the rest of your Drive</li>
+                  <li><strong>Google Calendar (calendar):</strong> Create calendar events with Google Meet links when you schedule a BugMeet meeting</li>
+                  <li><strong>Storage:</strong> We store an OAuth refresh token (to keep the integration working) and your Google email on our servers. We do not store the contents of your Google files outside the documents you create through BugRicer</li>
+                  <li><strong>No sharing or selling:</strong> Google user data is never sold, used for advertising, or shared with third parties, except as required by law</li>
+                  <li><strong>Disconnect and deletion:</strong> You can disconnect Google at any time from BugDocs/BugSheets, which deletes the stored tokens. You can also revoke access at <a href="https://myaccount.google.com/permissions" target="_blank" rel="noopener noreferrer" className="text-blue-600 dark:text-blue-400 hover:underline">myaccount.google.com/permissions</a>, or email us to delete all Google-related data</li>
+                </ul>
+                <p className="text-slate-700 dark:text-slate-300 mt-2">
+                  BugRicer's use and transfer to any other app of information received from Google APIs will adhere to the{" "}
+                  <a href="https://developers.google.com/terms/api-services-user-data-policy" target="_blank" rel="noopener noreferrer" className="text-blue-600 dark:text-blue-400 hover:underline">Google API Services User Data Policy</a>, including the Limited Use requirements.
+                </p>
+              </div>
+
+              <div>
                 <h2 className="text-xl font-semibold text-slate-900 dark:text-white mb-3">BugBackup & Data Exports</h2>
                 <p className="text-slate-700 dark:text-slate-300 mb-2">
                   Authorized administrators may create platform backups that can include database dumps, uploaded files, and configuration snapshots. Backup archives may be sent to a designated email address and contain sensitive organizational data.

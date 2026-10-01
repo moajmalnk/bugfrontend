@@ -3,7 +3,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
 import { useAuth } from "@/context/AuthContext";
 import { resolveAvatarUrl } from "@/lib/avatarUrl";
-import { cn, getEffectiveRole, showBugMessageInMainNav } from "@/lib/utils";
+import { cn, getEffectiveRole, isWorkforceUser, showBugMessageInMainNav } from "@/lib/utils";
 import { VerifiedBlueTick, isFullFledgedUser } from "@/components/ui/VerifiedBlueTick";
 import { usePermissions } from "@/hooks/usePermissions";
 import {
@@ -54,10 +54,15 @@ import {
   getHelpRoleFilterForUser,
 } from "@/lib/help";
 
-/** Why: Every sidebar row shows a count, matching Users/Clients. 99+ keeps long labels readable. */
-function formatNavCount(count: number | undefined): string | number {
+/**
+ * Why: Zero hides the badge so empty sections stay quiet and the loading/error
+ * fallback (all zeros) never renders as fake "0" data. 99+ keeps the badge column narrow;
+ * the exact figure stays in the tooltip.
+ */
+function formatNavCount(count: number | undefined): string | undefined {
   const n = Number(count) || 0;
-  return n > 99 ? "99+" : n;
+  if (n <= 0) return undefined;
+  return n > 99 ? "99+" : String(n);
 }
 
 interface SidebarProps {
@@ -76,6 +81,9 @@ export const Sidebar = ({ className, closeSidebar }: SidebarProps) => {
   const isCreator = role === "creator";
   // Why: Bridge legacy ENUM admin until all new permission keys are seeded/granted.
   const can = (key: string) => role === "admin" || hasPermission(key);
+  const isWorkforce = isWorkforceUser(currentUser);
+  // Why: CODO testers keep BugUpdate / Weekly Report / Leave even before migration 115 seeds tester permissions.
+  const isCodoTester = role === "tester" && isWorkforce;
 
   const isActive = (path: string) => {
     if (!role) return false;
@@ -132,13 +140,13 @@ export const Sidebar = ({ className, closeSidebar }: SidebarProps) => {
       <Link
         to={destination}
         onClick={handleClick}
-        className="block"
-        aria-label={badge != null && badge !== "" ? `${label}, ${badge}` : label}
+        className="block min-w-0"
+        aria-label={badge ? `${label}, ${badgeTitle ?? badge}` : label}
       >
         <Button
           variant="ghost"
           className={cn(
-            "w-full justify-start h-10 min-h-10 px-3 py-0 transition-all duration-200 text-sm font-medium group relative",
+            "w-full min-w-0 justify-start gap-0 h-10 min-h-10 rounded-xl px-3 py-0 transition-all duration-200 text-sm font-medium group relative",
             "inline-flex items-center",
             "hover:bg-accent/80 hover:text-accent-foreground",
             "focus:bg-accent focus:text-accent-foreground focus:ring-2 focus:ring-accent/20",
@@ -156,18 +164,19 @@ export const Sidebar = ({ className, closeSidebar }: SidebarProps) => {
             {icon}
           </span>
           <span className="min-w-0 flex-1 truncate text-left leading-none pl-3">{label}</span>
-          {badge != null && badge !== "" && (
+          {badge && (
             <span
               title={badgeTitle}
+              aria-hidden="true"
               className={cn(
-                "ml-1 shrink-0 min-w-5 h-5 px-1.5 text-[11px] font-semibold leading-none rounded-full tabular-nums inline-flex items-center justify-center",
+                "ml-2 shrink-0 min-w-8 h-5 px-1.5 text-[11px] font-semibold leading-none rounded-full tabular-nums inline-flex items-center justify-center transition-colors duration-200",
                 badgeTone === "alert"
                   ? active
-                    ? "bg-amber-500/25 text-amber-950 dark:text-amber-100"
-                    : "bg-amber-500/15 text-amber-800 dark:text-amber-200 group-hover:bg-amber-500/25"
+                    ? "bg-amber-500/25 text-amber-950 ring-1 ring-inset ring-amber-500/40 dark:text-amber-100"
+                    : "bg-amber-500/15 text-amber-800 ring-1 ring-inset ring-amber-500/30 dark:text-amber-200 group-hover:bg-amber-500/25"
                   : active
-                    ? "bg-accent-foreground/20 text-accent-foreground"
-                    : "bg-muted text-muted-foreground group-hover:bg-accent-foreground/20 group-hover:text-accent-foreground"
+                    ? "bg-accent-foreground/15 text-accent-foreground"
+                    : "bg-muted/70 text-muted-foreground group-hover:bg-accent-foreground/15 group-hover:text-accent-foreground"
               )}
             >
               {badge}
@@ -206,7 +215,9 @@ export const Sidebar = ({ className, closeSidebar }: SidebarProps) => {
       </div>
 
       {/* Navigation */}
-      <ScrollArea className="flex-1 px-3">
+      {/* Radix wraps content in a display:table div that grows with nowrap rows and pushes badges past the edge. */}
+      <ScrollArea className="flex-1 px-3 [&_[data-radix-scroll-area-viewport]>div]:!block">
+
         <div className="space-y-6">
           {/* Main Navigation — permission-driven (custom roles use RBAC, not ENUM) */}
           <div className="space-y-1">
@@ -298,7 +309,7 @@ export const Sidebar = ({ className, closeSidebar }: SidebarProps) => {
             />
               </>
             )}
-            {/* Why: Testers focus on bugs/fixes — hide docs/sheets/meet/daily-update/leave from their nav. */}
+            {/* Why: Testers focus on bugs/fixes — hide docs/sheets/meet from their nav. Work items follow isWorkforce. */}
             {role !== "tester" && (can("DOCS_VIEW") || can("DOCS_CREATE")) && (
               <NavLink
                 to="/bugdocs"
@@ -354,8 +365,9 @@ export const Sidebar = ({ className, closeSidebar }: SidebarProps) => {
               />
             )}
 
-            {role !== "tester" &&
-              (can("DAILY_UPDATE_CREATE") ||
+            {isWorkforce &&
+              (isCodoTester ||
+                can("DAILY_UPDATE_CREATE") ||
                 can("DAILY_UPDATE_VIEW") ||
                 can("UPDATES_VIEW") ||
                 can("UPDATES_CREATE")) && (
@@ -368,9 +380,10 @@ export const Sidebar = ({ className, closeSidebar }: SidebarProps) => {
               />
             )}
 
-            {role !== "tester" &&
+            {isWorkforce &&
               (role === "admin" ||
                 role === "developer" ||
+                isCodoTester ||
                 can("DAILY_UPDATE_CREATE") ||
                 can("DAILY_UPDATE_VIEW") ||
                 can("UPDATES_VIEW") ||
@@ -388,8 +401,9 @@ export const Sidebar = ({ className, closeSidebar }: SidebarProps) => {
               />
             )}
 
-            {role !== "tester" &&
-              (can("LEAVE_VIEW") ||
+            {isWorkforce &&
+              (isCodoTester ||
+                can("LEAVE_VIEW") ||
                 role === "developer" ||
                 role === "creator" ||
                 role === "user") && (

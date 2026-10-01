@@ -11,7 +11,17 @@ export const adminGuideArticles: HelpArticle[] = [
     roles: ["admin"],
     keywords: ["admin", "handbook", "governance", "platform"],
     readMinutes: 15,
-    relatedIds: ["users-management", "settings-and-roles", "admin-compliance-pipeline", "bugbackup-guide"],
+    relatedIds: [
+      "users-management",
+      "admin-user-details",
+      "settings-and-roles",
+      "admin-compliance-pipeline",
+      "leave-requests-admin",
+      "attendance-exceptions-admin",
+      "bugassets-guide",
+      "recycle-bin-guide",
+      "bugbackup-guide",
+    ],
     sections: [
       {
         id: "overview",
@@ -19,7 +29,7 @@ export const adminGuideArticles: HelpArticle[] = [
         blocks: [
           {
             type: "paragraph",
-            text: "Admins have full access to BugRicer including the Administration section: Users, OT requests, WhatsApp, BugBackup, Activities, Feedbacks, and Settings. You manage team access, compliance pipelines, announcements, and disaster recovery.",
+            text: "Admins have full access to BugRicer including the Administration section. You manage team access, attendance and leave, compliance pipelines, company assets and clients, announcements, and disaster recovery.",
           },
         ],
       },
@@ -31,13 +41,22 @@ export const adminGuideArticles: HelpArticle[] = [
             type: "table",
             headers: ["Page", "Purpose"],
             rows: [
-              ["Users", "Add, edit, deactivate users; per-user permissions"],
+              ["Users", "Add, edit, deactivate users; tester type; per-user permissions; View as user"],
+              ["Clients", "Client companies, contacts, and notes"],
+              ["BugAssets", "Domains, servers, hosting, hardware, mailboxes, tools, and renewals"],
               ["OT requests", "Approve overtime from Daily Work Update"],
+              ["Leave requests", "Approve or reject leave; Official Leave credits"],
+              ["Attendance", "WFH requests, late check-in exceptions, add or fix hours"],
+              ["Performance Reviews", "Conduct and track employee reviews"],
+              ["Recruitment", "Candidate pipeline"],
               ["WhatsApp", "Send single or bulk WhatsApp messages"],
-              ["BugBackup", "Database, uploads, and config backups"],
-              ["Activities", "Platform-wide audit log"],
               ["Feedbacks", "Rate Us widget submissions and metrics"],
+              ["Activities", "Platform-wide audit log"],
+              ["Push Coverage", "Notification reach per user and channel"],
+              ["Shorts", "Short video library"],
               ["Settings", "General, notifications, announcements, custom roles"],
+              ["BugBackup", "Database, uploads, and config backups"],
+              ["Recycle Bin", "Restore or permanently delete removed items"],
             ],
           },
         ],
@@ -49,7 +68,9 @@ export const adminGuideArticles: HelpArticle[] = [
           {
             type: "list",
             items: [
+              "Clear the amber sidebar badges: compliance, leave, OT, WFH requests, and asset renewals",
               "Review and approve OT requests daily",
+              "Keep BugDates holidays up to date so attendance rules and Official Leave are correct",
               "Monitor Activity log for unusual actions",
               "Publish announcements for team-wide updates",
               "Manage user onboarding and role assignments",

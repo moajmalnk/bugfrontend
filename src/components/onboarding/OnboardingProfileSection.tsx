@@ -1317,7 +1317,7 @@ export function OnboardingProfileSection({
         <CardHeader className="p-4 sm:p-5">
           <div className="flex items-center gap-2">
             <Github className="h-4 w-4 text-primary" />
-            <CardTitle className="text-lg">Developer profiles</CardTitle>
+            <CardTitle className="text-lg">Professional profiles</CardTitle>
           </div>
         </CardHeader>
         <CardContent className="p-4 sm:p-5 pt-0 space-y-4">

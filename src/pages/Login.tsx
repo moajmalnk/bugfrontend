@@ -42,8 +42,6 @@ import {
 } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { GoogleLogin, CredentialResponse } from '@react-oauth/google';
-import { GOOGLE_OAUTH_CONFIG } from '@/config/google-oauth-config';
 import { GoogleSignInButton } from '@/components/GoogleSignInButton';
 import { clearGoogleOAuthCache, handleGoogleOAuthError } from '@/utils/googleOAuthUtils'; 
 import { User as UserType } from "@/types";
@@ -55,6 +53,16 @@ type AuthApiResponse = {
   message?: string;
   token?: string;
   user?: UserType;
+};
+
+/** Reasons sent back by api/auth/google-login-redirect.php as ?google_error=. */
+const GOOGLE_ERROR_MESSAGES: Record<string, string> = {
+  invalid_token: "Google could not verify your sign-in. Please try again.",
+  email_unverified: "Your Google email is not verified.",
+  account_revoked: "This account is no longer active.",
+  csrf_failed: "Sign-in request could not be verified. Please try again.",
+  missing_credential: "No credential was received from Google. Please try again.",
+  server_error: "Failed to sign in with Google. Please try again.",
 };
 
 const Login = () => {
@@ -207,8 +215,74 @@ const Login = () => {
     [loginWithToken]
   );
 
+  /**
+   * Why: Google redirect mode lands here with a single-use code. The request is
+   * deliberately not aborted on effect cleanup: the code is already stripped
+   * from the URL, so cancelling would lose the sign-in under StrictMode remounts.
+   */
+  const handleGoogleCodeExchange = useCallback(
+    async (code: string) => {
+      setIsLoading(true);
+      try {
+        const response = await axios.post<AuthApiResponse>(
+          `${API_BASE_URL}/google-exchange.php`,
+          { code },
+          { timeout: 15_000 }
+        );
+
+        const data = response.data;
+        if (data.success && data.token && data.user) {
+          const { token: jwtToken, user } = data;
+          localStorage.setItem("token", jwtToken);
+
+          await loginWithToken(user, jwtToken);
+
+          setShowSuccess(true);
+          setIsAnimating(true);
+
+          setTimeout(() => {
+            setShowSuccess(false);
+            setIsAnimating(false);
+            navigate(`/${getEffectiveRole(user)}/dashboard`, { replace: true });
+          }, 1500);
+        } else {
+          throw new Error(data.message || "Google Sign-In failed");
+        }
+      } catch (error: unknown) {
+        toast({
+          title: "Google Sign-In Failed",
+          description: extractApiErrorMessage(
+            error,
+            "Failed to sign in with Google. Please try again."
+          ),
+          variant: "destructive",
+        });
+      } finally {
+        setIsLoading(false);
+      }
+    },
+    [loginWithToken, navigate]
+  );
+
   useEffect(() => {
     const urlParams = new URLSearchParams(window.location.search);
+
+    const googleCode = urlParams.get("google_code");
+    const googleError = urlParams.get("google_error");
+    if (googleCode || googleError) {
+      window.history.replaceState({}, document.title, window.location.pathname);
+      if (googleCode) {
+        void handleGoogleCodeExchange(googleCode);
+      } else {
+        toast({
+          title: "Google Sign-In Failed",
+          description: GOOGLE_ERROR_MESSAGES[googleError ?? ""] ?? GOOGLE_ERROR_MESSAGES.server_error,
+          variant: "destructive",
+        });
+      }
+      return;
+    }
+
     const welcomeToken = urlParams.get("welcome_token");
     if (welcomeToken) {
       // Clear immediately so StrictMode / auth updates do not re-consume the invite.
@@ -234,6 +308,7 @@ const Login = () => {
     navigate,
     handleMagicLinkVerification,
     handleWelcomeInviteVerification,
+    handleGoogleCodeExchange,
   ]);
 
   if (isAuthLoading) {
@@ -568,57 +643,6 @@ const Login = () => {
         description: extractApiErrorMessage(
           error,
           "Failed to send magic link. Please try again."
-        ),
-        variant: "destructive",
-      });
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const handleGoogleLogin = async (credentialResponse: CredentialResponse) => {
-    if (!credentialResponse.credential) {
-      toast({
-        title: "Google Sign-In Failed",
-        description: "No credential received from Google",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    setIsLoading(true);
-    try {
-      const response = await axios.post<AuthApiResponse>(`${API_BASE_URL}/google-login.php`, {
-        id_token: credentialResponse.credential
-      });
-      
-      const data = response.data;
-      if (data.success && data.token && data.user) {
-        // Store the token
-        localStorage.setItem("token", data.token);
-        
-        // Update auth context
-        await loginWithToken(data.user, data.token);
-        
-        // Show success animation
-        setShowSuccess(true);
-        setIsAnimating(true);
-        
-        setTimeout(() => {
-          setShowSuccess(false);
-          setIsAnimating(false);
-          // Navigate to the appropriate dashboard based on user role
-          navigate(`/${getEffectiveRole(data.user!)}/dashboard`, { replace: true });
-        }, 1500);
-      } else {
-        throw new Error(data.message || "Google Sign-In failed");
-      }
-    } catch (error: unknown) {
-      toast({
-        title: "Google Sign-In Failed",
-        description: extractApiErrorMessage(
-          error,
-          "Failed to sign in with Google. Please try again."
         ),
         variant: "destructive",
       });
@@ -1221,7 +1245,6 @@ const Login = () => {
                     {/* Google Sign-In Button */}
                     <GoogleSignInButton
                       variant="icon"
-                      onSuccess={handleGoogleLogin}
                       onError={(error) => {
                         console.error('Google OAuth Error:', error);
                         

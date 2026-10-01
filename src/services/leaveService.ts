@@ -1,4 +1,5 @@
 import { ENV } from '@/lib/env';
+import { notifyIfWorkforceDenied } from '@/lib/apiError';
 
 export type LeaveStatus = 'pending' | 'approved' | 'rejected' | 'cancelled';
 
@@ -99,6 +100,7 @@ function authHeaders(): HeadersInit {
 
 async function parseJson(res: Response) {
   const data = await res.json().catch(() => ({}));
+  notifyIfWorkforceDenied(res.status, data);
   if (!res.ok || data?.success === false) {
     throw new Error(data?.message || `Request failed (${res.status})`);
   }

@@ -171,6 +171,11 @@ async function handleResponseError(error: {
   ) {
     window.dispatchEvent(new CustomEvent("auth:revoked"));
   }
+  const reason = (error.response?.data as { data?: { reason?: string } } | undefined)
+    ?.data?.reason;
+  if (status === 403 && reason === "client_tester") {
+    window.dispatchEvent(new CustomEvent("auth:workforce-denied"));
+  }
 
   return Promise.reject(error);
 }

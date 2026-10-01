@@ -40,7 +40,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Switch } from '@/components/ui/switch';
 import { toast } from '@/components/ui/use-toast';
 import { useAuth } from '@/context/AuthContext';
-import { cn, getEffectiveRole, hasPermissionOrAdmin } from '@/lib/utils';
+import { cn, getEffectiveRole, hasPermissionOrAdmin, isWorkforceUser } from '@/lib/utils';
 import { isWorkforceRosterRole, WORKFORCE_ROLE_FILTER_OPTIONS } from '@/lib/roleBadge';
 import { usePermissions } from '@/hooks/usePermissions';
 import {
@@ -113,7 +113,7 @@ export default function AdminAttendanceExceptions() {
       setData(payload);
       setPendingWfh(Array.isArray(wfhPayload.pending) ? wfhPayload.pending : []);
       const staff = (userList || [])
-        .filter((u) => isWorkforceRosterRole(u.role) && isAccountActive(u))
+        .filter((u) => isWorkforceRosterRole(u.role) && isWorkforceUser(u) && isAccountActive(u))
         .sort(compareUsersByActivityThenHours);
       setUsers(staff);
       setGrantUserId((prev) => {

@@ -41,8 +41,13 @@ interface SearchCache {
 let sessionCache: SearchCache | null = null;
 let sessionCacheKey = "";
 
-function buildCacheKey(role: string, userId: string, permissions: string[]): string {
-  return `${SEARCH_INDEX_VERSION}:${role}:${userId}:${permissions.sort().join(",")}`;
+function buildCacheKey(
+  role: string,
+  userId: string,
+  permissions: string[],
+  isWorkforce: boolean
+): string {
+  return `${SEARCH_INDEX_VERSION}:${role}:${userId}:${isWorkforce ? "wf" : "nowf"}:${[...permissions].sort().join(",")}`;
 }
 
 interface UseGlobalSearchOptions {
@@ -52,6 +57,8 @@ interface UseGlobalSearchOptions {
   userId?: string;
   permissions: string[];
   enabled: boolean;
+  /** CODO workforce (non-testers + CODO testers); hides work pages for client testers. */
+  isWorkforce?: boolean;
 }
 
 export function useGlobalSearch({
@@ -61,6 +68,7 @@ export function useGlobalSearch({
   userId,
   permissions,
   enabled,
+  isWorkforce = role !== "tester",
 }: UseGlobalSearchOptions) {
   const [loading, setLoading] = useState(false);
   const [cache, setCache] = useState<SearchCache | null>(
@@ -74,7 +82,7 @@ export function useGlobalSearch({
   );
 
   const loadData = useCallback(async () => {
-    const key = buildCacheKey(role, userId ?? "", permissions);
+    const key = buildCacheKey(role, userId ?? "", permissions, isWorkforce);
     if (sessionCache && sessionCacheKey === key) {
       setCache(sessionCache);
       return;
@@ -82,7 +90,7 @@ export function useGlobalSearch({
 
     setLoading(true);
     try {
-      const visiblePages = getVisiblePages({ role, hasPermission });
+      const visiblePages = getVisiblePages({ role, hasPermission, isWorkforce });
       const pages = visiblePages
         .filter((p) => p.category === "pages")
         .map((page) => ({
@@ -430,7 +438,7 @@ export function useGlobalSearch({
     } finally {
       setLoading(false);
     }
-  }, [role, userId, permissions, hasPermission]);
+  }, [role, userId, permissions, hasPermission, isWorkforce]);
 
   useEffect(() => {
     if (!enabled) {

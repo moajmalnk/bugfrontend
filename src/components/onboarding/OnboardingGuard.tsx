@@ -5,8 +5,8 @@ import { OnboardingCelebration } from "./OnboardingCelebration";
 import { OnboardingWizard } from "./OnboardingWizard";
 
 /**
- * Why: Lock incomplete *developers* into mandatory onboarding before the app.
- * Testers/admins are not required to complete the wizard.
+ * Why: Lock incomplete employees (developers + CODO testers) into mandatory
+ * onboarding before the app. Client testers/admins/creators skip the wizard.
  */
 export default function OnboardingGuard() {
   const { currentUser, updateCurrentUser } = useAuth();

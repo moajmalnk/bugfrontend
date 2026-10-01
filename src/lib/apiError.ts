@@ -84,14 +84,29 @@ export function getNetworkErrorMessage(
   return fallback;
 }
 
+/**
+ * Why: fetch-based services bypass the axios interceptor, so they call this to
+ * surface the backend "client_tester" 403 to AuthContext the same way.
+ */
+export function notifyIfWorkforceDenied(status: number, body: unknown): void {
+  if (status !== 403) return;
+  const reason = (body as { data?: { reason?: unknown } } | null)?.data?.reason;
+  if (reason === 'client_tester') {
+    window.dispatchEvent(new CustomEvent('auth:workforce-denied'));
+  }
+}
+
 export async function readApiJson<T = Record<string, unknown>>(response: Response): Promise<T> {
   const text = await response.text();
   if (!text.trim()) {
     return {} as T;
   }
+  let parsed: T;
   try {
-    return JSON.parse(text) as T;
+    parsed = JSON.parse(text) as T;
   } catch {
     throw new Error('Invalid response from server. Please try again.');
   }
+  notifyIfWorkforceDenied(response.status, parsed);
+  return parsed;
 }

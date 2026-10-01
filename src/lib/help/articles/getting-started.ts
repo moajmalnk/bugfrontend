@@ -9,9 +9,16 @@ export const gettingStartedArticles: HelpArticle[] = [
     description:
       "Learn how to log in, understand your role-based dashboard, and navigate the sidebar.",
     roles: ["all"],
-    keywords: ["login", "otp", "dashboard", "sidebar", "overview", "start"],
-    readMinutes: 5,
-    relatedIds: ["profile-and-account", "search-and-shortcuts", "projects-guide"],
+    keywords: ["login", "otp", "dashboard", "sidebar", "overview", "start", "creator", "roles"],
+    readMinutes: 6,
+    relatedIds: [
+      "profile-and-account",
+      "search-and-shortcuts",
+      "period-filter-and-badges",
+      "employee-onboarding",
+      "checkin-attendance",
+      "projects-guide",
+    ],
     sections: [
       {
         id: "overview",
@@ -19,7 +26,19 @@ export const gettingStartedArticles: HelpArticle[] = [
         blocks: [
           {
             type: "paragraph",
-            text: "BugRicer is a bug tracking and team collaboration platform. After login, your sidebar and available features depend on your role: Admin, Developer, or Tester. Each role has tailored access to projects, bugs, and tools.",
+            text: "BugRicer is a bug tracking, team collaboration, and workforce platform. After login, your sidebar and available features depend on your role: Admin, Developer, Tester, or Creator. Admins can also grant extra permissions through custom roles.",
+          },
+          {
+            type: "table",
+            title: "Main areas",
+            headers: ["Area", "Includes"],
+            rows: [
+              ["Work", "Dashboard, Projects, Bugs, Retests, Fixes, Updates, Compliance, BugCreative"],
+              ["Daily", "Check-in and checkout, BugUpdate, Weekly Report, BugToDo, BugDates"],
+              ["People", "My Leave, Official Leave, WFH requests, Onboarding"],
+              ["Team", "Messages, Meet, Docs, Sheets, CODO Rules, Cursor Tips, Help"],
+              ["Admin", "Users, Clients, BugAssets, Leave / OT / Attendance requests, Reviews, Recruitment, Push Coverage, Shorts, Backups, Recycle Bin"],
+            ],
           },
         ],
       },
@@ -32,7 +51,8 @@ export const gettingStartedArticles: HelpArticle[] = [
             rows: [
               { role: "Admin", access: "Full access", notes: "All features including Administration" },
               { role: "Developer", access: "Projects, bugs, collaboration tools", notes: "No admin-only sections by default" },
-              { role: "Tester", access: "Bug reporting and core tracking", notes: "Focused on testing workflows" },
+              { role: "Tester", access: "Bug reporting, retests, and core tracking", notes: "CODO Testers also get attendance, leave, and BugUpdate" },
+              { role: "Creator", access: "BugCreative, assigned projects, daily tools", notes: "Bugs, Retests, and Fixes are hidden" },
             ],
           },
         ],
@@ -58,7 +78,7 @@ export const gettingStartedArticles: HelpArticle[] = [
               },
               {
                 title: "Explore your dashboard",
-                body: "After login you land on Projects. Use the left sidebar to access Bugs, Fixes, Updates, and role-specific tools.",
+                body: "New team members first complete onboarding and respond to any new CODO rules. Then use the left sidebar to reach your dashboard, projects, and role-specific tools. Numbers beside sidebar items are live counts.",
                 screenshot: helpImage("getting-started-overview", 3),
                 screenshotCaption: "Main sidebar navigation",
               },

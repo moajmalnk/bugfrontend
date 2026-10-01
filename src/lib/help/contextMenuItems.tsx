@@ -1,6 +1,7 @@
 import {
   BookOpen,
   Bug,
+  CalendarClock,
   ExternalLink,
   LifeBuoy,
   ListTodo,
@@ -39,6 +40,7 @@ const CATEGORY_ICONS: Record<string, LucideIcon> = {
   Bug,
   Users,
   ListTodo,
+  CalendarClock,
   Plug,
   Shield,
 };
@@ -78,6 +80,7 @@ const HANDBOOK_BY_ROLE: Record<string, { id: string; label: string }> = {
   admin: { id: "admin-handbook", label: "Admin Handbook" },
   developer: { id: "developer-handbook", label: "Developer Handbook" },
   tester: { id: "tester-handbook", label: "Tester Handbook" },
+  creator: { id: "creator-handbook", label: "Creator Handbook" },
 };
 
 export function getHelpContextMenuSections(

@@ -25,11 +25,11 @@ import { useUndoDelete } from "@/hooks/useUndoDelete";
 import { UndoDeleteNotificationPortal } from "@/components/ui/UndoDeleteNotification";
 import { ENV } from "@/lib/env";
 import { resolveAvatarUrl } from "@/lib/avatarUrl";
-import { getEffectiveRole } from "@/lib/utils";
-import { getRoleIcon as getRoleIconFn } from "@/lib/roleBadge";
+import { cn, getEffectiveRole } from "@/lib/utils";
+import { getRoleIcon as getRoleIconFn, TesterTypeBadge } from "@/lib/roleBadge";
 import { userService } from "@/services/userService";
 import { notifyAdminNavCountsChanged } from "@/services/adminNavCountsService";
-import { User, UserRole } from "@/types";
+import { TesterType, User, UserRole } from "@/types";
 import { BarChart3, ClipboardList, Palette, Shield, UserCheck, UserRound, Code2, Bug } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
@@ -173,6 +173,7 @@ interface NewUser {
   email: string;
   password?: string;
   role: UserRole;
+  tester_type?: TesterType;
   phone?: string;
   joining_date?: string;
 }
@@ -198,6 +199,9 @@ const Users = () => {
   } = useUrlPagination({ defaultPageSize: 10 });
   const [searchParams, setSearchParams] = useSearchParams();
   const tabFromUrl = searchParams.get("tab") || "active";
+  const testerTypeParam = searchParams.get("tester_type");
+  const testerTypeFilter: TesterType | "all" =
+    testerTypeParam === "codo" || testerTypeParam === "client" ? testerTypeParam : "all";
   const [userToDelete, setUserToDelete] = useState<User | null>(null);
 
   // Undo delete hook
@@ -310,10 +314,21 @@ const Users = () => {
   // Apply filtering whenever search term or tab changes
   useEffect(() => {
     applyFilters();
-  }, [searchTerm, users, tabFromUrl]);
+  }, [searchTerm, users, tabFromUrl, testerTypeFilter]);
 
   // Reset current page when filters change
-  useResetUrlPageOnChange(setCurrentPage, [searchTerm, tabFromUrl]);
+  useResetUrlPageOnChange(setCurrentPage, [searchTerm, tabFromUrl, testerTypeFilter]);
+
+  const handleTesterTypeFilterChange = (next: TesterType | "all") => {
+    const params = new URLSearchParams(searchParams);
+    if (next === "all") {
+      params.delete("tester_type");
+    } else {
+      params.set("tester_type", next);
+    }
+    params.delete("page");
+    setSearchParams(params, { replace: true });
+  };
 
   const handleItemsPerPageChange = (value: number) => {
     setItemsPerPage(value);
@@ -371,6 +386,11 @@ const Users = () => {
         filtered = filtered.filter(user => user.role === "developer");
       } else if (tabFromUrl === "testers") {
         filtered = filtered.filter(user => user.role === "tester");
+        if (testerTypeFilter !== "all") {
+          filtered = filtered.filter(
+            (user) => (user.tester_type === "codo" ? "codo" : "client") === testerTypeFilter
+          );
+        }
       } else if (tabFromUrl === "admins") {
         filtered = filtered.filter(user => user.role === "admin");
       } else if (tabFromUrl === "creators") {
@@ -406,6 +426,7 @@ const Users = () => {
         username: userData.username,
         email: userData.email,
         role: userData.role,
+        tester_type: userData.role === "tester" ? userData.tester_type : undefined,
         phone: userData.phone,
         joining_date: userData.joining_date || undefined,
       };
@@ -514,6 +535,8 @@ const Users = () => {
   const adminCount = users.filter(u => u.role === "admin").length;
   const developerCount = users.filter(u => u.role === "developer").length;
   const testerCount = users.filter(u => u.role === "tester").length;
+  const codoTesterCount = users.filter(u => u.role === "tester" && u.tester_type === "codo").length;
+  const clientTesterCount = testerCount - codoTesterCount;
   const creatorCount = users.filter(u => u.role === "creator").length;
   const othersCount = users.filter(
     (u) => !["admin", "developer", "tester", "creator"].includes(u.role)
@@ -786,6 +809,42 @@ const Users = () => {
           {renderUsersContent()}
         </TabsContent>
         <TabsContent value="testers" className="space-y-6 sm:space-y-8">
+          {!isLoading && testerCount > 0 && (
+            <div
+              role="radiogroup"
+              aria-label="Filter testers by type"
+              className="flex flex-wrap items-center gap-2"
+            >
+              {(
+                [
+                  { value: "all", label: "All testers", count: testerCount },
+                  { value: "codo", label: "CODO Testers", count: codoTesterCount },
+                  { value: "client", label: "Client Testers", count: clientTesterCount },
+                ] as const
+              ).map((opt) => {
+                const selected = testerTypeFilter === opt.value;
+                return (
+                  <button
+                    key={opt.value}
+                    type="button"
+                    role="radio"
+                    aria-checked={selected}
+                    onClick={() => handleTesterTypeFilterChange(opt.value)}
+                    className={cn(
+                      "inline-flex items-center gap-2 rounded-xl border px-3 py-1.5 text-sm font-medium transition-colors",
+                      "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+                      selected
+                        ? "border-primary bg-primary/10 text-foreground"
+                        : "border-border bg-background text-muted-foreground hover:bg-muted/50"
+                    )}
+                  >
+                    {opt.label}
+                    <span className="rounded-full bg-muted px-2 text-xs text-foreground">{opt.count}</span>
+                  </button>
+                );
+              })}
+            </div>
+          )}
           {renderUsersContent()}
         </TabsContent>
         <TabsContent value="creators" className="space-y-6 sm:space-y-8">
@@ -1308,12 +1367,13 @@ const Users = () => {
                         <p className="text-xs text-gray-500 dark:text-gray-400 truncate">
                           {user.email}
                         </p>
-                        <div className="flex items-center gap-2 mt-1">
+                        <div className="flex flex-wrap items-center gap-2 mt-1">
                           <div className="flex items-center gap-1">
                             {getRoleIcon(user.role)}
                             <span className="text-xs font-medium text-gray-600 dark:text-gray-400 capitalize">
                               {user.role}
                             </span>
+                            <TesterTypeBadge role={user.role} testerType={user.tester_type} />
                           </div>
                           <StatusBadge status={user.status || 'offline'} lastSeen={user.last_active_at} />
                         </div>

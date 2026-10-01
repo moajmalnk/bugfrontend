@@ -47,8 +47,9 @@ export function ListPageHeader({
         )}
       />
       <div className={LIST_HEADER_CARD}>
-        <div className="flex flex-col gap-4 sm:gap-6 lg:flex-row lg:justify-between lg:items-center min-w-0">
-          <div className="space-y-2 sm:space-y-3 min-w-0 flex-1">
+        {/* Title column reserves 20rem; actions wrap below instead of squeezing it to zero width. */}
+        <div className="flex flex-wrap items-center justify-between gap-4 sm:gap-6 min-w-0">
+          <div className="space-y-2 sm:space-y-3 min-w-0 flex-1 basis-full sm:basis-[20rem]">
             <div className="flex items-center gap-3 min-w-0">
               {leading}
               <div
@@ -73,7 +74,7 @@ export function ListPageHeader({
           </div>
 
           {(actions || count !== undefined) && (
-            <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 sm:gap-4 shrink-0 w-full lg:w-auto">
+            <div className="flex flex-col sm:flex-row sm:flex-wrap items-stretch sm:items-center gap-3 sm:gap-4 min-w-0 w-full sm:w-auto max-w-full">
               {actions}
               {count !== undefined ? (
                 <div

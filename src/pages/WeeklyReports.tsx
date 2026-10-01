@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Navigate, useSearchParams } from 'react-router-dom';
+import { useSearchParams } from 'react-router-dom';
 import {
   ClipboardCopy,
   ClipboardList,
@@ -195,10 +195,6 @@ export default function WeeklyReports() {
       return hay.includes(q);
     });
   }, [items, query]);
-
-  if (role === 'tester') {
-    return <Navigate to={`/${currentUser?.role || 'tester'}/bugs`} replace />;
-  }
 
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
   const selectedDoc = selected ? formatWeeklyReportDocument(selected) : '';

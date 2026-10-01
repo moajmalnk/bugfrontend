@@ -1,12 +1,33 @@
 import React from 'react';
-import { GoogleLogin, CredentialResponse } from '@react-oauth/google';
+import { GoogleLogin } from '@react-oauth/google';
 import { googleOAuthDiagnostic } from '@/utils/googleOAuthDiagnostic';
+import { API_BASE_URL } from '@/lib/env';
+
+export interface GoogleSignInSetupError {
+  type: 'setup_required';
+  message: string;
+  setup: unknown;
+  currentOrigin: string;
+  clientId: string;
+}
 
 interface GoogleSignInButtonProps {
-  onSuccess: (credentialResponse: CredentialResponse) => void;
-  onError: (error: any) => void;
+  onError: (error: GoogleSignInSetupError) => void;
   variant?: 'full' | 'icon';
 }
+
+/**
+ * Why: redirect mode keeps sign-in in the same tab. Google POSTs the credential
+ * to the backend, which redirects back to /login?google_code=... for the
+ * frontend to exchange. Local frontends share the production backend, so they
+ * ask it to send the browser back to localhost.
+ */
+const getLoginUri = (): string => {
+  const isLocal =
+    typeof window !== 'undefined' &&
+    ['localhost', '127.0.0.1'].includes(window.location.hostname);
+  return `${API_BASE_URL}/google-login-redirect.php${isLocal ? '?return=local' : ''}`;
+};
 
 const handleGoogleError = (onError: GoogleSignInButtonProps['onError']) => {
   const diagnostic = googleOAuthDiagnostic.getSetupInstructionsForRejection();
@@ -20,10 +41,11 @@ const handleGoogleError = (onError: GoogleSignInButtonProps['onError']) => {
 };
 
 export const GoogleSignInButton: React.FC<GoogleSignInButtonProps> = ({
-  onSuccess,
   onError,
   variant = 'full',
 }) => {
+  const loginUri = getLoginUri();
+
   if (variant === 'icon') {
     return (
       <div className="relative w-10 h-10 sm:w-12 sm:h-12">
@@ -43,7 +65,7 @@ export const GoogleSignInButton: React.FC<GoogleSignInButtonProps> = ({
         {/* Invisible overlay — stable key so GSI initialize() is not called on every render */}
         <div className="absolute inset-0 opacity-0 pointer-events-auto overflow-hidden">
           <GoogleLogin
-            onSuccess={onSuccess}
+            onSuccess={() => undefined}
             onError={() => handleGoogleError(onError)}
             useOneTap={false}
             theme="outline"
@@ -52,7 +74,8 @@ export const GoogleSignInButton: React.FC<GoogleSignInButtonProps> = ({
             logo_alignment="center"
             text="signin_with"
             width="300"
-            ux_mode="popup"
+            ux_mode="redirect"
+            login_uri={loginUri}
             auto_select={false}
           />
         </div>
@@ -63,7 +86,7 @@ export const GoogleSignInButton: React.FC<GoogleSignInButtonProps> = ({
   return (
     <div className="flex justify-center mt-3">
       <GoogleLogin
-        onSuccess={onSuccess}
+        onSuccess={() => undefined}
         onError={() => handleGoogleError(onError)}
         useOneTap={false}
         theme="outline"
@@ -72,7 +95,8 @@ export const GoogleSignInButton: React.FC<GoogleSignInButtonProps> = ({
         logo_alignment="left"
         text="signin_with"
         width="280"
-        ux_mode="popup"
+        ux_mode="redirect"
+        login_uri={loginUri}
         auto_select={false}
       />
     </div>

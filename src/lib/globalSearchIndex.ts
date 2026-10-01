@@ -24,12 +24,16 @@ export interface PageSearchEntry {
   excludeRoles?: string[];
   permission?: string;
   adminOnly?: boolean;
+  /** BugUpdate / check-in / weekly report / leave: CODO workforce only (never client testers). */
+  workforceOnly?: boolean;
   showWhen?: (ctx: SearchVisibilityContext) => boolean;
 }
 
 export interface SearchVisibilityContext {
   role: string;
   hasPermission: (key: string) => boolean;
+  /** From isWorkforceUser(); defaults to "not a tester" when omitted. */
+  isWorkforce?: boolean;
 }
 
 export interface SearchResult {
@@ -140,7 +144,7 @@ const PAGE_ENTRIES: PageSearchEntry[] = [
       "gps",
       "break",
     ],
-    excludeRoles: ["tester"],
+    workforceOnly: true,
     showWhen: (ctx) =>
       ctx.hasPermission("TASKS_VIEW_ALL") ||
       ctx.hasPermission("TASKS_VIEW_ASSIGNED") ||
@@ -162,7 +166,7 @@ const PAGE_ENTRIES: PageSearchEntry[] = [
       "sick leave",
       "casual leave",
     ],
-    excludeRoles: ["tester"],
+    workforceOnly: true,
     subtitle: "Attendance",
   },
   {
@@ -196,7 +200,7 @@ const PAGE_ENTRIES: PageSearchEntry[] = [
       "progress",
       "blockers",
     ],
-    excludeRoles: ["tester"],
+    workforceOnly: true,
     showWhen: (ctx) =>
       ctx.hasPermission("DAILY_UPDATE_CREATE") ||
       ctx.hasPermission("DAILY_UPDATE_VIEW") ||
@@ -215,7 +219,7 @@ const PAGE_ENTRIES: PageSearchEntry[] = [
       "blockers",
       "work completed",
     ],
-    excludeRoles: ["tester"],
+    workforceOnly: true,
     showWhen: (ctx) =>
       ctx.hasPermission("DAILY_UPDATE_CREATE") ||
       ctx.hasPermission("DAILY_UPDATE_VIEW") ||
@@ -673,6 +677,11 @@ export function isPageVisible(
   entry: PageSearchEntry,
   ctx: SearchVisibilityContext
 ): boolean {
+  if (entry.workforceOnly) {
+    const isWorkforce = ctx.isWorkforce ?? ctx.role !== "tester";
+    if (!isWorkforce) return false;
+    if (ctx.role === "tester") return true;
+  }
   if (entry.excludeRoles?.includes(ctx.role)) return false;
   if (entry.showWhen && !entry.showWhen(ctx)) return false;
 

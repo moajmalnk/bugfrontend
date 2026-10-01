@@ -29,7 +29,8 @@ import { toast } from "@/components/ui/use-toast";
 import { DatePicker } from "@/components/ui/DatePicker";
 import { userService } from "@/services/userService";
 import { permissionService } from "@/services/permissionService";
-import { User, UserRole } from "@/types";
+import { TesterType, User, UserRole } from "@/types";
+import { TesterTypeField } from "@/components/users/TesterTypeField";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Loader2, Pencil, RefreshCw } from "lucide-react";
 import React, { useEffect, useState } from "react";
@@ -44,7 +45,8 @@ const optionalDate = z
     message: "Date must be YYYY-MM-DD",
   });
 
-const userFormSchema = z.object({
+const userFormSchema = z
+  .object({
   username: z
     .string()
     .min(3, { message: "Username must be at least 3 characters" })
@@ -53,6 +55,7 @@ const userFormSchema = z.object({
     }),
   email: z.string().email({ message: "Invalid email address" }),
   role: z.string().min(1, { message: "Please select a role" }),
+  tester_type: z.string().optional(),
   phone: z.string().optional(),
   joining_date: optionalDate,
   employee_code: z.string().optional(),
@@ -64,6 +67,14 @@ const userFormSchema = z.object({
   offer_letter_issued: z.boolean().optional(),
   offer_letter_shared_date: optionalDate,
   probation_end_date: optionalDate,
+}).superRefine((values, ctx) => {
+  if (values.role === "tester" && values.tester_type !== "codo" && values.tester_type !== "client") {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ["tester_type"],
+      message: "Choose CODO Tester or Client Tester",
+    });
+  }
 });
 
 type UserFormValues = z.infer<typeof userFormSchema>;
@@ -147,6 +158,8 @@ function toFormValues(user: User): UserFormValues {
     username: user.username || "",
     email: user.email,
     role: user.role || "tester",
+    tester_type:
+      user.role === "tester" ? (user.tester_type === "codo" ? "codo" : "client") : "",
     phone: user.phone ? user.phone.replace(/^\+91/, "") : "",
     joining_date: user.joining_date || "",
     employee_code: user.employee_code || "",
@@ -212,6 +225,25 @@ export function EditUserDialog({
   }, [user, form]);
 
   const isAdminEditor = String(loggedInUserRole || "").toLowerCase() === "admin";
+  const selectedRoleName = form.watch("role");
+  const selectedTesterType = form.watch("tester_type");
+  const isTesterRole = selectedRoleName === "tester";
+  const testerTypeMissing =
+    isTesterRole && selectedTesterType !== "codo" && selectedTesterType !== "client";
+
+  useEffect(() => {
+    if (!isTesterRole && form.getValues("tester_type")) {
+      form.setValue("tester_type", "");
+      form.clearErrors("tester_type");
+    }
+  }, [isTesterRole, form]);
+
+  const handleOpenChange = (next: boolean) => {
+    setOpen(next);
+    if (!next) {
+      form.reset(toFormValues(user));
+    }
+  };
 
   const onSubmit = async (data: UserFormValues) => {
     setIsSubmitting(true);
@@ -223,11 +255,13 @@ export function EditUserDialog({
       const payload: Parameters<typeof userService.updateUser>[1] = {
         username: data.username,
         email: data.email,
-        role: data.role as UserRole,
-        role_id: selectedRole?.id,
         phone: data.phone ? "+91" + data.phone : "",
       };
       if (isAdminEditor) {
+        payload.role = data.role as UserRole;
+        payload.role_id = selectedRole?.id;
+        payload.tester_type =
+          data.role === "tester" ? (data.tester_type as TesterType) : null;
         payload.joining_date = data.joining_date?.trim() || null;
         payload.employee_code = data.employee_code?.trim() || null;
         payload.job_title = data.job_title?.trim() || null;
@@ -316,7 +350,7 @@ export function EditUserDialog({
   };
 
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
+    <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogTrigger asChild>
         {trigger || (
           <Button variant="outline" size="sm">
@@ -420,6 +454,33 @@ export function EditUserDialog({
                   </FormItem>
                 )}
               />
+
+              {isTesterRole && (
+                <FormField
+                  control={form.control}
+                  name="tester_type"
+                  render={({ field, fieldState }) => (
+                    <FormItem className="col-span-12 space-y-2">
+                      <FormLabelDot color="bg-yellow-500">Tester type</FormLabelDot>
+                      <FormControl>
+                        <TesterTypeField
+                          value={field.value}
+                          onChange={(v) => {
+                            field.onChange(v);
+                            form.clearErrors("tester_type");
+                          }}
+                          disabled={!isAdminEditor || isSubmitting}
+                          invalid={!!fieldState.error}
+                        />
+                      </FormControl>
+                      <p className="text-[11px] text-muted-foreground leading-snug">
+                        Only CODO Testers can use BugUpdate, check-in, weekly report and leave.
+                      </p>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              )}
 
               {isAdminEditor ? (
                 <>
@@ -718,7 +779,7 @@ export function EditUserDialog({
               <Button
                 type="button"
                 variant="outline"
-                onClick={() => setOpen(false)}
+                onClick={() => handleOpenChange(false)}
                 disabled={isSubmitting}
                 className="h-11 px-6 border-gray-200 dark:border-gray-700 rounded-xl"
               >
@@ -726,7 +787,7 @@ export function EditUserDialog({
               </Button>
               <Button
                 type="submit"
-                disabled={isSubmitting}
+                disabled={isSubmitting || testerTypeMissing}
                 className="h-11 px-8 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-700 hover:from-blue-700 hover:to-indigo-800 text-white font-semibold shadow-lg"
               >
                 {isSubmitting ? (

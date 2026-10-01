@@ -38,6 +38,37 @@ export function getRoleBadgeClass(role: string): string {
 export const SYSTEM_USER_ROLES = ["admin", "developer", "tester", "creator"] as const;
 
 /**
+ * Why: Testers split into CODO (in-house workforce) and Client (external);
+ * the badge makes the access difference visible wherever a tester is listed.
+ */
+export function TesterTypeBadge({
+  role,
+  testerType,
+  className,
+}: {
+  role?: string | null;
+  testerType?: string | null;
+  className?: string;
+}) {
+  if (role !== "tester") return null;
+  const isCodo = testerType === "codo";
+  return (
+    <span
+      className={cn(
+        "inline-flex items-center rounded-full border px-2 py-0.5 text-[10px] font-semibold whitespace-nowrap",
+        isCodo
+          ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300"
+          : "border-sky-500/30 bg-sky-500/10 text-sky-700 dark:text-sky-300",
+        className
+      )}
+      title={isCodo ? "CODO Tester (in-house)" : "Client Tester (external)"}
+    >
+      {isCodo ? "CODO" : "Client"}
+    </span>
+  );
+}
+
+/**
  * Why: Attendance exceptions, leave, and office-day rollups include every
  * staffed BugRicer login — not only admin / developer / legacy user.
  */

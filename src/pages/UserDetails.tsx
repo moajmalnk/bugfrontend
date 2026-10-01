@@ -27,14 +27,15 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Tabs, TabsContent } from "@/components/ui/tabs";
+import { BottomSheetTabs } from "@/components/ui/BottomSheetTabs";
 import { useAuth } from "@/context/AuthContext";
 import { ENV } from "@/lib/env";
 import { userRequiresOnboarding } from "@/lib/utils";
 import { usePermissions } from "@/hooks/usePermissions";
 import { useToast } from "@/hooks/use-toast";
 import { cn, getEffectiveRole } from "@/lib/utils";
-import { getRoleIcon as roleIcon } from "@/lib/roleBadge";
+import { getRoleIcon as roleIcon, TesterTypeBadge } from "@/lib/roleBadge";
 import { VerifiedBlueTick, isFullFledgedUser } from "@/components/ui/VerifiedBlueTick";
 import { userService } from "@/services/userService";
 import { onboardingService } from "@/services/onboardingService";
@@ -42,10 +43,15 @@ import type { User } from "@/types";
 import { useQuery } from "@tanstack/react-query";
 import { formatDistanceToNow } from "date-fns";
 import {
+  Activity,
   AtSign,
+  BarChart3,
   Briefcase,
   Calendar,
+  CalendarCheck,
+  CalendarOff,
   ExternalLink,
+  FolderKanban,
   Key,
   Loader2,
   Lock,
@@ -54,11 +60,13 @@ import {
   Phone,
   Timer,
   Trash2,
+  Wallet,
   UserPlus,
   UserRound,
   UserCheck,
   UserX,
   X,
+  type LucideIcon,
 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import {
@@ -83,15 +91,21 @@ type UserDetailsTab =
   | "work-statistics"
   | "active-hours";
 
-const USER_DETAILS_TABS: { value: UserDetailsTab; label: string; adminOnly?: boolean }[] = [
-  { value: "personal", label: "Personal" },
-  { value: "professional", label: "Professional" },
-  { value: "payments", label: "Payments" },
-  { value: "attendance", label: "Attendance", adminOnly: true },
-  { value: "leaves", label: "Leaves" },
-  { value: "projects", label: "Projects" },
-  { value: "work-statistics", label: "Work Statistics" },
-  { value: "active-hours", label: "Active Hours" },
+const USER_DETAILS_TABS: {
+  value: UserDetailsTab;
+  label: string;
+  shortLabel?: string;
+  icon: LucideIcon;
+  adminOnly?: boolean;
+}[] = [
+  { value: "personal", label: "Personal", icon: UserRound },
+  { value: "professional", label: "Professional", shortLabel: "Pro", icon: Briefcase },
+  { value: "payments", label: "Payments", icon: Wallet },
+  { value: "attendance", label: "Attendance", shortLabel: "Attend.", icon: CalendarCheck, adminOnly: true },
+  { value: "leaves", label: "Leaves", icon: CalendarOff },
+  { value: "projects", label: "Projects", icon: FolderKanban },
+  { value: "work-statistics", label: "Work Statistics", shortLabel: "Stats", icon: BarChart3 },
+  { value: "active-hours", label: "Active Hours", shortLabel: "Hours", icon: Activity },
 ];
 
 function parseUserDetailsTab(
@@ -482,6 +496,7 @@ export default function UserDetails() {
                             <span className="capitalize font-semibold">
                               {user.role}
                             </span>
+                            <TesterTypeBadge role={user.role} testerType={user.tester_type} />
                           </span>
                           <span
                             className={cn(
@@ -923,22 +938,19 @@ export default function UserDetails() {
               onValueChange={setActiveTab}
               className="space-y-4 sm:space-y-6"
             >
-              <div
-                className="overflow-x-auto rounded-2xl border border-border/60 bg-muted/20 p-1"
-                style={{ scrollbarWidth: "thin" }}
-              >
-                <TabsList className="inline-flex h-auto min-h-12 w-max min-w-full gap-1.5 bg-transparent p-0 sm:flex sm:flex-wrap sm:w-full">
-                  {visibleTabs.map((tab) => (
-                    <TabsTrigger
-                      key={tab.value}
-                      value={tab.value}
-                      className="h-10 shrink-0 rounded-xl px-3 text-sm font-semibold transition-all data-[state=active]:border data-[state=active]:border-border data-[state=active]:bg-background data-[state=active]:shadow-sm sm:flex-1 sm:min-w-[7rem]"
-                    >
-                      {tab.label}
-                    </TabsTrigger>
-                  ))}
-                </TabsList>
-              </div>
+              <BottomSheetTabs
+                items={visibleTabs.map((tab) => ({
+                  value: tab.value,
+                  label: tab.label,
+                  shortLabel: tab.shortLabel,
+                  icon: tab.icon,
+                }))}
+                value={activeTab}
+                onValueChange={setActiveTab}
+                title="Select Section"
+                description={`Navigate ${user.name || user.username || "user"}'s details`}
+                desktopBreakpoint="xl"
+              />
 
               <TabsContent value="personal" className="mt-0 focus-visible:outline-none">
                 {activeTab === "personal" ? (

@@ -57,7 +57,7 @@ import { EditUserDialog } from "./EditUserDialog";
 import { UserWorkStats } from "./UserWorkStats";
 import { ActiveHours } from "./ActiveHours";
 import { usePermissions } from "@/hooks/usePermissions";
-import { getRoleIcon as roleIcon } from "@/lib/roleBadge";
+import { getRoleIcon as roleIcon, TesterTypeBadge } from "@/lib/roleBadge";
 
 export interface DeleteUserDialogProps {
   user: User;
@@ -374,6 +374,7 @@ export function UserDetailDialog({
                     <span className="capitalize font-semibold text-sm sm:text-base text-foreground">
                       {user.role}
                     </span>
+                    <TesterTypeBadge role={user.role} testerType={user.tester_type} />
                   </div>
                   <Badge
                     variant={isAccountDeactivated ? "destructive" : "secondary"}

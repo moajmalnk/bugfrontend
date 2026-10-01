@@ -17,7 +17,7 @@ import { useAuth } from "@/context/AuthContext";
 import { useGlobalSearchModal } from "@/context/GlobalSearchContext";
 import { useGlobalSearch } from "@/hooks/useGlobalSearch";
 import { usePermissions } from "@/hooks/usePermissions";
-import { getEffectiveRole } from "@/lib/utils";
+import { getEffectiveRole, isWorkforceUser } from "@/lib/utils";
 import { UserAvatar } from "@/components/users/UserAvatar";
 import {
   getSearchCategoryOrder,
@@ -169,6 +169,7 @@ export function GlobalSearchDialog() {
     userId: currentUser?.id,
     permissions,
     enabled: open,
+    isWorkforce: isWorkforceUser(currentUser),
   });
 
   const hintChips = useMemo(() => getSearchHintChips(role), [role]);

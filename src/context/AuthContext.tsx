@@ -2,9 +2,9 @@ import { toast } from "@/components/ui/use-toast";
 import { getNetworkErrorMessage } from "@/lib/apiError";
 import { resolveAvatarUrl } from "@/lib/avatarUrl";
 import { ENV } from "@/lib/env";
-import { getEffectiveRole } from "@/lib/utils";
+import { getEffectiveRole, isTesterTypePending } from "@/lib/utils";
 import { syncFcmTokenForSession, clearFcmRegistrationCache, applyServerFcmEpoch, setupFcmPwaAutoSync, prepareFcmOnLogin } from "@/firebase-messaging-sw";
-import { User } from "@/types";
+import { TesterType, User } from "@/types";
 import {
   createContext,
   ReactNode,
@@ -203,6 +203,55 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     window.addEventListener("auth:revoked", onRevoked);
     return () => window.removeEventListener("auth:revoked", onRevoked);
   }, [revokeSessionForced]);
+
+  /**
+   * Why: an admin can reclassify a CODO tester as Client mid-session. The backend
+   * rejects work APIs with reason "client_tester"; mirroring that here lets
+   * WorkforceRoute and the sidebar drop the work pages without a reload.
+   */
+  useEffect(() => {
+    const onWorkforceDenied = () => {
+      setCurrentUser((prev) =>
+        prev && prev.role === "tester" && prev.tester_type !== "client"
+          ? { ...prev, tester_type: "client" }
+          : prev
+      );
+    };
+    window.addEventListener("auth:workforce-denied", onWorkforceDenied);
+    return () => window.removeEventListener("auth:workforce-denied", onWorkforceDenied);
+  }, []);
+
+  /**
+   * Why: Google / OTP / magic-link logins return a user without tester_type.
+   * Hydrate it once from /me; on failure fall back to "client" (least privilege)
+   * so WorkforceRoute never waits indefinitely.
+   */
+  const testerTypePending = isTesterTypePending(currentUser);
+  useEffect(() => {
+    if (!testerTypePending || !currentUser) return;
+    const userId = currentUser.id;
+    const token = sessionStorage.getItem("token") || localStorage.getItem("token");
+    const controller = new AbortController();
+
+    const apply = (value: TesterType) =>
+      setCurrentUser((prev) =>
+        prev && prev.id === userId && prev.tester_type === undefined
+          ? { ...prev, tester_type: value }
+          : prev
+      );
+
+    fetch(AUTH_ENDPOINTS.me, {
+      headers: { Accept: "application/json", ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+      signal: controller.signal,
+    })
+      .then((res) => res.json())
+      .then((data) => apply(data?.data?.tester_type === "codo" ? "codo" : "client"))
+      .catch((error) => {
+        if ((error as Error)?.name !== "AbortError") apply("client");
+      });
+
+    return () => controller.abort();
+  }, [testerTypePending, currentUser?.id]);
 
   // Heartbeat system - send heartbeat every 30 seconds when user is authenticated
   useEffect(() => {

@@ -35,26 +35,38 @@ import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { permissionService } from "@/services/permissionService";
 import { cn } from "@/lib/utils";
+import { TesterTypeField } from "@/components/users/TesterTypeField";
 
-const userFormSchema = z.object({
-  username: z
-    .string()
-    .min(3, { message: "Username must be at least 3 characters" })
-    .regex(/^[a-zA-Z0-9_]+$/, {
-      message: "Username can only contain letters, numbers, and underscores",
+const userFormSchema = z
+  .object({
+    username: z
+      .string()
+      .min(3, { message: "Username must be at least 3 characters" })
+      .regex(/^[a-zA-Z0-9_]+$/, {
+        message: "Username can only contain letters, numbers, and underscores",
+      }),
+    email: z.string().email({ message: "Invalid email address" }),
+    role: z.string().min(1, {
+      message: "Please select a role",
     }),
-  email: z.string().email({ message: "Invalid email address" }),
-  role: z.string().min(1, {
-    message: "Please select a role",
-  }),
-  phone: z.string().optional(),
-  joining_date: z
-    .string()
-    .optional()
-    .refine((v) => !v || /^\d{4}-\d{2}-\d{2}$/.test(v), {
-      message: "Joining date must be YYYY-MM-DD",
-    }),
-});
+    tester_type: z.string().optional(),
+    phone: z.string().optional(),
+    joining_date: z
+      .string()
+      .optional()
+      .refine((v) => !v || /^\d{4}-\d{2}-\d{2}$/.test(v), {
+        message: "Joining date must be YYYY-MM-DD",
+      }),
+  })
+  .superRefine((values, ctx) => {
+    if (values.role === "tester" && values.tester_type !== "codo" && values.tester_type !== "client") {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["tester_type"],
+        message: "Choose CODO Tester or Client Tester",
+      });
+    }
+  });
 
 type UserFormValues = z.infer<typeof userFormSchema>;
 
@@ -120,10 +132,24 @@ export function AddUserDialog({ onUserAdd }: AddUserDialogProps) {
       username: "",
       email: "",
       role: "",
+      tester_type: "",
       phone: "",
       joining_date: "",
     },
   });
+
+  const selectedRoleName = form.watch("role");
+  const selectedTesterType = form.watch("tester_type");
+  const isTesterRole = selectedRoleName === "tester";
+  const testerTypeMissing =
+    isTesterRole && selectedTesterType !== "codo" && selectedTesterType !== "client";
+
+  useEffect(() => {
+    if (!isTesterRole && form.getValues("tester_type")) {
+      form.setValue("tester_type", "", { shouldValidate: false });
+      form.clearErrors("tester_type");
+    }
+  }, [isTesterRole, form]);
 
   useEffect(() => {
     const loadRoles = async () => {
@@ -161,6 +187,7 @@ export function AddUserDialog({ onUserAdd }: AddUserDialogProps) {
         email: userData.email,
         role: userData.role,
         role_id: selectedRole?.id,
+        tester_type: userData.role === "tester" ? userData.tester_type : undefined,
         phone: userData.phone && userData.phone.trim() ? "+91" + userData.phone.trim() : undefined,
         joining_date: userData.joining_date?.trim() || undefined,
       };
@@ -226,12 +253,12 @@ export function AddUserDialog({ onUserAdd }: AddUserDialogProps) {
 
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)}>
-            <div className="max-h-[min(70vh,520px)] overflow-y-auto px-6 py-5 space-y-4">
+            <div className="max-h-[min(70vh,520px)] overflow-y-auto px-6 py-5 grid grid-cols-12 gap-4">
               <FormField
                 control={form.control}
                 name="username"
                 render={({ field }) => (
-                  <FormItem className="space-y-2">
+                  <FormItem className="col-span-12 space-y-2">
                     <FormLabelDot>Username</FormLabelDot>
                     <FormControl>
                       <Input placeholder="Username" {...field} className={fieldInputClass} />
@@ -248,7 +275,7 @@ export function AddUserDialog({ onUserAdd }: AddUserDialogProps) {
                 control={form.control}
                 name="email"
                 render={({ field }) => (
-                  <FormItem className="space-y-2">
+                  <FormItem className="col-span-12 space-y-2">
                     <FormLabelDot color="bg-indigo-500">Email</FormLabelDot>
                     <FormControl>
                       <Input
@@ -267,7 +294,7 @@ export function AddUserDialog({ onUserAdd }: AddUserDialogProps) {
                 control={form.control}
                 name="role"
                 render={({ field }) => (
-                  <FormItem className="space-y-2">
+                  <FormItem className="col-span-12 md:col-span-6 space-y-2">
                     <FormLabelDot color="bg-emerald-500">Role</FormLabelDot>
                     <Select onValueChange={field.onChange} value={field.value}>
                       <FormControl>
@@ -292,7 +319,7 @@ export function AddUserDialog({ onUserAdd }: AddUserDialogProps) {
                 control={form.control}
                 name="phone"
                 render={({ field }) => (
-                  <FormItem className="space-y-2">
+                  <FormItem className="col-span-12 md:col-span-6 space-y-2">
                     <FormLabelDot color="bg-orange-500">Phone</FormLabelDot>
                     <FormControl>
                       <PhoneInput value={field.value} onChange={field.onChange} />
@@ -302,11 +329,38 @@ export function AddUserDialog({ onUserAdd }: AddUserDialogProps) {
                 )}
               />
 
+              {isTesterRole && (
+                <FormField
+                  control={form.control}
+                  name="tester_type"
+                  render={({ field, fieldState }) => (
+                    <FormItem className="col-span-12 space-y-2">
+                      <FormLabelDot color="bg-yellow-500">Tester type</FormLabelDot>
+                      <FormControl>
+                        <TesterTypeField
+                          value={field.value}
+                          onChange={(v) => {
+                            field.onChange(v);
+                            form.clearErrors("tester_type");
+                          }}
+                          disabled={isSubmitting}
+                          invalid={!!fieldState.error}
+                        />
+                      </FormControl>
+                      <FormDescription className="text-xs">
+                        Only CODO Testers can use BugUpdate, check-in, weekly report and leave.
+                      </FormDescription>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              )}
+
               <FormField
                 control={form.control}
                 name="joining_date"
                 render={({ field }) => (
-                  <FormItem className="space-y-2">
+                  <FormItem className="col-span-12 space-y-2">
                     <FormLabelDot color="bg-teal-500">Joining date</FormLabelDot>
                     <FormControl>
                       <DatePicker
@@ -338,7 +392,7 @@ export function AddUserDialog({ onUserAdd }: AddUserDialogProps) {
               </Button>
               <Button
                 type="submit"
-                disabled={isSubmitting}
+                disabled={isSubmitting || testerTypeMissing}
                 className="h-11 px-8 bg-gradient-to-r from-blue-600 to-indigo-700 hover:from-blue-700 hover:to-indigo-800 text-white font-semibold shadow-lg"
               >
                 {isSubmitting ? (
