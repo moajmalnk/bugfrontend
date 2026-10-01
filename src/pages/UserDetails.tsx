@@ -577,32 +577,42 @@ export default function UserDetails() {
                         </div>
                       </div>
 
-                      <div className="min-w-0 flex-1">
-                        <div className="flex flex-wrap items-center gap-2">
-                          <h2 className="text-xl sm:text-2xl font-bold break-words">
+                      <div className="min-w-0 flex-1 flex flex-col gap-3">
+                        <div className="flex flex-wrap items-center gap-2 min-w-0">
+                          <h2 className="text-xl sm:text-2xl font-bold leading-tight break-words">
                             {user.name || user.username}
                           </h2>
                           {isFullFledgedUser(user) ? <VerifiedBlueTick size="md" /> : null}
                           <span
                             className={cn(
-                              "inline-flex items-center gap-2 px-3 py-1 rounded-full text-xs font-semibold text-white shrink-0",
+                              "inline-flex h-7 items-center px-3 rounded-full text-xs font-semibold text-white shrink-0",
                               statusConfig.color
                             )}
                           >
                             {statusConfig.label}
                           </span>
                         </div>
-                        <div className="mt-2 flex flex-wrap items-center gap-2">
-                          <span className="inline-flex items-center gap-2 px-3 py-1 rounded-lg bg-muted/50 border border-border/40 shrink-0">
-                            {getRoleIcon(user.role)}
-                            <span className="capitalize font-semibold">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <span className="inline-flex h-8 items-center gap-2 px-3 rounded-xl bg-muted/50 border border-border/40 shrink-0">
+                            {roleIcon(user.role, "h-4 w-4")}
+                            <span className="capitalize text-sm font-semibold">
                               {user.role}
                             </span>
                             <TesterTypeBadge role={user.role} testerType={user.tester_type} />
                           </span>
+                          {user.last_active_at && (
+                            <span className="text-xs text-muted-foreground">
+                              Active{" "}
+                              {formatDistanceToNow(new Date(user.last_active_at), {
+                                addSuffix: true,
+                              })}
+                            </span>
+                          )}
+                        </div>
+                        <div className="flex flex-wrap items-center gap-2">
                           <span
                             className={cn(
-                              "inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold shrink-0",
+                              "inline-flex h-7 items-center px-3 rounded-full text-xs font-semibold whitespace-nowrap shrink-0",
                               isAccountDeactivated
                                 ? "bg-red-500/10 text-red-600 dark:text-red-400 border border-red-500/20"
                                 : "bg-green-500/10 text-green-600 dark:text-green-400 border border-green-500/20"
@@ -616,6 +626,7 @@ export default function UserDetails() {
                           Number(user.onboarding_completed ?? 0) === 1 ? (
                             <OnboardingVerificationBadge
                               status={user.onboarding_verification_status}
+                              className="h-7 px-3 py-0 font-semibold whitespace-nowrap"
                             />
                           ) : null}
                           <StandardsModeBadge
@@ -623,20 +634,15 @@ export default function UserDetails() {
                             testerType={user.tester_type}
                             label="CODO Rules"
                             mode={getStandardsMode(user, "codo")}
+                            className="h-7 py-0"
                           />
                           <StandardsModeBadge
                             role={user.role}
                             testerType={user.tester_type}
                             label="Cursor Tips"
                             mode={getStandardsMode(user, "cursor_tips")}
+                            className="h-7 py-0"
                           />
-                          {user.last_active_at && (
-                            <span className="text-xs text-muted-foreground">
-                              {formatDistanceToNow(new Date(user.last_active_at), {
-                                addSuffix: true,
-                              })}
-                            </span>
-                          )}
                         </div>
                       </div>
 

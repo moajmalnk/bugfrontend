@@ -52,6 +52,7 @@ import {
   Building2,
   Camera,
   CheckCircle2,
+  Crop,
   FileText,
   Loader2,
   Map,
@@ -900,6 +901,10 @@ export function OnboardingWizard({
   const [photoCropOpen, setPhotoCropOpen] = useState(false);
   const [photoCropSrc, setPhotoCropSrc] = useState<string | null>(null);
   const [photoPreviewUrl, setPhotoPreviewUrl] = useState<string | null>(null);
+  // Why: Re-cropping the 512px output would compound quality loss, so keep the original upload.
+  const [photoSourceFile, setPhotoSourceFile] = useState<File | null>(null);
+  const [photoResizeLoading, setPhotoResizeLoading] = useState(false);
+  const pendingPhotoSourceRef = useRef<File | null>(null);
   const [ifscLookupBusy, setIfscLookupBusy] = useState(false);
   const [ifscLookupHint, setIfscLookupHint] = useState<string | null>(null);
   const [ifscMeta, setIfscMeta] = useState<string | null>(null);
@@ -1235,7 +1240,17 @@ export function OnboardingWizard({
     }
     setPhotoPreviewUrl(existingAvatarUrl);
   }, [form.profile_photo, existingAvatarUrl]);
+  useEffect(() => {
+    if (!form.profile_photo) setPhotoSourceFile(null);
+  }, [form.profile_photo]);
   const openProfilePhotoPicker = () => photoInputRef.current?.click();
+
+  const openPhotoCropper = (source: File) => {
+    pendingPhotoSourceRef.current = source;
+    if (photoCropSrc) URL.revokeObjectURL(photoCropSrc);
+    setPhotoCropSrc(URL.createObjectURL(source));
+    setPhotoCropOpen(true);
+  };
 
   const onProfilePhotoPicked = (file: File | null) => {
     if (!file) return;
@@ -1246,10 +1261,31 @@ export function OnboardingWizard({
       return;
     }
     setFileErrors((p) => ({ ...p, profile_photo: undefined }));
-    if (photoCropSrc) URL.revokeObjectURL(photoCropSrc);
-    const src = URL.createObjectURL(file);
-    setPhotoCropSrc(src);
-    setPhotoCropOpen(true);
+    openPhotoCropper(file);
+  };
+
+  const resizeCurrentPhoto = async () => {
+    if (photoResizeLoading) return;
+    const local = photoSourceFile ?? form.profile_photo;
+    if (local) {
+      openPhotoCropper(local);
+      return;
+    }
+    if (!existingAvatarUrl) return;
+    setPhotoResizeLoading(true);
+    try {
+      const blob = await onboardingService.fetchAvatarBlob(userId);
+      if (!blob.type.startsWith("image/")) throw new Error("Not an image");
+      openPhotoCropper(new File([blob], "current-avatar", { type: blob.type }));
+    } catch {
+      toast({
+        title: "Could not load current photo",
+        description: "Use Replace to upload the photo again.",
+        variant: "destructive",
+      });
+    } finally {
+      setPhotoResizeLoading(false);
+    }
   };
 
   const handlePinChange = useCallback((raw: string, opts?: { silent?: boolean }) => {
@@ -2537,7 +2573,7 @@ export function OnboardingWizard({
                         </p>
                         <p className="text-xs text-muted-foreground mt-1">
                           {(editMode || adminMode) && existingAvatarUrl && !form.profile_photo
-                            ? "Current photo on file · replace to upload a new crop"
+                            ? "Current photo on file · resize to adjust the crop or replace with a new photo"
                             : "Square crop required · JPG / PNG / WebP · used across BugRicer"}
                         </p>
                         {fileErrors.profile_photo ? (
@@ -2563,6 +2599,22 @@ export function OnboardingWizard({
                             </>
                           )}
                         </Button>
+                        {form.profile_photo || existingAvatarUrl ? (
+                          <Button
+                            type="button"
+                            variant="outline"
+                            className="rounded-xl h-9"
+                            disabled={photoResizeLoading}
+                            onClick={() => void resizeCurrentPhoto()}
+                          >
+                            {photoResizeLoading ? (
+                              <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" />
+                            ) : (
+                              <Crop className="h-3.5 w-3.5 mr-1.5" />
+                            )}
+                            Resize
+                          </Button>
+                        ) : null}
                         {form.profile_photo ? (
                           <Button
                             type="button"
@@ -4298,9 +4350,11 @@ export function OnboardingWizard({
               setPhotoCropSrc(null);
             }
             if (photoInputRef.current) photoInputRef.current.value = "";
+            pendingPhotoSourceRef.current = null;
           }
         }}
         onApply={(file) => {
+          if (pendingPhotoSourceRef.current) setPhotoSourceFile(pendingPhotoSourceRef.current);
           setForm((p) => ({ ...p, profile_photo: file }));
           setFileErrors((p) => ({ ...p, profile_photo: undefined }));
           toast({ title: "Profile photo ready" });

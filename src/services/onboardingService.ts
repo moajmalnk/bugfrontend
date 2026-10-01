@@ -325,6 +325,20 @@ export const onboardingService = {
     return `${base}/users/download_statutory.php?user_id=${encodeURIComponent(userId)}&file=${encodeURIComponent(file)}&token=${encodeURIComponent(token)}`;
   },
 
+  /** Streams the saved avatar through the API so the frontend can re-crop it in a canvas. */
+  async fetchAvatarBlob(userId: string): Promise<Blob> {
+    const response = await apiClient.get("/users/avatar_image.php", {
+      params: { user_id: userId },
+      responseType: "blob",
+    });
+    const blob = response.data as Blob;
+    const headerType = String(response.headers?.["content-type"] || "").split(";")[0].trim();
+    if (headerType.startsWith("image/") && blob.type !== headerType) {
+      return new Blob([blob], { type: headerType });
+    }
+    return blob;
+  },
+
   async downloadFile(
     userId: string,
     file: "aadhaar_file_path" | "pan_file_path" | "offer_letter_path" | "nda_path",
