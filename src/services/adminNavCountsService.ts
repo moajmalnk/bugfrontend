@@ -17,7 +17,6 @@ import {
   listAllRequestSubmissions,
   normalizeAllRequestSubmissionsResponse,
 } from '@/services/todoService';
-import { MessagingService } from '@/services/messagingService';
 import { sharedTaskService } from '@/services/sharedTaskService';
 import { listCodoRules } from '@/services/codoRulesService';
 import { listCursorTips } from '@/services/cursorTipsService';
@@ -43,6 +42,9 @@ export type AdminNavCounts = {
   sheets: number;
   meetings: number;
   tasks: number;
+  tasksOverdue: number;
+  bugdates: number;
+  bugdatesPending: number;
   bugupdate: number;
   weeklyReport: number;
   myleave: number;
@@ -80,6 +82,9 @@ export const EMPTY_ADMIN_NAV_COUNTS: AdminNavCounts = {
   sheets: 0,
   meetings: 0,
   tasks: 0,
+  tasksOverdue: 0,
+  bugdates: 0,
+  bugdatesPending: 0,
   bugupdate: 0,
   weeklyReport: 0,
   myleave: 0,
@@ -107,24 +112,10 @@ export const EMPTY_ADMIN_NAV_COUNTS: AdminNavCounts = {
 
 export const ADMIN_NAV_COUNTS_QUERY_KEY = ['admin-nav-counts'] as const;
 
-const ADMIN_NAV_COUNTS_EVENT = 'bugricer:admin-nav-counts';
+export { notifyAdminNavCountsChanged, subscribeAdminNavCountsChanged } from '@/lib/navCountsEvents';
 
 /** Why: Remember production hosts that have not shipped sidebar_counts.php yet. */
 let dedicatedCountsAvailable: boolean | null = null;
-
-/**
- * Why: Queue pages mutate pending totals; the sidebar listens for this event
- * instead of each page importing QueryClient.
- */
-export function notifyAdminNavCountsChanged(): void {
-  if (typeof window === 'undefined') return;
-  window.dispatchEvent(new Event(ADMIN_NAV_COUNTS_EVENT));
-}
-
-export function subscribeAdminNavCountsChanged(onChange: () => void): () => void {
-  window.addEventListener(ADMIN_NAV_COUNTS_EVENT, onChange);
-  return () => window.removeEventListener(ADMIN_NAV_COUNTS_EVENT, onChange);
-}
 
 function currentTokenPayload(): { user_id?: string; role?: string } | null {
   const token = sessionStorage.getItem('token') || localStorage.getItem('token');
@@ -200,7 +191,7 @@ async function applyComplianceNavCount(counts: AdminNavCounts): Promise<void> {
 
 /**
  * Why: Non-admin sidebar badges should mirror each page's default tab —
- * assigned projects, shared docs/sheets, and the user's shared tasks.
+ * assigned projects and shared docs/sheets. Open/overdue tasks come from the API.
  */
 async function applyRoleScopedNavOverrides(counts: AdminNavCounts): Promise<void> {
   const payload = currentTokenPayload();
@@ -233,12 +224,6 @@ async function applyRoleScopedNavOverrides(counts: AdminNavCounts): Promise<void
           })
           .catch(() => {})
       : Promise.resolve(),
-    sharedTaskService
-      .getSharedTasks()
-      .then((tasks) => {
-        counts.tasks = tasks.length;
-      })
-      .catch(() => {}),
   ]);
 }
 
@@ -268,6 +253,9 @@ function normalizeCounts(payload: Partial<AdminNavCounts>): AdminNavCounts {
     sheets: asCount(payload.sheets),
     meetings: asCount(payload.meetings),
     tasks: asCount(payload.tasks),
+    tasksOverdue: asCount(payload.tasksOverdue),
+    bugdates: asCount(payload.bugdates),
+    bugdatesPending: asCount(payload.bugdatesPending),
     bugupdate: asCount(payload.bugupdate),
     weeklyReport: asCount(payload.weeklyReport),
     myleave: asCount(payload.myleave),
@@ -376,7 +364,14 @@ async function fetchAdminNavCountsFallback(): Promise<AdminNavCounts> {
     sharedTaskService
       .getSharedTasks()
       .then((tasks) => {
-        counts.tasks = tasks.length;
+        const today = new Date().toISOString().slice(0, 10);
+        const open = tasks.filter(
+          (task) => task.status === 'pending' || task.status === 'in_progress'
+        );
+        counts.tasks = open.length;
+        counts.tasksOverdue = open.filter(
+          (task) => !!task.due_date && task.due_date.slice(0, 10) < today
+        ).length;
       })
       .catch(() => {}),
     listWeeklyReports({
@@ -391,12 +386,6 @@ async function fetchAdminNavCountsFallback(): Promise<AdminNavCounts> {
     getMyLeaveRequests()
       .then((rows) => {
         counts.myleave = rows.length;
-      })
-      .catch(() => {}),
-    MessagingService
-      .getMyChatGroups()
-      .then((groups) => {
-        counts.messages = groups.length;
       })
       .catch(() => {}),
     commonBugsService

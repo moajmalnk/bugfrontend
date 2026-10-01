@@ -1,4 +1,5 @@
 import { ENV } from '@/lib/env';
+import { notifyAdminNavCountsChanged } from '@/lib/navCountsEvents';
 
 export type BugDatesCategory =
   | 'growth_program'
@@ -148,6 +149,7 @@ export async function createBugDatesEvent(input: BugDatesEventInput): Promise<Bu
     body: JSON.stringify({ ...input, action: 'create' }),
   });
   const data = await parseJson(res);
+  notifyAdminNavCountsChanged();
   return data.data;
 }
 
@@ -158,6 +160,7 @@ export async function updateBugDatesEvent(input: BugDatesEventInput & { id: numb
     body: JSON.stringify({ ...input, action: 'update' }),
   });
   const data = await parseJson(res);
+  notifyAdminNavCountsChanged();
   return data.data;
 }
 
@@ -168,6 +171,7 @@ export async function deleteBugDatesEvent(id: number): Promise<void> {
     body: JSON.stringify({ id, action: 'delete' }),
   });
   await parseJson(res);
+  notifyAdminNavCountsChanged();
 }
 
 export async function reviewBugDatesEvent(
@@ -180,6 +184,7 @@ export async function reviewBugDatesEvent(
     body: JSON.stringify({ id, action }),
   });
   const data = await parseJson(res);
+  notifyAdminNavCountsChanged();
   return data.data;
 }
 
@@ -250,6 +255,7 @@ export async function generateBugDatesTodo(input: {
     body: JSON.stringify(input),
   });
   const data = await parseJson(res);
+  notifyAdminNavCountsChanged();
   return data.data;
 }
 

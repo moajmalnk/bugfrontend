@@ -132,6 +132,8 @@ function stripPhantomCheckInDrafts(userId: string | number) {
   }
 }
 
+type CheckoutWizardStepKey = 'weekly_report' | 'form' | 'preview';
+
 function countTaskLines(text?: string) {
   if (!text) return 0;
   return text
@@ -337,7 +339,7 @@ export function DailyWorkFlowPanel({
   const [breakEntries, setBreakEntries] = useState<string[]>([]);
   const [draftHydrationEpoch, setDraftHydrationEpoch] = useState(0);
   const [isCheckoutWizardOpen, setIsCheckoutWizardOpen] = useState(false);
-  const [checkoutWizardStep, setCheckoutWizardStep] = useState<'weekly_report' | 'form' | 'preview'>('form');
+  const [checkoutWizardStep, setCheckoutWizardStep] = useState<CheckoutWizardStepKey>('form');
   const [weeklyReportDirty, setWeeklyReportDirty] = useState(false);
   const [todaySubmissionComplete, setTodaySubmissionComplete] = useState(false);
   const [projectUpdates, setProjectUpdates] = useState<Record<string, ProjectWorkUpdate>>({});
@@ -912,6 +914,34 @@ export function DailyWorkFlowPanel({
     checkoutProjects,
   ]);
 
+  /** Why: Mirrors canSubmit so the footer can say exactly what blocks checkout. */
+  const checkoutMissing = useMemo(() => {
+    const missing: string[] = [];
+    const hrs = Number(form.hours_today);
+    if (!form.submission_date) missing.push('work date');
+    if (!(hrs >= 1 && hrs <= 8)) missing.push('hours worked (1–8)');
+    if (requestAdminApproval) {
+      if (!(requestedExtraHours > 0 && requestedExtraHours <= 16)) missing.push('extra hours');
+      if (!approvalReason.trim()) missing.push('approval reason');
+    }
+    if (
+      hrs >= 1 &&
+      !checkoutHoursAllocationOk(hrs, timeAllocation, projectUpdates, checkoutProjects.map((p) => p.id))
+    ) {
+      missing.push('hour allocation');
+    }
+    return missing;
+  }, [
+    form.submission_date,
+    form.hours_today,
+    requestAdminApproval,
+    requestedExtraHours,
+    approvalReason,
+    timeAllocation,
+    projectUpdates,
+    checkoutProjects,
+  ]);
+
   const taskCounts = useMemo(() => {
     const completed = countTaskLines(form.completed_tasks);
     const pending = countTaskLines(form.pending_tasks);
@@ -1058,7 +1088,7 @@ export function DailyWorkFlowPanel({
       }
       setLoading(true);
       setError(null);
-      
+
       // Client-side validation for mandatory fields
       if (!form.submission_date) {
         throw new Error('Date is required');
@@ -1089,14 +1119,14 @@ export function DailyWorkFlowPanel({
       }
 
       // Tasks / project notes are optional at checkout (Office/WFH is check-in only).
-      
-      toast({ 
+
+      toast({
         title: isEditing ? 'Updating...' : 'Checking out...',
         description: 'Processing your submission'
       });
 
       await assertDeviceClockMatchesServer(isEditing ? 'update this submission' : 'check out');
-      
+
       const noteParts: string[] = [];
       if (requestAdminApproval) {
         noteParts.push(
@@ -1142,10 +1172,10 @@ export function DailyWorkFlowPanel({
           growth_glimpse_attended: timeAllocation.growth_glimpse_attended,
         },
       };
-      
+
       const res = await submitWork(payload);
       if ((res as any)?.success === false) throw new Error((res as any)?.message || 'Failed');
-      
+
       setSelectedProjects([]);
       setExtraCheckoutProjectIds([]);
       setPlannedWork('');
@@ -1168,7 +1198,7 @@ export function DailyWorkFlowPanel({
         return;
       }
 
-      toast({ 
+      toast({
         title: isEditing ? 'Daily submission updated' : 'Daily submission saved',
         description: 'Your work update has been saved successfully'
       });
@@ -3250,66 +3280,117 @@ export function DailyWorkFlowPanel({
           }
         }}
       >
-        <DialogContent className="flex max-h-[92vh] w-[95vw] max-w-4xl flex-col gap-0 overflow-hidden p-0 [&>button[data-radix-dialog-close]]:hidden">
-          {/* Header */}
-          <div
-            className={`relative overflow-visible p-6 text-white ${
-              checkoutWizardStep === 'weekly_report'
-                ? 'bg-gradient-to-br from-indigo-600 via-violet-600 to-purple-700'
-                : checkoutWizardStep === 'form'
-                  ? 'bg-gradient-to-br from-amber-500 via-orange-600 to-red-600'
-                  : 'bg-gradient-to-br from-blue-600 via-indigo-600 to-purple-600'
-            }`}
-          >
-            <div className="absolute inset-0 bg-black/10" />
-            <button
-              onClick={(e) => {
-                e.preventDefault();
-                e.stopPropagation();
-                if (checkoutWizardStep === 'preview') {
-                  closeCheckoutWizard();
-                } else {
-                  dismissCheckoutWizard();
-                }
-              }}
-              className="absolute top-3 right-3 z-[100] rounded-lg border-2 border-white/40 bg-white/25 p-2.5 shadow-2xl backdrop-blur-md transition-all duration-200 hover:scale-110 hover:border-white/60 hover:bg-white/40 active:scale-95"
-              aria-label="Close dialog"
-              type="button"
-            >
-              <X className="h-5 w-5 text-white transition-transform duration-200 group-hover:rotate-90" strokeWidth={3} />
-            </button>
-            <div className="relative z-10">
-              <DialogHeader className="space-y-2 pr-14 text-left">
-                <DialogTitle className="flex items-center gap-3 text-2xl font-bold">
-                  <div className="rounded-xl bg-white/20 p-2 backdrop-blur-sm">
+        <DialogContent className="flex max-h-[92vh] w-[95vw] max-w-4xl flex-col gap-0 overflow-hidden rounded-2xl border-border/60 p-0 [&>button[data-radix-dialog-close]]:hidden">
+          {(() => {
+            const steps: { key: CheckoutWizardStepKey; label: string }[] = [
+              ...(!isEditing && isSaturdayYmd(checkoutWorkDate())
+                ? [{ key: 'weekly_report' as const, label: 'Weekly report' }]
+                : []),
+              { key: 'form', label: isEditing ? 'Update' : 'Log hours' },
+              { key: 'preview', label: 'Preview' },
+            ];
+            const activeIndex = Math.max(
+              0,
+              steps.findIndex((s) => s.key === checkoutWizardStep)
+            );
+            return (
+              <div className="border-b border-border/60 bg-background px-5 py-4 sm:px-6">
+                <div className="flex items-start gap-3">
+                  <div
+                    className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl text-white shadow-sm ${
+                      checkoutWizardStep === 'weekly_report'
+                        ? 'bg-gradient-to-br from-indigo-600 to-violet-600'
+                        : checkoutWizardStep === 'form'
+                          ? 'bg-gradient-to-br from-amber-500 to-orange-600'
+                          : 'bg-gradient-to-br from-blue-600 to-indigo-600'
+                    }`}
+                  >
                     {checkoutWizardStep === 'weekly_report' ? (
-                      <ClipboardList className="h-6 w-6" />
+                      <ClipboardList className="h-5 w-5" />
                     ) : checkoutWizardStep === 'form' ? (
-                      <LogOut className="h-6 w-6" />
+                      <LogOut className="h-5 w-5" />
                     ) : (
-                      <FileText className="h-6 w-6" />
+                      <FileText className="h-5 w-5" />
                     )}
                   </div>
-                  {checkoutWizardStep === 'weekly_report'
-                    ? 'Weekly Report'
-                    : checkoutWizardStep === 'form'
-                      ? isEditing
-                        ? 'Update Work Submission'
-                        : 'Complete Checkout'
-                      : 'Daily Work Preview'}
-                </DialogTitle>
-                <DialogDescription className="text-base text-white/90">
-                  {checkoutWizardStep === 'weekly_report'
-                    ? 'Fill this short weekly summary, then you can log hours and check out.'
-                    : checkoutWizardStep === 'form'
-                      ? isEditing
-                        ? 'Review and update your daily work submission.'
-                        : 'Log hours to check out. Tasks and project notes are optional — Office/WFH was already set at check-in.'
-                      : 'Copy or share your daily work update.'}
-                </DialogDescription>
-              </DialogHeader>
-            </div>
-          </div>
+                  <DialogHeader className="min-w-0 flex-1 space-y-0.5 text-left">
+                    <DialogTitle className="truncate text-lg font-semibold leading-6 text-foreground">
+                      {checkoutWizardStep === 'weekly_report'
+                        ? 'Weekly Report'
+                        : checkoutWizardStep === 'form'
+                          ? isEditing
+                            ? 'Update Work Submission'
+                            : 'Complete Checkout'
+                          : 'Daily Work Preview'}
+                    </DialogTitle>
+                    <DialogDescription className="text-sm text-muted-foreground">
+                      {checkoutWizardStep === 'weekly_report'
+                        ? 'Fill this short weekly summary, then you can log hours and check out.'
+                        : checkoutWizardStep === 'form'
+                          ? isEditing
+                            ? 'Review and update your daily work submission.'
+                            : `${formatAttendanceDateLabel(form.submission_date)}`
+                          : 'Copy or share your daily work update.'}
+                    </DialogDescription>
+                  </DialogHeader>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    disabled={loading}
+                    onClick={() => {
+                      if (checkoutWizardStep === 'preview') {
+                        closeCheckoutWizard();
+                      } else {
+                        dismissCheckoutWizard();
+                      }
+                    }}
+                    className="h-9 w-9 shrink-0 rounded-xl text-muted-foreground hover:text-foreground"
+                    aria-label="Close dialog"
+                  >
+                    <X className="h-4 w-4" />
+                  </Button>
+                </div>
+                {steps.length > 1 ? (
+                  <ol className="mt-4 flex items-center gap-2" aria-label="Checkout progress">
+                    {steps.map((step, idx) => {
+                      const done = idx < activeIndex;
+                      const current = idx === activeIndex;
+                      return (
+                        <li key={step.key} className="flex min-w-0 flex-1 items-center gap-2">
+                          <span
+                            className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-lg text-[11px] font-semibold ${
+                              done
+                                ? 'bg-emerald-500 text-white'
+                                : current
+                                  ? 'bg-primary text-primary-foreground'
+                                  : 'bg-muted text-muted-foreground'
+                            }`}
+                            aria-current={current ? 'step' : undefined}
+                          >
+                            {done ? <CheckCircle2 className="h-3.5 w-3.5" /> : idx + 1}
+                          </span>
+                          <span
+                            className={`truncate text-xs font-medium ${
+                              current ? 'text-foreground' : 'text-muted-foreground'
+                            }`}
+                          >
+                            {step.label}
+                          </span>
+                          {idx < steps.length - 1 ? (
+                            <span
+                              className={`h-px min-w-4 flex-1 ${done ? 'bg-emerald-500/60' : 'bg-border'}`}
+                              aria-hidden
+                            />
+                          ) : null}
+                        </li>
+                      );
+                    })}
+                  </ol>
+                ) : null}
+              </div>
+            );
+          })()}
 
           {checkoutWizardStep === 'weekly_report' ? (
             <WeeklyReportStep
@@ -3322,33 +3403,36 @@ export function DailyWorkFlowPanel({
             />
           ) : checkoutWizardStep === 'form' ? (
             <>
-              <div className="flex-1 overflow-y-auto bg-gray-50/50 p-5 dark:bg-gray-900/50 sm:p-6">
-                <div className="space-y-6">
-                  {/* Basic Information */}
-                  <div className="rounded-xl border border-gray-200 bg-white p-5 shadow-sm dark:border-gray-700 dark:bg-gray-800">
-                    <div className="mb-5 flex items-center gap-3">
-                      <div className="rounded-lg bg-blue-100 p-1.5 dark:bg-blue-900/30">
-                        <Calendar className="h-5 w-5 text-blue-600 dark:text-blue-400" />
+              <div className="flex-1 overflow-y-auto bg-muted/30 px-5 py-5 sm:px-6">
+                <div className="flex flex-col gap-4">
+                  {/* Hours */}
+                  <section className="rounded-2xl border border-border/60 bg-card p-4 shadow-sm sm:p-5">
+                    <div className="mb-4 flex items-center gap-3">
+                      <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-blue-500/10 text-blue-600 dark:text-blue-400">
+                        <Clock className="h-4 w-4" />
                       </div>
-                      <h3 className="text-base font-semibold text-gray-900 dark:text-white">Basic Information</h3>
+                      <div className="min-w-0 flex-1">
+                        <h3 className="text-sm font-semibold text-foreground">Hours &amp; status</h3>
+                        <p className="text-xs text-muted-foreground">Daily hours are capped at 8.</p>
+                      </div>
                     </div>
-                    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 md:grid-cols-3 md:items-stretch">
-                      <div className="flex flex-col gap-2">
-                        <Label htmlFor="checkout-work-date" className="text-sm font-medium leading-5 text-gray-700 dark:text-gray-300">
-                          Work Date <span className="text-red-500">*</span>
-                        </Label>
+                    <div className="grid grid-cols-12 gap-4">
+                      <div className="col-span-12 flex flex-col gap-1.5 sm:col-span-6 md:col-span-4">
+                        <span id="checkout-work-date-label" className="text-sm font-medium leading-5 text-foreground">
+                          Work date <span className="text-destructive">*</span>
+                        </span>
                         <div
-                          id="checkout-work-date"
-                          className="flex h-11 items-center gap-2 rounded-md border border-gray-200 bg-gray-50 px-3 text-sm text-gray-900 dark:border-gray-700 dark:bg-gray-900/60 dark:text-gray-100"
+                          aria-labelledby="checkout-work-date-label"
+                          className="flex h-11 items-center gap-2 rounded-xl border border-input bg-muted/40 px-3 text-sm text-foreground"
                         >
-                          <Calendar className="h-4 w-4 shrink-0 text-gray-500 dark:text-gray-400" />
+                          <Calendar className="h-4 w-4 shrink-0 text-muted-foreground" />
                           <span className="truncate">{formatAttendanceDateLabel(form.submission_date)}</span>
                         </div>
                       </div>
-                      <div className="flex flex-col gap-2">
-                        <Label htmlFor="checkout-hours" className="text-sm font-medium leading-5 text-gray-700 dark:text-gray-300">
-                          Hours Worked <span className="text-red-500">*</span>
-                        </Label>
+                      <div className="col-span-12 flex flex-col gap-1.5 sm:col-span-6 md:col-span-4">
+                        <span className="text-sm font-medium leading-5 text-foreground">
+                          Hours worked <span className="text-destructive">*</span>
+                        </span>
                         <HourPicker
                           value={form.hours_today}
                           onChange={(v) => setForm((p) => ({ ...p, hours_today: v }))}
@@ -3356,58 +3440,61 @@ export function DailyWorkFlowPanel({
                           max={8}
                           step={0.25}
                           placeholder="Select hours"
-                          className="h-11"
+                          className="h-11 rounded-xl"
                         />
                       </div>
-                      <div className="flex flex-col gap-2 sm:col-span-2 md:col-span-1">
-                        <Label htmlFor="checkout-planned-status" className="text-sm font-medium leading-5 text-gray-700 dark:text-gray-300">
-                          Planned Work Status
-                        </Label>
+                      <div className="col-span-12 flex flex-col gap-1.5 md:col-span-4">
+                        <span className="text-sm font-medium leading-5 text-foreground">Planned work status</span>
                         <StatusDropdown
                           value={form.planned_work_status || 'not_started'}
                           onChange={(value) => setForm((p) => ({ ...p, planned_work_status: value }))}
                           placeholder="Select status"
-                          className="h-11 w-full"
+                          className="h-11 w-full rounded-xl"
                         />
                       </div>
                     </div>
-                    <div className="mt-4 rounded-lg border border-blue-200 bg-blue-50/80 p-4 dark:border-blue-800 dark:bg-blue-950/20">
-                      <div className="flex items-start gap-3">
-                        <Checkbox
-                          id="checkout-request-admin-approval"
-                          checked={requestAdminApproval}
-                          onCheckedChange={(checked) => {
-                            const enabled = Boolean(checked);
-                            setRequestAdminApproval(enabled);
-                            if (!enabled) {
-                              setRequestedExtraHours(0);
-                              setApprovalReason('');
-                            }
-                          }}
-                          className="mt-0.5"
-                        />
-                        <div className="min-w-0 space-y-1">
-                          <Label
-                            htmlFor="checkout-request-admin-approval"
-                            className="cursor-pointer text-sm font-semibold text-blue-900 dark:text-blue-200"
-                          >
-                            Worked more than 8 hours? Request Admin Approval
-                          </Label>
-                          <p className="text-xs text-blue-700 dark:text-blue-300">
-                            Daily hours are capped at 8. Use this to request extra-hour approval.
-                          </p>
-                        </div>
-                      </div>
-                    </div>
+
+                    <label
+                      htmlFor="checkout-request-admin-approval"
+                      className={`mt-4 flex cursor-pointer items-start gap-3 rounded-xl border p-3.5 transition-colors ${
+                        requestAdminApproval
+                          ? 'border-blue-300 bg-blue-50/80 dark:border-blue-800 dark:bg-blue-950/30'
+                          : 'border-border/60 bg-muted/30 hover:bg-muted/50'
+                      }`}
+                    >
+                      <Checkbox
+                        id="checkout-request-admin-approval"
+                        checked={requestAdminApproval}
+                        onCheckedChange={(checked) => {
+                          const enabled = Boolean(checked);
+                          setRequestAdminApproval(enabled);
+                          if (!enabled) {
+                            setRequestedExtraHours(0);
+                            setApprovalReason('');
+                          }
+                        }}
+                        className="mt-0.5"
+                      />
+                      <span className="min-w-0 flex-1">
+                        <span className="block text-sm font-medium text-foreground">
+                          Worked more than 8 hours?
+                        </span>
+                        <span className="block text-xs text-muted-foreground">
+                          Request admin approval for the extra hours.
+                        </span>
+                      </span>
+                    </label>
+
                     {requestAdminApproval ? (
-                      <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2 sm:items-stretch">
-                        <div className="flex min-w-0 flex-col gap-2">
-                          <Label htmlFor="checkout-extra-hours" className="text-sm font-medium leading-5 text-gray-700 dark:text-gray-300">
-                            Requested Extra Hours
+                      <div className="mt-4 grid grid-cols-12 gap-4">
+                        <div className="col-span-12 flex flex-col gap-1.5 sm:col-span-4">
+                          <Label htmlFor="checkout-extra-hours" className="text-sm font-medium leading-5 text-foreground">
+                            Extra hours <span className="text-destructive">*</span>
                           </Label>
                           <Input
                             id="checkout-extra-hours"
                             type="number"
+                            inputMode="decimal"
                             min={0.25}
                             max={16}
                             step={0.25}
@@ -3417,119 +3504,43 @@ export function DailyWorkFlowPanel({
                               setRequestedExtraHours(Math.max(0, Math.min(16, next)));
                             }}
                             placeholder="e.g. 2"
-                            className="h-11 border-2 border-gray-200 bg-white dark:border-gray-700 dark:bg-gray-900"
+                            aria-invalid={!(requestedExtraHours > 0)}
+                            className="h-11 rounded-xl bg-background"
                           />
+                          <p
+                            className={`text-xs ${requestedExtraHours > 0 ? 'text-muted-foreground' : 'text-destructive'}`}
+                            role={requestedExtraHours > 0 ? undefined : 'alert'}
+                          >
+                            {requestedExtraHours > 0 ? 'Up to 16 hours.' : 'Enter the extra hours (0.25–16).'}
+                          </p>
                         </div>
-                        <div className="flex min-w-0 flex-col gap-2">
-                          <Label htmlFor="checkout-approval-reason" className="text-sm font-medium leading-5 text-gray-700 dark:text-gray-300">
-                            Reason for Approval
-                          </Label>
+                        <div className="col-span-12 flex flex-col gap-1.5 sm:col-span-8">
+                          <div className="flex items-center justify-between gap-2">
+                            <Label htmlFor="checkout-approval-reason" className="text-sm font-medium leading-5 text-foreground">
+                              Reason <span className="text-destructive">*</span>
+                            </Label>
+                            <span className="text-[11px] tabular-nums text-muted-foreground">
+                              {approvalReason.length}/500
+                            </span>
+                          </div>
                           <Input
                             id="checkout-approval-reason"
                             value={approvalReason}
-                            onChange={(e) => setApprovalReason(e.target.value)}
-                            placeholder="Explain why extra hours are needed..."
-                            className="h-11 border-2 border-gray-200 bg-white dark:border-gray-700 dark:bg-gray-900"
+                            maxLength={500}
+                            onChange={(e) => setApprovalReason(e.target.value.slice(0, 500))}
+                            placeholder="Why were extra hours needed?"
+                            aria-invalid={!approvalReason.trim()}
+                            className="h-11 rounded-xl bg-background"
                           />
+                          {!approvalReason.trim() ? (
+                            <p className="text-xs text-destructive" role="alert">
+                              A reason is required for approval.
+                            </p>
+                          ) : null}
                         </div>
                       </div>
                     ) : null}
-                  </div>
-
-                  {/* Daily Tasks */}
-                  <div className="rounded-xl border border-gray-200 bg-white p-5 shadow-sm dark:border-gray-700 dark:bg-gray-800">
-                    <div className="mb-5 flex items-center gap-3">
-                      <div className="rounded-lg bg-emerald-100 p-1.5 dark:bg-emerald-900/30">
-                        <ListTodo className="h-5 w-5 text-emerald-600 dark:text-emerald-400" />
-                      </div>
-                      <div className="min-w-0 flex-1">
-                        <h3 className="text-base font-semibold text-gray-900 dark:text-white">Daily Tasks</h3>
-                        <p className="text-xs text-gray-500 dark:text-gray-400">
-                          Optional — add tasks if you want them on today’s summary
-                          {taskCounts.total > 0 ? (
-                            <span className="ml-1 font-medium text-emerald-600 dark:text-emerald-400">
-                              · {taskCounts.total} {taskCounts.total === 1 ? 'item' : 'items'} total
-                            </span>
-                          ) : null}
-                        </p>
-                      </div>
-                      {taskCounts.total > 0 ? (
-                        <span className="shrink-0 rounded-full bg-emerald-100 px-2.5 py-1 text-xs font-bold text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300">
-                          {taskCounts.total}
-                        </span>
-                      ) : null}
-                    </div>
-                    <div className="grid grid-cols-1 gap-4 md:grid-cols-2 md:items-stretch">
-                      <div className="flex flex-col gap-2">
-                        <div className="flex min-h-5 items-center justify-between gap-2">
-                          <Label htmlFor="checkout-completed" className="text-sm font-medium leading-5 text-gray-700 dark:text-gray-300">
-                            Completed Tasks
-                          </Label>
-                          <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-[11px] font-semibold tabular-nums text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300">
-                            {taskCounts.completed}
-                          </span>
-                        </div>
-                        <Textarea
-                          id="checkout-completed"
-                          value={form.completed_tasks || ''}
-                          onChange={(e) => setForm((p) => ({ ...p, completed_tasks: e.target.value }))}
-                          className="min-h-[120px] flex-1 resize-none border-2 border-gray-200 bg-white dark:border-gray-700 dark:bg-gray-900"
-                          placeholder="List completed tasks..."
-                        />
-                      </div>
-                      <div className="flex flex-col gap-2">
-                        <div className="flex min-h-5 items-center justify-between gap-2">
-                          <Label htmlFor="checkout-pending" className="text-sm font-medium leading-5 text-gray-700 dark:text-gray-300">
-                            Pending Tasks
-                          </Label>
-                          <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-semibold tabular-nums text-amber-700 dark:bg-amber-900/30 dark:text-amber-300">
-                            {taskCounts.pending}
-                          </span>
-                        </div>
-                        <Textarea
-                          id="checkout-pending"
-                          value={form.pending_tasks || ''}
-                          onChange={(e) => setForm((p) => ({ ...p, pending_tasks: e.target.value }))}
-                          className="min-h-[120px] flex-1 resize-none border-2 border-gray-200 bg-white dark:border-gray-700 dark:bg-gray-900"
-                          placeholder="List pending tasks..."
-                        />
-                      </div>
-                      <div className="flex flex-col gap-2">
-                        <div className="flex min-h-5 items-center justify-between gap-2">
-                          <Label htmlFor="checkout-ongoing" className="text-sm font-medium leading-5 text-gray-700 dark:text-gray-300">
-                            Ongoing Tasks
-                          </Label>
-                          <span className="rounded-full bg-blue-100 px-2 py-0.5 text-[11px] font-semibold tabular-nums text-blue-700 dark:bg-blue-900/30 dark:text-blue-300">
-                            {taskCounts.ongoing}
-                          </span>
-                        </div>
-                        <Textarea
-                          id="checkout-ongoing"
-                          value={form.ongoing_tasks || ''}
-                          onChange={(e) => setForm((p) => ({ ...p, ongoing_tasks: e.target.value }))}
-                          className="min-h-[120px] flex-1 resize-none border-2 border-gray-200 bg-white dark:border-gray-700 dark:bg-gray-900"
-                          placeholder="List ongoing tasks..."
-                        />
-                      </div>
-                      <div className="flex flex-col gap-2">
-                        <div className="flex min-h-5 items-center justify-between gap-2">
-                          <Label htmlFor="checkout-upcoming" className="text-sm font-medium leading-5 text-gray-700 dark:text-gray-300">
-                            Upcoming Tasks
-                          </Label>
-                          <span className="rounded-full bg-orange-100 px-2 py-0.5 text-[11px] font-semibold tabular-nums text-orange-700 dark:bg-orange-900/30 dark:text-orange-300">
-                            {taskCounts.upcoming}
-                          </span>
-                        </div>
-                        <Textarea
-                          id="checkout-upcoming"
-                          value={form.notes || ''}
-                          onChange={(e) => setForm((p) => ({ ...p, notes: e.target.value }))}
-                          className="min-h-[120px] flex-1 resize-none border-2 border-gray-200 bg-white dark:border-gray-700 dark:bg-gray-900"
-                          placeholder="List upcoming tasks..."
-                        />
-                      </div>
-                    </div>
-                  </div>
+                  </section>
 
                   <CheckoutProjectUpdatesCard
                     projects={checkoutProjects}
@@ -3558,91 +3569,163 @@ export function DailyWorkFlowPanel({
                     loading={loadingProjects && checkoutProjects.length === 0 && assignableCheckoutProjects.length === 0}
                   />
 
-                  {/* Work Notes */}
-                  <div className="rounded-xl border border-gray-200 bg-white p-5 shadow-sm dark:border-gray-700 dark:bg-gray-800">
-                    <div className="mb-5 flex items-center gap-3">
-                      <div className="rounded-lg bg-purple-100 p-1.5 dark:bg-purple-900/30">
-                        <FileText className="h-5 w-5 text-purple-600 dark:text-purple-400" />
+                  {/* Daily Tasks */}
+                  <section className="rounded-2xl border border-border/60 bg-card p-4 shadow-sm sm:p-5">
+                    <div className="mb-4 flex items-center gap-3">
+                      <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-emerald-500/10 text-emerald-600 dark:text-emerald-400">
+                        <ListTodo className="h-4 w-4" />
                       </div>
-                      <h3 className="text-base font-semibold text-gray-900 dark:text-white">Work Notes</h3>
+                      <div className="min-w-0 flex-1">
+                        <h3 className="text-sm font-semibold text-foreground">Daily tasks</h3>
+                        <p className="text-xs text-muted-foreground">
+                          Optional · one task per line
+                        </p>
+                      </div>
+                      <span className="shrink-0 rounded-xl border border-border/60 bg-muted/40 px-2.5 py-1 text-xs font-medium tabular-nums text-muted-foreground">
+                        {taskCounts.total} {taskCounts.total === 1 ? 'item' : 'items'}
+                      </span>
                     </div>
-                    <div className="flex flex-col gap-2">
-                      <Label htmlFor="checkout-work-notes" className="text-sm font-medium leading-5 text-gray-700 dark:text-gray-300">
-                        Additional notes about your work today
-                      </Label>
-                      <Textarea
-                        id="checkout-work-notes"
-                        value={form.planned_work_notes || ''}
-                        onChange={(e) => setForm((p) => ({ ...p, planned_work_notes: e.target.value }))}
-                        className="min-h-[120px] w-full resize-none border-2 border-gray-200 bg-white dark:border-gray-700 dark:bg-gray-900"
-                        placeholder="Additional notes about your work today..."
-                      />
+                    <div className="grid grid-cols-12 gap-4">
+                      {(
+                        [
+                          { id: 'checkout-completed', label: 'Completed', field: 'completed_tasks', count: taskCounts.completed, dot: 'bg-emerald-500', placeholder: 'What did you finish today?' },
+                          { id: 'checkout-ongoing', label: 'Ongoing', field: 'ongoing_tasks', count: taskCounts.ongoing, dot: 'bg-blue-500', placeholder: 'What is still in progress?' },
+                          { id: 'checkout-pending', label: 'Pending', field: 'pending_tasks', count: taskCounts.pending, dot: 'bg-amber-500', placeholder: 'What is blocked or waiting?' },
+                          { id: 'checkout-upcoming', label: 'Upcoming', field: 'notes', count: taskCounts.upcoming, dot: 'bg-orange-500', placeholder: 'What is next?' },
+                        ] as const
+                      ).map((task) => (
+                        <div key={task.id} className="col-span-12 flex flex-col gap-1.5 md:col-span-6">
+                          <div className="flex items-center justify-between gap-2">
+                            <Label htmlFor={task.id} className="flex items-center gap-2 text-sm font-medium leading-5 text-foreground">
+                              <span className={`h-2 w-2 rounded-full ${task.dot}`} aria-hidden />
+                              {task.label}
+                            </Label>
+                            <span className="text-[11px] tabular-nums text-muted-foreground">
+                              {task.count} {task.count === 1 ? 'line' : 'lines'}
+                            </span>
+                          </div>
+                          <Textarea
+                            id={task.id}
+                            value={form[task.field] || ''}
+                            onChange={(e) => {
+                              const value = e.target.value;
+                              setForm((p) => ({ ...p, [task.field]: value }));
+                            }}
+                            className="min-h-[104px] resize-y rounded-xl bg-background text-sm leading-relaxed"
+                            placeholder={task.placeholder}
+                          />
+                        </div>
+                      ))}
                     </div>
-                  </div>
+                  </section>
 
-                  {!canSubmit ? (
-                    <div className="flex items-start gap-3 rounded-xl border-2 border-red-200 bg-red-50 p-4 dark:border-red-800 dark:bg-red-950/20">
-                      <div className="rounded-lg bg-red-500 p-1.5 shrink-0">
-                        <AlertTriangle className="h-4 w-4 text-white" />
+                  {/* Work Notes */}
+                  <section className="rounded-2xl border border-border/60 bg-card p-4 shadow-sm sm:p-5">
+                    <div className="mb-4 flex items-center gap-3">
+                      <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-purple-500/10 text-purple-600 dark:text-purple-400">
+                        <FileText className="h-4 w-4" />
                       </div>
-                      <p className="text-sm leading-relaxed text-red-700 dark:text-red-300">
-                        Set hours worked (1–8) and allocate them across Lunch, Breaks
-                        {isGrowthGlimpseDay(form.submission_date || serverToday)
-                          ? ', Growth Glimpse'
-                          : ''}
-                        , projects, and Other so the total matches. Mark slots you skipped. Tasks and
-                        Office/WFH are not required here.
-                      </p>
+                      <div className="min-w-0 flex-1">
+                        <h3 className="text-sm font-semibold text-foreground">Work notes</h3>
+                        <p className="text-xs text-muted-foreground">Optional · anything else worth sharing</p>
+                      </div>
                     </div>
-                  ) : null}
+                    <Label htmlFor="checkout-work-notes" className="sr-only">
+                      Additional notes about your work today
+                    </Label>
+                    <Textarea
+                      id="checkout-work-notes"
+                      value={form.planned_work_notes || ''}
+                      onChange={(e) => setForm((p) => ({ ...p, planned_work_notes: e.target.value }))}
+                      className="min-h-[104px] w-full resize-y rounded-xl bg-background text-sm leading-relaxed"
+                      placeholder="Blockers, decisions, links…"
+                    />
+                  </section>
                 </div>
               </div>
 
-              <DialogFooter className="border-t border-gray-200 bg-white p-5 dark:border-gray-700 dark:bg-gray-800 sm:px-6">
-                <Button
-                  disabled={!canSubmit || loading}
-                  onClick={() => void onSubmit({ openPreviewAfter: true })}
-                  className="h-11 w-full bg-gradient-to-r from-amber-600 to-orange-600 font-semibold text-white hover:from-amber-700 hover:to-orange-700"
-                >
-                  {loading ? (
-                    <span className="flex items-center gap-2">
-                      <span className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
-                      Submitting...
-                    </span>
-                  ) : isEditing ? (
-                    'Update Submission'
-                  ) : (
-                    'Complete Checkout'
-                  )}
-                </Button>
+              <DialogFooter className="border-t border-border/60 bg-background px-5 py-4 sm:px-6">
+                <div className="flex w-full flex-col-reverse gap-3 sm:flex-row sm:items-center sm:justify-between">
+                  <div className="min-w-0 text-xs sm:max-w-[55%]" aria-live="polite">
+                    {checkoutMissing.length > 0 ? (
+                      <span className="flex items-start gap-1.5 text-amber-700 dark:text-amber-400">
+                        <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+                        <span>
+                          Still needed: {checkoutMissing.join(', ')}
+                          {checkoutMissing.includes('hour allocation')
+                            ? ` — split hours across Lunch, Breaks${
+                                isGrowthGlimpseDay(form.submission_date || serverToday) ? ', Growth Glimpse' : ''
+                              }, projects and Other.`
+                            : '.'}
+                        </span>
+                      </span>
+                    ) : (
+                      <span className="flex items-center gap-1.5 text-emerald-700 dark:text-emerald-400">
+                        <CheckCircle2 className="h-3.5 w-3.5 shrink-0" />
+                        {isEditing ? 'Ready to update.' : 'Ready to check out · draft saved on this device.'}
+                      </span>
+                    )}
+                  </div>
+                  <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+                    <Button
+                      type="button"
+                      disabled={!canSubmit || loading}
+                      onClick={() => void onSubmit({ openPreviewAfter: true })}
+                      className="h-10 w-full rounded-xl bg-gradient-to-r from-amber-500 to-orange-600 font-semibold text-white hover:from-amber-600 hover:to-orange-700 sm:w-auto sm:min-w-[170px]"
+                    >
+                      {loading ? (
+                        <>
+                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                          Submitting…
+                        </>
+                      ) : isEditing ? (
+                        'Update submission'
+                      ) : (
+                        <>
+                          <LogOut className="mr-2 h-4 w-4" />
+                          Complete checkout
+                        </>
+                      )}
+                    </Button>
+                  </div>
+                </div>
               </DialogFooter>
             </>
           ) : (
             <>
-              <div className="flex-1 overflow-y-auto bg-gray-50/50 p-5 dark:bg-gray-900/50 sm:p-6">
-                <div className="rounded-xl border border-gray-200 bg-white p-5 shadow-sm dark:border-gray-700 dark:bg-gray-800">
-                  <h3 className="mb-4 text-sm font-semibold text-gray-900 dark:text-white">Submission Summary</h3>
-                  <div className="max-h-[50vh] overflow-y-auto overflow-x-hidden rounded-lg border border-gray-200 bg-gray-50 p-4 dark:border-gray-700 dark:bg-gray-900/50">
-                    <pre className="m-0 whitespace-pre-wrap font-mono text-xs leading-relaxed text-gray-700 dark:text-gray-300">
+              <div className="flex-1 overflow-y-auto bg-muted/30 px-5 py-5 sm:px-6">
+                <section className="rounded-2xl border border-border/60 bg-card p-4 shadow-sm sm:p-5">
+                  <div className="mb-4 flex items-center gap-3">
+                    <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-emerald-500/10 text-emerald-600 dark:text-emerald-400">
+                      <CheckCircle2 className="h-4 w-4" />
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <h3 className="text-sm font-semibold text-foreground">Submission summary</h3>
+                      <p className="text-xs text-muted-foreground">Saved. Copy or share it with your team.</p>
+                    </div>
+                  </div>
+                  <div className="max-h-[50vh] overflow-y-auto overflow-x-hidden rounded-xl border border-border/60 bg-muted/40 p-4">
+                    <pre className="m-0 whitespace-pre-wrap font-mono text-xs leading-relaxed text-foreground/80">
                       {template || 'No preview available.'}
                     </pre>
                   </div>
-                </div>
+                </section>
               </div>
-              <DialogFooter className="border-t border-gray-200 bg-white p-5 dark:border-gray-700 dark:bg-gray-800 sm:px-6">
-                <div className="grid w-full grid-cols-2 gap-3">
+              <DialogFooter className="border-t border-border/60 bg-background px-5 py-4 sm:px-6">
+                <div className="grid w-full grid-cols-12 gap-3">
                   <Button
+                    type="button"
                     variant="outline"
                     onClick={() => void onCopyPreview()}
-                    className="h-11 w-full border-2"
+                    className="col-span-6 h-10 w-full rounded-xl"
                   >
                     <ClipboardCopy className="mr-2 h-4 w-4" />
                     Copy
                   </Button>
                   <Button
-                    variant="outline"
+                    type="button"
                     onClick={() => void onSharePreview()}
-                    className="h-11 w-full border-2"
+                    className="col-span-6 h-10 w-full rounded-xl"
                   >
                     <Share2 className="mr-2 h-4 w-4" />
                     Share

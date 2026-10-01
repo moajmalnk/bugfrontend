@@ -1,4 +1,5 @@
 import { ENV } from '@/lib/env';
+import { notifyAdminNavCountsChanged } from '@/lib/navCountsEvents';
 
 export interface SharedTask {
   id?: number;
@@ -122,6 +123,7 @@ export const sharedTaskService = {
       if (!data?.success) {
         throw new Error(data?.message || 'Failed to create shared task');
       }
+      notifyAdminNavCountsChanged();
       return data?.data;
     } catch (error: any) {
       console.error('Error creating shared task:', error);
@@ -146,6 +148,7 @@ export const sharedTaskService = {
       if (!data?.success) {
         throw new Error(data?.message || 'Failed to update shared task');
       }
+      notifyAdminNavCountsChanged();
       return data?.data;
     } catch (error: any) {
       console.error('Error updating shared task:', error);
@@ -169,6 +172,7 @@ export const sharedTaskService = {
       if (!data?.success) {
         throw new Error(data?.message || 'Failed to delete shared task');
       }
+      notifyAdminNavCountsChanged();
     } catch (error: any) {
       console.error('Error deleting shared task:', error);
       throw error;
@@ -193,6 +197,7 @@ export const sharedTaskService = {
     if (!response.ok) {
       throw new Error(data.message || 'Failed to complete task');
     }
+    notifyAdminNavCountsChanged();
   },
 
   async uncompleteTaskForUser(taskId: number): Promise<void> {
@@ -213,6 +218,7 @@ export const sharedTaskService = {
     if (!response.ok) {
       throw new Error(data.message || 'Failed to uncomplete task');
     }
+    notifyAdminNavCountsChanged();
   },
 
   async declineTask(taskId: number): Promise<void> {

@@ -31,6 +31,15 @@ function formatRange(start: string, end: string) {
   }
 }
 
+/** Why: Leave types vary per company, so cards split the 12-col row evenly instead of leaving empty slots. */
+function balanceSpan(count: number): string {
+  if (count <= 1) return 'col-span-12';
+  if (count === 2) return 'col-span-12 sm:col-span-6';
+  if (count === 3) return 'col-span-12 sm:col-span-4';
+  if (count === 4) return 'col-span-12 sm:col-span-6 lg:col-span-3';
+  return 'col-span-12 sm:col-span-6 lg:col-span-4';
+}
+
 export function UserLeaveDetails({ userId, username }: Props) {
   const { currentUser } = useAuth();
   const role = getEffectiveRole(currentUser || {});
@@ -101,9 +110,9 @@ export function UserLeaveDetails({ userId, username }: Props) {
     return (
       <div className="space-y-3">
         <Skeleton className="h-8 w-48" />
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-          {[1, 2, 3, 4].map((i) => (
-            <Skeleton key={i} className="h-20 rounded-xl" />
+        <div className="grid grid-cols-12 gap-4">
+          {[1, 2, 3].map((i) => (
+            <Skeleton key={i} className={`${balanceSpan(3)} h-20 rounded-xl`} />
           ))}
         </div>
         <Skeleton className="h-28 w-full rounded-xl" />
@@ -154,11 +163,11 @@ export function UserLeaveDetails({ userId, username }: Props) {
       </div>
 
       {balances.length > 0 ? (
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+        <div className="grid grid-cols-12 gap-4">
           {balances.map((b) => (
             <div
               key={b.id}
-              className="rounded-xl border border-border/50 bg-background/50 p-3 space-y-1"
+              className={`${balanceSpan(balances.length)} min-w-0 rounded-xl border border-border/50 bg-background/50 p-3 space-y-1`}
             >
               <div className="text-xs font-medium text-muted-foreground truncate">{b.name}</div>
               <div className="text-xl font-bold tabular-nums text-teal-700 dark:text-teal-300">

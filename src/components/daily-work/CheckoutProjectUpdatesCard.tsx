@@ -81,9 +81,9 @@ export function CheckoutProjectUpdatesCard({
 
   if (loading) {
     return (
-      <div className="rounded-xl border border-gray-200 bg-white p-5 shadow-sm dark:border-gray-700 dark:bg-gray-800">
+      <div className="rounded-2xl border border-border/60 bg-card p-4 shadow-sm sm:p-5">
         <div className="mb-5 flex items-center gap-3">
-          <Skeleton className="h-9 w-9 rounded-lg" />
+          <Skeleton className="h-8 w-8 rounded-xl" />
           <Skeleton className="h-5 w-48" />
         </div>
         <div className="space-y-4">
@@ -95,17 +95,17 @@ export function CheckoutProjectUpdatesCard({
   }
 
   return (
-    <div className="rounded-xl border border-gray-200 bg-white p-5 shadow-sm dark:border-gray-700 dark:bg-gray-800">
+    <div className="rounded-2xl border border-border/60 bg-card p-4 shadow-sm sm:p-5">
       <div className="mb-5 flex flex-wrap items-start justify-between gap-3">
         <div className="flex items-center gap-3 min-w-0">
-          <div className="rounded-lg bg-indigo-100 p-1.5 dark:bg-indigo-900/30">
-            <FolderKanban className="h-5 w-5 text-indigo-600 dark:text-indigo-400" />
+          <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-indigo-500/10 text-indigo-600 dark:text-indigo-400">
+            <FolderKanban className="h-4 w-4" />
           </div>
           <div className="min-w-0">
-            <h3 className="text-base font-semibold text-gray-900 dark:text-white">
+            <h3 className="text-sm font-semibold text-foreground">
               Hours &amp; Project Progress
             </h3>
-            <p className="text-xs text-gray-500 dark:text-gray-400">
+            <p className="text-xs text-muted-foreground">
               Mark Lunch, Breaks, and Growth Glimpse if you took them. Skipped time goes to projects
               or Other. Totals must match {formatHoursShort(target)}h.
             </p>

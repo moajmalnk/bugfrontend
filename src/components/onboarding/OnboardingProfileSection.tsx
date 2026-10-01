@@ -178,50 +178,111 @@ type DetailCell = {
   value?: string | null;
   /** When set, value renders as an external link. */
   href?: string | null;
+  /** IDs, account numbers and codes read better in a fixed-width face. */
+  mono?: boolean;
 };
 
-/**
- * Why: 12-column grid (gap-4) keeps profile detail cards aligned to Codo layout —
- * not an HTML table with uneven pairing.
- */
-function DetailTable({
-  columns,
-  cells,
-}: {
-  columns: 2 | 3;
+function formatDateOnly(value?: string | null): string | null {
+  if (!value) return null;
+  const d = new Date(String(value).slice(0, 10) + "T00:00:00");
+  if (Number.isNaN(d.getTime())) return String(value);
+  return d.toLocaleDateString(undefined, { day: "2-digit", month: "short", year: "numeric" });
+}
+
+type DetailGroup = {
+  title?: string;
   cells: DetailCell[];
-}) {
-  const spanClass =
-    columns === 3
-      ? "col-span-12 sm:col-span-6 lg:col-span-4"
-      : "col-span-12 sm:col-span-6";
+};
+
+const DETAIL_GROUP_SPAN: Record<number, string> = {
+  1: "col-span-12",
+  2: "col-span-12 md:col-span-6",
+  3: "col-span-12 lg:col-span-4",
+  4: "col-span-12 md:col-span-6 xl:col-span-3",
+};
+
+/** Fixed row height so rows line up across side-by-side tables. */
+const DETAIL_ROW = "h-11";
+
+/**
+ * Why: Profile records are label → value data, so a two-column key/value table
+ * keeps every label and value on the same row. Side-by-side tables share one row
+ * height, one label width and one row count (shorter tables get blank rows), so
+ * every table in a section has the same shape and its row lines align.
+ * Long values truncate on one line; the full text is in the tooltip.
+ */
+function DetailTable({ groups }: { groups: DetailGroup[] }) {
+  const span = DETAIL_GROUP_SPAN[groups.length] ?? DETAIL_GROUP_SPAN[3];
+  const rowCount = Math.max(...groups.map((g) => g.cells.length));
+  const anyTitle = groups.some((g) => g.title);
 
   return (
     <div className="grid grid-cols-12 gap-4">
-      {cells.map((cell, i) => {
-        if (!cell.label) return null;
-        const display = (cell.value || "").trim();
-        const href = (cell.href || "").trim();
-        return (
-          <div key={`${cell.label}-${i}`} className={cn("min-w-0", spanClass)}>
-            <p className="text-xs text-muted-foreground">{cell.label}</p>
-            {href && display ? (
-              <a
-                href={href}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-sm text-primary break-all mt-0.5 inline-block hover:underline"
-              >
-                {display}
-              </a>
-            ) : (
-              <p className="text-sm text-foreground break-words mt-0.5">
-                {display || "—"}
-              </p>
-            )}
+      {groups.map((group, gi) => (
+        <div key={group.title || gi} className={cn("min-w-0", span)}>
+          <div className="h-full overflow-hidden rounded-xl border border-border/60">
+            {anyTitle ? (
+              <div className="flex h-9 items-center border-b border-border/60 bg-muted/40 px-4">
+                <p className="truncate text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+                  {group.title || "\u00a0"}
+                </p>
+              </div>
+            ) : null}
+            <table className="w-full table-fixed text-sm">
+              <colgroup>
+                <col className="w-[42%]" />
+                <col />
+              </colgroup>
+              <tbody className="divide-y divide-border/50">
+                {group.cells.map((cell, i) => {
+                  const display = (cell.value || "").trim();
+                  const href = (cell.href || "").trim();
+                  return (
+                    <tr
+                      key={`${cell.label}-${i}`}
+                      className={cn(DETAIL_ROW, "transition-colors hover:bg-muted/30")}
+                    >
+                      <th
+                        scope="row"
+                        title={cell.label}
+                        className="truncate px-4 text-left align-middle text-xs font-medium text-muted-foreground"
+                      >
+                        {cell.label}
+                      </th>
+                      <td
+                        title={display || undefined}
+                        className={cn(
+                          "truncate px-4 align-middle",
+                          display ? "text-foreground" : "text-muted-foreground",
+                          cell.mono && display && "font-mono text-[13px] tabular-nums"
+                        )}
+                      >
+                        {href && display ? (
+                          <a
+                            href={href}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-primary hover:underline"
+                          >
+                            {display}
+                          </a>
+                        ) : (
+                          display || "—"
+                        )}
+                      </td>
+                    </tr>
+                  );
+                })}
+                {Array.from({ length: rowCount - group.cells.length }).map((_, i) => (
+                  <tr key={`filler-${i}`} aria-hidden="true" className={DETAIL_ROW}>
+                    <td colSpan={2} />
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
-        );
-      })}
+        </div>
+      ))}
     </div>
   );
 }
@@ -1188,59 +1249,40 @@ export function OnboardingProfileSection({
         </CardHeader>
         <CardContent className="p-4 sm:p-5 pt-0">
           <DetailTable
-            columns={3}
-            cells={[
-              { label: "Employee ID", value: employment.employee_code },
+            groups={[
               {
-                label: "Join date",
-                value: employment.joining_date
-                  ? new Date(
-                      String(employment.joining_date).slice(0, 10) + "T00:00:00"
-                    ).toLocaleDateString(undefined, {
-                      day: "2-digit",
-                      month: "short",
-                      year: "numeric",
-                    })
-                  : null,
-              },
-              { label: "Job title", value: employment.job_title },
-              { label: "Job level", value: employment.job_level },
-              { label: "Department", value: employment.department },
-              { label: "Reports to", value: employment.reports_to },
-              {
-                label: "Contract type",
-                value: employment.contract_type
-                  ? HR_CONTRACT_TYPES.find(
-                      (o) => o.value === employment.contract_type
-                    )?.label ||
-                    String(employment.contract_type).replace(/_/g, " ")
-                  : null,
-              },
-              { label: "Offer letter", value: employment.offer_letter },
-              {
-                label: "Offer letter shared",
-                value: employment.offer_letter_shared_date
-                  ? new Date(
-                      String(employment.offer_letter_shared_date).slice(0, 10) +
-                        "T00:00:00"
-                    ).toLocaleDateString(undefined, {
-                      day: "2-digit",
-                      month: "short",
-                      year: "numeric",
-                    })
-                  : null,
+                title: "Role",
+                cells: [
+                  { label: "Employee ID", value: employment.employee_code, mono: true },
+                  { label: "Job title", value: employment.job_title },
+                  { label: "Job level", value: employment.job_level },
+                ],
               },
               {
-                label: "End date",
-                value: employment.probation_end_date
-                  ? new Date(
-                      String(employment.probation_end_date).slice(0, 10) + "T00:00:00"
-                    ).toLocaleDateString(undefined, {
-                      day: "2-digit",
-                      month: "short",
-                      year: "numeric",
-                    })
-                  : "NILL",
+                title: "Team",
+                cells: [
+                  { label: "Department", value: employment.department },
+                  { label: "Reports to", value: employment.reports_to },
+                  { label: "Join date", value: formatDateOnly(employment.joining_date) },
+                ],
+              },
+              {
+                title: "Contract",
+                cells: [
+                  {
+                    label: "Contract type",
+                    value: employment.contract_type
+                      ? HR_CONTRACT_TYPES.find((o) => o.value === employment.contract_type)?.label ||
+                        String(employment.contract_type).replace(/_/g, " ")
+                      : null,
+                  },
+                  { label: "End date", value: formatDateOnly(employment.probation_end_date) },
+                  { label: "Offer letter", value: employment.offer_letter },
+                  {
+                    label: "Offer letter shared",
+                    value: formatDateOnly(employment.offer_letter_shared_date),
+                  },
+                ],
               },
             ]}
           />
@@ -1258,54 +1300,60 @@ export function OnboardingProfileSection({
         </CardHeader>
         <CardContent className="p-4 sm:p-5 pt-0">
           <DetailTable
-            columns={3}
-            cells={[
-              { label: "Emergency contact", value: details.emergency_contact },
+            groups={[
               {
-                label: "Emergency verified",
-                value: formatWhen(details.emergency_contact_verified_at),
-              },
-              { label: "Contact email", value: details.contact_email },
-              {
-                label: "Email verified",
-                value: formatWhen(details.contact_email_verified_at),
-              },
-              {
-                label: "Date of birth",
-                value: details.date_of_birth
-                  ? new Date(
-                      String(details.date_of_birth).slice(0, 10) + "T00:00:00"
-                    ).toLocaleDateString(undefined, {
-                      day: "2-digit",
-                      month: "short",
-                      year: "numeric",
-                    })
-                  : null,
+                title: "Contact",
+                cells: [
+                  { label: "Emergency contact", value: details.emergency_contact, mono: true },
+                  {
+                    label: "Emergency verified",
+                    value: formatWhen(details.emergency_contact_verified_at),
+                  },
+                  { label: "Contact email", value: details.contact_email },
+                  {
+                    label: "Email verified",
+                    value: formatWhen(details.contact_email_verified_at),
+                  },
+                ],
               },
               {
-                label: "Gender",
-                value: details.gender
-                  ? String(details.gender)
-                      .replace(/_/g, " ")
-                      .replace(/\b\w/g, (c) => c.toUpperCase())
-                  : null,
+                title: "Personal",
+                cells: [
+                  { label: "Date of birth", value: formatDateOnly(details.date_of_birth) },
+                  {
+                    label: "Gender",
+                    value: details.gender
+                      ? String(details.gender)
+                          .replace(/_/g, " ")
+                          .replace(/\b\w/g, (c) => c.toUpperCase())
+                      : null,
+                  },
+                  {
+                    label: "Marital status",
+                    value: details.marital_status
+                      ? String(details.marital_status).replace(/\b\w/g, (c) => c.toUpperCase())
+                      : null,
+                  },
+                ],
               },
               {
-                label: "Marital status",
-                value: details.marital_status
-                  ? String(details.marital_status).replace(/\b\w/g, (c) =>
-                      c.toUpperCase()
-                    )
-                  : null,
+                title: "Residential address",
+                cells: [
+                  { label: "House", value: details.house_name_number },
+                  { label: "Landmark", value: details.landmark },
+                  { label: "City", value: details.city },
+                  { label: "Post office", value: details.post_office },
+                ],
               },
-              { label: "House", value: details.house_name_number },
-              { label: "Landmark", value: details.landmark },
-              { label: "City", value: details.city },
-              { label: "Post office", value: details.post_office },
-              { label: "PIN", value: details.pin_code },
-              { label: "District", value: details.district },
-              { label: "State", value: details.state },
-              { label: "Country", value: details.country },
+              {
+                title: "Region",
+                cells: [
+                  { label: "PIN", value: details.pin_code, mono: true },
+                  { label: "District", value: details.district },
+                  { label: "State", value: details.state },
+                  { label: "Country", value: details.country },
+                ],
+              },
             ]}
           />
         </CardContent>
@@ -1322,17 +1370,20 @@ export function OnboardingProfileSection({
         </CardHeader>
         <CardContent className="p-4 sm:p-5 pt-0 space-y-4">
           <DetailTable
-            columns={2}
-            cells={[
+            groups={[
               {
-                label: "GitHub",
-                value: details.github_url || null,
-                href: details.github_url || null,
-              },
-              {
-                label: "LinkedIn",
-                value: details.linkedin_url || null,
-                href: details.linkedin_url || null,
+                cells: [
+                  {
+                    label: "GitHub",
+                    value: details.github_url || null,
+                    href: details.github_url || null,
+                  },
+                  {
+                    label: "LinkedIn",
+                    value: details.linkedin_url || null,
+                    href: details.linkedin_url || null,
+                  },
+                ],
               },
             ]}
           />
@@ -1432,23 +1483,100 @@ export function OnboardingProfileSection({
             <CardTitle className="text-lg">Statutory Documents</CardTitle>
           </div>
         </CardHeader>
-        <CardContent className="p-4 sm:p-5 pt-0 flex flex-col gap-3">
-          <DetailRow label="Aadhaar" value={details.aadhaar_number} />
-          <DetailRow label="PAN" value={details.pan_number} />
-          <DocButton
-            label="Aadhaar scan"
-            present={details.has_aadhaar_file}
-            previewBusy={previewBusyKey === "aadhaar_file_path"}
-            onPreview={() => void openPreview("aadhaar_file_path", "Aadhaar scan", "aadhaar")}
-            onDownload={() => download("aadhaar_file_path", "aadhaar")}
-          />
-          <DocButton
-            label="PAN scan"
-            present={details.has_pan_file}
-            previewBusy={previewBusyKey === "pan_file_path"}
-            onPreview={() => void openPreview("pan_file_path", "PAN scan", "pan")}
-            onDownload={() => download("pan_file_path", "pan")}
-          />
+        <CardContent className="p-4 sm:p-5 pt-0">
+          <div className="overflow-x-auto rounded-xl border border-border/60">
+            <table className="w-full min-w-[560px] text-sm">
+              <thead className="bg-muted/40">
+                <tr className="text-left text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+                  <th scope="col" className="px-4 py-2.5">Document</th>
+                  <th scope="col" className="px-4 py-2.5">Number</th>
+                  <th scope="col" className="px-4 py-2.5">Scan</th>
+                  <th scope="col" className="px-4 py-2.5 text-right">Actions</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-border/50">
+                {(
+                  [
+                    {
+                      key: "aadhaar_file_path",
+                      kind: "aadhaar",
+                      label: "Aadhaar",
+                      number: details.aadhaar_number,
+                      present: details.has_aadhaar_file,
+                    },
+                    {
+                      key: "pan_file_path",
+                      kind: "pan",
+                      label: "PAN",
+                      number: details.pan_number,
+                      present: details.has_pan_file,
+                    },
+                  ] as const
+                ).map((doc) => (
+                  <tr key={doc.key} className="transition-colors hover:bg-muted/30">
+                    <td className="px-4 py-3">
+                      <span className="flex items-center gap-2 font-medium text-foreground">
+                        <FileText className="h-4 w-4 shrink-0 text-muted-foreground" />
+                        {doc.label}
+                      </span>
+                    </td>
+                    <td
+                      className={cn(
+                        "px-4 py-3",
+                        doc.number ? "font-mono text-[13px] tabular-nums text-foreground" : "text-muted-foreground"
+                      )}
+                    >
+                      {doc.number || "—"}
+                    </td>
+                    <td className="px-4 py-3">
+                      <span
+                        className={cn(
+                          "inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-semibold",
+                          doc.present
+                            ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300"
+                            : "bg-muted text-muted-foreground"
+                        )}
+                      >
+                        {doc.present ? "Uploaded" : "Not uploaded"}
+                      </span>
+                    </td>
+                    <td className="px-4 py-3">
+                      {doc.present ? (
+                        <div className="flex justify-end gap-2">
+                          <Button
+                            type="button"
+                            size="sm"
+                            className="rounded-xl"
+                            disabled={previewBusyKey === doc.key}
+                            onClick={() => void openPreview(doc.key, `${doc.label} scan`, doc.kind)}
+                          >
+                            {previewBusyKey === doc.key ? (
+                              <Loader2 className="mr-1 h-3.5 w-3.5 animate-spin" />
+                            ) : (
+                              <Eye className="mr-1 h-3.5 w-3.5" />
+                            )}
+                            Preview
+                          </Button>
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant="outline"
+                            className="rounded-xl"
+                            onClick={() => download(doc.key, doc.kind)}
+                          >
+                            <Download className="mr-1 h-3.5 w-3.5" />
+                            Download
+                          </Button>
+                        </div>
+                      ) : (
+                        <p className="text-right text-xs text-muted-foreground">—</p>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         </CardContent>
       </Card>
       ) : null}
@@ -1468,16 +1596,24 @@ export function OnboardingProfileSection({
         </CardHeader>
         <CardContent className="p-4 sm:p-5 pt-0">
           <DetailTable
-            columns={2}
-            cells={[
-              { label: "Account holder", value: details.account_holder_name },
-              { label: "Bank", value: details.bank_name },
-              { label: "Account number", value: details.account_number },
-              { label: "IFSC", value: details.ifsc_code },
-              { label: "Branch", value: details.branch_name },
-              { label: "Account type", value: details.account_type },
-              { label: "UPI ID", value: details.upi_id },
-              { label: "UPI phone", value: details.upi_linked_phone },
+            groups={[
+              {
+                cells: [
+                  { label: "Account holder", value: details.account_holder_name },
+                  { label: "Account number", value: details.account_number, mono: true },
+                  {
+                    label: "Account type",
+                    value: details.account_type
+                      ? String(details.account_type).replace(/\b\w/g, (c) => c.toUpperCase())
+                      : null,
+                  },
+                  { label: "Bank", value: details.bank_name },
+                  { label: "Branch", value: details.branch_name },
+                  { label: "IFSC", value: details.ifsc_code, mono: true },
+                  { label: "UPI ID", value: details.upi_id },
+                  { label: "UPI phone", value: details.upi_linked_phone, mono: true },
+                ],
+              },
             ]}
           />
         </CardContent>
@@ -1497,27 +1633,29 @@ export function OnboardingProfileSection({
             <CardTitle className="text-lg">Agreements & verification times</CardTitle>
           </div>
         </CardHeader>
-        <CardContent className="p-4 sm:p-5 pt-0 grid grid-cols-12 gap-4">
-          <div className="col-span-12">
-            <DetailRow
-              label="Terms accepted"
-              value={formatWhen(data?.terms_accepted_at || data?.user?.terms_accepted_at)}
-            />
-          </div>
-          <div className="col-span-12">
-            <DetailRow
-              label="Privacy accepted"
-              value={formatWhen(data?.privacy_accepted_at || data?.user?.privacy_accepted_at)}
-            />
-          </div>
-          <div className="col-span-12">
-            <DetailRow
-              label="Onboarding completed"
-              value={formatWhen(
-                data?.onboarding_completed_at || data?.user?.onboarding_completed_at
-              )}
-            />
-          </div>
+        <CardContent className="p-4 sm:p-5 pt-0">
+          <DetailTable
+            groups={[
+              {
+                cells: [
+                  {
+                    label: "Terms accepted",
+                    value: formatWhen(data?.terms_accepted_at || data?.user?.terms_accepted_at),
+                  },
+                  {
+                    label: "Privacy accepted",
+                    value: formatWhen(data?.privacy_accepted_at || data?.user?.privacy_accepted_at),
+                  },
+                  {
+                    label: "Onboarding completed",
+                    value: formatWhen(
+                      data?.onboarding_completed_at || data?.user?.onboarding_completed_at
+                    ),
+                  },
+                ],
+              },
+            ]}
+          />
         </CardContent>
       </Card>
       ) : null}

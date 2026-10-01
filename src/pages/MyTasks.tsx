@@ -8,8 +8,7 @@ import { Badge } from '@/components/ui/badge';
 import { toast } from '@/components/ui/use-toast';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
-import { Label } from '@/components/ui/label';
-import { Plus, Search, Filter, Clock, ListChecks, User, FileText, Calendar, Users, CheckCircle2, X, Share2, Copy, ChevronsUpDown, Check } from 'lucide-react';
+import { Plus, Search, Filter, Clock, ListChecks, User, FileText, Calendar, Users, CheckCircle2, X, Copy, Check } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { DatePicker } from '@/components/ui/DatePicker';
 import { useAuth } from '@/context/AuthContext';
@@ -19,8 +18,6 @@ import { UndoDeleteNotificationPortal } from '@/components/ui/UndoDeleteNotifica
 import { useSearchParams } from 'react-router-dom';
 import { projectService, Project } from '@/services/projectService';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command';
 import {
   TaskFormActions,
   TaskFormDialogShell,
@@ -29,6 +26,7 @@ import {
   taskFieldControlClass,
   taskTextareaClass,
 } from '@/components/tasks/TaskFormDialogShell';
+import { SharedTaskFormDialog } from '@/components/tasks/SharedTaskFormDialog';
 
 type ApiResponse<T> = { success?: boolean; message?: string; data?: T } | T;
 
@@ -58,9 +56,7 @@ export default function MyTasks() {
   const [taskToDelete, setTaskToDelete] = useState<UserTask | null>(null);
   const [sharedTaskToDelete, setSharedTaskToDelete] = useState<SharedTask | null>(null);
   const [sharedSearchTerm, setSharedSearchTerm] = useState("");
-  const [selectedUserTab, setSelectedUserTab] = useState<'all' | 'admin' | 'developer' | 'tester'>('all');
   const [selectedUsers, setSelectedUsers] = useState<string[]>([]);
-  const [sharedProjectPickerOpen, setSharedProjectPickerOpen] = useState(false);
   const [showAllAssignees, setShowAllAssignees] = useState(false);
   const [activeDetailTab, setActiveDetailTab] = useState<'details' | 'members'>('details');
   
@@ -72,46 +68,6 @@ export default function MyTasks() {
   
   // Auto-refresh configuration (in milliseconds)
   const AUTO_REFRESH_INTERVAL = 30000; // 30 seconds
-
-  // Filter users by role (exclude testers)
-  const filteredUsers = useMemo(() => {
-    const nonTesters = users.filter(user => user.role !== 'tester');
-    if (selectedUserTab === 'all') return nonTesters;
-    return nonTesters.filter(user => user.role === selectedUserTab);
-  }, [users, selectedUserTab]);
-
-  // Get user counts by role (exclude testers)
-  const userCounts = useMemo(() => {
-    const nonTesters = users.filter(u => u.role !== 'tester');
-    return {
-      all: nonTesters.length,
-      admin: nonTesters.filter(u => u.role === 'admin').length,
-      developer: nonTesters.filter(u => u.role === 'developer').length,
-      tester: 0, // No testers
-    };
-  }, [users]);
-
-  // Handle user selection (multi-select)
-  const toggleUserSelection = (userId: string) => {
-    setSelectedUsers(prev => {
-      if (prev.includes(userId)) {
-        return prev.filter(id => id !== userId);
-      } else {
-        return [...prev, userId];
-      }
-    });
-  };
-
-  // Clear all selections
-  const clearAllSelections = () => {
-    setSelectedUsers([]);
-  };
-
-  // Select all users in current tab
-  const selectAllUsers = () => {
-    const allUserIds = filteredUsers.map(user => user.id);
-    setSelectedUsers(allUserIds);
-  };
 
   // Helper function to filter items
   const itemsFiltered = (items: UserTask[], query?: string) => {
@@ -570,8 +526,6 @@ export default function MyTasks() {
         assigned_to_ids: selectedUsers,
         assigned_to_names: selectedUserObjects.map(user => user.name),
       };
-      
-      console.log('Creating shared task with data:', taskData);
       
       if (editingShared.id) {
         await sharedTaskService.updateSharedTask(taskData as any);
@@ -2162,402 +2116,24 @@ export default function MyTasks() {
         </Dialog>
 
         {/* Create / Edit shared task */}
-        <TaskFormDialogShell
+        <SharedTaskFormDialog
           open={sharedModalOpen}
-          onOpenChange={setSharedModalOpen}
-          title={editingShared?.id ? 'Edit Shared Task' : 'Create New Shared Task'}
-          description={
-            editingShared?.id
-              ? 'Update the shared task details and assignee.'
-              : 'Create a new shared task that can be assigned to team members.'
-          }
-          icon={<Share2 className="h-5 w-5 text-white" />}
-          headerClassName="bg-gradient-to-br from-indigo-600 via-blue-600 to-emerald-600"
-          footer={
-            <TaskFormActions
-              onCancel={() => setSharedModalOpen(false)}
-              onSubmit={onSaveShared}
-              submitting={submitting}
-              submitLabel={editingShared?.id ? 'Update Task' : 'Create Task'}
-              disabled={
-                !editingShared?.title?.trim() || selectedUsers.length === 0 || !editingShared?.project_ids?.length
-              }
-            />
-          }
-        >
-          <div className="space-y-5">
-            <TaskFormSection
-              title="Basic Information"
-              subtitle="Title and description for the team"
-              icon={<FileText className="h-4 w-4" />}
-            >
-              <div className="space-y-4">
-                <TaskFormField label="Task Title" required htmlFor="edit-shared-task-title">
-                  <Input
-                    id="edit-shared-task-title"
-                    value={editingShared?.title || ''}
-                    onChange={(e) => setEditingShared({ ...editingShared, title: e.target.value } as SharedTask)}
-                    placeholder="Enter task title..."
-                    className={taskFieldControlClass}
-                  />
-                </TaskFormField>
-                <TaskFormField label="Description" htmlFor="edit-shared-task-description">
-                  <Textarea
-                    id="edit-shared-task-description"
-                    value={editingShared?.description || ''}
-                    onChange={(e) =>
-                      setEditingShared({ ...editingShared, description: e.target.value } as SharedTask)
-                    }
-                    placeholder="Enter task description..."
-                    className={taskTextareaClass}
-                  />
-                </TaskFormField>
-              </div>
-            </TaskFormSection>
-
-            <TaskFormSection
-              title="Project & Schedule"
-              subtitle="Project, due date, and priority"
-              icon={<Calendar className="h-4 w-4" />}
-              accent="indigo"
-            >
-              <div className="space-y-4">
-                <TaskFormField label="Project" required>
-                  <Popover open={sharedProjectPickerOpen} onOpenChange={setSharedProjectPickerOpen}>
-                    <PopoverTrigger asChild>
-                      <Button
-                        type="button"
-                        variant="outline"
-                        role="combobox"
-                        aria-expanded={sharedProjectPickerOpen}
-                        className={`w-full justify-between ${taskFieldControlClass}`}
-                      >
-                        <span className="flex items-center gap-2 truncate">
-                          <div className="h-3 w-3 rounded-full bg-gradient-to-br from-blue-500 to-emerald-600" />
-                          {editingShared?.project_ids?.[0]
-                            ? projects.find((p) => p.id === editingShared.project_ids?.[0])?.name || 'Select a project'
-                            : 'Select a project'}
-                        </span>
-                        <ChevronsUpDown className="h-4 w-4 opacity-60" />
-                      </Button>
-                    </PopoverTrigger>
-                    <PopoverContent className="z-[90] w-[--radix-popover-trigger-width] p-0" align="start">
-                      <Command>
-                        <CommandInput placeholder="Search project..." />
-                        <CommandList className="max-h-64">
-                          <CommandEmpty>No project found.</CommandEmpty>
-                          <CommandGroup>
-                            {projects.map((project) => (
-                              <CommandItem
-                                key={project.id}
-                                value={`${project.name} ${project.id}`}
-                                onSelect={() => {
-                                  setEditingShared({
-                                    ...editingShared,
-                                    project_ids: project.id ? [project.id] : [],
-                                  } as SharedTask);
-                                  setSharedProjectPickerOpen(false);
-                                }}
-                              >
-                                <Check
-                                  className={`mr-2 h-4 w-4 ${
-                                    editingShared?.project_ids?.[0] === project.id ? 'opacity-100' : 'opacity-0'
-                                  }`}
-                                />
-                                <div className="flex items-center gap-2 truncate">
-                                  <div className="h-3 w-3 rounded-full bg-gradient-to-br from-blue-500 to-emerald-600" />
-                                  <span className="truncate">{project.name}</span>
-                                </div>
-                              </CommandItem>
-                            ))}
-                          </CommandGroup>
-                        </CommandList>
-                      </Command>
-                    </PopoverContent>
-                  </Popover>
-                </TaskFormField>
-
-                <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-                  <TaskFormField label="Due Date">
-                    <DatePicker
-                      value={editingShared?.due_date || ''}
-                      onChange={(value) => setEditingShared({ ...editingShared, due_date: value } as SharedTask)}
-                      placeholder="Select due date"
-                    />
-                  </TaskFormField>
-                  <TaskFormField label="Priority">
-                    <Select
-                      value={editingShared?.priority || 'medium'}
-                      onValueChange={(value) =>
-                        setEditingShared({ ...editingShared, priority: value } as SharedTask)
-                      }
-                    >
-                      <SelectTrigger className={`w-full ${taskFieldControlClass}`}>
-                        <SelectValue>
-                          {editingShared?.priority && (
-                            <div className="flex items-center gap-2">
-                              <div
-                                className={`h-3 w-3 rounded-full ${
-                                  editingShared.priority === 'low'
-                                    ? 'bg-green-500'
-                                    : editingShared.priority === 'medium'
-                                      ? 'bg-yellow-500'
-                                      : 'bg-red-500'
-                                }`}
-                              />
-                              <span className="capitalize">{editingShared.priority} Priority</span>
-                            </div>
-                          )}
-                        </SelectValue>
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="low" className="flex items-center gap-2">
-                          <div className="h-3 w-3 rounded-full bg-green-500" />
-                          <span>Low Priority</span>
-                        </SelectItem>
-                        <SelectItem value="medium" className="flex items-center gap-2">
-                          <div className="h-3 w-3 rounded-full bg-yellow-500" />
-                          <span>Medium Priority</span>
-                        </SelectItem>
-                        <SelectItem value="high" className="flex items-center gap-2">
-                          <div className="h-3 w-3 rounded-full bg-red-500" />
-                          <span>High Priority</span>
-                        </SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </TaskFormField>
-                </div>
-
-                {editingShared?.id ? (
-                  <TaskFormField label="Status">
-                    <Select
-                      value={editingShared?.status || 'pending'}
-                      onValueChange={(value) =>
-                        setEditingShared({ ...editingShared, status: value } as SharedTask)
-                      }
-                    >
-                      <SelectTrigger className={`w-full ${taskFieldControlClass}`}>
-                        <SelectValue>
-                          {editingShared?.status && (
-                            <div className="flex items-center gap-2">
-                              <div
-                                className={`h-3 w-3 rounded-full ${
-                                  editingShared.status === 'pending'
-                                    ? 'bg-gray-500'
-                                    : editingShared.status === 'in_progress'
-                                      ? 'bg-blue-500'
-                                      : editingShared.status === 'completed'
-                                        ? 'bg-green-500'
-                                        : 'bg-purple-500'
-                                }`}
-                              />
-                              <span className="capitalize">{editingShared.status.replace('_', ' ')}</span>
-                            </div>
-                          )}
-                        </SelectValue>
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="pending">Pending</SelectItem>
-                        <SelectItem value="in_progress">In Progress</SelectItem>
-                        <SelectItem value="completed">Completed</SelectItem>
-                        <SelectItem value="approved">Approved</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </TaskFormField>
-                ) : null}
-              </div>
-            </TaskFormSection>
-
-            <TaskFormSection
-              title="Team Assignment"
-              subtitle="Select who should work on this task"
-              icon={<Users className="h-4 w-4" />}
-              accent="purple"
-            >
-              <TaskFormField label="Assign To" required>
-                <div className="mb-4 flex justify-center gap-1 overflow-x-auto pb-2 sm:gap-2">
-                  <button
-                    type="button"
-                    onClick={() => setSelectedUserTab('all')}
-                    className={`flex items-center gap-1 whitespace-nowrap rounded-lg px-2 py-2 text-xs font-medium transition-all sm:gap-2 sm:px-4 sm:text-sm ${
-                      selectedUserTab === 'all'
-                        ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/20 dark:text-blue-400'
-                        : 'bg-gray-100 text-gray-600 hover:bg-gray-200 dark:bg-gray-800 dark:text-gray-400 dark:hover:bg-gray-700'
-                    }`}
-                  >
-                    <Users className="h-3 w-3 sm:h-4 sm:w-4" />
-                    All
-                    <span
-                      className={`rounded-full px-1.5 py-0.5 text-xs sm:px-2 sm:py-1 ${
-                        selectedUserTab === 'all'
-                          ? 'bg-blue-200 text-blue-800 dark:bg-blue-800/30 dark:text-blue-300'
-                          : 'bg-gray-200 text-gray-600 dark:bg-gray-700 dark:text-gray-400'
-                      }`}
-                    >
-                      {userCounts.all}
-                    </span>
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setSelectedUserTab('admin')}
-                    className={`flex items-center gap-1 whitespace-nowrap rounded-lg px-2 py-2 text-xs font-medium transition-all sm:gap-2 sm:px-4 sm:text-sm ${
-                      selectedUserTab === 'admin'
-                        ? 'bg-red-100 text-red-700 dark:bg-red-900/20 dark:text-red-400'
-                        : 'bg-gray-100 text-gray-600 hover:bg-gray-200 dark:bg-gray-800 dark:text-gray-400 dark:hover:bg-gray-700'
-                    }`}
-                  >
-                    <User className="h-3 w-3 sm:h-4 sm:w-4" />
-                    Admins
-                    <span
-                      className={`rounded-full px-1.5 py-0.5 text-xs sm:px-2 sm:py-1 ${
-                        selectedUserTab === 'admin'
-                          ? 'bg-red-200 text-red-800 dark:bg-red-800/30 dark:text-red-300'
-                          : 'bg-gray-200 text-gray-600 dark:bg-gray-700 dark:text-gray-400'
-                      }`}
-                    >
-                      {userCounts.admin}
-                    </span>
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setSelectedUserTab('developer')}
-                    className={`flex items-center gap-1 whitespace-nowrap rounded-lg px-2 py-2 text-xs font-medium transition-all sm:gap-2 sm:px-4 sm:text-sm ${
-                      selectedUserTab === 'developer'
-                        ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/20 dark:text-blue-400'
-                        : 'bg-gray-100 text-gray-600 hover:bg-gray-200 dark:bg-gray-800 dark:text-gray-400 dark:hover:bg-gray-700'
-                    }`}
-                  >
-                    <User className="h-3 w-3 sm:h-4 sm:w-4" />
-                    Devs
-                    <span
-                      className={`rounded-full px-1.5 py-0.5 text-xs sm:px-2 sm:py-1 ${
-                        selectedUserTab === 'developer'
-                          ? 'bg-blue-200 text-blue-800 dark:bg-blue-800/30 dark:text-blue-300'
-                          : 'bg-gray-200 text-gray-600 dark:bg-gray-700 dark:text-gray-400'
-                      }`}
-                    >
-                      {userCounts.developer}
-                    </span>
-                  </button>
-                </div>
-
-                {filteredUsers.length > 0 ? (
-                  <div className="mb-3 flex items-center justify-between rounded-lg border border-gray-200 bg-gray-50 p-3 dark:border-gray-700 dark:bg-gray-800/30">
-                    <div className="flex items-center gap-2">
-                      <CheckCircle2
-                        className={`h-4 w-4 ${selectedUsers.length > 0 ? 'text-blue-600 dark:text-blue-400' : 'text-gray-400'}`}
-                      />
-                      <span
-                        className={`text-sm font-medium ${selectedUsers.length > 0 ? 'text-gray-900 dark:text-white' : 'text-gray-600 dark:text-gray-400'}`}
-                      >
-                        {selectedUsers.length} {selectedUsers.length === 1 ? 'user' : 'users'} selected
-                      </span>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <button
-                        type="button"
-                        onClick={selectAllUsers}
-                        disabled={selectedUsers.length === filteredUsers.length}
-                        className="rounded-md bg-blue-50 px-3 py-1.5 text-xs font-medium text-blue-600 transition-colors hover:bg-blue-100 disabled:cursor-not-allowed disabled:opacity-50 dark:bg-blue-900/20 dark:text-blue-400 dark:hover:bg-blue-900/30"
-                      >
-                        Select All
-                      </button>
-                      <button
-                        type="button"
-                        onClick={clearAllSelections}
-                        disabled={selectedUsers.length === 0}
-                        className="rounded-md bg-gray-100 px-3 py-1.5 text-xs font-medium text-gray-600 transition-colors hover:bg-gray-200 disabled:cursor-not-allowed disabled:opacity-50 dark:bg-gray-700 dark:text-gray-400 dark:hover:bg-gray-600"
-                      >
-                        Clear
-                      </button>
-                    </div>
-                  </div>
-                ) : null}
-
-                <div className="max-h-60 overflow-y-auto rounded-lg border border-gray-200 dark:border-gray-700 hide-scrollbar">
-                  {filteredUsers.length === 0 ? (
-                    <div className="p-8 text-center">
-                      <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-gray-100 dark:bg-gray-800">
-                        <Users className="h-6 w-6 text-gray-400" />
-                      </div>
-                      <p className="mb-1 text-sm font-medium text-gray-900 dark:text-white">No users found</p>
-                      <p className="text-xs text-gray-500 dark:text-gray-400">Try selecting a different role filter</p>
-                    </div>
-                  ) : (
-                    <div className="space-y-2 p-3">
-                      {filteredUsers.map((user) => (
-                        <button
-                          key={user.id}
-                          type="button"
-                          onClick={() => toggleUserSelection(user.id)}
-                          className={`group flex w-full items-center gap-3 rounded-xl p-3 text-left transition-all ${
-                            selectedUsers.includes(user.id)
-                              ? 'border-2 border-blue-300 bg-gradient-to-r from-blue-50 to-blue-50/50 shadow-sm dark:border-blue-700 dark:from-blue-900/20 dark:to-blue-900/10'
-                              : 'border border-gray-200 bg-white hover:border-blue-200 hover:bg-gray-50 hover:shadow-md dark:border-gray-700 dark:bg-gray-800 dark:hover:border-blue-700 dark:hover:bg-gray-800/50'
-                          }`}
-                        >
-                          <div
-                            className={`rounded-lg p-1.5 sm:p-2 ${
-                              user.role === 'admin'
-                                ? 'bg-red-100 dark:bg-red-900/20'
-                                : user.role === 'developer'
-                                  ? 'bg-blue-100 dark:bg-blue-900/20'
-                                  : 'bg-green-100 dark:bg-green-900/20'
-                            }`}
-                          >
-                            <User
-                              className={`h-3 w-3 sm:h-4 sm:w-4 ${
-                                user.role === 'admin'
-                                  ? 'text-red-600 dark:text-red-400'
-                                  : user.role === 'developer'
-                                    ? 'text-blue-600 dark:text-blue-400'
-                                    : 'text-green-600 dark:text-green-400'
-                              }`}
-                            />
-                          </div>
-                          <div className="min-w-0 flex-1">
-                            <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:gap-2">
-                              <span className="truncate text-sm font-medium text-gray-900 dark:text-white sm:text-base">
-                                {user.name}
-                              </span>
-                              <span
-                                className={`self-start rounded-full px-1.5 py-0.5 text-xs font-medium sm:px-2 sm:py-1 ${
-                                  user.role === 'admin'
-                                    ? 'bg-red-100 text-red-700 dark:bg-red-900/20 dark:text-red-400'
-                                    : user.role === 'developer'
-                                      ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/20 dark:text-blue-400'
-                                      : 'bg-green-100 text-green-700 dark:bg-green-900/20 dark:text-green-400'
-                                }`}
-                              >
-                                {user.role === 'admin' ? 'Admin' : user.role === 'developer' ? 'Developer' : 'Tester'}
-                              </span>
-                            </div>
-                            <div className="mt-1 flex items-center gap-1">
-                              <User className="h-2.5 w-2.5 text-gray-400 sm:h-3 sm:w-3" />
-                              <span className="truncate text-xs text-gray-500 dark:text-gray-400 sm:text-sm">
-                                {user.email}
-                              </span>
-                            </div>
-                          </div>
-                          <div className="flex shrink-0 items-center">
-                            {selectedUsers.includes(user.id) ? (
-                              <div className="relative">
-                                <div className="absolute inset-0 animate-ping rounded-full bg-blue-500 opacity-20" />
-                                <CheckCircle2 className="relative h-5 w-5 text-blue-600 dark:text-blue-400" />
-                              </div>
-                            ) : (
-                              <div className="h-5 w-5 rounded-full border-2 border-gray-300 transition-colors group-hover:border-blue-400 dark:border-gray-600 dark:group-hover:border-blue-500" />
-                            )}
-                          </div>
-                        </button>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              </TaskFormField>
-            </TaskFormSection>
-          </div>
-        </TaskFormDialogShell>
+          onOpenChange={(open) => {
+            setSharedModalOpen(open);
+            if (!open) {
+              setEditingShared(null);
+              setSelectedUsers([]);
+            }
+          }}
+          value={editingShared}
+          onChange={setEditingShared}
+          selectedUsers={selectedUsers}
+          onSelectedUsersChange={setSelectedUsers}
+          projects={projects}
+          users={users}
+          submitting={submitting}
+          onSubmit={onSaveShared}
+        />
 
         {/* Professional Shared Task Detail Modal */}
         <Dialog open={sharedDetailOpen} onOpenChange={(open) => {

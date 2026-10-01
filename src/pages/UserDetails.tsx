@@ -31,7 +31,7 @@ import { Tabs, TabsContent } from "@/components/ui/tabs";
 import { BottomSheetTabs } from "@/components/ui/BottomSheetTabs";
 import { useAuth } from "@/context/AuthContext";
 import { ENV } from "@/lib/env";
-import { userRequiresOnboarding } from "@/lib/utils";
+import { userHasEmployeeRecords } from "@/lib/utils";
 import { usePermissions } from "@/hooks/usePermissions";
 import { useToast } from "@/hooks/use-toast";
 import { cn, getEffectiveRole } from "@/lib/utils";
@@ -510,7 +510,7 @@ export default function UserDetails() {
                               ? "Account deactivated"
                               : "Account active"}
                           </span>
-                          {userRequiresOnboarding(user) &&
+                          {userHasEmployeeRecords(user) &&
                           Number(user.onboarding_completed ?? 0) === 1 ? (
                             <OnboardingVerificationBadge
                               status={user.onboarding_verification_status}
@@ -954,7 +954,7 @@ export default function UserDetails() {
 
               <TabsContent value="personal" className="mt-0 focus-visible:outline-none">
                 {activeTab === "personal" ? (
-                  userRequiresOnboarding(user) ? (
+                  userHasEmployeeRecords(user) ? (
                     <OnboardingProfileSection
                       userId={user.id}
                       onboardingCompleted={user.onboarding_completed}
@@ -986,8 +986,8 @@ export default function UserDetails() {
                     <Card className="rounded-2xl shadow-sm border-border/60">
                       <CardContent className="p-5 sm:p-6">
                         <p className="text-sm text-muted-foreground">
-                          Personal onboarding details apply to developer accounts. Contact
-                          basics are shown in the profile card above.
+                          Personal records apply to employee accounts — developers, CODO testers and creators.
+                          Contact basics are shown in the profile card above.
                         </p>
                       </CardContent>
                     </Card>
@@ -1000,7 +1000,7 @@ export default function UserDetails() {
                 className="mt-0 focus-visible:outline-none"
               >
                 {activeTab === "professional" ? (
-                  userRequiresOnboarding(user) ? (
+                  userHasEmployeeRecords(user) ? (
                     <OnboardingProfileSection
                       userId={user.id}
                       onboardingCompleted={user.onboarding_completed}
@@ -1027,7 +1027,7 @@ export default function UserDetails() {
                     <Card className="rounded-2xl shadow-sm border-border/60">
                       <CardContent className="p-5 sm:p-6">
                         <p className="text-sm text-muted-foreground">
-                          Employment and document verification apply to developer onboarding.
+                          Employment and document records apply to employee accounts.
                           Job summary fields remain in the profile card above.
                         </p>
                       </CardContent>
@@ -1038,7 +1038,7 @@ export default function UserDetails() {
 
               <TabsContent value="payments" className="mt-0 focus-visible:outline-none">
                 {activeTab === "payments" ? (
-                  userRequiresOnboarding(user) ? (
+                  userHasEmployeeRecords(user) ? (
                     <OnboardingProfileSection
                       userId={user.id}
                       onboardingCompleted={user.onboarding_completed}
@@ -1065,7 +1065,7 @@ export default function UserDetails() {
                     <Card className="rounded-2xl shadow-sm border-border/60">
                       <CardContent className="p-5 sm:p-6">
                         <p className="text-sm text-muted-foreground">
-                          Banking details appear after developer onboarding is completed.
+                          Banking details apply to employee accounts — developers, CODO testers and creators.
                         </p>
                       </CardContent>
                     </Card>

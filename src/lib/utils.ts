@@ -71,6 +71,17 @@ export const userRequiresOnboarding = (user: {
 };
 
 /**
+ * Why: Creators are staff too, so HR keeps their personal, employment and banking
+ * records — but unlike developers they are never locked into the onboarding wizard.
+ */
+export const userHasEmployeeRecords = (user: {
+  role?: string;
+  role_id?: number | null;
+  tester_type?: string | null;
+} | null | undefined): boolean =>
+  userRequiresOnboarding(user) || getEffectiveRole(user || {}) === "creator";
+
+/**
  * Incomplete mandatory onboarding — employees (developers + CODO testers) are
  * locked into the wizard. Mirrors backend br_user_requires_onboarding().
  */

@@ -14,19 +14,18 @@ import {
 } from "@/components/ui/dialog";
 import { createMeeting, getMeeting } from "@/services/meetings";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Loader2, Video, Users, Copy, Check, Plus, Clock, ExternalLink, Calendar, Search, Filter, X, User, Shield, Code, TestTube, Mail, Eye, BarChart3, UserCheck, Timer, Trash2, RefreshCw, Link as LinkIcon, Phone, Palette } from "lucide-react";
-import { DatePicker } from "@/components/ui/DatePicker";
-import { TimePicker } from "@/components/ui/TimePicker";
+import { Loader2, Video, Users, Copy, Check, Plus, Clock, ExternalLink, Calendar, Search, Filter, X, User, Eye, BarChart3, UserCheck, Timer, Trash2, RefreshCw, Link as LinkIcon } from "lucide-react";
 import { googleDocsService } from "@/services/googleDocsService";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "sonner";
 import { ENV } from "@/lib/env";
 import { apiClient } from "@/lib/axios";
 import { useAuth } from "@/context/AuthContext";
-import { getRoleBadgeClass, getRoleIcon } from "@/lib/roleBadge";
 import { useUndoDelete } from "@/hooks/useUndoDelete";
 import { UndoDeleteNotificationPortal } from "@/components/ui/UndoDeleteNotification";
 import { buildGoogleReauthUrl } from "@/lib/googleReauth";
+import { MeetFormDialog, type MeetInvitee } from "@/components/meet/MeetFormDialog";
+import { normalizeMeetCode } from "@/lib/meetCode";
 
 // Type definitions for Google Meet API response
 interface GoogleMeetResponse {
@@ -66,19 +65,17 @@ interface RunningMeetsResponse {
 }
 
 // Team member interfaces
-interface TeamMember {
-  email: string;
-  phone?: string | null;
-  role: 'admin' | 'developer' | 'tester' | 'creator';
-}
+type TeamMember = MeetInvitee;
 
 interface TeamMembersResponse {
   success: boolean;
   emails: string[];
   data?: Array<{
+    id?: string;
+    username?: string | null;
     email: string;
     phone?: string | null;
-    [key: string]: any;
+    avatar?: string | null;
   }>;
   error?: string;
 }
@@ -201,7 +198,6 @@ export default function MeetLobby() {
   const [teamMembers, setTeamMembers] = useState<TeamMember[]>([]);
   const [selectedUsers, setSelectedUsers] = useState<string[]>([]);
   const [loadingUsers, setLoadingUsers] = useState(false);
-  const [activeRoleTab, setActiveRoleTab] = useState<"all" | "admin" | "developer" | "tester" | "creator">("all");
   const [isDetailsModalOpen, setIsDetailsModalOpen] = useState(false);
   const [meetingDetails, setMeetingDetails] = useState<MeetingDetails | null>(null);
   const [loadingDetails, setLoadingDetails] = useState(false);
@@ -329,15 +325,16 @@ export default function MeetLobby() {
   };
 
   const handleJoin = async () => {
-    if (!code.trim()) {
-      setError("Please enter a meeting code");
+    const meetCode = normalizeMeetCode(code);
+    if (!meetCode) {
+      setError("Please enter a valid meeting code");
       return;
     }
     setLoading(true);
     setError(null);
     try {
       // Construct the Google Meet URL from the code
-      const joinUrl = `https://meet.google.com/${code.toUpperCase()}`;
+      const joinUrl = `https://meet.google.com/${meetCode}`;
       toast.success("Redirecting to Google Meet...");
       // Clear the code input and close modal
       setCode("");
@@ -850,12 +847,19 @@ export default function MeetLobby() {
       const creatorsData = creatorsResponse.data as TeamMembersResponse;
 
       // Helper function to create team member with phone number
-      const createTeamMember = (email: string, role: 'admin' | 'developer' | 'tester' | 'creator', dataArray?: Array<{email: string; phone?: string | null}>) => {
+      const createTeamMember = (
+        email: string,
+        role: TeamMember['role'],
+        dataArray?: TeamMembersResponse['data']
+      ): TeamMember => {
         const userData = dataArray?.find(user => user.email === email);
         return {
+          id: userData?.id,
+          username: userData?.username ?? null,
           email,
           phone: userData?.phone || null,
-          role
+          avatar: userData?.avatar ?? null,
+          role,
         };
       };
 
@@ -926,44 +930,9 @@ export default function MeetLobby() {
     setMeetingDate("");
     setMeetingTime("");
     setSelectedUsers([]);
-    setActiveRoleTab("all");
     setError(null);
   };
 
-  // Helper functions for user selection
-  const toggleUserSelection = (email: string) => {
-    setSelectedUsers(prev => 
-      prev.includes(email) 
-        ? prev.filter(e => e !== email)
-        : [...prev, email]
-    );
-  };
-
-  const getRoleColor = (role: string) => getRoleBadgeClass(role);
-
-  // Get selected users - memoized for performance
-  const getSelectedUsers = useMemo(() => {
-    return teamMembers.filter(member => selectedUsers.includes(member.email));
-  }, [teamMembers, selectedUsers]);
-
-  // Filter team members by role - memoized for performance
-  const getFilteredTeamMembers = useMemo(() => {
-    if (activeRoleTab === "all") {
-      return teamMembers;
-    }
-    return teamMembers.filter(member => member.role === activeRoleTab);
-  }, [teamMembers, activeRoleTab]);
-
-  // Get role counts - memoized for performance
-  const getRoleCounts = useMemo(() => {
-    return {
-      all: teamMembers.length,
-      admin: teamMembers.filter(m => m.role === 'admin').length,
-      developer: teamMembers.filter(m => m.role === 'developer').length,
-      tester: teamMembers.filter(m => m.role === 'tester').length,
-      creator: teamMembers.filter(m => m.role === 'creator').length
-    };
-  }, [teamMembers]);
 
   // Removed auto-refresh on window focus for better UX - user can manually refresh if needed
 
@@ -1348,306 +1317,27 @@ export default function MeetLobby() {
           onConfirmNow={undoDelete.confirmDelete}
         />
 
-        {/* Professional Modal for Create/Join Meeting */}
-        <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
-          <DialogContent 
-            className="w-[95vw] max-w-lg max-h-[90vh] overflow-y-auto mx-4 sm:mx-0"
-            aria-describedby="meeting-modal-description"
-          >
-            <DialogHeader className="relative">
-              <DialogTitle className="flex items-center gap-3 pr-12">
-                <div className={`p-2 rounded-xl ${modalType === "create" ? "bg-gradient-to-br from-blue-500 to-blue-600" : "bg-gradient-to-br from-green-500 to-emerald-600"}`}>
-                  {modalType === "create" ? (
-                    <Video className="h-5 w-5 text-white" />
-                  ) : (
-                    <Users className="h-5 w-5 text-white" />
-                  )}
-                </div>
-                <span className="text-lg sm:text-xl font-semibold">
-                  {modalType === "create" ? "Start a meet" : "Join with code"}
-                </span>
-              </DialogTitle>
-              <p id="meeting-modal-description" className="text-sm text-gray-600 dark:text-gray-400 mt-2">
-                {modalType === "create" ? "Create a new meeting and invite participants." : "Join an existing meeting using the meeting code."}
-              </p>
-              <Button
-                onClick={closeModal}
-                variant="ghost"
-                size="sm"
-                className="absolute top-0 right-0 h-8 w-8 p-0 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-full"
-              >
-                <X className="h-4 w-4" />
-              </Button>
-            </DialogHeader>
-            
-            <div className="space-y-6">
-              <div className="space-y-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                    {modalType === "create" ? "Meeting Title" : "Meeting Code"}
-                  </label>
-                  <Input 
-                    placeholder={modalType === "create" ? "Enter meeting title" : "Enter meeting code"} 
-                    value={modalType === "create" ? title : code} 
-                    onChange={(e) => {
-                      if (modalType === "create") {
-                        setTitle(e.target.value);
-                      } else {
-                        setCode(e.target.value.toUpperCase());
-                      }
-                    }}
-                    className="w-full h-12 bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 rounded-xl shadow-sm hover:shadow-md transition-all duration-300 font-mono text-center text-lg tracking-wider"
-                  />
-                </div>
-
-                {/* Meet Time - Only for Create Modal */}
-                {modalType === "create" && (
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                        Meeting Date
-                      </label>
-                      <DatePicker
-                        value={meetingDate}
-                        onChange={setMeetingDate}
-                        placeholder="Select meeting date"
-                        className="h-12 bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 rounded-xl shadow-sm hover:shadow-md transition-all duration-300"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                        Meeting Time
-                      </label>
-                      <TimePicker
-                        value={meetingTime}
-                        onChange={setMeetingTime}
-                        placeholder="Select meeting time"
-                        className="h-12 bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 rounded-xl shadow-sm hover:shadow-md transition-all duration-300"
-                      />
-                    </div>
-                  </div>
-                )}
-
-                {/* Team Member Selection - Only for Create Modal */}
-                {modalType === "create" && (
-                  <div className="space-y-3">
-                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
-                      Invite Team Members
-                    </label>
-                    
-                    {loadingUsers ? (
-                      <div className="flex items-center justify-center py-8">
-                        <div className="flex items-center gap-3">
-                          <Clock className="h-5 w-5 animate-spin text-blue-500" />
-                          <span className="text-sm text-gray-600 dark:text-gray-400">Loading team members...</span>
-                        </div>
-                      </div>
-                    ) : teamMembers.length === 0 ? (
-                      <div className="text-center py-8">
-                        <Users className="h-12 w-12 text-gray-400 mx-auto mb-3" />
-                        <p className="text-sm text-gray-500 dark:text-gray-400">No team members found</p>
-                      </div>
-                    ) : (
-                      <div className="space-y-3">
-                        {/* Role Tabs - Responsive Grid */}
-                        <div className="grid grid-cols-2 sm:grid-cols-5 gap-1 p-1 bg-gray-100 dark:bg-gray-800 rounded-xl">
-                          <button
-                            onClick={() => setActiveRoleTab("all")}
-                            className={`flex items-center justify-center gap-1 sm:gap-2 px-2 sm:px-3 py-2 rounded-md text-xs sm:text-sm font-medium transition-all duration-200 ${
-                              activeRoleTab === "all"
-                                ? "bg-white dark:bg-gray-700 text-gray-900 dark:text-white shadow-sm"
-                                : "text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white"
-                            }`}
-                          >
-                            <Users className="h-3 w-3 sm:h-4 sm:w-4" />
-                            <span className="hidden sm:inline">All</span>
-                            <span className="sm:hidden">All</span>
-                            <span className="ml-1 px-1.5 sm:px-2 py-0.5 bg-gray-200 dark:bg-gray-600 text-gray-700 dark:text-gray-300 rounded-full text-xs">
-                              {getRoleCounts.all}
-                            </span>
-                          </button>
-                          <button
-                            onClick={() => setActiveRoleTab("admin")}
-                            className={`flex items-center justify-center gap-1 sm:gap-2 px-2 sm:px-3 py-2 rounded-md text-xs sm:text-sm font-medium transition-all duration-200 ${
-                              activeRoleTab === "admin"
-                                ? "bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-300 shadow-sm"
-                                : "text-gray-600 dark:text-gray-400 hover:text-red-600 dark:hover:text-red-400"
-                            }`}
-                          >
-                            <Shield className="h-3 w-3 sm:h-4 sm:w-4" />
-                            <span className="hidden sm:inline">Admins</span>
-                            <span className="sm:hidden">Admin</span>
-                            <span className="ml-1 px-1.5 sm:px-2 py-0.5 bg-red-200 dark:bg-red-800 text-red-700 dark:text-red-300 rounded-full text-xs">
-                              {getRoleCounts.admin}
-                            </span>
-                          </button>
-                          <button
-                            onClick={() => setActiveRoleTab("developer")}
-                            className={`flex items-center justify-center gap-1 sm:gap-2 px-2 sm:px-3 py-2 rounded-md text-xs sm:text-sm font-medium transition-all duration-200 ${
-                              activeRoleTab === "developer"
-                                ? "bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 shadow-sm"
-                                : "text-gray-600 dark:text-gray-400 hover:text-blue-600 dark:hover:text-blue-400"
-                            }`}
-                          >
-                            <Code className="h-3 w-3 sm:h-4 sm:w-4" />
-                            <span className="hidden sm:inline">Devs</span>
-                            <span className="sm:hidden">Dev</span>
-                            <span className="ml-1 px-1.5 sm:px-2 py-0.5 bg-blue-200 dark:bg-blue-800 text-blue-700 dark:text-blue-300 rounded-full text-xs">
-                              {getRoleCounts.developer}
-                            </span>
-                          </button>
-                          <button
-                            onClick={() => setActiveRoleTab("tester")}
-                            className={`flex items-center justify-center gap-1 sm:gap-2 px-2 sm:px-3 py-2 rounded-md text-xs sm:text-sm font-medium transition-all duration-200 ${
-                              activeRoleTab === "tester"
-                                ? "bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300 shadow-sm"
-                                : "text-gray-600 dark:text-gray-400 hover:text-green-600 dark:hover:text-green-400"
-                            }`}
-                          >
-                            <TestTube className="h-3 w-3 sm:h-4 sm:w-4" />
-                            <span className="hidden sm:inline">Testers</span>
-                            <span className="sm:hidden">Test</span>
-                            <span className="ml-1 px-1.5 sm:px-2 py-0.5 bg-green-200 dark:bg-green-800 text-green-700 dark:text-green-300 rounded-full text-xs">
-                              {getRoleCounts.tester}
-                            </span>
-                          </button>
-                          <button
-                            onClick={() => setActiveRoleTab("creator")}
-                            className={`flex items-center justify-center gap-1 sm:gap-2 px-2 sm:px-3 py-2 rounded-xl text-xs sm:text-sm font-medium transition-all duration-200 ${
-                              activeRoleTab === "creator"
-                                ? "bg-fuchsia-100 dark:bg-fuchsia-900/30 text-fuchsia-700 dark:text-fuchsia-300 shadow-sm"
-                                : "text-gray-600 dark:text-gray-400 hover:text-fuchsia-600 dark:hover:text-fuchsia-400"
-                            }`}
-                          >
-                            <Palette className="h-3 w-3 sm:h-4 sm:w-4" />
-                            <span className="hidden sm:inline">Creators</span>
-                            <span className="sm:hidden">Create</span>
-                            <span className="ml-1 px-1.5 sm:px-2 py-0.5 bg-fuchsia-200 dark:bg-fuchsia-800 text-fuchsia-700 dark:text-fuchsia-300 rounded-full text-xs">
-                              {getRoleCounts.creator}
-                            </span>
-                          </button>
-                        </div>
-
-                        {/* Team Members List */}
-                        <div className="max-h-48 overflow-y-auto space-y-2 border border-gray-200 dark:border-gray-700 rounded-xl p-3 bg-gray-50 dark:bg-gray-800/50">
-                          {getFilteredTeamMembers.map((member) => (
-                            <div
-                              key={member.email}
-                              onClick={() => toggleUserSelection(member.email)}
-                              className={`flex items-center gap-2 sm:gap-3 p-2 sm:p-3 rounded-lg cursor-pointer transition-all duration-200 ${
-                                selectedUsers.includes(member.email)
-                                  ? 'bg-blue-100 dark:bg-blue-900/30 border-2 border-blue-300 dark:border-blue-700'
-                                  : 'bg-white dark:bg-gray-700 border border-gray-200 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-600'
-                              }`}
-                            >
-                              <div className="flex-shrink-0">
-                                <div className={`p-1.5 sm:p-2 rounded-lg ${getRoleColor(member.role)}`}>
-                                  {getRoleIcon(member.role)}
-                                </div>
-                              </div>
-                              <div className="flex-1 min-w-0">
-                                <div className="flex items-center gap-1 sm:gap-2">
-                                  <Mail className="h-3 w-3 sm:h-4 sm:w-4 text-gray-500 flex-shrink-0" />
-                                  <span className="text-xs sm:text-sm font-medium text-gray-900 dark:text-white truncate">
-                                    {member.email}
-                                  </span>
-                                </div>
-                                <div className="flex items-center gap-2 mt-1 flex-wrap">
-                                  <span className={`px-1.5 sm:px-2 py-0.5 sm:py-1 rounded-full text-xs font-medium ${getRoleColor(member.role)}`}>
-                                    {member.role.charAt(0).toUpperCase() + member.role.slice(1)}
-                                  </span>
-                                  {member.phone && (
-                                    <div className="flex items-center gap-1">
-                                      <Phone className="h-3 w-3 text-gray-500 flex-shrink-0" />
-                                      <span className="text-xs text-gray-600 dark:text-gray-400 truncate">
-                                        {member.phone}
-                                      </span>
-                                    </div>
-                                  )}
-                                </div>
-                              </div>
-                              <div className="flex-shrink-0">
-                                <div className={`w-4 h-4 sm:w-5 sm:h-5 rounded-full border-2 flex items-center justify-center ${
-                                  selectedUsers.includes(member.email)
-                                    ? 'bg-blue-500 border-blue-500'
-                                    : 'border-gray-300 dark:border-gray-600'
-                                }`}>
-                                  {selectedUsers.includes(member.email) && (
-                                    <Check className="h-2 w-2 sm:h-3 sm:w-3 text-white" />
-                                  )}
-                                </div>
-                              </div>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    )}
-
-                    {/* Selected Users Summary - Responsive */}
-                    {selectedUsers.length > 0 && (
-                      <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-xl p-2 sm:p-3">
-                        <div className="flex items-center gap-2 mb-2">
-                          <Users className="h-3 w-3 sm:h-4 sm:w-4 text-blue-600 dark:text-blue-400" />
-                          <span className="text-xs sm:text-sm font-medium text-blue-800 dark:text-blue-300">
-                            {selectedUsers.length} member{selectedUsers.length !== 1 ? 's' : ''} selected
-                          </span>
-                        </div>
-                        <div className="flex flex-wrap gap-1">
-                          {getSelectedUsers.map((member) => (
-                            <span
-                              key={member.email}
-                              className="inline-flex items-center gap-1 px-1.5 sm:px-2 py-0.5 sm:py-1 bg-blue-100 dark:bg-blue-800/30 text-blue-800 dark:text-blue-300 rounded-md text-xs"
-                            >
-                              {getRoleIcon(member.role)}
-                              <span className="truncate max-w-[120px] sm:max-w-none">
-                                {member.email}
-                              </span>
-                            </span>
-                          ))}
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                )}
-                
-                <div className="flex flex-col sm:flex-row gap-2 sm:gap-3">
-                  <Button 
-                    onClick={modalType === "create" ? handleCreate : handleJoin} 
-                    disabled={loading || (modalType === "join" && !code.trim())}
-                    className={`flex-1 h-10 sm:h-12 font-semibold shadow-lg hover:shadow-xl transition-all duration-300 transform hover:scale-105 ${
-                      modalType === "create" 
-                        ? "bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white" 
-                        : "bg-gradient-to-r from-green-600 to-emerald-700 hover:from-green-700 hover:to-emerald-800 text-white"
-                    }`}
-                  >
-                    {loading ? (
-                      <>
-                        <Loader2 className="mr-1 sm:mr-2 h-4 w-4 sm:h-5 sm:w-5 animate-spin" />
-                        <span className="text-sm sm:text-base">
-                          {modalType === "create" ? "Creating..." : "Joining..."}
-                        </span>
-                      </>
-                    ) : (
-                      <>
-                        {modalType === "create" ? (
-                          <>
-                            <Plus className="mr-1 sm:mr-2 h-4 w-4 sm:h-5 sm:w-5" />
-                            <span className="text-sm sm:text-base">Create Meeting</span>
-                          </>
-                        ) : (
-                          <>
-                            <Users className="mr-1 sm:mr-2 h-4 w-4 sm:h-5 sm:w-5" />
-                            <span className="text-sm sm:text-base">Join Meeting</span>
-                          </>
-                        )}
-                      </>
-                    )}
-                  </Button>
-                </div>
-                  </div>
-                </div>
-          </DialogContent>
-        </Dialog>
+        <MeetFormDialog
+          open={isModalOpen}
+          mode={modalType}
+          onClose={closeModal}
+          title={title}
+          onTitleChange={setTitle}
+          code={code}
+          onCodeChange={setCode}
+          meetingDate={meetingDate}
+          onMeetingDateChange={setMeetingDate}
+          meetingTime={meetingTime}
+          onMeetingTimeChange={setMeetingTime}
+          members={teamMembers}
+          loadingMembers={loadingUsers}
+          onRetryMembers={() => void fetchTeamMembers()}
+          selectedEmails={selectedUsers}
+          onSelectedEmailsChange={setSelectedUsers}
+          submitting={loading}
+          onCreate={handleCreate}
+          onJoin={handleJoin}
+        />
 
         {/* Meeting Details Modal */}
         <Dialog open={isDetailsModalOpen} onOpenChange={setIsDetailsModalOpen}>

@@ -266,6 +266,13 @@ export const Sidebar = ({ className, closeSidebar }: SidebarProps) => {
                 to="/bugdates"
                 icon={<CalendarDays className="h-5 w-5" />}
                 label="BugDates"
+                badge={formatNavCount(navCounts.bugdatesPending || navCounts.bugdates)}
+                badgeTone={navCounts.bugdatesPending > 0 ? "alert" : "default"}
+                badgeTitle={
+                  navCounts.bugdatesPending > 0
+                    ? `${navCounts.bugdatesPending} event${navCounts.bugdatesPending === 1 ? "" : "s"} awaiting approval`
+                    : `${navCounts.bugdates} event${navCounts.bugdates === 1 ? "" : "s"} in the next 7 days`
+                }
               />
             )}
             {!isCreator &&
@@ -350,7 +357,7 @@ export const Sidebar = ({ className, closeSidebar }: SidebarProps) => {
                 icon={<Video className="h-5 w-5" />}
                 label="BugMeet"
                 badge={formatNavCount(navCounts.meetings)}
-                badgeTitle={`${navCounts.meetings} meeting${navCounts.meetings === 1 ? "" : "s"}`}
+                badgeTitle={`${navCounts.meetings} live or upcoming meeting${navCounts.meetings === 1 ? "" : "s"} (next 24h)`}
               />
             )}
 
@@ -360,11 +367,10 @@ export const Sidebar = ({ className, closeSidebar }: SidebarProps) => {
                 icon={<ListTodo className="h-5 w-5" />}
                 label="BugToDo"
                 badge={formatNavCount(navCounts.tasks)}
-                badgeTitle={
-                  role === "admin"
-                    ? `${navCounts.tasks} task${navCounts.tasks === 1 ? "" : "s"}`
-                    : `${navCounts.tasks} shared task${navCounts.tasks === 1 ? "" : "s"}`
-                }
+                badgeTone={navCounts.tasksOverdue > 0 ? "alert" : "default"}
+                badgeTitle={`${navCounts.tasks} open ${role === "admin" ? "team " : ""}to-do${navCounts.tasks === 1 ? "" : "s"}${
+                  navCounts.tasksOverdue > 0 ? ` · ${navCounts.tasksOverdue} overdue` : ""
+                }`}
               />
             )}
 
@@ -425,7 +431,8 @@ export const Sidebar = ({ className, closeSidebar }: SidebarProps) => {
                 icon={<MessageSquare className="h-5 w-5" />}
                 label="BugMessage"
                 badge={formatNavCount(navCounts.messages)}
-                badgeTitle={`${navCounts.messages} chat${navCounts.messages === 1 ? "" : "s"}`}
+                badgeTone={navCounts.messages > 0 ? "alert" : "default"}
+                badgeTitle={`${navCounts.messages} unread message${navCounts.messages === 1 ? "" : "s"}`}
               />
             )}
 

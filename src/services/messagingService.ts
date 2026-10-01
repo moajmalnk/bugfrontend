@@ -1,5 +1,6 @@
 import { apiClient as axiosInstance } from '@/lib/axios';
 import { ENV } from '@/lib/env';
+import { notifyAdminNavCountsChanged } from '@/lib/navCountsEvents';
 import {
     ChatGroup,
     ChatGroupMember,
@@ -15,6 +16,20 @@ import {
 } from '@/types';
 
 const MESSAGING_API_BASE = '/messaging';
+
+let unreadBadgeTimer: ReturnType<typeof setTimeout> | null = null;
+
+/**
+ * Why: Opening a chat marks many messages read in a burst; coalesce them into one
+ * sidebar count refresh so the BugMessage unread badge clears without request spam.
+ */
+function scheduleUnreadBadgeRefresh(): void {
+  if (unreadBadgeTimer) clearTimeout(unreadBadgeTimer);
+  unreadBadgeTimer = setTimeout(() => {
+    unreadBadgeTimer = null;
+    notifyAdminNavCountsChanged();
+  }, 1500);
+}
 
 interface VoiceUploadResponse {
   file_url: string;
@@ -554,12 +569,14 @@ export class MessagingService {
     await axiosInstance.post(`${MESSAGING_API_BASE}/mark_read.php`, {
       message_id: messageId
     });
+    scheduleUnreadBadgeRefresh();
   }
 
   static async markVoicePlayed(messageId: string): Promise<void> {
     await axiosInstance.post(`${MESSAGING_API_BASE}/mark_voice_played.php`, {
       message_id: messageId
     });
+    scheduleUnreadBadgeRefresh();
   }
 
   // Block/Unblock User

@@ -303,6 +303,49 @@ export async function getCreativeStats(params?: {
   return data.data as CreativeStats;
 }
 
+export type CreatorDashboardRecentAsset = {
+  id: string;
+  title: string;
+  status: CreativeStatus;
+  material_type: CreativeMaterialType;
+  platform: CreativePlatform;
+  scheduled_date: string | null;
+  published_date: string | null;
+  updated_at: string;
+};
+
+export type CreatorDashboardSummary = {
+  from: string;
+  to: string;
+  by_status: Record<CreativeStatus, number>;
+  total: number;
+  drafts: number;
+  in_review: number;
+  rejected: number;
+  due_next_7_days: number;
+  overdue: number;
+  published_in_period: number;
+  created_in_period: number;
+  recent: CreatorDashboardRecentAsset[];
+};
+
+/**
+ * Why: Dashboard cards mix current pipeline state (period-independent) with
+ * period output (published / created) — one server call keeps them consistent.
+ */
+export async function getCreatorDashboardSummary(
+  params: { from: string; to: string },
+  signal?: AbortSignal
+): Promise<CreatorDashboardSummary> {
+  const qs = new URLSearchParams({ view: 'dashboard', from: params.from, to: params.to });
+  const res = await fetch(`${ENV.API_URL}/creative/stats.php?${qs}`, {
+    headers: authHeaders(),
+    signal,
+  });
+  const data = await parseJson(res);
+  return data.data as CreatorDashboardSummary;
+}
+
 export async function listCreativeFolders(params?: {
   parent_id?: string | 'root' | 'all';
 }): Promise<CreativeFolder[]> {

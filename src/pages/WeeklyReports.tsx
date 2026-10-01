@@ -15,6 +15,7 @@ import {
   Trash2,
   Loader2,
   FilePlus2,
+  X,
 } from 'lucide-react';
 import { WeeklyReportStep } from '@/components/daily-work/WeeklyReportStep';
 import { Button } from '@/components/ui/button';
@@ -946,19 +947,32 @@ export default function WeeklyReports() {
           if (!open) closeLateReport();
         }}
       >
-        <DialogContent className="flex max-h-[92vh] w-[95vw] max-w-4xl flex-col gap-0 overflow-hidden rounded-2xl p-0">
-          <div className="bg-gradient-to-br from-indigo-600 via-violet-600 to-purple-700 p-6 text-white">
-            <DialogHeader className="space-y-2 pr-8 text-left">
-              <DialogTitle className="flex items-center gap-3 text-2xl font-bold">
-                <div className="rounded-xl bg-white/20 p-2">
-                  <FilePlus2 className="h-6 w-6" />
-                </div>
+        <DialogContent className="flex max-h-[92vh] w-[95vw] max-w-4xl flex-col gap-0 overflow-hidden rounded-2xl border-border/60 p-0 [&>button[data-radix-dialog-close]]:hidden">
+          <div className="flex items-start gap-3 border-b border-border/60 bg-background px-5 py-4 sm:px-6">
+            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-indigo-600 to-violet-600 text-white shadow-sm">
+              <FilePlus2 className="h-5 w-5" />
+            </div>
+            <DialogHeader className="min-w-0 flex-1 space-y-0.5 text-left">
+              <DialogTitle className="flex flex-wrap items-center gap-2 text-lg font-semibold leading-6 text-foreground">
                 File late weekly report
+                <span className="rounded-lg bg-amber-500/10 px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wide text-amber-700 dark:text-amber-400">
+                  Late
+                </span>
               </DialogTitle>
-              <DialogDescription className="text-base text-white/90">
+              <DialogDescription className="truncate text-sm text-muted-foreground">
                 {lateWeek?.label ?? ''}
               </DialogDescription>
             </DialogHeader>
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon"
+              onClick={closeLateReport}
+              className="h-9 w-9 shrink-0 rounded-xl text-muted-foreground hover:text-foreground"
+              aria-label="Close dialog"
+            >
+              <X className="h-4 w-4" />
+            </Button>
           </div>
           {lateWeek ? (
             <WeeklyReportStep
@@ -969,6 +983,7 @@ export default function WeeklyReports() {
               lateWeekStart={lateWeek.weekStart}
               onContinue={handleLateFiled}
               onDirtyChange={setLateDirty}
+              onCancel={closeLateReport}
             />
           ) : null}
         </DialogContent>

@@ -334,6 +334,39 @@ export interface UserProfilePortfolio {
   projects: UserPortfolioProject[];
 }
 
+export type ActiveHoursPeriod = 'daily' | 'weekly' | 'monthly' | 'yearly';
+
+/** Timestamps are ISO-8601 with offset (server computes in Asia/Kolkata). */
+export interface ActiveHoursData {
+  period: ActiveHoursPeriod;
+  timezone: string;
+  date_range: { start: string; end: string };
+  summary: {
+    total_hours: number;
+    total_minutes: number;
+    total_sessions: number;
+    active_days: number;
+    days_elapsed: number;
+    average_hours_per_day: number;
+    average_minutes_per_active_day: number;
+    longest_session_minutes: number;
+    first_activity_at: string | null;
+    last_activity_at: string | null;
+    peak_hour: number | null;
+  };
+  presence: { is_online: boolean; last_seen_at: string | null };
+  daily_breakdown: Array<{
+    date: string;
+    total_minutes: number;
+    session_count: number;
+    first_seen: string;
+    last_seen: string;
+  }>;
+  hourly_distribution: Array<{ hour: number; minutes: number }>;
+  sessions: Array<{ start: string; end: string; minutes: number; is_ongoing: boolean }>;
+  generated_at: string;
+}
+
 class UserService {
   private baseUrl = `${ENV.API_URL}/users`;
 
@@ -431,7 +464,10 @@ class UserService {
   }
 
   async getAllTesterEmails(): Promise<string[]> {
-    const response = await fetch(`${ENV.API_URL}/get_all_testers.php`);
+    const token = sessionStorage.getItem('token') || localStorage.getItem('token');
+    const response = await fetch(`${ENV.API_URL}/get_all_testers.php`, {
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+    });
     const data = await response.json();
     if (!data.success) {
       throw new Error(data.message || 'Failed to fetch tester emails');
@@ -682,10 +718,14 @@ class UserService {
 
   async getActiveHours(
     userId: string,
-    period: 'daily' | 'weekly' | 'monthly' | 'yearly' = 'daily'
-  ): Promise<any> {
+    period: ActiveHoursPeriod = 'daily',
+    opts?: { date?: string; signal?: AbortSignal }
+  ): Promise<ActiveHoursData> {
+    const params = new URLSearchParams({ id: userId, period });
+    if (opts?.date) params.set('date', opts.date);
     const response = await this.fetchWithAuth(
-      `${this.baseUrl}/active_hours.php?id=${userId}&period=${period}`
+      `${this.baseUrl}/active_hours.php?${params.toString()}`,
+      { signal: opts?.signal }
     );
     if (!response.success) {
       throw new Error(response.message || 'Failed to fetch active hours');
