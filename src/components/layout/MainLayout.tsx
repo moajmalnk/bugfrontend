@@ -1,7 +1,7 @@
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/context/AuthContext";
 import { Menu, Bug, Search, RefreshCw } from "lucide-react";
-import { lazy, memo, ReactNode, Suspense, useEffect, useState } from "react";
+import { lazy, memo, ReactNode, Suspense, useEffect, useRef, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { cn, getEffectiveRole } from "@/lib/utils";
 import { Sidebar } from "./Sidebar";
@@ -151,6 +151,15 @@ export const MainLayout = ({ children }: MainLayoutProps) => {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   // Mount the mobile drawer (and its Sidebar with permission fetches) only after first open.
   const [drawerMounted, setDrawerMounted] = useState(false);
+  const drawerRef = useRef<HTMLDivElement>(null);
+
+  // `inert` (not aria-hidden) so a focused link inside the closed drawer is released
+  // instead of being hidden from assistive tech. React 18 has no `inert` prop.
+  useEffect(() => {
+    if (drawerRef.current) {
+      drawerRef.current.inert = !sidebarOpen;
+    }
+  }, [sidebarOpen, drawerMounted]);
 
   const openSidebar = () => {
     setDrawerMounted(true);
@@ -189,6 +198,7 @@ export const MainLayout = ({ children }: MainLayoutProps) => {
         {/* Sidebar drawer for mobile/tablet — mounted lazily on first open */}
         {drawerMounted && (
           <div
+            ref={drawerRef}
             className={cn(
               "fixed inset-0 z-50 transition-opacity duration-300 ease-in-out lg:hidden",
               sidebarOpen
@@ -197,7 +207,6 @@ export const MainLayout = ({ children }: MainLayoutProps) => {
             )}
             onClick={() => setSidebarOpen(false)}
             aria-label="Sidebar overlay"
-            aria-hidden={!sidebarOpen}
           >
             {/* Backdrop */}
             <div className="absolute inset-0 bg-black/50" />
