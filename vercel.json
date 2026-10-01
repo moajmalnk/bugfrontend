@@ -9,6 +9,10 @@
       "destination": "/api/share-target"
     },
     {
+      "source": "/privacy-policy",
+      "destination": "/privacy-policy.html"
+    },
+    {
       "source": "/((?!assets/|service-worker\\.js|firebase-messaging-sw\\.js|manifest\\.json|version\\.json|robots\\.txt|sitemap\\.xml|llms\\.txt|favicon\\.ico|browserconfig\\.xml|apple-touch-icon\\.png|icon-.*\\.png|share-target|api/|br-api/).*)",
       "destination": "/index.html"
     }

@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { FileText, ArrowLeft } from 'lucide-react';
 
-const LAST_UPDATED = 'July 2026';
+const LAST_UPDATED = 'October 2026';
 
 const PrivacyPolicy = () => {
   useEffect(() => {
