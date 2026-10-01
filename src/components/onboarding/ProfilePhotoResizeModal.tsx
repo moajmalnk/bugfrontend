@@ -17,7 +17,7 @@ import {
 import { Label } from "@/components/ui/label";
 import { Slider } from "@/components/ui/slider";
 import { toast } from "@/components/ui/use-toast";
-import { Loader2 } from "lucide-react";
+import { Loader2, Redo2, Undo2 } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import Cropper, { type Area, type MediaSize, type Size } from "react-easy-crop";
 
@@ -34,6 +34,18 @@ const FIT_PADDING = 0.92;
 
 /** Must sit above OnboardingWizard (z-[1000]) or the crop UI is trapped underneath. */
 const NESTED_MODAL_Z = "z-[1100]";
+
+/** Cap so long editing sessions don't grow memory unbounded. */
+const HISTORY_LIMIT = 50;
+
+type CropView = { crop: { x: number; y: number }; zoom: number };
+
+const sameView = (a: CropView, b: CropView) =>
+  Math.abs(a.zoom - b.zoom) < 0.005 &&
+  Math.abs(a.crop.x - b.crop.x) < 0.5 &&
+  Math.abs(a.crop.y - b.crop.y) < 0.5;
+
+const isMac = typeof navigator !== "undefined" && /Mac|iPhone|iPad/i.test(navigator.platform);
 
 type Props = {
   open: boolean;
@@ -180,6 +192,73 @@ export function ProfilePhotoResizeModal({
   const stageRef = useRef<HTMLDivElement>(null);
   const mediaSizeRef = useRef<MediaSize | null>(null);
   const userAdjustedRef = useRef(false);
+  // Why: One history entry per finished gesture (drag, wheel, slider release, Fit),
+  // not per pixel, so Undo steps back to the last position the user chose.
+  const [past, setPast] = useState<CropView[]>([]);
+  const [future, setFuture] = useState<CropView[]>([]);
+  const viewRef = useRef<CropView>({ crop, zoom });
+  viewRef.current = { crop, zoom };
+  const gestureStartRef = useRef<CropView | null>(null);
+
+  const recordFrom = useCallback((before: CropView) => {
+    setPast((p) => [...p, before].slice(-HISTORY_LIMIT));
+    setFuture([]);
+  }, []);
+
+  const beginGesture = useCallback(() => {
+    if (!gestureStartRef.current) gestureStartRef.current = viewRef.current;
+  }, []);
+
+  const endGesture = useCallback(() => {
+    const before = gestureStartRef.current;
+    gestureStartRef.current = null;
+    if (before && !sameView(before, viewRef.current)) recordFrom(before);
+  }, [recordFrom]);
+
+  const restoreView = (view: CropView) => {
+    userAdjustedRef.current = true;
+    setZoom(Math.max(minZoom, Math.min(MAX_ZOOM, view.zoom)));
+    setCrop(view.crop);
+  };
+
+  const handleUndo = () => {
+    if (busy || past.length === 0) return;
+    const prev = past[past.length - 1];
+    setPast((p) => p.slice(0, -1));
+    setFuture((f) => [viewRef.current, ...f].slice(0, HISTORY_LIMIT));
+    restoreView(prev);
+  };
+
+  const handleRedo = () => {
+    if (busy || future.length === 0) return;
+    const next = future[0];
+    setFuture((f) => f.slice(1));
+    setPast((p) => [...p, viewRef.current].slice(-HISTORY_LIMIT));
+    restoreView(next);
+  };
+
+  const undoRef = useRef(handleUndo);
+  const redoRef = useRef(handleRedo);
+  undoRef.current = handleUndo;
+  redoRef.current = handleRedo;
+
+  useEffect(() => {
+    if (!open) return;
+    const onKey = (e: KeyboardEvent) => {
+      const mod = isMac ? e.metaKey : e.ctrlKey;
+      if (!mod) return;
+      const key = e.key.toLowerCase();
+      if (key === "z" && !e.shiftKey) {
+        e.preventDefault();
+        undoRef.current();
+      } else if ((key === "z" && e.shiftKey) || key === "y") {
+        e.preventDefault();
+        redoRef.current();
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [open]);
 
   const applyFitFromMedia = useCallback((media: MediaSize, size: Size) => {
     const fit = zoomToFitInCircle(media, size);
@@ -208,6 +287,9 @@ export function ProfilePhotoResizeModal({
     applyingRef.current = false;
     userAdjustedRef.current = false;
     mediaSizeRef.current = null;
+    setPast([]);
+    setFuture([]);
+    gestureStartRef.current = null;
   }, [open, imageSrc]);
 
   useEffect(() => {
@@ -253,6 +335,7 @@ export function ProfilePhotoResizeModal({
   const handleFit = () => {
     const media = mediaSizeRef.current;
     if (!media || !cropSize) return;
+    recordFrom(viewRef.current);
     userAdjustedRef.current = false;
     applyFitFromMedia(media, cropSize);
   };
@@ -333,6 +416,8 @@ export function ProfilePhotoResizeModal({
               onZoomChange={handleZoomChange}
               onCropComplete={onCropComplete}
               onMediaLoaded={onMediaLoaded}
+              onInteractionStart={beginGesture}
+              onInteractionEnd={endGesture}
               style={{
                 containerStyle: { background: "hsl(var(--muted) / 0.4)" },
                 cropAreaStyle: {
@@ -357,7 +442,11 @@ export function ProfilePhotoResizeModal({
                 max={MAX_ZOOM}
                 step={0.02}
                 value={[zoom]}
-                onValueChange={(v) => handleZoomChange(v[0] ?? minZoom)}
+                onValueChange={(v) => {
+                  beginGesture();
+                  handleZoomChange(v[0] ?? minZoom);
+                }}
+                onValueCommit={endGesture}
               />
               <div className="flex justify-between text-[11px] text-muted-foreground">
                 <span>Full photo</span>
@@ -379,7 +468,34 @@ export function ProfilePhotoResizeModal({
           </div>
         </div>
 
-        <DialogFooter className="px-6 pb-6 gap-2 sm:gap-2">
+        <DialogFooter className="px-6 pb-6 gap-2 sm:gap-2 sm:justify-between">
+          <div className="flex items-center gap-2" role="group" aria-label="Edit history">
+            <Button
+              type="button"
+              variant="outline"
+              size="icon"
+              className="rounded-xl h-10 w-10"
+              disabled={busy || past.length === 0}
+              onClick={handleUndo}
+              aria-label="Undo"
+              title={`Undo (${isMac ? "⌘Z" : "Ctrl+Z"})`}
+            >
+              <Undo2 className="h-4 w-4" />
+            </Button>
+            <Button
+              type="button"
+              variant="outline"
+              size="icon"
+              className="rounded-xl h-10 w-10"
+              disabled={busy || future.length === 0}
+              onClick={handleRedo}
+              aria-label="Redo"
+              title={`Redo (${isMac ? "⇧⌘Z" : "Ctrl+Y"})`}
+            >
+              <Redo2 className="h-4 w-4" />
+            </Button>
+          </div>
+          <div className="flex flex-col-reverse sm:flex-row gap-2">
           <Button
             type="button"
             variant="outline"
@@ -404,6 +520,7 @@ export function ProfilePhotoResizeModal({
               "Use photo"
             )}
           </Button>
+          </div>
         </DialogFooter>
       </DialogContent>
     </Dialog>
