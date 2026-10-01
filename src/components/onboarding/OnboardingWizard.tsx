@@ -2086,7 +2086,7 @@ export function OnboardingWizard({
     urlParam,
   ]);
 
-  const connectGoogleAccount = () => {
+  const connectGoogleAccount = async () => {
     if (adminMode || googleConnecting) return;
     try {
       setGoogleConnecting(true);
@@ -2110,6 +2110,17 @@ export function OnboardingWizard({
       returnUrl.searchParams.delete("email");
       returnUrl.searchParams.set(urlParam, "permissions");
 
+      // Why: OAuth is a full-page redirect — flush the debounced draft first or the
+      // last edits are lost when the wizard rehydrates on return.
+      if (draftStoreKey) {
+        try {
+          hasDraftRef.current = true;
+          await saveOnboardingDraft(draftStoreKey, 3, form);
+        } catch {
+          // non-blocking
+        }
+      }
+
       window.location.href = buildGoogleReauthUrl(token, oauthUserId, returnUrl.toString());
     } catch (err) {
       setGoogleConnecting(false);
@@ -2126,7 +2137,26 @@ export function OnboardingWizard({
       !!form.profile_photo || ((editMode || adminMode) && !!existingAvatarUrl);
     const hasAadhaar =
       !!form.aadhaar_file || ((editMode || adminMode) && hasExistingAadhaar);
-    if (loading || !step5Valid || !hasPhoto || !hasAadhaar) {
+    if (loading) return;
+    // Why: Deep links / OAuth returns can land on Review with earlier steps incomplete —
+    // never let Save silently no-op or submit blanks; send the user to the gap.
+    const firstInvalid = [!!step1Valid, step2Valid, !!step3Valid].findIndex((ok) => !ok);
+    if (firstInvalid >= 0 || !hasPhoto || !hasAadhaar) {
+      const target = firstInvalid >= 0 ? firstInvalid : !hasPhoto ? 0 : 1;
+      toast({
+        title: "Some details are missing",
+        description: `Complete the ${STEPS[target]?.label ?? "highlighted"} step, then save again.`,
+        variant: "destructive",
+      });
+      void goToStep(target);
+      return;
+    }
+    if (!form.terms_accepted || !form.privacy_accepted) {
+      toast({
+        title: "Accept the terms to continue",
+        description: "Tick both agreements on this page before saving.",
+        variant: "destructive",
+      });
       return;
     }
     if (!adminMode && !googleConnected) {
@@ -2203,6 +2233,14 @@ export function OnboardingWizard({
 
     // Why: Edit/admin mode closes immediately so Save feels instant; request continues in background.
     if (editMode || adminMode) {
+      if (draftStoreKey) {
+        try {
+          hasDraftRef.current = true;
+          await saveOnboardingDraft(draftStoreKey, 4, form);
+        } catch {
+          // non-blocking
+        }
+      }
       const cleaned = new URLSearchParams(searchParams);
       cleaned.delete(urlParam);
       setSearchParams(cleaned, { replace: true });
