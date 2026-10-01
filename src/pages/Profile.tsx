@@ -26,7 +26,7 @@ import { OnboardingWizard } from "@/components/onboarding/OnboardingWizard";
 import { OnboardingVerificationBadge } from "@/components/onboarding/OnboardingVerificationBanner";
 import { useAuth } from "@/context/AuthContext";
 import { formatLocalDate } from "@/lib/utils/dateUtils";
-import { cn, isWorkforceUser, userRequiresOnboarding } from "@/lib/utils";
+import { cn, isWorkforceUser, userHasEmployeeRecords, userRequiresOnboarding } from "@/lib/utils";
 import { API_BASE_URL } from "@/lib/env";
 import { resolveAvatarUrl } from "@/lib/avatarUrl";
 import { onboardingService } from "@/services/onboardingService";
@@ -270,9 +270,11 @@ export default function Profile() {
   const canEditViaOnboarding =
     canUseOnboarding && Number(currentUser?.onboarding_completed ?? 0) === 1;
   const canEditBasicProfile = !canUseOnboarding;
+  // Creators are never forced into the wizard, but an HR onboarding request link opens it.
+  const isOptionalOnboardingUser = !canUseOnboarding && userHasEmployeeRecords(currentUser);
   const editOnboardingOpen =
-    canUseOnboarding &&
-    Number(currentUser?.onboarding_completed ?? 0) === 1 &&
+    ((canUseOnboarding && Number(currentUser?.onboarding_completed ?? 0) === 1) ||
+      isOptionalOnboardingUser) &&
     !!onboardingSlug &&
     (ONBOARDING_STEP_SLUGS as readonly string[]).includes(onboardingSlug);
 

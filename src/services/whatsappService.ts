@@ -64,6 +64,7 @@ export interface ProjectWhatsAppShareData {
   durationDaysLabel?: string | null;
   hoursNeededLabel?: string | null;
   developerHoursTakenLabel?: string | null;
+  testerHoursTakenLabel?: string | null;
   /** Bug / work analytics */
   totalBugs?: number | null;
   openBugs?: number | null;
@@ -169,11 +170,13 @@ class WhatsAppService {
     if (data.hoursNeededLabel && data.hoursNeededLabel !== "Not set") {
       pushTimeline("Hours needed", data.hoursNeededLabel);
     }
-    if (
-      data.developerHoursTakenLabel &&
-      data.developerHoursTakenLabel !== "Not set"
-    ) {
-      pushTimeline("Developer hours taken", data.developerHoursTakenLabel);
+    const devHours = data.developerHoursTakenLabel;
+    const testerHours = data.testerHoursTakenLabel;
+    const hasDevHours = !!devHours && devHours !== "Not set";
+    const hasTesterHours = !!testerHours && testerHours !== "Not set";
+    if (hasDevHours || hasTesterHours) {
+      timelineLines.push(`• Developer hours taken: *${hasDevHours ? devHours : "0 hrs"}*`);
+      timelineLines.push(`• Tester hours taken: *${hasTesterHours ? testerHours : "0 hrs"}*`);
     }
     if (timelineLines.length > 0) {
       message += `\n🗓️ *Timeline*\n${timelineLines.join("\n")}\n`;

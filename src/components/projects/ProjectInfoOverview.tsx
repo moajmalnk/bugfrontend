@@ -492,14 +492,20 @@ export function ProjectInfoOverview({ project, createdByName }: ProjectInfoOverv
       label: 'Developer Hours Taken',
       value: formatProjectHoursDisplay(project.developer_hours_taken),
     },
+    {
+      label: 'Tester Hours Taken',
+      value: formatProjectHoursDisplay(project.tester_hours_taken),
+    },
   ];
 
   const hoursNeededDisplay = formatProjectHoursDisplay(project.estimated_hours);
   const developerHoursDisplay = formatProjectHoursDisplay(project.developer_hours_taken);
   const showHoursNeeded = hoursNeededDisplay !== 'Not set';
   const showDeveloperHours = developerHoursDisplay !== 'Not set';
+  const testerHoursDisplay = formatProjectHoursDisplay(project.tester_hours_taken);
+  const showTesterHours = testerHoursDisplay !== 'Not set';
   const metricCols =
-    5 + (showHoursNeeded ? 1 : 0) + (showDeveloperHours ? 1 : 0);
+    5 + (showHoursNeeded ? 1 : 0) + (showDeveloperHours ? 1 : 0) + (showTesterHours ? 1 : 0);
 
   return (
     <div className="space-y-4 sm:space-y-6">
@@ -507,7 +513,13 @@ export function ProjectInfoOverview({ project, createdByName }: ProjectInfoOverv
       <div
         className={cn(
           'grid grid-cols-2 gap-2 sm:gap-3',
-          metricCols <= 5 ? 'xl:grid-cols-5' : metricCols === 6 ? 'xl:grid-cols-6' : 'xl:grid-cols-7'
+          metricCols <= 5
+            ? 'xl:grid-cols-5'
+            : metricCols === 6
+              ? 'xl:grid-cols-6'
+              : metricCols === 7
+                ? 'xl:grid-cols-7'
+                : 'xl:grid-cols-8'
         )}
       >
         <StatPill label="Duration" value={`${duration} days`} highlight />
@@ -516,6 +528,9 @@ export function ProjectInfoOverview({ project, createdByName }: ProjectInfoOverv
         ) : null}
         {showDeveloperHours ? (
           <StatPill label="Dev Hours" value={developerHoursDisplay} highlight />
+        ) : null}
+        {showTesterHours ? (
+          <StatPill label="Tester Hours" value={testerHoursDisplay} highlight />
         ) : null}
         <StatusStatPill
           label="Status"

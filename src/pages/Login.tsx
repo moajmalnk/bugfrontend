@@ -40,7 +40,7 @@ import {
   User,
   X
 } from "lucide-react";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { GoogleSignInButton } from '@/components/GoogleSignInButton';
 import { clearGoogleOAuthCache, handleGoogleOAuthError } from '@/utils/googleOAuthUtils'; 
@@ -66,7 +66,15 @@ const GOOGLE_ERROR_MESSAGES: Record<string, string> = {
   server_error: "Failed to sign in with Google. Please try again.",
 };
 
+/**
+ * Why: Onboarding-request links carry `next` (e.g. profile?onboarding=address) so the
+ * employee lands on the wizard. Only role-relative app paths are allowed — never
+ * absolute URLs — to rule out open redirects.
+ */
+const SAFE_NEXT_PATH = /^[a-z0-9][a-z0-9/_-]*(\?[a-z0-9_=&-]*)?$/i;
+
 const Login = () => {
+  const welcomeNextRef = useRef<string | null>(null);
   const [loginMethod, setLoginMethod] = useState<LoginMethod>("username");
   const [username, setUsername] = useState("");
   const [email, setEmail] = useState("");
@@ -289,6 +297,8 @@ const Login = () => {
 
     const welcomeToken = urlParams.get("welcome_token");
     if (welcomeToken) {
+      const next = urlParams.get("next");
+      welcomeNextRef.current = next && SAFE_NEXT_PATH.test(next) ? next : null;
       // Clear immediately so StrictMode / auth updates do not re-consume the invite.
       window.history.replaceState({}, document.title, window.location.pathname);
       void handleWelcomeInviteVerification(welcomeToken);
@@ -304,7 +314,9 @@ const Login = () => {
     const token =
       localStorage.getItem("token") || sessionStorage.getItem("token");
     if (isAuthenticated && currentUser?.role && token) {
-      navigate(`/${getEffectiveRole(currentUser)}/dashboard`, { replace: true });
+      const next = welcomeNextRef.current;
+      welcomeNextRef.current = null;
+      navigate(`/${getEffectiveRole(currentUser)}/${next || "dashboard"}`, { replace: true });
     }
   }, [
     isAuthenticated,

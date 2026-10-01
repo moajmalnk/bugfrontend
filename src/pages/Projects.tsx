@@ -426,6 +426,9 @@ const Projects = () => {
           developerHoursTakenLabel: formatProjectHoursDisplay(
             project.developer_hours_taken
           ),
+          testerHoursTakenLabel: formatProjectHoursDisplay(
+            project.tester_hours_taken
+          ),
           totalBugs,
           openBugs,
           fixedBugs,

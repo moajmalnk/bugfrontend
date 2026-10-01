@@ -27,6 +27,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Textarea } from "@/components/ui/textarea";
 import { Tabs, TabsContent } from "@/components/ui/tabs";
 import { BottomSheetTabs } from "@/components/ui/BottomSheetTabs";
 import { useAuth } from "@/context/AuthContext";
@@ -49,6 +50,7 @@ import {
   Briefcase,
   Calendar,
   CalendarCheck,
+  ClipboardList,
   CalendarOff,
   ExternalLink,
   FolderKanban,
@@ -188,6 +190,14 @@ async function handlePasswordChange(
 
 type InviteChannel = "email" | "whatsapp" | "both";
 
+const ONBOARDING_NOTE_MAX = 300;
+const ONBOARDING_NOTE_SUGGESTIONS = [
+  "Please re-upload a clear Aadhaar scan.",
+  "Please add your PAN card.",
+  "Please correct your bank details.",
+  "Please update your address.",
+] as const;
+
 export default function UserDetails() {
   const { userId } = useParams();
   const navigate = useNavigate();
@@ -243,6 +253,10 @@ export default function UserDetails() {
   const [isResendingWelcome, setIsResendingWelcome] = useState(false);
   const [resendConfirmOpen, setResendConfirmOpen] = useState(false);
   const [resendChannel, setResendChannel] = useState<InviteChannel>("email");
+  const [onboardingRequestOpen, setOnboardingRequestOpen] = useState(false);
+  const [onboardingChannel, setOnboardingChannel] = useState<InviteChannel>("email");
+  const [onboardingNote, setOnboardingNote] = useState("");
+  const [isRequestingOnboarding, setIsRequestingOnboarding] = useState(false);
   const [isAccountToggleLoading, setIsAccountToggleLoading] = useState(false);
 
   const { data: user, isLoading, refetch } = useQuery({
@@ -288,6 +302,58 @@ export default function UserDetails() {
     currentUser?.id !== user?.id &&
     !isAccountDeactivated &&
     (effectiveRole === "admin" || hasPermission("USERS_CREATE"));
+
+  const canRequestOnboarding =
+    Boolean(user?.id && (user?.email || user?.phone)) &&
+    userHasEmployeeRecords(user) &&
+    currentUser?.id !== user?.id &&
+    !isAccountDeactivated &&
+    (effectiveRole === "admin" || hasPermission("USERS_EDIT"));
+  const onboardingRequestIsUpdate = Number(user?.onboarding_completed ?? 0) === 1;
+
+  const openOnboardingRequest = () => {
+    if (!user) return;
+    setOnboardingChannel(user.email && user.phone ? "both" : user.email ? "email" : "whatsapp");
+    setOnboardingNote("");
+    setOnboardingRequestOpen(true);
+  };
+
+  const closeOnboardingRequest = () => {
+    setOnboardingRequestOpen(false);
+    setOnboardingNote("");
+  };
+
+  const handleRequestOnboarding = async () => {
+    if (!user?.id || isRequestingOnboarding) return;
+    setIsRequestingOnboarding(true);
+    try {
+      const channels: Array<"email" | "whatsapp"> =
+        onboardingChannel === "both" ? ["email", "whatsapp"] : [onboardingChannel];
+      const { message, partial, mode } = await userService.requestOnboarding(
+        user.id,
+        channels,
+        onboardingNote
+      );
+      closeOnboardingRequest();
+      toast({
+        title: partial
+          ? "Request partly sent"
+          : mode === "update"
+            ? "Profile update requested"
+            : "Onboarding requested",
+        description: message,
+        variant: partial ? "destructive" : "default",
+      });
+    } catch (err) {
+      toast({
+        title: "Request not sent",
+        description: err instanceof Error ? err.message : "Could not send the onboarding request.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsRequestingOnboarding(false);
+    }
+  };
 
   const handleUserUpdate = (updated: User) => {
     toast({ title: "Updated", description: "User updated successfully" });
@@ -562,8 +628,34 @@ export default function UserDetails() {
                         </div>
                       </div>
 
-                      {canResendWelcome && (
-                        <div className="shrink-0 sm:self-start">
+                      {(canResendWelcome || canRequestOnboarding) && (
+                        <div className="flex shrink-0 flex-col gap-2 sm:flex-row sm:flex-wrap sm:justify-end sm:self-start">
+                          {canRequestOnboarding ? (
+                            <Button
+                              type="button"
+                              variant="outline"
+                              onClick={openOnboardingRequest}
+                              disabled={isRequestingOnboarding}
+                              className="h-10 w-full rounded-xl gap-2 sm:w-auto"
+                              title={
+                                onboardingRequestIsUpdate
+                                  ? "Ask them to review and resubmit their employee profile"
+                                  : "Ask them to complete their onboarding profile"
+                              }
+                            >
+                              {isRequestingOnboarding ? (
+                                <Loader2 className="h-4 w-4 shrink-0 animate-spin" />
+                              ) : (
+                                <ClipboardList className="h-4 w-4 shrink-0" />
+                              )}
+                              {isRequestingOnboarding
+                                ? "Sending…"
+                                : onboardingRequestIsUpdate
+                                  ? "Request profile update"
+                                  : "Request onboarding"}
+                            </Button>
+                          ) : null}
+                          {canResendWelcome ? (
                           <Button
                             type="button"
                             variant="outline"
@@ -584,6 +676,7 @@ export default function UserDetails() {
                             )}
                             {isResendingWelcome ? "Sending…" : "Resend invitation"}
                           </Button>
+                          ) : null}
                         </div>
                       )}
                     </div>
@@ -662,6 +755,127 @@ export default function UserDetails() {
                                 : resendChannel === "whatsapp"
                                   ? "Send WhatsApp"
                                   : "Send email"
+                            )}
+                          </AlertDialogAction>
+                        </AlertDialogFooter>
+                      </AlertDialogContent>
+                    </AlertDialog>
+
+                    <AlertDialog
+                      open={onboardingRequestOpen}
+                      onOpenChange={(open) => {
+                        if (isRequestingOnboarding) return;
+                        if (open) setOnboardingRequestOpen(true);
+                        else closeOnboardingRequest();
+                      }}
+                    >
+                      <AlertDialogContent className="max-w-[600px] rounded-2xl">
+                        <AlertDialogHeader>
+                          <AlertDialogTitle>
+                            {onboardingRequestIsUpdate ? "Request profile update?" : "Request onboarding?"}
+                          </AlertDialogTitle>
+                          <AlertDialogDescription>
+                            {onboardingRequestIsUpdate
+                              ? `${user.name || user.username} gets a secure link that opens their employee profile with saved details filled in, so they can correct and resubmit it for HR verification.`
+                              : `${user.name || user.username} gets a secure link that signs them in and opens the onboarding wizard to complete their employee profile.`}
+                          </AlertDialogDescription>
+                        </AlertDialogHeader>
+
+                        <div className="flex flex-col gap-4">
+                          <div role="radiogroup" aria-label="Send request via" className="grid grid-cols-12 gap-2">
+                            {(
+                              [
+                                { key: "email", label: "Email", icon: Mail, available: Boolean(user.email) },
+                                { key: "whatsapp", label: "WhatsApp", icon: MessageCircle, available: Boolean(user.phone) },
+                                { key: "both", label: "Both", icon: Send, available: Boolean(user.email && user.phone) },
+                              ] as const
+                            ).map((opt) => {
+                              const selected = onboardingChannel === opt.key;
+                              const Icon = opt.icon;
+                              return (
+                                <button
+                                  key={opt.key}
+                                  type="button"
+                                  role="radio"
+                                  aria-checked={selected}
+                                  disabled={!opt.available || isRequestingOnboarding}
+                                  onClick={() => setOnboardingChannel(opt.key)}
+                                  className={cn(
+                                    "col-span-4 flex min-w-0 flex-col items-center gap-1.5 rounded-xl border p-3 text-center transition-colors disabled:cursor-not-allowed disabled:opacity-40",
+                                    selected
+                                      ? "border-primary bg-primary/10 text-foreground ring-1 ring-primary/40"
+                                      : "border-border/60 bg-muted/30 text-muted-foreground hover:border-primary/40 hover:text-foreground"
+                                  )}
+                                >
+                                  <Icon className="h-5 w-5" />
+                                  <span className="text-sm font-medium">{opt.label}</span>
+                                </button>
+                              );
+                            })}
+                          </div>
+                          <p className="text-xs text-muted-foreground break-all">
+                            {onboardingChannel === "email" && <>To {user.email}</>}
+                            {onboardingChannel === "whatsapp" && <>To {user.phone}</>}
+                            {onboardingChannel === "both" && <>To {user.email} and {user.phone}</>}
+                            {" · An in-app notification is always sent."}
+                          </p>
+
+                          <div className="flex flex-col gap-2">
+                            <label htmlFor="onboarding-request-note" className="text-sm font-medium">
+                              Note for the employee <span className="font-normal text-muted-foreground">(optional)</span>
+                            </label>
+                            <div className="flex flex-wrap gap-2">
+                              {ONBOARDING_NOTE_SUGGESTIONS.map((hint) => (
+                                <button
+                                  key={hint}
+                                  type="button"
+                                  disabled={isRequestingOnboarding}
+                                  onClick={() =>
+                                    setOnboardingNote((prev) =>
+                                      (prev.trim() ? `${prev.trim()} ${hint}` : hint).slice(0, ONBOARDING_NOTE_MAX)
+                                    )
+                                  }
+                                  className="rounded-xl border border-border/60 bg-muted/30 px-2.5 py-1 text-xs text-muted-foreground transition-colors hover:border-primary/40 hover:text-foreground disabled:opacity-40"
+                                >
+                                  {hint}
+                                </button>
+                              ))}
+                            </div>
+                            <Textarea
+                              id="onboarding-request-note"
+                              value={onboardingNote}
+                              onChange={(e) => setOnboardingNote(e.target.value.slice(0, ONBOARDING_NOTE_MAX))}
+                              maxLength={ONBOARDING_NOTE_MAX}
+                              rows={3}
+                              disabled={isRequestingOnboarding}
+                              placeholder="e.g. Your PAN scan is blurry — please upload a clearer copy."
+                              className="resize-none rounded-xl"
+                            />
+                            <p className="text-end text-[11px] text-muted-foreground">
+                              {onboardingNote.length}/{ONBOARDING_NOTE_MAX}
+                            </p>
+                          </div>
+                        </div>
+
+                        <AlertDialogFooter>
+                          <AlertDialogCancel className="rounded-xl" disabled={isRequestingOnboarding}>
+                            Cancel
+                          </AlertDialogCancel>
+                          <AlertDialogAction
+                            className="rounded-xl"
+                            disabled={isRequestingOnboarding}
+                            onClick={(e) => {
+                              e.preventDefault();
+                              void handleRequestOnboarding();
+                            }}
+                          >
+                            {isRequestingOnboarding ? (
+                              <>
+                                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                Sending…
+                              </>
+                            ) : (
+                              "Send request"
                             )}
                           </AlertDialogAction>
                         </AlertDialogFooter>

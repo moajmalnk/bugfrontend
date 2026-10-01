@@ -322,8 +322,10 @@ export interface Project {
   developer_compliance_complete_date?: string | null;
   /** Estimated total project hours needed (manual). */
   estimated_hours?: number | string | null;
-  /** Total developer hours taken — auto-summed from checkout project hours. */
+  /** Developer hours taken — auto-summed from developers' checkout project hours. */
   developer_hours_taken?: number | string | null;
+  /** Tester hours taken — auto-summed from testers' checkout project hours. */
+  tester_hours_taken?: number | string | null;
   timeline_history?: ProjectTimelineHistoryEntry[];
   members?: string[];
   members_detail?: ProjectMemberDetail[];

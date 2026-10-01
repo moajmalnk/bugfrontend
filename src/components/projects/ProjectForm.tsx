@@ -1217,7 +1217,7 @@ export function ProjectForm({
                       </span>
                     </div>
                     <p className="text-[11px] sm:text-xs text-muted-foreground leading-snug">
-                      Auto-collected from checkout project hours
+                      Auto-collected from developers' checkout hours · tester hours are tracked separately
                     </p>
                     {hoursOverEstimate !== null ? (
                       <p className="text-[11px] sm:text-xs text-amber-700 dark:text-amber-300 leading-snug">

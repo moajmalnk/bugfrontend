@@ -501,6 +501,34 @@ class UserService {
     };
   }
 
+  /**
+   * Why: HR chases missing / incorrect employee records. Email and WhatsApp send
+   * synchronously so the admin sees the real delivery result; push always goes out.
+   */
+  async requestOnboarding(
+    userId: string,
+    channels: Array<"email" | "whatsapp">,
+    note: string
+  ): Promise<{ message: string; partial: boolean; mode: "complete" | "update" }> {
+    const response = await fetch(`${this.baseUrl}/request_onboarding.php`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${localStorage.getItem("token")}`,
+      },
+      body: JSON.stringify({ user_id: userId, channels, note: note.trim() }),
+    });
+    const data = await response.json().catch(() => null);
+    if (!response.ok || !data?.success) {
+      throw new Error(data?.message || "Could not send the onboarding request.");
+    }
+    return {
+      message: String(data.message || "Onboarding request sent."),
+      partial: data.data?.partial === true,
+      mode: data.data?.mode === "update" ? "update" : "complete",
+    };
+  }
+
   async addUser(userData: NewUserData): Promise<{
     user: User;
     message: string;
