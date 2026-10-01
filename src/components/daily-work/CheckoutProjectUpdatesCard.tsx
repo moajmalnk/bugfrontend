@@ -171,7 +171,9 @@ export function CheckoutProjectUpdatesCard({
               min={0}
               max={24}
               step={0.5}
-              value={timeAllocation.other_hours}
+              inputMode="decimal"
+              placeholder="0.0"
+              value={timeAllocation.other_hours ? timeAllocation.other_hours : ''}
               onChange={(e) => {
                 const next = Math.max(0, Math.min(24, Number(e.target.value || 0)));
                 onOtherHoursChange(Math.round(next * 10) / 10);
@@ -271,7 +273,9 @@ export function CheckoutProjectUpdatesCard({
                       min={0}
                       max={24}
                       step={0.5}
-                      value={hours}
+                      inputMode="decimal"
+                      placeholder="e.g. 2.5"
+                      value={hours ? hours : ''}
                       onChange={(e) => {
                         const next = Math.max(0, Math.min(24, Number(e.target.value || 0)));
                         onChange(project.id, { hours: Math.round(next * 10) / 10 });
@@ -292,7 +296,9 @@ export function CheckoutProjectUpdatesCard({
                       min={0}
                       max={100}
                       step={1}
-                      value={progress}
+                      inputMode="numeric"
+                      placeholder="0–100"
+                      value={progress ? progress : ''}
                       onChange={(e) => {
                         const next = Math.max(0, Math.min(100, Number(e.target.value || 0)));
                         onChange(project.id, { progress_percentage: Math.round(next) });
