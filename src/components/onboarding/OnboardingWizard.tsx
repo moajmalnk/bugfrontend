@@ -74,6 +74,7 @@ import {
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import type { UserOnboardingDetails } from "@/services/onboardingService";
+import { buildGoogleReauthUrl } from "@/lib/googleReauth";
 
 /** Why: input-otp caret/focus breaks inside Dialog overflow scroll — native digit boxes stay typeable. */
 function OtpDigitBoxes({
@@ -1747,14 +1748,7 @@ export function OnboardingWizard({
       returnUrl.searchParams.delete("email");
       returnUrl.searchParams.set(urlParam, "permissions");
 
-      const isLocal =
-        window.location.hostname === "localhost" ||
-        window.location.hostname === "127.0.0.1";
-      const reauthUrl = isLocal
-        ? `http://localhost/BugRicer/backend/api/oauth/admin-reauth.php?user_id=${oauthUserId}&token=${encodeURIComponent(token)}&return_url=${encodeURIComponent(returnUrl.toString())}`
-        : `https://bugbackend.bugricer.com/api/oauth/production-reauth.php?user_id=${oauthUserId}&token=${encodeURIComponent(token)}&return_url=${encodeURIComponent(returnUrl.toString())}`;
-
-      window.location.href = reauthUrl;
+      window.location.href = buildGoogleReauthUrl(token, oauthUserId, returnUrl.toString());
     } catch (err) {
       setGoogleConnecting(false);
       toast({

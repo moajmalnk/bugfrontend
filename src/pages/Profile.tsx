@@ -66,6 +66,7 @@ import {
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { ONBOARDING_STEP_SLUGS } from "@/lib/onboardingPersistence";
+import { buildGoogleReauthUrl } from "@/lib/googleReauth";
 
 const CONTRACT_LABELS: Record<string, string> = {
   full_time: "Full-Time",
@@ -388,20 +389,8 @@ export default function Profile() {
       const payload = JSON.parse(atob(token.split('.')[1]));
       const userId = payload.user_id;
       
-      // Build return URL based on current environment
-      const isLocal = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
-      const returnUrl = isLocal 
-        ? `http://localhost:8080${window.location.pathname}`
-        : `https://bugs.bugricer.com${window.location.pathname}`;
-      
-      // Check if we're in production or local
-      const isProduction = !isLocal;
-      const reauthUrl = isProduction 
-        ? `https://bugbackend.bugricer.com/api/oauth/production-reauth.php?user_id=${userId}&token=${encodeURIComponent(token)}&return_url=${encodeURIComponent(returnUrl)}`
-        : `http://localhost/BugRicer/backend/api/oauth/admin-reauth.php?user_id=${userId}&token=${encodeURIComponent(token)}&return_url=${encodeURIComponent(returnUrl)}`;
-      
-      // Navigate to reauth endpoint
-      window.location.href = reauthUrl;
+      const returnUrl = `${window.location.origin}${window.location.pathname}`;
+      window.location.href = buildGoogleReauthUrl(token, userId, returnUrl);
     } catch (error: any) {
       console.error('Error connecting Google:', error);
       toast({

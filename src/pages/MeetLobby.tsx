@@ -26,6 +26,7 @@ import { useAuth } from "@/context/AuthContext";
 import { getRoleBadgeClass, getRoleIcon } from "@/lib/roleBadge";
 import { useUndoDelete } from "@/hooks/useUndoDelete";
 import { UndoDeleteNotificationPortal } from "@/components/ui/UndoDeleteNotification";
+import { buildGoogleReauthUrl } from "@/lib/googleReauth";
 
 // Type definitions for Google Meet API response
 interface GoogleMeetResponse {
@@ -755,19 +756,8 @@ export default function MeetLobby() {
       // In impersonation mode, user_id is the impersonated user's ID
       const userId = payload.user_id;
       
-      // Build return URL based on current environment
-      const isLocal = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
-      const returnUrl = isLocal 
-        ? `http://localhost:8080${window.location.pathname}`
-        : `https://bugs.bugricer.com${window.location.pathname}`;
-      
-      // Check if we're in production or local
-      const isProduction = !isLocal;
-      const reauthUrl = isProduction 
-        ? `https://bugbackend.bugricer.com/api/oauth/production-reauth.php?user_id=${userId}&token=${encodeURIComponent(token)}&return_url=${encodeURIComponent(returnUrl)}`
-        : `http://localhost/BugRicer/backend/api/oauth/admin-reauth.php?user_id=${userId}&token=${encodeURIComponent(token)}&return_url=${encodeURIComponent(returnUrl)}`;
-      // Open in same window for OAuth flow, not new window
-      window.location.href = reauthUrl;
+      const returnUrl = `${window.location.origin}${window.location.pathname}`;
+      window.location.href = buildGoogleReauthUrl(token, userId, returnUrl);
     } catch (error) {
       console.error('Error getting user ID:', error);
       toast.error("Error getting user information");
