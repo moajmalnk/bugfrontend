@@ -26,6 +26,8 @@ export interface PageSearchEntry {
   adminOnly?: boolean;
   /** BugUpdate / check-in / weekly report / leave: CODO workforce only (never client testers). */
   workforceOnly?: boolean;
+  /** CODO Rules / Compliance / Cursor Tips: hidden from client testers; role/permission rules still apply. */
+  codoTeamOnly?: boolean;
   showWhen?: (ctx: SearchVisibilityContext) => boolean;
 }
 
@@ -72,6 +74,7 @@ const PAGE_ENTRIES: PageSearchEntry[] = [
       "admin lock",
     ],
     roles: ["admin", "developer", "tester"],
+    codoTeamOnly: true,
     subtitle: "Project compliance overview",
   },
   {
@@ -326,6 +329,7 @@ const PAGE_ENTRIES: PageSearchEntry[] = [
       "standards",
     ],
     permission: "CODO_VIEW",
+    codoTeamOnly: true,
   },
   {
     id: "page-cursor-tips",
@@ -345,6 +349,7 @@ const PAGE_ENTRIES: PageSearchEntry[] = [
       "prompt",
     ],
     permission: "CURSOR_TIPS_VIEW",
+    codoTeamOnly: true,
   },
 
   // —— Messaging ——
@@ -682,6 +687,7 @@ export function isPageVisible(
     if (!isWorkforce) return false;
     if (ctx.role === "tester") return true;
   }
+  if (entry.codoTeamOnly && !(ctx.isWorkforce ?? ctx.role !== "tester")) return false;
   if (entry.excludeRoles?.includes(ctx.role)) return false;
   if (entry.showWhen && !entry.showWhen(ctx)) return false;
 

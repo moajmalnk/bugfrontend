@@ -101,6 +101,14 @@ export const isWorkforceUser = (user: {
 };
 
 /**
+ * Why: CODO Rules, project Compliance and Cursor Tips are internal engineering
+ * standards for the CODO team (admins, developers, CODO testers). Client testers
+ * are external reviewers and never see them — no acknowledgement gate, nav or pages.
+ * Mirrors backend br_require_codo_standards_access(); the backend remains the authority.
+ */
+export const canAccessCodoStandards = isWorkforceUser;
+
+/**
  * Why: some login flows return a user without tester_type; until AuthContext
  * hydrates it from /me, a tester's workforce access is unknown (not denied).
  */

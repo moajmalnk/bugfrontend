@@ -4,7 +4,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { toast } from '@/components/ui/use-toast';
 import { useAuth } from '@/context/AuthContext';
 import { getNetworkErrorMessage } from '@/lib/apiError';
-import { cn, getEffectiveRole, userHasPendingOnboarding } from '@/lib/utils';
+import { canAccessCodoStandards, cn, getEffectiveRole, userHasPendingOnboarding } from '@/lib/utils';
 import {
   acknowledgeCodoRule,
   fetchPendingCodoAcknowledgements,
@@ -59,8 +59,9 @@ function describeLoadError(message: string): string {
 }
 
 /**
- * Why: A developer or tester must answer every active CODO rule for their role
+ * Why: A developer or CODO tester must answer every active CODO rule for their role
  * before the dashboard is usable. New rules stay pending until that person responds.
+ * Client testers are external reviewers and are never gated.
  */
 export default function CodoAcknowledgementGate() {
   const { currentUser, logout, exitImpersonateMode } = useAuth();
@@ -72,6 +73,7 @@ export default function CodoAcknowledgementGate() {
   const gated =
     !!currentUser &&
     (role === 'developer' || role === 'tester') &&
+    canAccessCodoStandards(currentUser) &&
     !userHasPendingOnboarding(currentUser);
 
   const userId = currentUser?.id ? String(currentUser.id) : '';

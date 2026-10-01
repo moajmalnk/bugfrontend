@@ -46,7 +46,7 @@ import {
   isCompliancePipelineSatisfied,
 } from "@/lib/codo/complianceRules";
 import { formatLocalDate } from "@/lib/utils/dateUtils";
-import { canReportBug, cn } from "@/lib/utils";
+import { canAccessCodoStandards, canReportBug, cn } from "@/lib/utils";
 import {
   computeProjectDurationDays,
   deadlineTimerToneClass,
@@ -271,6 +271,9 @@ const Projects = () => {
   const setClientFilter = (value: string) => setFilter("clientFilter", value);
   const [clientsList, setClientsList] = useState<Client[]>([]);
   const { currentUser } = useAuth();
+  const hasCodoStandards = canAccessCodoStandards(currentUser);
+  const showProjectCompliance = (project: Parameters<typeof isProjectComplianceRequired>[0]) =>
+    hasCodoStandards && isProjectComplianceRequired(project);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [projectToDelete, setProjectToDelete] = useState<string | null>(null);
   const { toast: useToastToast } = useToast();
@@ -372,7 +375,7 @@ const Projects = () => {
           project.deadline_date,
           project.status
         );
-        const complianceOn = isProjectComplianceRequired(project);
+        const complianceOn = showProjectCompliance(project);
         const durationDays = computeProjectDurationDays(project);
 
         const briefing = whatsappService.formatProjectShareMessage({
@@ -1055,7 +1058,7 @@ const Projects = () => {
     const missing = projects.filter(
       (project) =>
         ids.includes(project.id) &&
-        isProjectComplianceRequired(project) &&
+        showProjectCompliance(project) &&
         !project.compliance &&
         !attemptedComplianceIds.current.has(project.id)
     );
@@ -1093,7 +1096,7 @@ const Projects = () => {
     return () => {
       cancelled = true;
     };
-  }, [pageProjectIds]);
+  }, [pageProjectIds, hasCodoStandards]);
   const activeProjectsCount = useMemo(
     () => projects.filter((project) => project.status !== "archived").length,
     [projects]
@@ -1625,7 +1628,7 @@ const Projects = () => {
                         {getProjectClientLabel(project)}
                       </Badge>
                     )}
-                    {isProjectComplianceRequired(project) &&
+                    {showProjectCompliance(project) &&
                       project.compliance &&
                       canUseProjectActions && (
                       <Badge
@@ -1912,7 +1915,7 @@ const Projects = () => {
                         </div>
                       </div>
 
-                      {isProjectComplianceRequired(project) && (
+                      {showProjectCompliance(project) && (
                       <div className="grid grid-cols-12 gap-2 sm:gap-3">
                         <div
                           className="col-span-4 flex flex-col items-center justify-center min-h-[5rem] p-2 sm:p-3 rounded-xl bg-emerald-50/70 dark:bg-emerald-900/20 hover:bg-emerald-100/80 dark:hover:bg-emerald-900/30 transition-colors duration-200 text-center"
@@ -2029,7 +2032,7 @@ const Projects = () => {
                   {(() => {
                     const showComplianceBtn =
                       canUseProjectActions &&
-                      isProjectComplianceRequired(project);
+                      showProjectCompliance(project);
                     const showCopyBtn =
                       (currentUser?.role === "admin" ||
                         currentUser?.role === "tester") &&

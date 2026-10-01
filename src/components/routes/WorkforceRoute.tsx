@@ -5,12 +5,16 @@ import { toast } from "@/components/ui/use-toast";
 import { useAuth } from "@/context/AuthContext";
 import { getEffectiveRole, isTesterTypePending, isWorkforceUser } from "@/lib/utils";
 
+const WORK_FEATURES_DENIED =
+  "Work updates, check-in, weekly reports and leave are for CODO team members only.";
+
 /**
- * Why: BugUpdate, check-in, Weekly Report and My Leave are CODO workforce
- * features. Client testers typing the URL directly are sent back to Bugs.
- * The backend enforces the same rule with 403; this only keeps the UI honest.
+ * Why: BugUpdate, check-in, Weekly Report, My Leave — and the CODO standards
+ * (CODO Rules, Compliance, Cursor Tips) — are CODO team features. Client testers
+ * typing the URL directly are sent back to Bugs. The backend enforces the same
+ * rule with 403; this only keeps the UI honest.
  */
-export function WorkforceRoute() {
+export function WorkforceRoute({ deniedDescription = WORK_FEATURES_DENIED }: { deniedDescription?: string }) {
   const { currentUser } = useAuth();
   const pending = isTesterTypePending(currentUser);
   const denied = !!currentUser && !pending && !isWorkforceUser(currentUser);
@@ -19,10 +23,10 @@ export function WorkforceRoute() {
     if (denied) {
       toast({
         title: "Not available for Client Testers",
-        description: "Work updates, check-in, weekly reports and leave are for CODO team members only.",
+        description: deniedDescription,
       });
     }
-  }, [denied]);
+  }, [denied, deniedDescription]);
 
   if (pending) {
     return (

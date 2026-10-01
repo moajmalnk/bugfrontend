@@ -12,6 +12,8 @@ import { getEffectiveRole } from "@/lib/utils";
 import { WorkforceRoute } from "@/components/routes/WorkforceRoute";
 
 const APP_ROLES = new Set(["admin", "developer", "tester", "user", "creator"]);
+const CODO_STANDARDS_DENIED =
+  "CODO Rules, Compliance and Cursor Tips are for the CODO team only.";
 
 /**
  * Why: Role-prefixed routes must exist while logged out so ProtectedRoute can
@@ -432,9 +434,13 @@ const RouteConfig = () => {
       <Route path="/:role" element={<ProtectedRoleLayout />}>
           <Route path="dashboard" element={<RoleDashboard />} />
           <Route path="projects" element={<Projects />} />
-          <Route path="compliance" element={<ComplianceOverview />} />
+          <Route element={<WorkforceRoute deniedDescription={CODO_STANDARDS_DENIED} />}>
+            <Route path="compliance" element={<ComplianceOverview />} />
+            <Route path="projects/:projectId/compliance" element={<ProjectCompliance />} />
+            <Route path="common-codo" element={<CommonCodoRules />} />
+            <Route path="cursor-tips" element={<CursorTips />} />
+          </Route>
           <Route path="projects/new" element={<NewProject />} />
-          <Route path="projects/:projectId/compliance" element={<ProjectCompliance />} />
           <Route path="projects/:projectId/edit" element={<EditProject />} />
           <Route path="projects/:projectId" element={<ProjectDetails />} />
           <Route path="document" element={<DocumentPreviewPage />} />
@@ -501,8 +507,6 @@ const RouteConfig = () => {
           <Route path="performance-reviews/:id/edit" element={<PerformanceReviewForm />} />
           <Route path="performance-reviews" element={<PerformanceReviews />} />
           <Route path="common-bugs" element={<CommonBugs />} />
-          <Route path="common-codo" element={<CommonCodoRules />} />
-          <Route path="cursor-tips" element={<CursorTips />} />
           <Route path="bugdocs" element={<BugDocsPage />} />
           <Route path="bugdocs/project/:projectId" element={<ProjectDocumentsPage />} />
           <Route path="bugsheets" element={<BugSheetsPage />} />

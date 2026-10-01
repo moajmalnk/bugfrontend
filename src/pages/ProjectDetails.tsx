@@ -82,7 +82,7 @@ import { useAuth } from "@/context/AuthContext";
 import { useActivityLogger } from "@/hooks/useActivityLogger";
 import { usePersistedFilters } from "@/hooks/usePersistedFilters";
 import { ENV } from "@/lib/env";
-import { canReportBug } from "@/lib/utils";
+import { canAccessCodoStandards, canReportBug } from "@/lib/utils";
 import { cn } from "@/lib/utils";
 import {
   getProjectStatusLabel,
@@ -4944,6 +4944,7 @@ const ProjectDetails = () => {
               {(currentUser?.role === "admin" ||
                 currentUser?.role === "developer" ||
                 currentUser?.role === "tester") &&
+                canAccessCodoStandards(currentUser) &&
                 isProjectComplianceRequired(project) && (
                 <Button
                   asChild
