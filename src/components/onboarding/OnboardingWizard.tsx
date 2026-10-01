@@ -69,6 +69,7 @@ import {
   X,
   XCircle,
   Clock,
+  AlertCircle,
 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { OnboardingBodySkeleton } from "./WorkspaceLaunchSkeleton";
@@ -364,6 +365,25 @@ function SummarySection({ title, children }: { title: string; children: ReactNod
       <div className="grid grid-cols-12 gap-2.5 sm:gap-3">{children}</div>
     </div>
   );
+}
+
+/**
+ * Why: The server names the field it rejected (e.g. "Missing required fields: city");
+ * map it to the wizard step so the employee can jump straight to the fix.
+ */
+function stepForSubmitError(message: string): number | null {
+  const m = message.toLowerCase();
+  if (/aadhaar|pan_|pan |statutory/.test(m)) return 1;
+  if (/account_|bank|ifsc|branch|upi/.test(m)) return 2;
+  if (/google/.test(m)) return 3;
+  if (
+    /emergency|contact_email|profile_photo|date_of_birth|gender|marital|github|linkedin|house|city|pin_code|district|state|country|address/.test(
+      m
+    )
+  ) {
+    return 0;
+  }
+  return null;
 }
 
 function validateFile(file: File): string | null {
@@ -838,6 +858,7 @@ export function OnboardingWizard({
   const [loading, setLoading] = useState(false);
   // null = not uploading; 0–100 while the submit body is in flight.
   const [uploadPercent, setUploadPercent] = useState<number | null>(null);
+  const [submitError, setSubmitError] = useState<{ message: string; step: number | null } | null>(null);
   const [wfhBusy, setWfhBusy] = useState(false);
   const [wfhMapOpen, setWfhMapOpen] = useState(false);
   const [hydrated, setHydrated] = useState(false);
@@ -2150,6 +2171,7 @@ export function OnboardingWizard({
       return;
     }
 
+    setSubmitError(null);
     try {
       const hasFiles = !!(payload.aadhaar_file || payload.pan_file || payload.profile_photo);
       if (hasFiles) setUploadPercent(0);
@@ -2180,6 +2202,7 @@ export function OnboardingWizard({
     } catch (err) {
       const message = extractApiErrorMessage(err, "Could not complete onboarding");
       setUploadPercent(null);
+      setSubmitError({ message, step: stepForSubmitError(message) });
       toast({
         title: "Onboarding failed",
         description: message,
@@ -3982,6 +4005,35 @@ export function OnboardingWizard({
           </div>
 
           <div className="shrink-0 px-4 sm:px-8 py-3 sm:py-4 border-t border-border/50 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/90 flex flex-col gap-2 sm:gap-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
+            {submitError && step === 4 ? (
+              <div
+                role="alert"
+                className="flex flex-col gap-2 rounded-xl border border-destructive/40 bg-destructive/10 p-3 sm:flex-row sm:items-center sm:justify-between"
+              >
+                <div className="flex min-w-0 items-start gap-2">
+                  <AlertCircle className="mt-0.5 h-4 w-4 shrink-0 text-destructive" />
+                  <div className="min-w-0">
+                    <p className="text-sm font-semibold text-destructive">Couldn't finish onboarding</p>
+                    <p className="break-words text-xs text-foreground/90">{submitError.message}</p>
+                  </div>
+                </div>
+                {submitError.step !== null ? (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="shrink-0 rounded-xl"
+                    onClick={() => {
+                      const target = submitError.step;
+                      setSubmitError(null);
+                      if (target !== null) void goToStep(target);
+                    }}
+                  >
+                    Fix in {STEPS[submitError.step].label}
+                  </Button>
+                ) : null}
+              </div>
+            ) : null}
             {nextBlockedHint ? (
               <p className="text-xs text-amber-600 dark:text-amber-400 order-first sm:order-none">
                 {nextBlockedHint}

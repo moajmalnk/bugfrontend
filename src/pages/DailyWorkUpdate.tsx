@@ -23,14 +23,14 @@ import { toast } from '@/components/ui/use-toast';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
-import { ClipboardCopy, Clock, FileText, Share2, FolderKanban, PauseCircle, PlayCircle, Search, X, LogOut, Calendar, ListTodo, AlertTriangle, Building2, Home, MapPin, Loader2, LocateFixed, RefreshCw, ShieldAlert, CheckCircle2, ClipboardList } from 'lucide-react';
+import { ClipboardCopy, Clock, FileText, Share2, FolderKanban, PauseCircle, PlayCircle, Search, X, LogOut, Calendar, ListTodo, AlertTriangle, Building2, Home, MapPin, Loader2, LocateFixed, RefreshCw, ShieldAlert, CheckCircle2, ClipboardList, Check } from 'lucide-react';
 import { projectService, Project } from '@/services/projectService';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { HourPicker } from '@/components/ui/HourPicker';
 import { StatusDropdown, type StatusOption } from '@/components/ui/StatusDropdown';
 import { useAuth } from '@/context/AuthContext';
-import { userRequiresOnboarding } from '@/lib/utils';
+import { cn, userRequiresOnboarding } from '@/lib/utils';
 import { bugService } from '@/services/bugService';
 import { updateService } from '@/services/updateService';
 import { toLocalCalendarDateString } from '@/lib/dateUtils';
@@ -423,12 +423,10 @@ export function DailyWorkFlowPanel({
     ]
   );
   const officeGeoVerified = workMode === 'office' && officeGeoStatus === 'ok' && !!officePosition;
-  const canConfirmCheckIn =
-    !verificationRejected &&
-    !!workMode &&
-    (workMode === 'wfh' || officeGeoVerified) &&
-    (selectedProjects.length > 0 || !!plannedWork.trim()) &&
-    officeGeoStatus !== 'checking';
+  const checkInLocationReady =
+    !!workMode && (workMode === 'wfh' || officeGeoVerified) && officeGeoStatus !== 'checking';
+  const checkInPlanReady = selectedProjects.length > 0 || !!plannedWork.trim();
+  const canConfirmCheckIn = !verificationRejected && checkInLocationReady && checkInPlanReady;
 
   const clearOfficeGeoState = useCallback(() => {
     setOfficeGeoStatus('idle');
@@ -2696,95 +2694,86 @@ export function DailyWorkFlowPanel({
         }
         closeCheckInDialog();
       }}>
-        <DialogContent className="flex max-h-[92vh] w-[95vw] max-w-4xl flex-col gap-0 overflow-hidden p-0 [&>button[data-radix-dialog-close]]:hidden">
-          {/* Header with gradient background */}
-          <div className="relative bg-gradient-to-br from-emerald-500 via-blue-600 to-indigo-600 p-6 text-white overflow-visible">
-            <div className="absolute inset-0 bg-black/10"></div>
-            {/* Close Button - Top Right */}
+        <DialogContent className="flex max-h-[92vh] w-[95vw] max-w-3xl flex-col gap-0 overflow-hidden rounded-2xl border-border/60 p-0 [&>button[data-radix-dialog-close]]:hidden">
+          {/* Header */}
+          <div className="relative overflow-hidden border-b border-border/60 bg-card px-5 py-5 sm:px-6">
+            <div className="pointer-events-none absolute -top-20 -right-16 h-48 w-48 rounded-full bg-emerald-500/15 blur-3xl" />
+            <div className="pointer-events-none absolute -bottom-24 left-10 h-48 w-48 rounded-full bg-indigo-500/15 blur-3xl" />
             <button
               onClick={(e) => {
                 e.preventDefault();
                 e.stopPropagation();
                 closeCheckInDialog();
               }}
-              className="absolute top-3 right-3 z-[100] p-2.5 bg-white/25 hover:bg-white/40 rounded-lg transition-all duration-200 group backdrop-blur-md border-2 border-white/40 hover:border-white/60 shadow-2xl hover:shadow-white/20 hover:scale-110 active:scale-95"
+              className="absolute right-4 top-4 z-[100] flex h-9 w-9 items-center justify-center rounded-xl text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
               aria-label="Close dialog"
               type="button"
               style={{ pointerEvents: 'auto' }}
             >
-              <X className="h-5 w-5 text-white group-hover:rotate-90 transition-transform duration-200" strokeWidth={3} />
+              <X className="h-4 w-4" />
             </button>
-            <div className="relative z-10">
-              <DialogHeader className="space-y-2 pr-14">
-                <DialogTitle className="flex items-center gap-3 text-2xl font-bold">
-                  <div className="p-2 bg-white/20 rounded-xl backdrop-blur-sm">
-                    <Clock className="h-6 w-6" />
-                  </div>
-                  Check-in
-                </DialogTitle>
-                <DialogDescription className="text-emerald-50 text-base">
-                  Select projects you plan to work on and describe your planned work.
-                </DialogDescription>
-              </DialogHeader>
+            <DialogHeader className="relative space-y-0 pr-12 text-left">
+              <div className="flex items-center gap-3">
+                <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-emerald-500 to-indigo-600 text-white shadow-lg shadow-emerald-500/20">
+                  <Clock className="h-5 w-5" />
+                </div>
+                <div className="min-w-0">
+                  <DialogTitle className="text-xl font-bold tracking-tight">Check-in</DialogTitle>
+                  <DialogDescription className="mt-0.5 text-sm">
+                    Confirm where you're working and what you plan to do today.
+                  </DialogDescription>
+                </div>
+              </div>
+            </DialogHeader>
+
+            <div className="relative mt-4 flex flex-wrap items-center gap-2">
+              <span className="inline-flex items-center gap-1.5 rounded-xl border border-border/60 bg-background/70 px-2.5 py-1 text-xs font-medium text-foreground">
+                <Calendar className="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400" />
+                {new Date(form.submission_date).toLocaleDateString('en-IN', {
+                  weekday: 'long',
+                  day: 'numeric',
+                  month: 'short',
+                  timeZone: 'Asia/Kolkata'
+                })}
+              </span>
+              <span className="inline-flex items-center gap-1.5 rounded-xl border border-border/60 bg-background/70 px-2.5 py-1 text-xs font-medium tabular-nums text-foreground">
+                <Clock className="h-3.5 w-3.5 text-indigo-600 dark:text-indigo-400" />
+                {new Date().toLocaleTimeString('en-IN', {
+                  hour: '2-digit',
+                  minute: '2-digit',
+                  timeZone: 'Asia/Kolkata'
+                })}{' '}
+                IST
+              </span>
+              <span className="inline-flex min-w-0 items-center gap-1.5 rounded-xl px-1 text-xs text-muted-foreground">
+                {isSundayHoliday
+                  ? 'Sunday holiday — check in anytime. Hours are not auto-added.'
+                  : checkInCutoffEnabled
+                    ? `Check in before ${checkInCutoffLabel}. Late check-ins count toward Office-only weeks.`
+                    : 'Late cutoff is off today — check-ins are not marked late.'}
+              </span>
             </div>
           </div>
 
           {/* Content Area */}
-          <div className="flex-1 overflow-y-auto p-6 space-y-6 bg-gray-50/50 dark:bg-gray-900/50">
-            {/* Date and Time - Elegant Cards */}
-            <div className="grid grid-cols-12 gap-4">
-              <div className="col-span-6 relative overflow-hidden bg-white dark:bg-gray-800 rounded-xl p-4 border border-gray-200 dark:border-gray-700 shadow-sm hover:shadow-md transition-shadow">
-                <div className="flex flex-col gap-1">
-                  <span className="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wide">Date</span>
-                  <span className="text-base font-bold text-gray-900 dark:text-white">
-                    {new Date(form.submission_date).toLocaleDateString('en-IN', {
-                      weekday: 'long',
-                      day: 'numeric',
-                      month: 'short',
-                      timeZone: 'Asia/Kolkata'
-                    })}
-                  </span>
-                </div>
-                <div className="absolute top-0 right-0 w-16 h-16 bg-emerald-500/10 rounded-bl-full"></div>
-              </div>
-              <div className="col-span-6 relative overflow-hidden bg-white dark:bg-gray-800 rounded-xl p-4 border border-gray-200 dark:border-gray-700 shadow-sm hover:shadow-md transition-shadow">
-                <div className="flex flex-col gap-1">
-                  <span className="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wide">Time</span>
-                  <span className="text-base font-bold text-gray-900 dark:text-white">
-                    {new Date().toLocaleTimeString('en-IN', {
-                      hour: '2-digit',
-                      minute: '2-digit',
-                      timeZone: 'Asia/Kolkata'
-                    })}
-                  </span>
-                </div>
-                <div className="absolute top-0 right-0 w-16 h-16 bg-blue-500/10 rounded-bl-full"></div>
-              </div>
-            </div>
-
-            {isSundayHoliday ? (
-              <p className="text-xs text-muted-foreground rounded-xl border border-border/60 bg-background/80 px-3 py-2">
-                Sunday holiday — check-in anytime. Hours are not auto-added.
-              </p>
-            ) : checkInCutoffEnabled ? (
-              <p className="text-xs text-muted-foreground rounded-xl border border-border/60 bg-background/80 px-3 py-2">
-                Please check in before {checkInCutoffLabel}. Late check-ins are allowed but count
-                toward Office-only weeks.
-              </p>
-            ) : (
-              <p className="text-xs text-muted-foreground rounded-xl border border-border/60 bg-background/80 px-3 py-2">
-                Late check-in cutoff is disabled — check-ins are not marked late by time today.
-              </p>
-            )}
-
+          <div className="flex-1 overflow-y-auto bg-muted/30 px-5 py-5 sm:px-6 [scrollbar-width:thin]">
+            <div className="flex flex-col gap-4">
             {/* Office / WFH — WFH only when Attendance exception grants it */}
-            <div className="space-y-3">
-              <Label className="text-sm font-semibold text-gray-900 dark:text-white flex items-center gap-2">
-                <div className="p-1.5 bg-indigo-100 dark:bg-indigo-900/30 rounded-lg">
-                  <Building2 className="h-4 w-4 text-indigo-600 dark:text-indigo-400" />
-                </div>
-                Work location
-                <span className="text-rose-500">*</span>
+            <section className="flex flex-col gap-3 rounded-2xl border border-border/60 bg-card p-4 sm:p-5">
+              <div className="flex flex-wrap items-center gap-2">
+                <span
+                  className={cn(
+                    'flex h-6 w-6 shrink-0 items-center justify-center rounded-lg text-[11px] font-bold',
+                    checkInLocationReady
+                      ? 'bg-emerald-500 text-white'
+                      : 'bg-primary/10 text-primary'
+                  )}
+                >
+                  {checkInLocationReady ? <Check className="h-3.5 w-3.5" /> : '1'}
+                </span>
+                <Label className="text-sm font-semibold text-foreground">
+                  Work location <span className="text-rose-500">*</span>
+                </Label>
                 {canChooseWfh ? (
                   <span className="ml-auto inline-flex items-center rounded-xl border border-emerald-300/80 bg-emerald-50 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-emerald-800 dark:border-emerald-700/60 dark:bg-emerald-950/40 dark:text-emerald-200">
                     Exception · WFH open
@@ -2794,7 +2783,7 @@ export function DailyWorkFlowPanel({
                     Office only
                   </span>
                 )}
-              </Label>
+              </div>
 
               {canChooseWfh ? (
                 <p className="text-xs text-emerald-800 dark:text-emerald-200 rounded-xl border border-emerald-300/70 bg-emerald-50/80 dark:border-emerald-800/50 dark:bg-emerald-950/30 px-3 py-2">
@@ -2821,51 +2810,71 @@ export function DailyWorkFlowPanel({
                 </p>
               )}
 
-              <p className="text-xs text-muted-foreground">
-                Office check-in requires your location within {officeGeoConfig.radiusM} m of{' '}
-                {officeGeoConfig.label}.
-              </p>
-
-              <div className="grid grid-cols-12 gap-3 sm:gap-4">
-                <button
-                  type="button"
-                  onClick={() => void selectWorkMode('office')}
-                  disabled={officeGeoStatus === 'checking' || isCheckingIn}
-                  className={`${
-                    canChooseWfh ? 'col-span-6' : 'col-span-12'
-                  } flex flex-col items-center gap-2 rounded-xl border-2 p-4 transition-all disabled:opacity-60 ${
-                    workMode === 'office'
-                      ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/30 text-blue-900 dark:text-blue-100'
-                      : 'border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 hover:border-blue-300'
-                  }`}
-                >
-                  <Building2 className="h-6 w-6" />
-                  <span className="text-sm font-semibold">Office</span>
-                  {!canChooseWfh ? (
-                    <span className="text-[10px] font-medium text-muted-foreground">
-                      Required unless exception granted
-                    </span>
-                  ) : null}
-                </button>
-
-                {canChooseWfh ? (
-                  <button
-                    type="button"
-                    onClick={() => void selectWorkMode('wfh')}
-                    disabled={officeGeoStatus === 'checking' || isCheckingIn}
-                    className={`col-span-6 flex flex-col items-center gap-2 rounded-xl border-2 p-4 transition-all disabled:opacity-40 disabled:cursor-not-allowed ${
-                      workMode === 'wfh'
-                        ? 'border-emerald-500 bg-emerald-50 dark:bg-emerald-900/30 text-emerald-900 dark:text-emerald-100'
-                        : 'border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 hover:border-emerald-300'
-                    }`}
-                  >
-                    <Home className="h-6 w-6" />
-                    <span className="text-sm font-semibold">WFH</span>
-                    <span className="text-[10px] font-medium text-muted-foreground">
-                      Exception granted
-                    </span>
-                  </button>
-                ) : null}
+              <div className="grid grid-cols-12 gap-3" role="radiogroup" aria-label="Work location">
+                {(
+                  [
+                    {
+                      mode: 'office' as const,
+                      label: 'Office',
+                      hint: canChooseWfh
+                        ? `Within ${officeGeoConfig.radiusM} m of office`
+                        : 'Required unless exception granted',
+                      Icon: Building2,
+                      active: 'border-blue-500 bg-blue-500/5 ring-4 ring-blue-500/10',
+                      iconActive: 'bg-blue-500 text-white',
+                    },
+                    ...(canChooseWfh
+                      ? [
+                          {
+                            mode: 'wfh' as const,
+                            label: 'Work from home',
+                            hint: 'Exception granted for today',
+                            Icon: Home,
+                            active: 'border-emerald-500 bg-emerald-500/5 ring-4 ring-emerald-500/10',
+                            iconActive: 'bg-emerald-500 text-white',
+                          },
+                        ]
+                      : []),
+                  ]
+                ).map(({ mode, label, hint, Icon, active, iconActive }) => {
+                  const selected = workMode === mode;
+                  return (
+                    <button
+                      key={mode}
+                      type="button"
+                      role="radio"
+                      aria-checked={selected}
+                      onClick={() => void selectWorkMode(mode)}
+                      disabled={officeGeoStatus === 'checking' || isCheckingIn}
+                      className={cn(
+                        canChooseWfh ? 'col-span-12 sm:col-span-6' : 'col-span-12',
+                        'relative flex items-center gap-3 rounded-xl border p-3.5 text-left transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-60',
+                        selected ? active : 'border-border bg-background hover:border-foreground/20 hover:bg-muted/40'
+                      )}
+                    >
+                      <span
+                        className={cn(
+                          'flex h-10 w-10 shrink-0 items-center justify-center rounded-xl transition-colors',
+                          selected ? iconActive : 'bg-muted text-muted-foreground'
+                        )}
+                      >
+                        <Icon className="h-5 w-5" />
+                      </span>
+                      <span className="min-w-0 flex-1">
+                        <span className="block text-sm font-semibold text-foreground">{label}</span>
+                        <span className="block truncate text-xs text-muted-foreground">{hint}</span>
+                      </span>
+                      <span
+                        className={cn(
+                          'flex h-5 w-5 shrink-0 items-center justify-center rounded-full border transition-colors',
+                          selected ? 'border-transparent bg-foreground text-background' : 'border-border'
+                        )}
+                      >
+                        {selected ? <Check className="h-3 w-3" /> : null}
+                      </span>
+                    </button>
+                  );
+                })}
               </div>
 
               {!canChooseWfh && showRequestWfhAction ? (
@@ -3056,61 +3065,86 @@ export function DailyWorkFlowPanel({
                   </div>
                 </div>
               ) : null}
-            </div>
+            </section>
 
-            {/* Project Selection - Enhanced */}
-            <div className="space-y-3">
-              <Label className="text-sm font-semibold text-gray-900 dark:text-white flex items-center gap-2">
-                <div className="p-1.5 bg-blue-100 dark:bg-blue-900/30 rounded-lg">
-                  <FolderKanban className="h-4 w-4 text-blue-600 dark:text-blue-400" />
-                </div>
-                Select Projects to Work On
-                {selectedProjects.length > 0 && (
-                  <span className="ml-auto px-2 py-1 bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 text-xs font-bold rounded-full">
+            {/* Project Selection */}
+            <section className="flex flex-col gap-3 rounded-2xl border border-border/60 bg-card p-4 sm:p-5">
+              <div className="flex flex-wrap items-center gap-2">
+                <span
+                  className={cn(
+                    'flex h-6 w-6 shrink-0 items-center justify-center rounded-lg text-[11px] font-bold',
+                    selectedProjects.length > 0
+                      ? 'bg-emerald-500 text-white'
+                      : 'bg-primary/10 text-primary'
+                  )}
+                >
+                  {selectedProjects.length > 0 ? <Check className="h-3.5 w-3.5" /> : '2'}
+                </span>
+                <Label className="text-sm font-semibold text-foreground">Projects you'll work on</Label>
+                {selectedProjects.length > 0 ? (
+                  <button
+                    type="button"
+                    onClick={() => setSelectedProjects([])}
+                    className="ml-auto inline-flex items-center gap-1 rounded-xl bg-primary/10 px-2.5 py-1 text-xs font-semibold text-primary transition-colors hover:bg-primary/15"
+                    aria-label="Clear selected projects"
+                  >
                     {selectedProjects.length} selected
-                  </span>
-                )}
-              </Label>
+                    <X className="h-3 w-3" />
+                  </button>
+                ) : null}
+              </div>
               <div className="relative">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400 z-10" />
+                <Search className="pointer-events-none absolute left-3.5 top-1/2 z-10 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
                 <Input
                   type="text"
                   value={projectSearch}
                   onChange={(e) => setProjectSearch(e.target.value)}
-                  placeholder="Search projects..."
-                  className="h-10 pl-10 border-2 border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800"
+                  placeholder="Search projects…"
+                  aria-label="Search projects"
+                  className="h-11 rounded-xl bg-background pl-10"
                 />
               </div>
-              <div className="border-2 border-gray-200 dark:border-gray-700 rounded-xl bg-white dark:bg-gray-800 shadow-sm">
-                <div className="max-h-56 overflow-y-auto p-3">
+              <div className="overflow-hidden rounded-xl border border-border/60 bg-background">
+                <div className="max-h-60 overflow-y-auto p-1.5 [scrollbar-width:thin]">
                   {loadingProjects ? (
-                    <div className="flex items-center justify-center py-8">
-                      <div className="w-6 h-6 border-3 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
-                      <span className="ml-3 text-sm text-gray-600 dark:text-gray-400 font-medium">Loading projects...</span>
+                    <div className="flex flex-col gap-1.5 p-1" aria-busy="true" aria-label="Loading projects">
+                      {[0, 1, 2, 3].map((i) => (
+                        <div key={i} className="flex items-center gap-3 rounded-xl px-3 py-2.5">
+                          <div className="h-4 w-4 animate-pulse rounded bg-muted" />
+                          <div className="h-4 flex-1 animate-pulse rounded-xl bg-muted" />
+                          <div className="h-5 w-16 animate-pulse rounded-xl bg-muted" />
+                        </div>
+                      ))}
                     </div>
                   ) : projects.length === 0 ? (
-                    <div className="text-center py-8">
-                      <FolderKanban className="h-10 w-10 text-gray-400 mx-auto mb-2 opacity-50" />
-                      <p className="text-sm text-gray-500 dark:text-gray-400">No projects available</p>
+                    <div className="flex flex-col items-center gap-2 py-8 text-center">
+                      <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-muted">
+                        <FolderKanban className="h-5 w-5 text-muted-foreground" />
+                      </div>
+                      <p className="text-sm font-medium text-foreground">No projects assigned</p>
+                      <p className="text-xs text-muted-foreground">Describe your planned work below instead.</p>
                     </div>
                   ) : filteredProjects.length === 0 ? (
-                    <div className="text-center py-8">
-                      <Search className="h-8 w-8 text-gray-400 mx-auto mb-2 opacity-60" />
-                      <p className="text-sm text-gray-500 dark:text-gray-400">No matching projects</p>
+                    <div className="flex flex-col items-center gap-2 py-8 text-center">
+                      <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-muted">
+                        <Search className="h-5 w-5 text-muted-foreground" />
+                      </div>
+                      <p className="text-sm font-medium text-foreground">No projects match “{projectSearch}”</p>
                     </div>
                   ) : (
-                    <div className="space-y-1.5">
+                    <div className="flex flex-col gap-1">
                       {filteredProjects.map((project) => {
                         const isSelected = selectedProjects.includes(project.id);
                         return (
                           <div
                             key={project.id}
                             onClick={() => handleProjectToggle(project.id)}
-                            className={`flex items-center gap-3 p-3 rounded-lg cursor-pointer transition-all ${
+                            className={cn(
+                              'flex cursor-pointer flex-wrap items-center gap-3 rounded-xl border px-3 py-2.5 transition-colors',
                               isSelected
-                                ? 'bg-blue-50 dark:bg-blue-900/20 border-2 border-blue-500 dark:border-blue-400'
-                                : 'hover:bg-gray-50 dark:hover:bg-gray-700/50 border-2 border-transparent'
-                            }`}
+                                ? 'border-primary/40 bg-primary/5'
+                                : 'border-transparent hover:bg-muted/60'
+                            )}
                           >
                             <Checkbox
                               id={`project-${project.id}`}
@@ -3125,26 +3159,37 @@ export function DailyWorkFlowPanel({
                                   setSelectedProjects((prev) => prev.filter((id) => id !== project.id));
                                 }
                               }}
-                              className="data-[state=checked]:bg-blue-600 data-[state=checked]:border-blue-600 shrink-0"
+                              className="shrink-0 rounded-md"
                             />
                             <label
                               htmlFor={`project-${project.id}`}
                               onClick={(e) => e.stopPropagation()}
-                              className={`text-sm font-medium cursor-pointer flex-1 min-w-0 ${
-                                isSelected
-                                  ? 'text-blue-900 dark:text-blue-100'
-                                  : 'text-gray-900 dark:text-white'
-                              }`}
+                              className={cn(
+                                'min-w-0 flex-1 cursor-pointer truncate text-sm font-medium',
+                                isSelected ? 'text-foreground' : 'text-foreground/90'
+                              )}
+                              title={project.name}
                             >
                               {project.name}
                             </label>
-                            <div className="flex items-center gap-2">
-                              <span className="px-2 py-0.5 rounded-full text-[11px] font-semibold bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300">
-                                {loadingProjectStats ? '...' : (projectStats[project.id]?.bugs ?? 0)} open
-                              </span>
-                              <span className="px-2 py-0.5 rounded-full text-[11px] font-semibold bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300">
-                                {loadingProjectStats ? '...' : (projectStats[project.id]?.updates ?? 0)} approved
-                              </span>
+                            <div className="flex shrink-0 items-center gap-1.5">
+                              {loadingProjectStats ? (
+                                <>
+                                  <span className="h-5 w-14 animate-pulse rounded-xl bg-muted" />
+                                  <span className="h-5 w-16 animate-pulse rounded-xl bg-muted" />
+                                </>
+                              ) : (
+                                <>
+                                  <span className="inline-flex items-center gap-1 rounded-xl bg-rose-500/10 px-2 py-0.5 text-[11px] font-semibold tabular-nums text-rose-700 dark:text-rose-300">
+                                    <span className="h-1.5 w-1.5 rounded-full bg-rose-500" />
+                                    {projectStats[project.id]?.bugs ?? 0} open
+                                  </span>
+                                  <span className="inline-flex items-center gap-1 rounded-xl bg-emerald-500/10 px-2 py-0.5 text-[11px] font-semibold tabular-nums text-emerald-700 dark:text-emerald-300">
+                                    <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
+                                    {projectStats[project.id]?.updates ?? 0} approved
+                                  </span>
+                                </>
+                              )}
                             </div>
                           </div>
                         );
@@ -3153,51 +3198,93 @@ export function DailyWorkFlowPanel({
                   )}
                 </div>
               </div>
-            </div>
+            </section>
 
-            {/* Planned Work - Enhanced */}
-            <div className="space-y-3">
-              <Label htmlFor="planned-work" className="text-sm font-semibold text-gray-900 dark:text-white flex items-center gap-2">
-                <div className="p-1.5 bg-emerald-100 dark:bg-emerald-900/30 rounded-lg">
-                  <FileText className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
-                </div>
-                Planned Work for Today
-              </Label>
+            {/* Planned Work */}
+            <section className="flex flex-col gap-3 rounded-2xl border border-border/60 bg-card p-4 sm:p-5">
+              <div className="flex flex-wrap items-center gap-2">
+                <span
+                  className={cn(
+                    'flex h-6 w-6 shrink-0 items-center justify-center rounded-lg text-[11px] font-bold',
+                    plannedWork.trim()
+                      ? 'bg-emerald-500 text-white'
+                      : 'bg-primary/10 text-primary'
+                  )}
+                >
+                  {plannedWork.trim() ? <Check className="h-3.5 w-3.5" /> : '3'}
+                </span>
+                <Label htmlFor="planned-work" className="text-sm font-semibold text-foreground">
+                  Planned work for today
+                </Label>
+                <span className="ml-auto text-xs text-muted-foreground">
+                  {selectedProjects.length > 0 ? 'Optional' : 'Required if no project selected'}
+                </span>
+              </div>
               <div className="relative">
                 <Textarea
                   id="planned-work"
-                  placeholder="Describe what you plan to work on today...&#10;&#10;Example:&#10;• Fix authentication bug in login module&#10;• Review PR #123 for new feature&#10;• Update API documentation&#10;• Write unit tests for user service"
+                  placeholder={'What will you focus on today?\n\n• Fix authentication bug in login module\n• Review PR #123\n• Update API documentation'}
                   value={plannedWork}
                   onChange={(e) => setPlannedWork(e.target.value)}
-                  className="min-h-[140px] border-2 border-gray-200 dark:border-gray-700 focus:border-emerald-500 dark:focus:border-emerald-400 rounded-xl text-sm leading-relaxed resize-none bg-white dark:bg-gray-800 shadow-sm focus:shadow-md transition-all"
+                  className="min-h-[132px] resize-y rounded-xl bg-background pb-8 text-sm leading-relaxed"
                 />
                 {plannedWork.trim() && (
-                  <div className="absolute bottom-3 right-3 text-xs text-gray-400">
+                  <span className="pointer-events-none absolute bottom-2.5 right-3 rounded-lg bg-muted px-1.5 py-0.5 text-[11px] font-medium tabular-nums text-muted-foreground">
                     {plannedWork.trim().split('\n').filter(l => l.trim()).length} line{plannedWork.trim().split('\n').filter(l => l.trim()).length !== 1 ? 's' : ''}
-                  </div>
+                  </span>
                 )}
               </div>
+            </section>
             </div>
           </div>
 
-          {/* Footer with Centered Action Button */}
-          <DialogFooter className="p-6 bg-white dark:bg-gray-800 border-t border-gray-200 dark:border-gray-700">
-            <div className="w-full flex justify-center">
+          {/* Footer */}
+          <DialogFooter className="flex-col gap-3 border-t border-border/60 bg-card px-5 py-4 sm:flex-row sm:items-center sm:justify-between sm:space-x-0 sm:px-6">
+            <div className="flex flex-wrap items-center gap-2 text-xs" aria-live="polite">
+              {[
+                { ok: checkInLocationReady, label: workMode === 'wfh' ? 'WFH' : 'Location' },
+                { ok: checkInPlanReady, label: 'Plan' },
+              ].map(({ ok, label }) => (
+                <span
+                  key={label}
+                  className={cn(
+                    'inline-flex items-center gap-1.5 rounded-xl px-2.5 py-1 font-medium',
+                    ok
+                      ? 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-300'
+                      : 'bg-muted text-muted-foreground'
+                  )}
+                >
+                  {ok ? <Check className="h-3.5 w-3.5" /> : <span className="h-1.5 w-1.5 rounded-full bg-current" />}
+                  {label}
+                  <span className="sr-only">{ok ? 'ready' : 'pending'}</span>
+                </span>
+              ))}
+            </div>
+            <div className="flex w-full flex-col-reverse gap-2 sm:w-auto sm:flex-row">
+              <Button
+                type="button"
+                variant="ghost"
+                onClick={closeCheckInDialog}
+                disabled={isCheckingIn}
+                className="h-11 rounded-xl"
+              >
+                Cancel
+              </Button>
               <Button
                 onClick={handleCheckIn}
                 disabled={isCheckingIn || !canConfirmCheckIn}
-                className="w-full sm:w-auto min-w-[200px] px-8 py-6 bg-gradient-to-r from-emerald-600 via-blue-600 to-indigo-600 hover:from-emerald-700 hover:via-blue-700 hover:to-indigo-700 text-white font-semibold text-base shadow-lg hover:shadow-xl transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed transform hover:scale-105 active:scale-95 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:ring-offset-2"
+                className="h-11 min-w-[180px] rounded-xl bg-gradient-to-r from-emerald-600 to-indigo-600 font-semibold text-white shadow-lg shadow-emerald-500/20 transition-all hover:from-emerald-700 hover:to-indigo-700 hover:shadow-xl disabled:opacity-50 disabled:shadow-none"
               >
                 {isCheckingIn ? (
-                  <div className="flex items-center justify-center gap-3 animate-pulse">
-                    <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-                    <span className="font-medium">Checking in...</span>
-                  </div>
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Checking in…
+                  </>
                 ) : (
-                  <div className="flex items-center justify-center gap-3">
-                    <Clock className="h-5 w-5 animate-pulse" />
-                    <span className="font-medium">Confirm Check-in</span>
-                  </div>
+                  <>
+                    <CheckCircle2 className="mr-2 h-4 w-4" />
+                    Confirm check-in
+                  </>
                 )}
               </Button>
             </div>
