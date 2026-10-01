@@ -107,7 +107,7 @@ const PrivacyPolicy = () => {
                   <li><strong>Google Docs (documents):</strong> Create and edit BugDocs documents that you start from BugRicer</li>
                   <li><strong>Google Sheets (spreadsheets):</strong> Create and edit BugSheets spreadsheets that you start from BugRicer</li>
                   <li><strong>Google Drive (drive.file):</strong> Access only the files BugRicer creates or that you open with BugRicer; we cannot see the rest of your Drive</li>
-                  <li><strong>Google Calendar (calendar):</strong> Create calendar events with Google Meet links when you schedule a BugMeet meeting</li>
+                  <li><strong>Google Calendar events (calendar.events):</strong> Create calendar events with Google Meet links when you schedule a BugMeet meeting</li>
                   <li><strong>Storage:</strong> We store an OAuth refresh token (to keep the integration working) and your Google email on our servers. We do not store the contents of your Google files outside the documents you create through BugRicer</li>
                   <li><strong>No sharing or selling:</strong> Google user data is never sold, used for advertising, or shared with third parties, except as required by law</li>
                   <li><strong>Disconnect and deletion:</strong> You can disconnect Google at any time from BugDocs/BugSheets, which deletes the stored tokens. You can also revoke access at <a href="https://myaccount.google.com/permissions" target="_blank" rel="noopener noreferrer" className="text-blue-600 dark:text-blue-400 hover:underline">myaccount.google.com/permissions</a>, or email us to delete all Google-related data</li>
