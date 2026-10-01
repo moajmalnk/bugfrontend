@@ -188,6 +188,8 @@ export interface User {
   work_mode?: 'office' | 'wfh' | null;
   /** True when today's check-in was after 10:00 AM IST */
   is_late?: boolean;
+  /** Day the work fields describe when fetched with ?date=; null/absent = today */
+  work_date?: string | null;
   permissions?: string[]; // Effective permissions for the user
 }
 

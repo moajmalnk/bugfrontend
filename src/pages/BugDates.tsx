@@ -39,7 +39,12 @@ import {
   type BugDatesEvent,
   type GrowthProgramSession,
 } from '@/services/bugDatesService';
-import { bugDatesItemChipClass } from '@/lib/bugDatesUi';
+import {
+  BUGDATES_CONTENT_LAYERS,
+  bugDatesItemChipClass,
+  isTentativeBugDatesItem,
+  sortBugDatesDayItems,
+} from '@/lib/bugDatesUi';
 import { cn, getEffectiveRole, hasPermissionOrAdmin } from '@/lib/utils';
 
 const FILTERS: { key: string; label: string; dot: string }[] = [
@@ -186,8 +191,20 @@ export default function BugDates() {
       if (!map.has(key)) map.set(key, []);
       map.get(key)!.push(item);
     }
+    for (const [key, list] of map) map.set(key, sortBugDatesDayItems(list));
     return map;
   }, [items]);
+
+  const monthContentItems = useMemo(() => {
+    const monthKey = format(cursor, 'yyyy-MM');
+    return sortBugDatesDayItems(
+      items.filter(
+        (i) =>
+          i.occurrence_date.startsWith(monthKey) &&
+          (BUGDATES_CONTENT_LAYERS as readonly string[]).includes(i.layer || i.category || '')
+      )
+    ).sort((a, b) => a.occurrence_date.localeCompare(b.occurrence_date));
+  }, [items, cursor]);
 
   const selectedItems = selectedDate ? byDate.get(selectedDate) || [] : [];
   const eventCount = useMemo(
@@ -388,6 +405,9 @@ export default function BugDates() {
                 const dayItems = byDate.get(key) || [];
                 const inMonth = isSameMonth(day, cursor);
                 const isToday = isSameDay(day, new Date());
+                const isHoliday = dayItems.some(
+                  (i) => (i.layer || i.category) === 'holiday' || i.is_office_closed
+                );
                 return (
                   <button
                     key={key}
@@ -395,7 +415,9 @@ export default function BugDates() {
                     onClick={() => setSelectedDate(key)}
                     className={cn(
                       'min-h-[72px] sm:min-h-[96px] p-1 sm:p-1.5 text-left transition-all duration-200',
-                      'bg-white dark:bg-gray-900 hover:bg-blue-50/60 dark:hover:bg-blue-950/30',
+                      isHoliday
+                        ? 'bg-rose-50/70 dark:bg-rose-950/20 hover:bg-rose-100/70 dark:hover:bg-rose-950/30'
+                        : 'bg-white dark:bg-gray-900 hover:bg-blue-50/60 dark:hover:bg-blue-950/30',
                       !inMonth && 'opacity-40 bg-gray-50 dark:bg-gray-950/50',
                       selectedDate === key &&
                         'ring-2 ring-inset ring-blue-500/50 bg-blue-50/40 dark:bg-blue-950/20'
@@ -436,6 +458,108 @@ export default function BugDates() {
                 );
               })}
             </div>
+          )}
+        </div>
+      </div>
+
+      {/* Month content calendar — holidays, observances, company events */}
+      <div className="relative w-full min-w-0">
+        <div className="absolute inset-0 bg-gradient-to-r from-gray-50/30 to-amber-50/30 dark:from-gray-800/30 dark:to-amber-900/20 rounded-2xl pointer-events-none" />
+        <div className="relative bg-white/80 dark:bg-gray-900/80 backdrop-blur-sm border border-gray-200/50 dark:border-gray-700/50 rounded-2xl p-4 sm:p-5 md:p-6">
+          <div className="flex flex-wrap items-center justify-between gap-2 min-w-0">
+            <div className="flex items-center gap-2 min-w-0">
+              <div className="p-1.5 bg-amber-500 rounded-lg shrink-0">
+                <CalendarDays className="h-4 w-4 text-white" />
+              </div>
+              <h2 className="text-base sm:text-lg font-semibold text-gray-900 dark:text-white truncate">
+                {format(cursor, 'MMMM')} content calendar
+              </h2>
+            </div>
+            {!loading ? (
+              <span className="text-xs font-medium text-gray-500 dark:text-gray-400">
+                {monthContentItems.length} {monthContentItems.length === 1 ? 'day' : 'days'} to plan
+              </span>
+            ) : null}
+          </div>
+
+          {loading ? (
+            <div className="mt-4 flex flex-col gap-2">
+              {Array.from({ length: 5 }).map((_, i) => (
+                <Skeleton key={i} className="h-14 w-full rounded-xl" />
+              ))}
+            </div>
+          ) : monthContentItems.length === 0 ? (
+            <p className="mt-4 rounded-xl border border-dashed border-gray-200 dark:border-gray-700 px-4 py-6 text-center text-sm text-gray-500 dark:text-gray-400">
+              No holidays or observances in {format(cursor, 'MMMM yyyy')}
+              {filters.length ? ' for the selected filters' : ''}.
+            </p>
+          ) : (
+            <ul className="mt-4 flex flex-col gap-2">
+              {monthContentItems.map((item) => {
+                const date = new Date(`${item.occurrence_date}T00:00:00`);
+                const layer = item.layer || item.category;
+                const tentative = isTentativeBugDatesItem(item);
+                return (
+                  <li key={`${item.id ?? item.title}-${item.occurrence_date}`}>
+                    <button
+                      type="button"
+                      onClick={() => setSelectedDate(item.occurrence_date)}
+                      className={cn(
+                        'w-full grid grid-cols-12 gap-3 items-start rounded-xl border px-3 py-2.5 text-left transition-all duration-200',
+                        'border-gray-200/70 dark:border-gray-700/70 hover:bg-blue-50/60 dark:hover:bg-blue-950/30',
+                        isSameDay(date, new Date()) && 'ring-2 ring-blue-500/40'
+                      )}
+                    >
+                      <div className="col-span-3 sm:col-span-2 flex flex-col items-center justify-center rounded-xl bg-gray-100 dark:bg-gray-800 py-1.5">
+                        <span className="text-[10px] font-bold uppercase tracking-wide text-gray-500 dark:text-gray-400">
+                          {format(date, 'MMM')}
+                        </span>
+                        <span className="text-lg font-bold leading-none text-gray-900 dark:text-white tabular-nums">
+                          {format(date, 'dd')}
+                        </span>
+                        <span className="text-[10px] font-medium text-gray-500 dark:text-gray-400">
+                          {format(date, 'EEE')}
+                        </span>
+                      </div>
+                      <div className="col-span-9 sm:col-span-10 min-w-0 flex flex-col gap-1">
+                        <div className="flex flex-wrap items-center gap-1.5 min-w-0">
+                          <span className="font-semibold text-sm text-gray-900 dark:text-white truncate max-w-full">
+                            {item.title}
+                          </span>
+                          <span
+                            className={cn(
+                              'rounded-lg px-1.5 py-0.5 text-[10px] font-semibold',
+                              bugDatesItemChipClass(item)
+                            )}
+                          >
+                            {layer === 'holiday'
+                              ? 'Holiday'
+                              : layer === 'company_event'
+                                ? 'Company'
+                                : 'Observance'}
+                          </span>
+                          {item.is_office_closed ? (
+                            <span className="rounded-lg border border-rose-500/30 bg-rose-500/10 px-1.5 py-0.5 text-[10px] font-semibold text-rose-700 dark:text-rose-300">
+                              Office closed
+                            </span>
+                          ) : null}
+                          {tentative ? (
+                            <span className="rounded-lg border border-gray-400/40 bg-gray-500/10 px-1.5 py-0.5 text-[10px] font-semibold text-gray-600 dark:text-gray-300">
+                              Tentative
+                            </span>
+                          ) : null}
+                        </div>
+                        {item.description ? (
+                          <p className="text-xs text-gray-600 dark:text-gray-400 line-clamp-2">
+                            {item.description}
+                          </p>
+                        ) : null}
+                      </div>
+                    </button>
+                  </li>
+                );
+              })}
+            </ul>
           )}
         </div>
       </div>

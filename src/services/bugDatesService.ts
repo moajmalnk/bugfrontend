@@ -122,6 +122,85 @@ export async function getBugDatesCalendar(params: {
   return data.data;
 }
 
+export type BugDatesAttendancePerson = {
+  user_id: string;
+  username: string;
+  avatar?: string | null;
+  /** checked_in = actual check-in; planned = WFH request (pending or approved) without a check-in yet */
+  status: 'checked_in' | 'planned';
+  wfh_request_status?: 'pending' | 'approved' | null;
+  /** WFH request note; only for the person themself or managers */
+  note?: string | null;
+  check_in_time?: string | null;
+  /** Derived from the saved work update; null while still working or when hidden */
+  checkout_time?: string | null;
+  break_minutes?: number | null;
+  hours_worked?: number | null;
+  is_late?: boolean | null;
+};
+
+export type BugDatesLeavePerson = {
+  user_id: string;
+  username: string;
+  avatar?: string | null;
+  /** "Away" when the viewer may not see the leave type */
+  leave_type_name: string;
+  status: 'pending' | 'approved';
+  is_half_day: boolean;
+  half_day_type?: string | null;
+  credited_hours?: number | null;
+  is_official_leave: boolean;
+  reason?: string | null;
+};
+
+export type BugDatesWeeklyReportFiler = {
+  user_id: string;
+  username: string;
+  avatar?: string | null;
+  filed_at: string | null;
+  filed_late: boolean;
+  has_blockers: boolean;
+  counts: { completed: number; wip: number; plan: number };
+};
+
+export type BugDatesWeeklyReportPending = {
+  user_id: string;
+  username: string;
+  avatar?: string | null;
+};
+
+/** Present only when the day is a Saturday (weekly report due day). */
+export type BugDatesDayWeeklyReport = {
+  week_start: string;
+  week_end: string;
+  week_label: string;
+  scope: 'team' | 'self';
+  due_state: 'upcoming' | 'due_today' | 'past';
+  submitted: BugDatesWeeklyReportFiler[];
+  pending: BugDatesWeeklyReportPending[];
+};
+
+export type BugDatesDayAttendance = {
+  date: string;
+  office: BugDatesAttendancePerson[];
+  wfh: BugDatesAttendancePerson[];
+  unset: BugDatesAttendancePerson[];
+  /** Missing on older backends */
+  leave?: BugDatesLeavePerson[];
+  weekly_report?: BugDatesDayWeeklyReport | null;
+  can_see_times: boolean;
+};
+
+export async function getBugDatesDayAttendance(
+  date: string,
+  signal?: AbortSignal
+): Promise<BugDatesDayAttendance> {
+  const qs = new URLSearchParams({ date });
+  const res = await fetch(`${API}/attendance.php?${qs}`, { headers: authHeaders(), signal });
+  const data = await parseJson(res);
+  return data.data;
+}
+
 export async function getBugDatesHolidays(from: string, to: string): Promise<string[]> {
   const qs = new URLSearchParams({ from, to });
   const res = await fetch(`${API}/holidays.php?${qs}`, { headers: authHeaders() });

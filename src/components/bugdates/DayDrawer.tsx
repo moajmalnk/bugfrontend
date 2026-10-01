@@ -22,6 +22,7 @@ import {
   type GrowthProgramSession,
 } from '@/services/bugDatesService';
 import { bugDatesItemChipClass } from '@/lib/bugDatesUi';
+import { DayAttendanceSection } from './DayAttendanceSection';
 import { format, parseISO } from 'date-fns';
 
 const MILESTONE_LABELS: Record<string, string> = {
@@ -100,6 +101,7 @@ export function DayDrawer({
 }: Props) {
   const navigate = useNavigate();
   const [busy, setBusy] = useState<string | null>(null);
+  const [teamCovered, setTeamCovered] = useState(true);
   const [sessionForm, setSessionForm] = useState({
     event_id: 0,
     agenda_topic: '',
@@ -138,6 +140,13 @@ export function DayDrawer({
   }, [items, sessions, date]);
 
   if (!open || !date) return null;
+
+  const visibleItems = teamCovered
+    ? items.filter((i) => {
+        const layer = i.layer || i.category;
+        return layer !== 'leave' && layer !== 'wfh';
+      })
+    : items;
 
   const label = (() => {
     try {
@@ -248,7 +257,7 @@ export function DayDrawer({
                 </h2>
               </div>
               <p className="ps-9 text-xs font-medium text-gray-500 dark:text-gray-400">
-                {items.length} item{items.length === 1 ? '' : 's'}
+                {visibleItems.length} scheduled item{visibleItems.length === 1 ? '' : 's'}
               </p>
             </div>
             <Button
@@ -264,7 +273,9 @@ export function DayDrawer({
         </div>
 
         <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto overscroll-y-contain px-4 py-4 pb-6 custom-scrollbar sm:gap-4 sm:pb-4">
-          {items.length === 0 && (
+          <DayAttendanceSection date={date} onTeamCoverage={setTeamCovered} />
+
+          {visibleItems.length === 0 && (
             <div className="rounded-2xl border-2 border-dashed border-gray-200 dark:border-gray-600 bg-gray-50/50 dark:bg-gray-800/30 p-8 text-center">
               <p className="text-sm font-medium text-gray-600 dark:text-gray-400">
                 Nothing scheduled for this day.
@@ -272,7 +283,7 @@ export function DayDrawer({
             </div>
           )}
 
-          {items.map((item, idx) => {
+          {visibleItems.map((item, idx) => {
             const layer = item.layer || item.category || 'company_event';
             const chip = bugDatesItemChipClass(item);
             const displayTitle = getDayItemTitle(item);

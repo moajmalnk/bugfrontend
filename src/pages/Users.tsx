@@ -15,6 +15,13 @@ import { Tabs, TabsContent } from "@/components/ui/tabs";
 import { toast } from "@/components/ui/use-toast";
 import { AddUserDialog } from "@/components/users/AddUserDialog";
 import { ActiveTodayWorkSummary } from "@/components/users/ActiveTodayWorkSummary";
+import { ActiveDayOverview } from "@/components/users/ActiveDayOverview";
+import {
+  istTodayYmd,
+  WORK_MODE_GROUPS,
+  workModeGroupOf,
+  type WorkModeFilter,
+} from "@/lib/workModeAttendance";
 import { UserAnalytics } from "@/components/users/UserAnalytics";
 import { UserWorkStats } from "@/components/users/UserWorkStats";
 import { UsersTopLeaderboards } from "@/components/users/UsersTopLeaderboards";
@@ -31,7 +38,7 @@ import { userService } from "@/services/userService";
 import { notifyAdminNavCountsChanged } from "@/services/adminNavCountsService";
 import { StandardsMode, TesterType, User, UserRole } from "@/types";
 import { BarChart3, ClipboardList, Palette, Shield, UserCheck, UserRound, Code2, Bug } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import {
   useUrlPagination,
@@ -40,7 +47,7 @@ import {
   listReturnState,
 } from "@/hooks/useUrlPagination";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-import { formatDistanceToNow } from "date-fns";
+import { format, formatDistanceToNow, parseISO } from "date-fns";
 
 const parseCheckInToMinutes = (value?: string | null): number | null => {
   if (!value) return null;
@@ -204,6 +211,15 @@ const Users = () => {
   const testerTypeParam = searchParams.get("tester_type");
   const testerTypeFilter: TesterType | "all" =
     testerTypeParam === "codo" || testerTypeParam === "client" ? testerTypeParam : "all";
+  const todayYmd = istTodayYmd();
+  const dateParam = searchParams.get("date") || "";
+  const workDate =
+    /^\d{4}-\d{2}-\d{2}$/.test(dateParam) && dateParam <= todayYmd ? dateParam : todayYmd;
+  const modeParam = searchParams.get("mode");
+  const workModeFilter: WorkModeFilter =
+    modeParam === "office" || modeParam === "wfh" || modeParam === "unset" ? modeParam : "all";
+  const [dayViewUnsupported, setDayViewUnsupported] = useState(false);
+  const fetchSeqRef = useRef(0);
   const [userToDelete, setUserToDelete] = useState<User | null>(null);
 
   // Undo delete hook
@@ -252,6 +268,11 @@ const Users = () => {
   });
 
   const fetchUsers = async () => {
+    // Why: switching days quickly must never let an older day's response overwrite the newer one.
+    const seq = ++fetchSeqRef.current;
+    const requestedDate = workDate;
+    const isPastDay = requestedDate !== todayYmd;
+    setIsLoading(true);
     try {
       const token = localStorage.getItem("token") || sessionStorage.getItem("token");
       if (!token) {
@@ -263,7 +284,10 @@ const Users = () => {
         setIsLoading(false);
         return;
       }
-      const response = await fetch(`${ENV.API_URL}/users/get.php`, {
+      const url = isPastDay
+        ? `${ENV.API_URL}/users/get.php?date=${encodeURIComponent(requestedDate)}`
+        : `${ENV.API_URL}/users/get.php`;
+      const response = await fetch(url, {
         method: "GET",
         headers: {
           Authorization: `Bearer ${token}`,
@@ -272,12 +296,17 @@ const Users = () => {
       });
 
       const data = await response.json().catch(() => ({}));
+      if (seq !== fetchSeqRef.current) return;
       if (!response.ok) {
         throw new Error(data?.message || `Request failed (${response.status})`);
       }
       if (!data.success || !Array.isArray(data.data)) {
         throw new Error(data?.message || "Invalid response from server");
       }
+      // An older backend ignores ?date= and returns today — flag it rather than mislabel the data.
+      setDayViewUnsupported(
+        isPastDay && data.data.length > 0 && data.data[0]?.work_date !== requestedDate
+      );
       setUsers(
         data.data.map((user: any) => {
           const name = user.username || user.name || "User";
@@ -298,6 +327,7 @@ const Users = () => {
         })
       );
     } catch (error) {
+      if (seq !== fetchSeqRef.current) return;
       const msg = error instanceof Error ? error.message : "Failed to load users. Please try again.";
       toast({
         title: "Error",
@@ -305,13 +335,34 @@ const Users = () => {
         variant: "destructive",
       });
     } finally {
-      setIsLoading(false);
+      if (seq === fetchSeqRef.current) setIsLoading(false);
     }
   };
 
   useEffect(() => {
     fetchUsers();
-  }, []);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [workDate]);
+
+  const updateListParams = (mutate: (params: URLSearchParams) => void) => {
+    const params = new URLSearchParams(searchParams);
+    mutate(params);
+    setSearchParams(params, { replace: true });
+  };
+
+  const handleWorkDateChange = (ymd: string) => {
+    updateListParams((params) => {
+      if (ymd === todayYmd) params.delete("date");
+      else params.set("date", ymd);
+    });
+  };
+
+  const handleWorkModeFilterChange = (next: WorkModeFilter) => {
+    updateListParams((params) => {
+      if (next === "all") params.delete("mode");
+      else params.set("mode", next);
+    });
+  };
 
   // Apply filtering whenever search term or tab changes
   useEffect(() => {
@@ -575,7 +626,10 @@ const Users = () => {
     "analytics",
   ] as const;
   const isKnownTab = (knownTabs as readonly string[]).includes(tabFromUrl);
-  const tabHasRows = (tab: string) => (tabCounts[tab] ?? 0) > 0;
+  const tabHasRows = (tab: string) =>
+    (tabCounts[tab] ?? 0) > 0 ||
+    // Active is a day view: an empty day (e.g. Sunday) must not bounce the admin to another tab.
+    (tab === "active" && (workDate !== todayYmd || searchParams.get("tab") === "active"));
   const isValidTab =
     isKnownTab && (isLoading || tabHasRows(tabFromUrl));
   const defaultTab =
@@ -649,7 +703,7 @@ const Users = () => {
       count: analyticsCount,
       countClass: "bg-violet-100 dark:bg-violet-900/30 text-violet-700 dark:text-violet-300",
     },
-  ].filter((tab) => isLoading || tab.count > 0);
+  ].filter((tab) => isLoading || tabHasRows(tab.value));
   // Only rewrite an unknown / empty tab after data is ready — never wipe developers/page on load
   useEffect(() => {
     if (isLoading) return;
@@ -709,6 +763,22 @@ const Users = () => {
   const paginatedUsers = filteredUsers.slice(
     (activePage - 1) * itemsPerPage,
     activePage * itemsPerPage
+  );
+
+  // Active tab = one day's attendance, bounded by team size, so it is grouped by work mode
+  // instead of paginated. Searching still uses the flat, paginated list across all users.
+  const groupedActiveView = activeTab === "active" && !searchTerm.trim();
+  const activeModeGroups = useMemo(
+    () =>
+      WORK_MODE_GROUPS.filter(
+        (g) => workModeFilter === "all" || workModeFilter === g.key
+      )
+        .map((g) => ({
+          ...g,
+          users: filteredUsers.filter((u) => workModeGroupOf(u) === g.key),
+        }))
+        .filter((g) => g.users.length > 0),
+    [filteredUsers, workModeFilter]
   );
 
   // USERS_VIEW permission (admin ENUM still has SUPER_ADMIN / all perms)
@@ -930,6 +1000,18 @@ const Users = () => {
         </div>
         )}
 
+        {groupedActiveView ? (
+          <ActiveDayOverview
+            date={workDate}
+            onDateChange={handleWorkDateChange}
+            attended={filteredUsers}
+            loading={isLoading}
+            modeFilter={workModeFilter}
+            onModeFilterChange={handleWorkModeFilterChange}
+            dayViewUnsupported={dayViewUnsupported}
+          />
+        ) : null}
+
         {!isLoading && leaderboardUsers.length > 0 ? (
           <UsersTopLeaderboards
             users={leaderboardUsers}
@@ -939,7 +1021,7 @@ const Users = () => {
         ) : null}
 
         {/* Professional Responsive Pagination Controls - Only show if there are multiple pages */}
-        {!isLoading && totalFiltered > 0 && totalPages > 1 && (
+        {!groupedActiveView && !isLoading && totalFiltered > 0 && totalPages > 1 && (
         <div className="flex flex-col gap-4 sm:gap-5 mb-6 w-full min-w-0 overflow-x-hidden bg-gradient-to-r from-background via-background to-muted/10 rounded-xl shadow-sm border border-border/50 backdrop-blur-sm hover:shadow-md transition-all duration-300">
           {/* Top Row - Results Info and Items Per Page */}
           <div className="flex flex-col sm:flex-row md:flex-row sm:items-center md:items-center justify-between gap-3 sm:gap-4 md:gap-4 p-4 sm:p-5">
@@ -1134,7 +1216,7 @@ const Users = () => {
         )}
 
         {/* Simple results info when no pagination needed */}
-        {!isLoading && totalFiltered > 0 && totalPages <= 1 && (
+        {!groupedActiveView && !isLoading && totalFiltered > 0 && totalPages <= 1 && (
         <div className="flex flex-col sm:flex-row md:flex-row sm:items-center md:items-center justify-between gap-3 sm:gap-4 md:gap-4 mb-6 p-4 sm:p-5 bg-gradient-to-r from-background via-background to-muted/10 rounded-xl border border-border/50 backdrop-blur-sm hover:shadow-md transition-all duration-300">
           <div className="flex items-center gap-2">
             <div className="w-2 h-2 bg-gradient-to-r from-primary to-primary/70 rounded-full animate-pulse"></div>
@@ -1159,7 +1241,7 @@ const Users = () => {
         </div>
         )}
 
-        {!isLoading && totalFiltered === 0 && (
+        {!groupedActiveView && !isLoading && totalFiltered === 0 && (
           <div className="rounded-2xl border border-dashed border-gray-300/80 bg-gray-50/40 px-6 py-10 text-center dark:border-gray-700 dark:bg-gray-800/20">
             <UserCheck className="mx-auto mb-3 h-10 w-10 text-muted-foreground/50" />
             <p className="text-sm font-medium text-gray-900 dark:text-white">
@@ -1173,7 +1255,66 @@ const Users = () => {
         )}
 
         {/* User list — keep mounted while loading so refresh shows skeletons, not a blank panel */}
-        {(isLoading || totalFiltered > 0) && (
+        {groupedActiveView
+          ? renderActiveDayGroups()
+          : (isLoading || totalFiltered > 0) && renderUserList(paginatedUsers)}
+
+        {/* User details now use route: /:role/users/:userId */}
+      </>
+    );
+  }
+
+  function renderActiveDayGroups() {
+    if (isLoading) return renderUserList([]);
+    const dayLabel =
+      workDate === todayYmd ? "today" : `on ${format(parseISO(workDate), "EEEE, d MMM yyyy")}`;
+    if (activeModeGroups.length === 0) {
+      return (
+        <div className="rounded-2xl border border-dashed border-gray-300/80 bg-gray-50/40 px-6 py-10 text-center dark:border-gray-700 dark:bg-gray-800/20">
+          <UserCheck className="mx-auto mb-3 h-10 w-10 text-muted-foreground/50" />
+          <p className="text-sm font-medium text-gray-900 dark:text-white">
+            {totalFiltered === 0
+              ? `No team members checked in ${dayLabel}.`
+              : `No ${workModeFilter === "office" ? "office" : workModeFilter === "wfh" ? "work-from-home" : "unrecorded-mode"} check-ins ${dayLabel}.`}
+          </p>
+        </div>
+      );
+    }
+    return (
+      <div className="flex flex-col gap-6 sm:gap-8">
+        {activeModeGroups.map((group) => {
+          const Icon = group.icon;
+          const late = group.users.filter((u) => u.is_late).length;
+          const checkedOut = group.users.filter((u) => u.checkout_time).length;
+          return (
+            <section key={group.key} aria-labelledby={`mode-${group.key}`} className="flex flex-col gap-3">
+              <div className="flex flex-wrap items-center gap-x-3 gap-y-1 min-w-0">
+                <div className={cn("p-1.5 rounded-lg shrink-0", group.iconBg)}>
+                  <Icon className="h-4 w-4 text-white" />
+                </div>
+                <h3
+                  id={`mode-${group.key}`}
+                  className={cn("text-base sm:text-lg font-semibold", group.accent)}
+                >
+                  {group.label}
+                </h3>
+                <span className="rounded-full bg-muted px-2.5 py-0.5 text-xs font-semibold text-foreground tabular-nums">
+                  {group.users.length}
+                </span>
+                <span className="text-xs text-muted-foreground">
+                  {late} late · {checkedOut} checked out
+                </span>
+              </div>
+              {renderUserList(group.users)}
+            </section>
+          );
+        })}
+      </div>
+    );
+  }
+
+  function renderUserList(rows: User[]) {
+    return (
         <div className="relative">
           <div className="absolute inset-0 bg-gradient-to-r from-gray-50/20 to-blue-50/20 dark:from-gray-800/20 dark:to-blue-900/20 rounded-2xl"></div>
           <div className="relative bg-white/80 dark:bg-gray-900/80 backdrop-blur-sm border border-gray-200/50 dark:border-gray-700/50 rounded-2xl overflow-hidden shadow-xl">
@@ -1234,7 +1375,7 @@ const Users = () => {
                             </TableCell>
                           </TableRow>
                         ))
-                    : paginatedUsers.map((user, index) => (
+                    : rows.map((user, index) => (
                         <TableRow
                           key={user.id}
                           className={`group hover:bg-gradient-to-r hover:from-blue-50/30 hover:to-emerald-50/30 dark:hover:from-blue-900/10 dark:hover:to-emerald-900/10 transition-all duration-200 border-b border-gray-100/50 dark:border-gray-800/50 ${
@@ -1325,7 +1466,7 @@ const Users = () => {
               ? Array(6)
                   .fill(0)
                   .map((_, index) => <UserCardSkeleton key={index} />)
-              : paginatedUsers.map((user) => (
+              : rows.map((user) => (
                   <div
                     key={user.id}
                     className="group relative overflow-hidden rounded-xl border border-gray-200/50 dark:border-gray-700/50 bg-white/90 dark:bg-gray-900/90 backdrop-blur-sm shadow-sm hover:shadow-lg transition-all duration-200 p-4 sm:p-5 flex flex-col gap-4 w-full"
@@ -1419,10 +1560,6 @@ const Users = () => {
             </div>
           </div>
         </div>
-        )}
-
-        {/* User details now use route: /:role/users/:userId */}
-      </>
     );
   }
 };
