@@ -2128,13 +2128,6 @@ export function OnboardingWizard({
                         ? "Edit onboarding details"
                         : "Set up your workspace"}
                   </DialogTitle>
-                  <DialogDescription className="text-sm text-muted-foreground max-w-xl leading-relaxed hidden sm:block">
-                    {adminMode
-                      ? "Fill or fix address, documents, banking, and contacts. Employee OTP is not required — you attest details as admin."
-                      : editMode
-                        ? "Update address, documents, banking, and permissions. Saving sends your profile back for HR verification."
-                        : "A short guided setup for address, documents, banking, and permissions. Required before you can enter BugRicer."}
-                  </DialogDescription>
                 </div>
                 <div className="flex items-start gap-2 shrink-0">
                   <div className="rounded-2xl border border-border/60 bg-background/70 px-3 py-1.5 sm:px-3.5 sm:py-2 text-right">
