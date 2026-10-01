@@ -94,7 +94,9 @@ export function stepToSlug(step: number): OnboardingStepSlug {
 
 export function slugToStep(slug: string | null | undefined): number {
   if (!slug) return 0;
-  const idx = ONBOARDING_STEP_SLUGS.indexOf(slug as OnboardingStepSlug);
+  // Tolerate "permissions?google_connected=true" from OAuth redirects that appended a 2nd "?".
+  const clean = slug.split("?")[0].trim();
+  const idx = ONBOARDING_STEP_SLUGS.indexOf(clean as OnboardingStepSlug);
   return idx >= 0 ? idx : 0;
 }
 

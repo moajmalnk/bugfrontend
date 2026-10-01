@@ -1,4 +1,5 @@
 import { apiClient } from "@/lib/axios";
+import { compressImageFile } from "@/lib/compressImageFile";
 
 export interface UserOnboardingDetails {
   id?: number;
@@ -218,16 +219,31 @@ function buildFormData(
 export const onboardingService = {
   async submit(
     payload: OnboardingPayload,
-    options?: { timeoutMs?: number; forUserId?: string }
+    options?: {
+      timeoutMs?: number;
+      forUserId?: string;
+      /** 0–100 while the request body uploads. */
+      onUploadProgress?: (percent: number) => void;
+    }
   ) {
     const hasFiles = !!(payload.aadhaar_file || payload.pan_file || payload.profile_photo);
     // Why: Text-only edits should not wait for the 120s file-upload budget.
     const timeout = options?.timeoutMs ?? (hasFiles ? 120_000 : 25_000);
-    const response = await apiClient.post(
-      "/users/submit_onboarding.php",
-      buildFormData(payload, { forUserId: options?.forUserId }),
-      { timeout }
+    const [aadhaar, pan] = await Promise.all([
+      payload.aadhaar_file ? compressImageFile(payload.aadhaar_file) : null,
+      payload.pan_file ? compressImageFile(payload.pan_file) : null,
+    ]);
+    const body = buildFormData(
+      { ...payload, aadhaar_file: aadhaar, pan_file: pan },
+      { forUserId: options?.forUserId }
     );
+    const response = await apiClient.post("/users/submit_onboarding.php", body, {
+      timeout,
+      onUploadProgress: (e: { loaded: number; total?: number }) => {
+        if (!options?.onUploadProgress || !e.total) return;
+        options.onUploadProgress(Math.min(100, Math.round((e.loaded / e.total) * 100)));
+      },
+    } as Parameters<typeof apiClient.post>[2]);
     return response.data;
   },
 

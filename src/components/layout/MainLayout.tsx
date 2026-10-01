@@ -19,6 +19,7 @@ const FirebaseListener = lazy(() => import("../messaging/FirebaseListener"));
 const AnnouncementPopup = lazy(() => import("../ui/AnnouncementPopup"));
 const FeedbackWidget = lazy(() => import("../feedback/FeedbackWidget"));
 const OnboardingGuard = lazy(() => import("../onboarding/OnboardingGuard"));
+const CodoWelcomeDialog = lazy(() => import("../onboarding/CodoWelcomeDialog"));
 const OnboardingVerificationBanner = lazy(
   () => import("../onboarding/OnboardingVerificationBanner")
 );
@@ -279,6 +280,7 @@ export const MainLayout = ({ children }: MainLayoutProps) => {
       <Suspense fallback={null}>
         <FirebaseListener />
         <OnboardingGuard />
+        <CodoWelcomeDialog />
         <AnnouncementPopup />
         <FeedbackWidget />
         <BugBotFab />

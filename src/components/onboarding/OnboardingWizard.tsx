@@ -62,14 +62,12 @@ import {
   Shield,
   Trash2,
   Upload,
-  ExternalLink,
-  BookOpen,
-  Globe,
   KeyRound,
   Eye,
   EyeOff,
   X,
   XCircle,
+  Clock,
 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { OnboardingBodySkeleton } from "./WorkspaceLaunchSkeleton";
@@ -716,6 +714,79 @@ interface OnboardingWizardProps {
 
 type ContactAvailability = "idle" | "checking" | "available" | "taken" | "unknown";
 
+/** Matches send_*_otp.php expires_in (5 minutes) until the server reports its own. */
+const OTP_TTL_MS = 5 * 60 * 1000;
+
+type OtpFailure =
+  | { kind: "expired" }
+  | { kind: "invalid"; message: string; expiresIn?: number }
+  | { kind: "other"; message: string };
+
+/** Why: Expired codes need a resend; wrong codes need a retype — branch on error_code. */
+function readOtpFailure(err: unknown): OtpFailure {
+  const res = (err as {
+    response?: { status?: number; data?: { error_code?: string; message?: string; data?: { expires_in?: number } } };
+  })?.response;
+  const code = res?.data?.error_code;
+  if (code === "OTP_EXPIRED" || res?.status === 410) return { kind: "expired" };
+  if (code === "OTP_INVALID" || res?.status === 422) {
+    return {
+      kind: "invalid",
+      message: res?.data?.message || "Incorrect code. Try again.",
+      expiresIn: Number(res?.data?.data?.expires_in) || undefined,
+    };
+  }
+  // Legacy backend answered every failure with 401 "Invalid or expired OTP".
+  if (res?.status === 401 && /otp/i.test(res?.data?.message ?? "")) {
+    return { kind: "invalid", message: "Incorrect or expired code. Try again or resend." };
+  }
+  return {
+    kind: "other",
+    message: err instanceof Error ? err.message : "Could not verify the code. Try again.",
+  };
+}
+
+const formatOtpTimer = (seconds: number) =>
+  `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, "0")}`;
+
+function OtpExpiredCard({
+  channel,
+  busy,
+  cooldown,
+  onResend,
+}: {
+  channel: "WhatsApp" | "email";
+  busy: boolean;
+  cooldown: number;
+  onResend: () => void;
+}) {
+  return (
+    <div
+      className="flex flex-col sm:flex-row sm:items-center gap-3 rounded-xl border border-amber-500/40 bg-amber-500/5 px-3 py-3"
+      role="alert"
+    >
+      <div className="flex items-start gap-2 min-w-0 flex-1">
+        <Clock className="h-4 w-4 text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" aria-hidden="true" />
+        <div className="min-w-0">
+          <p className="text-xs font-medium text-amber-700 dark:text-amber-300">Code expired</p>
+          <p className="text-[11px] text-muted-foreground">
+            For your security, codes last 5 minutes. Send a new one to {channel === "email" ? "your inbox" : "WhatsApp"}.
+          </p>
+        </div>
+      </div>
+      <Button
+        type="button"
+        className="rounded-xl h-10 w-full sm:w-auto shrink-0"
+        disabled={busy || cooldown > 0}
+        onClick={onResend}
+      >
+        {busy ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <RefreshCw className="h-4 w-4 mr-2" />}
+        {cooldown > 0 ? `Resend in ${cooldown}s` : "Send new code"}
+      </Button>
+    </div>
+  );
+}
+
 function ContactAvailabilityHint({ state }: { state: ContactAvailability }) {
   if (state === "checking") {
     return (
@@ -764,6 +835,8 @@ export function OnboardingWizard({
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [fileErrors, setFileErrors] = useState<Partial<Record<FileKey, string>>>({});
   const [loading, setLoading] = useState(false);
+  // null = not uploading; 0–100 while the submit body is in flight.
+  const [uploadPercent, setUploadPercent] = useState<number | null>(null);
   const [wfhBusy, setWfhBusy] = useState(false);
   const [wfhMapOpen, setWfhMapOpen] = useState(false);
   const [hydrated, setHydrated] = useState(false);
@@ -773,6 +846,12 @@ export function OnboardingWizard({
   const [pinLookupBusy, setPinLookupBusy] = useState(false);
   const [pinLookupHint, setPinLookupHint] = useState<string | null>(null);
   const [pinPostOffices, setPinPostOffices] = useState<string[]>([]);
+  // Why: PIN drives state/district/city. Remember what we auto-filled so a new PIN
+  // or office can refresh those fields without overwriting anything the user typed.
+  const [pinOfficeBlocks, setPinOfficeBlocks] = useState<Record<string, string>>({});
+  const [pinAutoFilled, setPinAutoFilled] = useState(false);
+  const lastAutoCityRef = useRef<string | null>(null);
+  const houseInputRef = useRef<HTMLInputElement>(null);
   const [photoCropOpen, setPhotoCropOpen] = useState(false);
   const [photoCropSrc, setPhotoCropSrc] = useState<string | null>(null);
   const [photoPreviewUrl, setPhotoPreviewUrl] = useState<string | null>(null);
@@ -792,6 +871,13 @@ export function OnboardingWizard({
   const [mailVerifyBusy, setMailVerifyBusy] = useState(false);
   const [mailCooldown, setMailCooldown] = useState(0);
   const [mailConflictMsg, setMailConflictMsg] = useState<string | null>(null);
+  // Why: Track code lifetime locally so an expired code swaps to "Send new code"
+  // instead of letting the user submit a dead OTP. Server stays the authority.
+  const [emgExpiresAt, setEmgExpiresAt] = useState<number | null>(null);
+  const [mailExpiresAt, setMailExpiresAt] = useState<number | null>(null);
+  const [emgOtpError, setEmgOtpError] = useState<string | null>(null);
+  const [mailOtpError, setMailOtpError] = useState<string | null>(null);
+  const [otpNow, setOtpNow] = useState(() => Date.now());
   const [emgAvailability, setEmgAvailability] = useState<ContactAvailability>("idle");
   const [mailAvailability, setMailAvailability] = useState<ContactAvailability>("idle");
   /** Why: Remember last OTP-verified values so edit mode only re-prompts OTP after a change. */
@@ -1060,11 +1146,13 @@ export function OnboardingWizard({
     setPhotoCropOpen(true);
   };
 
-  const handlePinChange = useCallback((raw: string) => {
+  const handlePinChange = useCallback((raw: string, opts?: { silent?: boolean }) => {
     const digits = raw.replace(/\D/g, "").slice(0, 6);
     setField("pin_code", digits);
     setPinLookupHint(null);
     setPinPostOffices([]);
+    setPinOfficeBlocks({});
+    setPinAutoFilled(false);
 
     pinAbortRef.current?.abort();
     if (pinTimerRef.current != null) {
@@ -1092,28 +1180,39 @@ export function OnboardingWizard({
             return;
           }
           const names = hit.offices.map((o) => o.name);
+          const blocks = Object.fromEntries(hit.offices.map((o) => [o.name, o.block]));
           setPinPostOffices(names);
+          setPinOfficeBlocks(blocks);
 
+          let autoOffice = "";
           setForm((prev) => {
             const matched = matchPinOffice(prev.post_office, names);
-            const autoOffice =
-              matched || (names.length === 1 ? names[0] : "");
+            autoOffice = matched || (names.length === 1 ? names[0] : "");
+            const autoCity = (autoOffice && blocks[autoOffice]) || hit.city;
+            const cityIsAuto =
+              !prev.city.trim() || prev.city === lastAutoCityRef.current;
+            if (cityIsAuto) lastAutoCityRef.current = autoCity;
             return {
               ...prev,
               pin_code: digits,
               post_office: autoOffice,
-              city: prev.city.trim() ? prev.city : hit.city,
+              city: cityIsAuto ? autoCity : prev.city,
               state: hit.state || prev.state || "Kerala",
               district: hit.district || prev.district,
               country: "India",
             };
           });
+          setPinAutoFilled(true);
 
           setPinLookupHint(
             names.length > 1
-              ? `${names.length} post offices found — select the correct one`
-              : `Filled from PIN · ${names[0]}`
+              ? `${names.length} post offices found — pick yours`
+              : `Filled state, district and city from ${names[0]}`
           );
+          // Single match: jump straight to the only address detail left to type.
+          if (!opts?.silent && names.length === 1) {
+            window.requestAnimationFrame(() => houseInputRef.current?.focus());
+          }
         } catch (e) {
           if ((e as Error)?.name === "AbortError") return;
           setPinLookupHint("Could not look up PIN right now");
@@ -1197,7 +1296,7 @@ export function OnboardingWizard({
     if (!open || !hydrated) return;
     const digits = form.pin_code.replace(/\D/g, "");
     if (digits.length !== 6 || pinPostOffices.length > 0) return;
-    handlePinChange(digits);
+    handlePinChange(digits, { silent: true });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, hydrated]);
 
@@ -1234,6 +1333,20 @@ export function OnboardingWizard({
 
   const isValidContactEmail = (email: string) =>
     /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim());
+
+  useEffect(() => {
+    if (!emgOtpSent && !mailOtpSent) return;
+    setOtpNow(Date.now());
+    const id = window.setInterval(() => setOtpNow(Date.now()), 1000);
+    return () => window.clearInterval(id);
+  }, [emgOtpSent, mailOtpSent]);
+
+  const emgSecondsLeft =
+    emgExpiresAt == null ? null : Math.max(0, Math.ceil((emgExpiresAt - otpNow) / 1000));
+  const mailSecondsLeft =
+    mailExpiresAt == null ? null : Math.max(0, Math.ceil((mailExpiresAt - otpNow) / 1000));
+  const emgOtpExpired = emgOtpSent && emgSecondsLeft === 0;
+  const mailOtpExpired = mailOtpSent && mailSecondsLeft === 0;
 
   const availabilityForUserId = adminMode ? userId : undefined;
   const emgDigitsForCheck = form.emergency_contact.replace(/\D/g, "");
@@ -1343,10 +1456,14 @@ export function OnboardingWizard({
     setEmgOtpBusy(true);
     setEmgOtpSent(true);
     setEmgOtp("");
+    setEmgOtpError(null);
+    setEmgExpiresAt(Date.now() + OTP_TTL_MS);
     setEmgCooldown(30);
     setForm((p) => ({ ...p, emergency_contact_verified: false }));
     try {
-      await onboardingService.sendEmergencyOtp(digits.slice(-10));
+      const sent = await onboardingService.sendEmergencyOtp(digits.slice(-10));
+      const ttl = Number(sent?.data?.expires_in);
+      if (ttl > 0) setEmgExpiresAt(Date.now() + ttl * 1000);
       toast({
         title: "OTP sent on WhatsApp",
         description: `Check WhatsApp on ····${digits.slice(-4)}`,
@@ -1369,8 +1486,9 @@ export function OnboardingWizard({
   const verifyEmergencyOtp = async (code?: string) => {
     const otp = (code ?? emgOtp).replace(/\D/g, "");
     const digits = form.emergency_contact.replace(/\D/g, "");
-    if (otp.length !== 6 || digits.length < 10 || emgVerifyBusy) return;
+    if (otp.length !== 6 || digits.length < 10 || emgVerifyBusy || emgOtpExpired) return;
     setEmgVerifyBusy(true);
+    setEmgOtpError(null);
     try {
       const res = await onboardingService.verifyEmergencyOtp(digits.slice(-10), otp);
       const verifiedAt =
@@ -1385,13 +1503,19 @@ export function OnboardingWizard({
       setEmgOtpSent(false);
       setEmgOtp("");
       setEmgCooldown(0);
+      setEmgExpiresAt(null);
       toast({ title: "Emergency number verified" });
     } catch (err) {
-      toast({
-        title: "OTP incorrect",
-        description: err instanceof Error ? err.message : "Check the code and try again",
-        variant: "destructive",
-      });
+      const outcome = readOtpFailure(err);
+      setEmgOtp("");
+      if (outcome.kind === "expired") {
+        setEmgExpiresAt(Date.now());
+      } else if (outcome.kind === "invalid") {
+        setEmgOtpError(outcome.message);
+        if (outcome.expiresIn) setEmgExpiresAt(Date.now() + outcome.expiresIn * 1000);
+      } else {
+        setEmgOtpError(outcome.message);
+      }
     } finally {
       setEmgVerifyBusy(false);
     }
@@ -1414,10 +1538,14 @@ export function OnboardingWizard({
     setMailOtpBusy(true);
     setMailOtpSent(true);
     setMailOtp("");
+    setMailOtpError(null);
+    setMailExpiresAt(Date.now() + OTP_TTL_MS);
     setMailCooldown(30);
     setForm((p) => ({ ...p, contact_email_verified: false }));
     try {
-      await onboardingService.sendContactEmailOtp(email);
+      const sent = await onboardingService.sendContactEmailOtp(email);
+      const ttl = Number(sent?.data?.expires_in);
+      if (ttl > 0) setMailExpiresAt(Date.now() + ttl * 1000);
       toast({
         title: "OTP sent to email",
         description: `Check inbox for ${email}`,
@@ -1440,8 +1568,9 @@ export function OnboardingWizard({
   const verifyContactEmailOtp = async (code?: string) => {
     const otp = (code ?? mailOtp).replace(/\D/g, "");
     const email = form.contact_email.trim().toLowerCase();
-    if (otp.length !== 6 || !isValidContactEmail(email) || mailVerifyBusy) return;
+    if (otp.length !== 6 || !isValidContactEmail(email) || mailVerifyBusy || mailOtpExpired) return;
     setMailVerifyBusy(true);
+    setMailOtpError(null);
     try {
       const res = await onboardingService.verifyContactEmailOtp(email, otp);
       const verifiedAt =
@@ -1456,13 +1585,19 @@ export function OnboardingWizard({
       setMailOtpSent(false);
       setMailOtp("");
       setMailCooldown(0);
+      setMailExpiresAt(null);
       toast({ title: "Contact email verified" });
     } catch (err) {
-      toast({
-        title: "OTP incorrect",
-        description: err instanceof Error ? err.message : "Check the code and try again",
-        variant: "destructive",
-      });
+      const outcome = readOtpFailure(err);
+      setMailOtp("");
+      if (outcome.kind === "expired") {
+        setMailExpiresAt(Date.now());
+      } else if (outcome.kind === "invalid") {
+        setMailOtpError(outcome.message);
+        if (outcome.expiresIn) setMailExpiresAt(Date.now() + outcome.expiresIn * 1000);
+      } else {
+        setMailOtpError(outcome.message);
+      }
     } finally {
       setMailVerifyBusy(false);
     }
@@ -1582,11 +1717,11 @@ export function OnboardingWizard({
     if (!form.marital_status) return "Select your marital status";
     if (!isValidGithubUrl(form.github_url)) return "Enter a valid GitHub profile URL";
     if (!isValidLinkedinUrl(form.linkedin_url)) return "Enter a valid LinkedIn profile URL";
+    if (form.pin_code.replace(/\D/g, "").length < 6) return "Enter a 6-digit PIN code";
     if (!form.state.trim()) return "Select your state";
     if (!form.district.trim()) return "Select your district";
     if (!form.city.trim()) return "Enter your city";
     if (!form.house_name_number.trim()) return "Enter house name / number";
-    if (form.pin_code.replace(/\D/g, "").length < 6) return "Enter a 6-digit PIN code";
     return "Complete all required address fields";
   }, [
     canNext,
@@ -1802,9 +1937,13 @@ export function OnboardingWizard({
 
   useEffect(() => {
     if (!open || adminMode) return;
-    const googleOk = searchParams.get("google_connected");
-    const googleError = searchParams.get("google_error");
-    if (!googleOk && !googleError) return;
+    // Older OAuth callbacks appended "?google_connected=…" onto the step param.
+    const rawSlug = searchParams.get(urlParam) || "";
+    const qIdx = rawSlug.indexOf("?");
+    const embedded = qIdx >= 0 ? new URLSearchParams(rawSlug.slice(qIdx + 1)) : null;
+    const googleOk = searchParams.get("google_connected") ?? embedded?.get("google_connected") ?? null;
+    const googleError = searchParams.get("google_error") ?? embedded?.get("google_error") ?? null;
+    if (!googleOk && !googleError && !embedded) return;
 
     if (googleOk === "true") {
       toast({
@@ -1826,7 +1965,8 @@ export function OnboardingWizard({
         next.delete("google_connected");
         next.delete("google_error");
         next.delete("email");
-        if (!next.get(urlParam)) next.set(urlParam, "permissions");
+        const slug = (next.get(urlParam) || "").split("?")[0];
+        next.set(urlParam, slug || "permissions");
         return next;
       },
       { replace: true }
@@ -2011,8 +2151,13 @@ export function OnboardingWizard({
     }
 
     try {
-      const result = await onboardingService.submit(payload);
-      await clearOnboardingDraft(userId);
+      const hasFiles = !!(payload.aadhaar_file || payload.pan_file || payload.profile_photo);
+      if (hasFiles) setUploadPercent(0);
+      const result = await onboardingService.submit(payload, {
+        onUploadProgress: hasFiles ? setUploadPercent : undefined,
+      });
+      setUploadPercent(null);
+      void clearOnboardingDraft(userId);
       const cleaned = new URLSearchParams(searchParams);
       cleaned.delete(urlParam);
       setSearchParams(cleaned, { replace: true });
@@ -2035,6 +2180,7 @@ export function OnboardingWizard({
     } catch (err) {
       const message =
         err instanceof Error ? err.message : "Could not complete onboarding";
+      setUploadPercent(null);
       toast({
         title: "Onboarding failed",
         description: message,
@@ -2389,6 +2535,13 @@ export function OnboardingWizard({
                         )}
                         Send WhatsApp OTP
                       </Button>
+                    ) : emgOtpExpired ? (
+                      <OtpExpiredCard
+                        channel="WhatsApp"
+                        busy={emgOtpBusy}
+                        cooldown={emgCooldown}
+                        onResend={() => void sendEmergencyOtp()}
+                      />
                     ) : (
                       <div className="grid grid-cols-12 gap-2.5 min-w-0">
                         <div className="col-span-12 min-w-0">
@@ -2396,7 +2549,10 @@ export function OnboardingWizard({
                             value={emgOtp}
                             autoFocus
                             disabled={emgVerifyBusy}
-                            onChange={setEmgOtp}
+                            onChange={(v) => {
+                              setEmgOtp(v);
+                              if (emgOtpError) setEmgOtpError(null);
+                            }}
                             onComplete={(code) => void verifyEmergencyOtp(code)}
                           />
                         </div>
@@ -2429,8 +2585,16 @@ export function OnboardingWizard({
                             {emgCooldown > 0 ? `Resend in ${emgCooldown}s` : "Resend OTP"}
                           </Button>
                         </div>
-                        <p className="col-span-12 text-[11px] text-muted-foreground">
+                        {emgOtpError ? (
+                          <p className="col-span-12 text-xs text-destructive" role="alert">
+                            {emgOtpError}
+                          </p>
+                        ) : null}
+                        <p className="col-span-12 text-[11px] text-muted-foreground" aria-live="polite">
                           OTP sent on WhatsApp · enter the 6-digit code
+                          {emgSecondsLeft != null && emgSecondsLeft > 0
+                            ? ` · expires in ${formatOtpTimer(emgSecondsLeft)}`
+                            : ""}
                         </p>
                       </div>
                     )}
@@ -2543,6 +2707,13 @@ export function OnboardingWizard({
                         )}
                         Send email OTP
                       </Button>
+                    ) : mailOtpExpired ? (
+                      <OtpExpiredCard
+                        channel="email"
+                        busy={mailOtpBusy}
+                        cooldown={mailCooldown}
+                        onResend={() => void sendContactEmailOtp()}
+                      />
                     ) : (
                       <div className="grid grid-cols-12 gap-2.5 min-w-0">
                         <div className="col-span-12 min-w-0">
@@ -2550,7 +2721,10 @@ export function OnboardingWizard({
                             value={mailOtp}
                             autoFocus
                             disabled={mailVerifyBusy}
-                            onChange={setMailOtp}
+                            onChange={(v) => {
+                              setMailOtp(v);
+                              if (mailOtpError) setMailOtpError(null);
+                            }}
                             onComplete={(code) => void verifyContactEmailOtp(code)}
                           />
                         </div>
@@ -2583,8 +2757,16 @@ export function OnboardingWizard({
                             {mailCooldown > 0 ? `Resend in ${mailCooldown}s` : "Resend OTP"}
                           </Button>
                         </div>
-                        <p className="col-span-12 text-[11px] text-muted-foreground">
+                        {mailOtpError ? (
+                          <p className="col-span-12 text-xs text-destructive" role="alert">
+                            {mailOtpError}
+                          </p>
+                        ) : null}
+                        <p className="col-span-12 text-[11px] text-muted-foreground" aria-live="polite">
                           OTP sent to inbox · enter the 6-digit code
+                          {mailSecondsLeft != null && mailSecondsLeft > 0
+                            ? ` · expires in ${formatOtpTimer(mailSecondsLeft)}`
+                            : ""}
                         </p>
                       </div>
                     )}
@@ -2697,6 +2879,107 @@ export function OnboardingWizard({
                   </div>
                 </div>
 
+                <div className="col-span-12 space-y-1">
+                  <h3 className="text-sm font-semibold tracking-tight text-foreground">Home address</h3>
+                  <p className="text-xs text-muted-foreground">
+                    Start with your PIN code — state, district and city fill in automatically.
+                  </p>
+                </div>
+
+                <FieldShell label="PIN code" required className="md:col-span-4">
+                  <div className="relative">
+                    <Input
+                      className={cn(
+                        fieldClass,
+                        (pinLookupBusy || pinAutoFilled) && "pr-10",
+                        pinAutoFilled && "border-emerald-500/50"
+                      )}
+                      inputMode="numeric"
+                      autoComplete="postal-code"
+                      maxLength={6}
+                      placeholder="6-digit PIN"
+                      value={form.pin_code}
+                      onChange={(e) => handlePinChange(e.target.value)}
+                    />
+                    {pinLookupBusy ? (
+                      <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 animate-spin text-muted-foreground" />
+                    ) : pinAutoFilled ? (
+                      <CheckCircle2 className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-emerald-500" />
+                    ) : null}
+                  </div>
+                  {pinLookupBusy ? (
+                    <p className="text-[11px] text-muted-foreground mt-1" aria-live="polite">
+                      Looking up PIN…
+                    </p>
+                  ) : pinLookupHint ? (
+                    <p
+                      className={cn(
+                        "text-[11px] mt-1",
+                        pinAutoFilled ? "text-emerald-600 dark:text-emerald-400" : "text-muted-foreground"
+                      )}
+                      aria-live="polite"
+                    >
+                      {pinLookupHint}
+                    </p>
+                  ) : null}
+                </FieldShell>
+                <FieldShell label="Post office" className="md:col-span-8">
+                  {pinPostOffices.length > 0 ? (
+                    <Select
+                      key={`po-${form.pin_code}-${pinPostOffices.join("|")}`}
+                      value={
+                        pinPostOffices.includes(form.post_office)
+                          ? form.post_office
+                          : undefined
+                      }
+                      onValueChange={(v) => {
+                        const block = pinOfficeBlocks[v];
+                        setForm((prev) => {
+                          const cityIsAuto =
+                            !prev.city.trim() || prev.city === lastAutoCityRef.current;
+                          if (cityIsAuto && block) lastAutoCityRef.current = block;
+                          return {
+                            ...prev,
+                            post_office: v,
+                            city: cityIsAuto && block ? block : prev.city,
+                          };
+                        });
+                        setPinLookupHint(`Filled state, district and city from ${v}`);
+                        window.requestAnimationFrame(() => houseInputRef.current?.focus());
+                      }}
+                    >
+                      <SelectTrigger className={cn(fieldClass, "w-full")}>
+                        <SelectValue placeholder={`Select post office (${pinPostOffices.length})`} />
+                      </SelectTrigger>
+                      <SelectContent
+                        position="popper"
+                        className="max-h-64 rounded-xl z-[1100]"
+                        searchPlaceholder="Search post office..."
+                      >
+                        {pinPostOffices.map((office) => (
+                          <SelectItem key={office} value={office}>
+                            {office}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  ) : (
+                    <Input
+                      className={fieldClass}
+                      maxLength={100}
+                      value={form.post_office}
+                      onChange={(e) =>
+                        setField("post_office", e.target.value.slice(0, 100))
+                      }
+                      placeholder={
+                        form.pin_code.length === 6 && !pinLookupBusy
+                          ? "Type post office"
+                          : "Enter PIN to load offices"
+                      }
+                    />
+                  )}
+                </FieldShell>
+
                 <FieldShell label="State" required className="md:col-span-4">
                   <Select value={form.state || undefined} onValueChange={handleStateChange}>
                     <SelectTrigger className={cn(fieldClass, "w-full")}>
@@ -2752,83 +3035,26 @@ export function OnboardingWizard({
                   />
                 </FieldShell>
 
-                <FieldShell label="Landmark" className="md:col-span-6">
-                  <Input
-                    className={fieldClass}
-                    maxLength={200}
-                    placeholder="Nearby landmark"
-                    value={form.landmark}
-                    onChange={(e) => setField("landmark", e.target.value.slice(0, 200))}
-                  />
-                </FieldShell>
                 <FieldShell label="House name / number" required className="md:col-span-6">
                   <Input
+                    ref={houseInputRef}
                     className={fieldClass}
                     maxLength={150}
+                    autoComplete="address-line1"
                     placeholder="House / flat / building"
                     value={form.house_name_number}
                     onChange={(e) => setField("house_name_number", e.target.value.slice(0, 150))}
                   />
                 </FieldShell>
-
-                <FieldShell label="PIN code" required className="md:col-span-4">
-                  <div className="relative">
-                    <Input
-                      className={cn(fieldClass, pinLookupBusy && "pr-10")}
-                      inputMode="numeric"
-                      maxLength={6}
-                      placeholder="6-digit PIN"
-                      value={form.pin_code}
-                      onChange={(e) => handlePinChange(e.target.value)}
-                    />
-                    {pinLookupBusy ? (
-                      <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 animate-spin text-muted-foreground" />
-                    ) : null}
-                  </div>
-                  {pinLookupHint ? (
-                    <p className="text-[11px] text-muted-foreground mt-1">{pinLookupHint}</p>
-                  ) : null}
-                </FieldShell>
-                <FieldShell label="Post office" className="md:col-span-8">
-                  {pinPostOffices.length > 0 ? (
-                    <Select
-                      key={`po-${form.pin_code}-${pinPostOffices.join("|")}`}
-                      value={
-                        pinPostOffices.includes(form.post_office)
-                          ? form.post_office
-                          : undefined
-                      }
-                      onValueChange={(v) => {
-                        setField("post_office", v);
-                        setPinLookupHint(`Selected · ${v}`);
-                      }}
-                    >
-                      <SelectTrigger className={cn(fieldClass, "w-full")}>
-                        <SelectValue placeholder="Select post office" />
-                      </SelectTrigger>
-                      <SelectContent
-                        position="popper"
-                        className="max-h-64 rounded-xl z-[1100]"
-                        searchPlaceholder="Search post office..."
-                      >
-                        {pinPostOffices.map((office) => (
-                          <SelectItem key={office} value={office}>
-                            {office}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  ) : (
-                    <Input
-                      className={fieldClass}
-                      maxLength={100}
-                      value={form.post_office}
-                      onChange={(e) =>
-                        setField("post_office", e.target.value.slice(0, 100))
-                      }
-                      placeholder="Enter PIN to load"
-                    />
-                  )}
+                <FieldShell label="Landmark" className="md:col-span-6">
+                  <Input
+                    className={fieldClass}
+                    maxLength={200}
+                    autoComplete="address-line2"
+                    placeholder="Nearby landmark"
+                    value={form.landmark}
+                    onChange={(e) => setField("landmark", e.target.value.slice(0, 200))}
+                  />
                 </FieldShell>
 
                 <div className="col-span-12 rounded-2xl border border-border/60 bg-gradient-to-br from-sky-500/[0.06] via-background to-background p-5 sm:p-6">
@@ -3588,77 +3814,6 @@ export function OnboardingWizard({
                   </div>
                 </SummaryBlock>
 
-                <div className="col-span-12 pt-1">
-                  <h2 className="text-base font-semibold tracking-tight">CODO resources</h2>
-                  <p className="text-sm text-muted-foreground mt-1">
-                    Company website and employee handbook — open before you accept legal terms.
-                  </p>
-                </div>
-                <div className="col-span-12 grid grid-cols-12 gap-3 sm:gap-4">
-                  <a
-                    href="https://codoai.in"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="col-span-12 sm:col-span-6 group rounded-2xl border border-border/60 bg-card/70 p-4 sm:p-5 flex items-start gap-3 hover:border-primary/40 hover:bg-primary/[0.04] transition-colors"
-                    onClick={() => {
-                      (
-                        window as Window & {
-                          gtag?: (...args: unknown[]) => void;
-                        }
-                      ).gtag?.("event", "codo_website_click", {
-                        location: "onboarding_review",
-                      });
-                    }}
-                  >
-                    <div className="h-11 w-11 rounded-xl bg-sky-500/15 text-sky-500 flex items-center justify-center shrink-0 border border-sky-500/25">
-                      <Globe className="h-5 w-5" />
-                    </div>
-                    <div className="min-w-0 flex-1 space-y-1">
-                      <div className="flex items-center gap-2">
-                        <p className="text-sm font-semibold text-foreground tracking-tight">
-                          CODO AI Innovations
-                        </p>
-                        <ExternalLink className="h-3.5 w-3.5 text-muted-foreground group-hover:text-primary shrink-0" />
-                      </div>
-                      <p className="text-xs text-muted-foreground leading-relaxed">
-                        Visit the company website
-                      </p>
-                      <p className="text-xs font-medium text-primary">codoai.in</p>
-                    </div>
-                  </a>
-                  <a
-                    href="/CODO-Handbook.pdf"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="col-span-12 sm:col-span-6 group rounded-2xl border border-border/60 bg-card/70 p-4 sm:p-5 flex items-start gap-3 hover:border-primary/40 hover:bg-primary/[0.04] transition-colors"
-                    onClick={() => {
-                      (
-                        window as Window & {
-                          gtag?: (...args: unknown[]) => void;
-                        }
-                      ).gtag?.("event", "codo_handbook_click", {
-                        location: "onboarding_review",
-                      });
-                    }}
-                  >
-                    <div className="h-11 w-11 rounded-xl bg-violet-500/15 text-violet-500 flex items-center justify-center shrink-0 border border-violet-500/25">
-                      <BookOpen className="h-5 w-5" />
-                    </div>
-                    <div className="min-w-0 flex-1 space-y-1">
-                      <div className="flex items-center gap-2">
-                        <p className="text-sm font-semibold text-foreground tracking-tight">
-                          CODO Handbook
-                        </p>
-                        <ExternalLink className="h-3.5 w-3.5 text-muted-foreground group-hover:text-primary shrink-0" />
-                      </div>
-                      <p className="text-xs text-muted-foreground leading-relaxed">
-                        Open the employee handbook PDF
-                      </p>
-                      <p className="text-xs font-medium text-primary">CODO-Handbook.pdf</p>
-                    </div>
-                  </a>
-                </div>
-
                 {requirePassword ? (
                   <div className="col-span-12 rounded-2xl border border-border/60 bg-card/70 p-5 sm:p-6 space-y-4">
                     <div className="flex items-start gap-3">
@@ -3879,7 +4034,11 @@ export function OnboardingWizard({
                     {loading ? (
                       <>
                         <Loader2 className="h-4 w-4 animate-spin mr-2" />
-                        {editMode || adminMode ? "Saving…" : "Finalizing…"}
+                        {editMode || adminMode
+                          ? "Saving…"
+                          : uploadPercent != null && uploadPercent < 100
+                            ? `Uploading ${uploadPercent}%`
+                            : "Finalizing…"}
                       </>
                     ) : editMode || adminMode ? (
                       "Save changes"

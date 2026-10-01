@@ -3,6 +3,7 @@ import { userHasPendingOnboarding } from "@/lib/utils";
 import { useCallback, useState } from "react";
 import { OnboardingCelebration } from "./OnboardingCelebration";
 import { OnboardingWizard } from "./OnboardingWizard";
+import { markCodoWelcomePending } from "./CodoWelcomeDialog";
 
 /**
  * Why: Lock incomplete employees (developers + CODO testers) into mandatory
@@ -26,6 +27,7 @@ export default function OnboardingGuard() {
 
   const handleCelebrationDone = useCallback(() => {
     if (!currentUser) return;
+    markCodoWelcomePending(String(currentUser.id));
     updateCurrentUser({
       ...currentUser,
       ...(pendingAvatar ? { avatar: pendingAvatar } : {}),

@@ -10,6 +10,8 @@ export type IndiaPinOffice = {
   name: string;
   branchType: string;
   deliveryStatus: string;
+  /** Taluk / block for this branch — best "city / town" guess once an office is picked. */
+  block: string;
 };
 
 export type IndiaPinLookup = {
@@ -63,6 +65,12 @@ function matchDistrict(state: string, apiDistrict: string): string {
   return soft || apiDistrict.trim();
 }
 
+/** India Post uses "NA" for unknown block/division — never surface that as a city. */
+function cleanPlace(value: string | undefined): string {
+  const v = (value || "").trim();
+  return /^(na|n\/a|-)$/i.test(v) ? "" : v;
+}
+
 function pickSuggested(offices: IndiaPinOffice[]): string {
   const sub = offices.find((o) => /sub post office/i.test(o.branchType));
   if (sub) return sub.name;
@@ -96,6 +104,7 @@ export async function lookupIndiaPin(
     name: (o.Name || "").trim(),
     branchType: (o.BranchType || "").trim(),
     deliveryStatus: (o.DeliveryStatus || "").trim(),
+    block: cleanPlace(o.Block) || cleanPlace(o.Division),
   })).filter((o) => o.name);
 
   if (offices.length === 0) return null;
@@ -105,7 +114,9 @@ export async function lookupIndiaPin(
   const state = matchState(geoSource?.State || "");
   const district = matchDistrict(state, geoSource?.District || "");
   const city =
-    (geoSource?.Block || geoSource?.Division || geoSource?.District || "").trim() ||
+    cleanPlace(geoSource?.Block) ||
+    cleanPlace(geoSource?.Division) ||
+    cleanPlace(geoSource?.District) ||
     district;
 
   return {
