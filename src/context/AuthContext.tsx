@@ -105,7 +105,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const checkAuthStatus = async () => {
     // 1. Check for token in URL (for admin deep links)
     const urlParams = new URLSearchParams(window.location.search);
-    const urlToken = urlParams.get("token");
+    // /reset-password?token= carries a one-time password-reset token, not a session JWT.
+    const urlToken =
+      window.location.pathname === "/reset-password" ? null : urlParams.get("token");
 
     if (urlToken) {
       // Use the token from the URL and store it in sessionStorage for this tab only

@@ -838,7 +838,10 @@ export default function Profile() {
       : []),
   ];
 
-  const metricItems = [...statItems, ...highlightItems];
+  const metricItems = [
+    ...statItems.filter((item) => Number(item.value) > 0),
+    ...highlightItems,
+  ];
   const metricColSpan =
     metricItems.length >= 6
       ? "col-span-6 sm:col-span-4 lg:col-span-3"
@@ -1016,6 +1019,7 @@ export default function Profile() {
               </div>
 
               {/* Compact metrics + most-wanted HR / onboarding highlights */}
+              {(isLoadingStats || metricItems.length > 0) && (
               <div className="pt-1 border-t border-border/50">
                 {isLoadingStats ? (
                   <div className="grid grid-cols-12 gap-3 pt-4">
@@ -1084,6 +1088,7 @@ export default function Profile() {
                   </div>
                 )}
               </div>
+              )}
 
               {/* Account integrations */}
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-1 border-t border-border/50">
