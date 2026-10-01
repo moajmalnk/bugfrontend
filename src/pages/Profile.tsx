@@ -26,7 +26,7 @@ import { OnboardingWizard } from "@/components/onboarding/OnboardingWizard";
 import { OnboardingVerificationBadge } from "@/components/onboarding/OnboardingVerificationBanner";
 import { useAuth } from "@/context/AuthContext";
 import { formatLocalDate } from "@/lib/utils/dateUtils";
-import { cn, userRequiresOnboarding } from "@/lib/utils";
+import { cn, isWorkforceUser, userRequiresOnboarding } from "@/lib/utils";
 import { API_BASE_URL } from "@/lib/env";
 import { resolveAvatarUrl } from "@/lib/avatarUrl";
 import { onboardingService } from "@/services/onboardingService";
@@ -1234,7 +1234,7 @@ export default function Profile() {
             </ProfileSection>
           ) : null}
 
-          {currentUser.id ? (
+          {currentUser.id && isWorkforceUser(currentUser) ? (
             <ProfileSection
               eyebrow="Time off"
               title="Leave overview"
