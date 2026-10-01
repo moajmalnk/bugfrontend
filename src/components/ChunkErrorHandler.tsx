@@ -13,6 +13,27 @@ interface ChunkErrorHandlerProps {
 
 type ChunkFailureKind = 'offline' | 'stale';
 
+const STALE_RELOAD_KEY = 'bugricer_stale_chunk_reload_at';
+const STALE_RELOAD_WINDOW_MS = 60_000;
+
+/**
+ * Why: After a deploy the old index references deleted chunk hashes. One reload
+ * fetches the new index (served no-cache) and fixes it; the time-window guard
+ * stops a reload loop if the chunk is genuinely missing, so the card shows instead.
+ * @returns true when a recovery reload was started
+ */
+function tryStaleChunkRecovery(): boolean {
+  try {
+    const last = Number(sessionStorage.getItem(STALE_RELOAD_KEY) || 0);
+    if (Date.now() - last < STALE_RELOAD_WINDOW_MS) return false;
+    sessionStorage.setItem(STALE_RELOAD_KEY, String(Date.now()));
+  } catch {
+    return false;
+  }
+  window.location.reload();
+  return true;
+}
+
 export function ChunkErrorHandler({ children }: ChunkErrorHandlerProps) {
   const [failureKind, setFailureKind] = useState<ChunkFailureKind | null>(null);
   const [errorInfo, setErrorInfo] = useState('');
@@ -27,6 +48,7 @@ export function ChunkErrorHandler({ children }: ChunkErrorHandlerProps) {
     }
 
     const offline = isOfflineChunkFailure(rawMessage);
+    if (!offline && tryStaleChunkRecovery()) return;
     setErrorInfo(rawMessage || 'Failed to load application page');
     setFailureKind(offline ? 'offline' : 'stale');
   }, []);
@@ -55,12 +77,25 @@ export function ChunkErrorHandler({ children }: ChunkErrorHandlerProps) {
       }
     };
 
+    // Vite fires this when a lazy route's chunk/preload fails (e.g. 404 after deploy).
+    const handlePreloadError = (event: Event) => {
+      const payload = (event as Event & { payload?: unknown }).payload;
+      const message =
+        payload instanceof Error
+          ? payload.message
+          : 'Failed to fetch dynamically imported module';
+      event.preventDefault();
+      captureFailure(message);
+    };
+
     window.addEventListener('error', handleError);
     window.addEventListener('unhandledrejection', handleRejection);
+    window.addEventListener('vite:preloadError', handlePreloadError);
 
     return () => {
       window.removeEventListener('error', handleError);
       window.removeEventListener('unhandledrejection', handleRejection);
+      window.removeEventListener('vite:preloadError', handlePreloadError);
     };
   }, [captureFailure]);
 
