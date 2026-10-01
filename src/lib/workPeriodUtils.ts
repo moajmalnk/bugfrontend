@@ -91,8 +91,31 @@ export function formatWorkingDaysPeriodLabel(dateStr: string): string {
   return formatCalendarMonthTitle(calendarMonthKey(dateStr));
 }
 
+export type CreditableSubmission = {
+  submission_date?: string;
+  hours_today?: number | string | null;
+  overtime_hours?: number | string | null;
+  extra_hours_approval_status?: string | null;
+  extra_hours_approved_amount?: number | string | null;
+};
+
+/**
+ * Why: Approved / changed overtime is stored apart from `hours_today`, so month
+ * totals must add it. Legacy rows may already hold OT inside `hours_today`
+ * (e.g. 10h), hence max(worked, regular ≤8 + approved) to avoid double counting.
+ * Keep in sync with br_credited_hours_sql() on the backend.
+ */
+export function creditedHours(s: CreditableSubmission): number {
+  const worked = Number(s.hours_today) || 0;
+  const status = String(s.extra_hours_approval_status || '').toLowerCase();
+  if (status !== 'approved' && status !== 'changed') return worked;
+  const approved = Number(s.extra_hours_approved_amount ?? s.overtime_hours) || 0;
+  if (approved <= 0) return worked;
+  return Math.round(Math.max(worked, Math.min(worked, 8) + approved) * 100) / 100;
+}
+
 export function computeMonthTotalsToDate(
-  submissions: Array<{ submission_date?: string; hours_today?: number }>,
+  submissions: CreditableSubmission[],
   dateStr: string
 ) {
   const { from } = getCalendarMonthPeriod(calendarMonthKey(dateStr));
@@ -102,11 +125,11 @@ export function computeMonthTotalsToDate(
     const d = String(s.submission_date || '').trim();
     if (!d || d < from || d > dateStr) continue;
     dateSet.add(d);
-    hours += Number(s.hours_today || 0);
+    hours += creditedHours(s);
   }
   return {
     days: dateSet.size,
-    hours,
+    hours: Math.round(hours * 100) / 100,
     periodLabel: formatWorkingDaysPeriodLabel(dateStr),
     range: formatCalendarMonthRange(calendarMonthKey(dateStr)),
   };

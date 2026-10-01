@@ -69,9 +69,46 @@ export async function fetchServerClock(): Promise<ServerClock> {
   };
 }
 
+const CLOCK_CACHE_TTL_MS = 120_000;
+let clockCache: { server: ServerClock; at: number; clientToday: string } | null = null;
+let clockInflight: Promise<ServerClock> | null = null;
+
+/**
+ * Why: Check-in / checkout used to wait on a server_time round trip before the
+ * real submit. A short cache (warmed when the dialog opens) makes submit instant;
+ * it is dropped if the device calendar date or clock moves, so skew is still caught.
+ */
+async function getServerClockCached(): Promise<ServerClock> {
+  const now = Date.now();
+  const clientToday = toLocalCalendarDateString(new Date());
+  if (
+    clockCache &&
+    now >= clockCache.at &&
+    now - clockCache.at < CLOCK_CACHE_TTL_MS &&
+    clockCache.clientToday === clientToday
+  ) {
+    return clockCache.server;
+  }
+  if (!clockInflight) {
+    clockInflight = fetchServerClock()
+      .then((server) => {
+        clockCache = { server, at: Date.now(), clientToday: toLocalCalendarDateString(new Date()) };
+        return server;
+      })
+      .finally(() => {
+        clockInflight = null;
+      });
+  }
+  return clockInflight;
+}
+
+export function prefetchServerClock(): void {
+  void getServerClockCached().catch(() => undefined);
+}
+
 export async function getDeviceClockSkewDetails(): Promise<DeviceClockSkew | null> {
   try {
-    const server = await fetchServerClock();
+    const server = await getServerClockCached();
     const clientToday = toLocalCalendarDateString(new Date());
     const serverToday = server.server_today;
 

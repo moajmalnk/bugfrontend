@@ -25,6 +25,7 @@ import {
   districtsForState,
 } from "@/lib/indiaLocations";
 import { lookupIndiaPin } from "@/lib/indiaPinLookup";
+import { extractApiErrorMessage } from "@/lib/apiError";
 import {
   isValidIfscFormat,
   lookupIndiaIfsc,
@@ -2128,8 +2129,7 @@ export function OnboardingWizard({
           null;
         onCompleted({ avatar, updated: true });
       } catch (err) {
-        const message =
-          err instanceof Error ? err.message : "Could not save onboarding changes";
+        const message = extractApiErrorMessage(err, "Could not save onboarding changes");
         toast({
           title: "Update failed",
           description: message,
@@ -2178,8 +2178,7 @@ export function OnboardingWizard({
       onCompleted({ avatar, updated: false });
       onOpenChange?.(false);
     } catch (err) {
-      const message =
-        err instanceof Error ? err.message : "Could not complete onboarding";
+      const message = extractApiErrorMessage(err, "Could not complete onboarding");
       setUploadPercent(null);
       toast({
         title: "Onboarding failed",

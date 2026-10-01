@@ -35,7 +35,7 @@ import { bugService } from '@/services/bugService';
 import { updateService } from '@/services/updateService';
 import { toLocalCalendarDateString } from '@/lib/dateUtils';
 import { extractApiErrorMessage } from '@/lib/apiError';
-import { assertDeviceClockMatchesServer } from '@/lib/deviceClock';
+import { assertDeviceClockMatchesServer, prefetchServerClock } from '@/lib/deviceClock';
 import {
   getCheckInPosition,
   OfficeLocationError,
@@ -340,6 +340,9 @@ export function DailyWorkFlowPanel({
   const [draftHydrationEpoch, setDraftHydrationEpoch] = useState(0);
   const [isCheckoutWizardOpen, setIsCheckoutWizardOpen] = useState(false);
   const [checkoutWizardStep, setCheckoutWizardStep] = useState<CheckoutWizardStepKey>('form');
+  useEffect(() => {
+    if (isCheckoutWizardOpen || isCheckInDialogOpen) prefetchServerClock();
+  }, [isCheckoutWizardOpen, isCheckInDialogOpen]);
   const [weeklyReportDirty, setWeeklyReportDirty] = useState(false);
   const [todaySubmissionComplete, setTodaySubmissionComplete] = useState(false);
   const [projectUpdates, setProjectUpdates] = useState<Record<string, ProjectWorkUpdate>>({});
@@ -1076,6 +1079,7 @@ export function DailyWorkFlowPanel({
   }, [form.submission_date]);
 
   async function onSubmit(options?: { openPreviewAfter?: boolean }) {
+    if (loading) return;
     try {
       if (verificationRejected) {
         toast({
@@ -1192,23 +1196,21 @@ export function DailyWorkFlowPanel({
         setCheckoutWizardStep('preview');
         setIsCheckoutWizardOpen(true);
         toast({
-          title: 'Checked out successfully',
-          description: 'Review your daily work summary below',
+          title: isEditing ? 'Submission updated' : 'Checked out successfully',
+          description: 'A receipt is on its way to your email, WhatsApp and notifications.',
         });
         return;
       }
 
       toast({
         title: isEditing ? 'Daily submission updated' : 'Daily submission saved',
-        description: 'Your work update has been saved successfully'
+        description: 'A receipt is on its way to your email, WhatsApp and notifications.',
       });
 
       if (isEmbedded) {
         onSaved?.();
       } else {
-        setTimeout(() => {
-          navigate(`/${currentUser?.role}/daily-update`);
-        }, 500);
+        navigate(`/${currentUser?.role}/daily-update`);
       }
     } catch (e: any) {
       setError(extractApiErrorMessage(e, 'Failed to submit'));

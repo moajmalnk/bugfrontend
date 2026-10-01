@@ -28,6 +28,7 @@ import { projectService } from '@/services/projectService';
 import {
   calendarMonthKey,
   computeMonthTotalsToDate,
+  creditedHours,
   formatCalendarMonthRange,
   formatCalendarMonthTitle,
   formatWorkingDaysPeriodLabel,
@@ -134,10 +135,10 @@ export default function DailyUpdate() {
       if (!d) continue;
       if (d >= from && d <= to) {
         dateSet.add(d);
-        hours += Number(s.hours_today || 0);
+        hours += creditedHours(s);
       }
     }
-    return { days: dateSet.size, hours };
+    return { days: dateSet.size, hours: Math.round(hours * 100) / 100 };
   }
 
   // Handle month tab clicks and update URL

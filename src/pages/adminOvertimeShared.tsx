@@ -1,6 +1,7 @@
 import { toLocalCalendarDateString } from '@/lib/dateUtils';
 import {
   calendarMonthKey,
+  creditedHours,
   formatCalendarMonthRange,
   formatCalendarMonthTitle,
   getCalendarMonthPeriod,
@@ -97,10 +98,10 @@ export function computeTotalsInRange(list: OvertimeRow[], from: string, to: stri
     if (!d) continue;
     if (d >= from && d <= to) {
       dateSet.add(d);
-      hours += Number(s.hours_today || 0);
+      hours += creditedHours(s);
     }
   }
-  return { days: dateSet.size, hours };
+  return { days: dateSet.size, hours: Math.round(hours * 100) / 100 };
 }
 
 export function formatDateForDisplay(dateStr: string) {
