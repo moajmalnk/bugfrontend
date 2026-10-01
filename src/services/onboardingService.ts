@@ -231,6 +231,25 @@ export const onboardingService = {
     return response.data;
   },
 
+  /**
+   * Why: Block OTP for an email / number already owned by another account before
+   * any code is sent. The send and submit endpoints still enforce the same rule.
+   */
+  async checkContactAvailability(
+    type: "email" | "phone",
+    value: string,
+    options?: { forUserId?: string; signal?: AbortSignal }
+  ): Promise<{ available: boolean; message: string | null }> {
+    const response = await apiClient.post(
+      "/users/check_onboarding_contact.php",
+      { type, value, ...(options?.forUserId ? { for_user_id: options.forUserId } : {}) },
+      // Stale @types/axios lacks `signal`; axios 1.x supports it at runtime.
+      { signal: options?.signal, timeout: 10_000 } as Parameters<typeof apiClient.post>[2]
+    );
+    const data = response.data?.data as { available?: boolean; message?: string | null } | undefined;
+    return { available: data?.available !== false, message: data?.message ?? null };
+  },
+
   async sendEmergencyOtp(phone: string) {
     const response = await apiClient.post("/users/send_emergency_otp.php", { phone });
     return response.data;

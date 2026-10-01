@@ -466,21 +466,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setCurrentUser(withResolvedAvatar(user));
     handleAuthFcmSync({ user: user as { fcm_token_epoch?: string | number } });
 
-    // Start activity session tracking on login
-    try {
-      await fetch(`${ENV.API_URL}/users/start_session_on_login.php`, {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${token}`,
-          "Content-Type": "application/json",
-        },
-      });
-    } catch (error) {
-      // Don't fail login if session tracking fails
+    // Activity tracking runs in the background so it never delays the first screen.
+    void fetch(`${ENV.API_URL}/users/start_session_on_login.php`, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${token}`,
+        "Content-Type": "application/json",
+      },
+    }).catch((error) => {
       if (import.meta.env.DEV) {
         console.error("Failed to start session tracking:", error);
       }
-    }
+    });
 
     // Get the intended destination or default to the user's role dashboard
     const intendedDestination =

@@ -72,6 +72,7 @@ import {
   XCircle,
 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { OnboardingBodySkeleton } from "./WorkspaceLaunchSkeleton";
 import { Link, useSearchParams } from "react-router-dom";
 import type { UserOnboardingDetails } from "@/services/onboardingService";
 import { buildGoogleReauthUrl } from "@/lib/googleReauth";
@@ -713,6 +714,28 @@ interface OnboardingWizardProps {
   onCompleted: (result?: { avatar?: string | null; updated?: boolean }) => void;
 }
 
+type ContactAvailability = "idle" | "checking" | "available" | "taken" | "unknown";
+
+function ContactAvailabilityHint({ state }: { state: ContactAvailability }) {
+  if (state === "checking") {
+    return (
+      <p className="text-[11px] text-muted-foreground flex items-center gap-1.5" aria-live="polite">
+        <Loader2 className="h-3 w-3 animate-spin" aria-hidden="true" />
+        Checking it isn’t used by another account…
+      </p>
+    );
+  }
+  if (state === "available") {
+    return (
+      <p className="text-[11px] text-emerald-600 dark:text-emerald-400 flex items-center gap-1.5" aria-live="polite">
+        <CheckCircle2 className="h-3 w-3" aria-hidden="true" />
+        Available — send the OTP to verify
+      </p>
+    );
+  }
+  return null;
+}
+
 export function OnboardingWizard({
   open,
   userId,
@@ -769,6 +792,8 @@ export function OnboardingWizard({
   const [mailVerifyBusy, setMailVerifyBusy] = useState(false);
   const [mailCooldown, setMailCooldown] = useState(0);
   const [mailConflictMsg, setMailConflictMsg] = useState<string | null>(null);
+  const [emgAvailability, setEmgAvailability] = useState<ContactAvailability>("idle");
+  const [mailAvailability, setMailAvailability] = useState<ContactAvailability>("idle");
   /** Why: Remember last OTP-verified values so edit mode only re-prompts OTP after a change. */
   const [verifiedEmgBaseline, setVerifiedEmgBaseline] = useState<string | null>(null);
   const [verifiedEmgBaselineAt, setVerifiedEmgBaselineAt] = useState<string | null>(null);
@@ -1210,6 +1235,75 @@ export function OnboardingWizard({
   const isValidContactEmail = (email: string) =>
     /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim());
 
+  const availabilityForUserId = adminMode ? userId : undefined;
+  const emgDigitsForCheck = form.emergency_contact.replace(/\D/g, "");
+  const mailForCheck = form.contact_email.trim().toLowerCase();
+
+  /**
+   * Why: A number or email owned by another account must be rejected before any
+   * OTP is sent. Debounced + aborted so only the latest value's result applies.
+   */
+  useEffect(() => {
+    if (!open || form.emergency_contact_verified || emgDigitsForCheck.length !== 10) {
+      setEmgAvailability("idle");
+      return;
+    }
+    setEmgAvailability("checking");
+    const controller = new AbortController();
+    const timer = window.setTimeout(() => {
+      onboardingService
+        .checkContactAvailability("phone", emgDigitsForCheck, {
+          forUserId: availabilityForUserId,
+          signal: controller.signal,
+        })
+        .then((res) => {
+          if (controller.signal.aborted) return;
+          setEmgAvailability(res.available ? "available" : "taken");
+          setEmgConflictMsg(res.available ? null : res.message || "This number is already in use.");
+        })
+        .catch(() => {
+          // Server re-checks on send, so a failed probe must not lock the user out.
+          if (!controller.signal.aborted) setEmgAvailability("unknown");
+        });
+    }, 350);
+    return () => {
+      window.clearTimeout(timer);
+      controller.abort();
+    };
+  }, [open, emgDigitsForCheck, form.emergency_contact_verified, availabilityForUserId]);
+
+  useEffect(() => {
+    if (
+      !open ||
+      form.contact_email_verified ||
+      !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(mailForCheck)
+    ) {
+      setMailAvailability("idle");
+      return;
+    }
+    setMailAvailability("checking");
+    const controller = new AbortController();
+    const timer = window.setTimeout(() => {
+      onboardingService
+        .checkContactAvailability("email", mailForCheck, {
+          forUserId: availabilityForUserId,
+          signal: controller.signal,
+        })
+        .then((res) => {
+          if (controller.signal.aborted) return;
+          setMailAvailability(res.available ? "available" : "taken");
+          setMailConflictMsg(res.available ? null : res.message || "This email is already in use.");
+        })
+        .catch(() => {
+          if (!controller.signal.aborted) setMailAvailability("unknown");
+        });
+    }, 400);
+    return () => {
+      window.clearTimeout(timer);
+      controller.abort();
+    };
+  }, [open, mailForCheck, form.contact_email_verified, availabilityForUserId]);
+
   const isValidGithubUrl = (value: string) => {
     const v = value.trim();
     if (!v) return true;
@@ -1236,6 +1330,8 @@ export function OnboardingWizard({
     const digits = form.emergency_contact.replace(/\D/g, "");
     if (
       digits.length < 10 ||
+      emgAvailability === "checking" ||
+      emgAvailability === "taken" ||
       emgOtpBusy ||
       emgCooldown > 0 ||
       form.emergency_contact_verified
@@ -1305,6 +1401,8 @@ export function OnboardingWizard({
     const email = form.contact_email.trim().toLowerCase();
     if (
       !isValidContactEmail(email) ||
+      mailAvailability === "checking" ||
+      mailAvailability === "taken" ||
       mailOtpBusy ||
       mailCooldown > 0 ||
       form.contact_email_verified
@@ -1454,7 +1552,8 @@ export function OnboardingWizard({
 
   const step4Valid = adminMode || googleConnected;
 
-  const canNext = [!!step1Valid, step2Valid, step3Valid, step4Valid, step5Valid][step];
+  const canNext =
+    hydrated && [!!step1Valid, step2Valid, step3Valid, step4Valid, step5Valid][step];
 
   /** Why: Users need a clear reason when Continue stays disabled on long address forms. */
   const nextBlockedHint = useMemo(() => {
@@ -2110,6 +2209,8 @@ export function OnboardingWizard({
           </DialogHeader>
 
           <div className="px-4 sm:px-8 py-4 sm:py-6 overflow-y-auto flex-1 min-h-0 scrollbar-thin overscroll-contain">
+            {!hydrated ? <OnboardingBodySkeleton /> : null}
+            <div className={hydrated ? "contents" : "hidden"}>
             {step === 0 && (
               <div className="grid grid-cols-12 gap-x-5 gap-y-5">
                 <div className="col-span-12 mb-1">
@@ -2247,8 +2348,10 @@ export function OnboardingWizard({
                       ) : null}
                     </div>
                     {emgConflictMsg ? (
-                      <p className="text-xs text-destructive">{emgConflictMsg}</p>
-                    ) : null}
+                      <p className="text-xs text-destructive" role="alert">{emgConflictMsg}</p>
+                    ) : (
+                      <ContactAvailabilityHint state={emgAvailability} />
+                    )}
 
                     {form.emergency_contact_verified || skipEmployeeOtp ? (
                       <div className="flex flex-col gap-1 rounded-xl border border-emerald-500/30 bg-emerald-500/5 px-3 py-2.5">
@@ -2280,11 +2383,13 @@ export function OnboardingWizard({
                         disabled={
                           form.emergency_contact.replace(/\D/g, "").length < 10 ||
                           !!emgConflictMsg ||
+                          emgAvailability === "checking" ||
+                          emgAvailability === "taken" ||
                           emgOtpBusy
                         }
                         onClick={() => void sendEmergencyOtp()}
                       >
-                        {emgOtpBusy ? (
+                        {emgOtpBusy || emgAvailability === "checking" ? (
                           <Loader2 className="h-4 w-4 animate-spin mr-2" />
                         ) : (
                           <MessageCircle className="h-4 w-4 mr-2" />
@@ -2387,8 +2492,10 @@ export function OnboardingWizard({
                       ) : null}
                     </div>
                     {mailConflictMsg ? (
-                      <p className="text-xs text-destructive">{mailConflictMsg}</p>
-                    ) : null}
+                      <p className="text-xs text-destructive" role="alert">{mailConflictMsg}</p>
+                    ) : (
+                      <ContactAvailabilityHint state={mailAvailability} />
+                    )}
 
                     {form.contact_email_verified || skipEmployeeOtp ? (
                       <div className="flex flex-col gap-1 rounded-xl border border-emerald-500/30 bg-emerald-500/5 px-3 py-2.5">
@@ -2430,11 +2537,13 @@ export function OnboardingWizard({
                         disabled={
                           !isValidContactEmail(form.contact_email) ||
                           !!mailConflictMsg ||
+                          mailAvailability === "checking" ||
+                          mailAvailability === "taken" ||
                           mailOtpBusy
                         }
                         onClick={() => void sendContactEmailOtp()}
                       >
-                        {mailOtpBusy ? (
+                        {mailOtpBusy || mailAvailability === "checking" ? (
                           <Loader2 className="h-4 w-4 animate-spin mr-2" />
                         ) : (
                           <Mail className="h-4 w-4 mr-2" />
@@ -3722,6 +3831,7 @@ export function OnboardingWizard({
                 </div>
               </div>
             )}
+            </div>
           </div>
 
           <div className="shrink-0 px-4 sm:px-8 py-3 sm:py-4 border-t border-border/50 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/90 flex flex-col gap-2 sm:gap-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]">

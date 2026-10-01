@@ -46,6 +46,7 @@ import { GoogleSignInButton } from '@/components/GoogleSignInButton';
 import { clearGoogleOAuthCache, handleGoogleOAuthError } from '@/utils/googleOAuthUtils'; 
 import { User as UserType } from "@/types";
 import { getEffectiveRole } from "@/lib/utils";
+import { WorkspaceLaunchSkeleton } from "@/components/onboarding/WorkspaceLaunchSkeleton";
 type LoginMethod = "username" | "email" | "otp" | "forgot" | "magic";
 
 type AuthApiResponse = {
@@ -92,6 +93,10 @@ const Login = () => {
   const [showPrivacyPolicy, setShowPrivacyPolicy] = useState(false);
   const [showTermsOfUse, setShowTermsOfUse] = useState(false);
   const [deviceClockWarning, setDeviceClockWarning] = useState<string | null>(null);
+  // Read synchronously so a welcome-link visit never paints the login form first.
+  const [inviteBooting, setInviteBooting] = useState(() =>
+    new URLSearchParams(window.location.search).has("welcome_token")
+  );
   const {
     register,
     isAuthenticated,
@@ -176,10 +181,13 @@ const Login = () => {
   const handleWelcomeInviteVerification = useCallback(
     async (token: string) => {
       setIsLoading(true);
+      // Warm the onboarding chunk while the token is verified so the wizard opens instantly.
+      void import("@/components/onboarding/OnboardingGuard");
       try {
         const response = await axios.post<AuthApiResponse>(
           `${API_BASE_URL}/verify_welcome_invite.php`,
-          { token }
+          { token },
+          { timeout: 15_000 }
         );
 
         const data = response.data;
@@ -187,19 +195,15 @@ const Login = () => {
           const { token: jwtToken, user } = data;
           localStorage.setItem("token", jwtToken);
           sessionStorage.setItem("token", jwtToken);
-
-          toast({
-            title: "Welcome to BugRicer",
-            description: `Signed in as ${user.username}`,
-            variant: "default",
-          });
+          // A stale deep link from an earlier session must not hijack first sign-in.
+          localStorage.removeItem("intendedDestination");
 
           await loginWithToken(user, jwtToken);
         } else {
           throw new Error(data.message || "Welcome link verification failed");
         }
       } catch (error: unknown) {
-        console.error("Welcome invite verification error:", error);
+        setInviteBooting(false);
         toast({
           title: "Welcome link error",
           description: extractApiErrorMessage(
@@ -310,6 +314,10 @@ const Login = () => {
     handleWelcomeInviteVerification,
     handleGoogleCodeExchange,
   ]);
+
+  if (inviteBooting) {
+    return <WorkspaceLaunchSkeleton message="Signing you in…" />;
+  }
 
   if (isAuthLoading) {
     // Show loading spinner

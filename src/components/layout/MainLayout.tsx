@@ -3,7 +3,7 @@ import { useAuth } from "@/context/AuthContext";
 import { Menu, Bug, Search, RefreshCw } from "lucide-react";
 import { lazy, memo, ReactNode, Suspense, useEffect, useRef, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
-import { cn, getEffectiveRole } from "@/lib/utils";
+import { cn, getEffectiveRole, userHasPendingOnboarding } from "@/lib/utils";
 import { Sidebar } from "./Sidebar";
 import { MainLayoutSkeleton } from "./MainLayoutSkeleton";
 import { NotificationPopover } from "@/components/notifications/NotificationPopover";
@@ -12,6 +12,7 @@ import { GlobalSearchProvider, useGlobalSearchModal } from "@/context/GlobalSear
 import { GlobalSearchDialog } from "@/components/search/GlobalSearchDialog";
 import { AdminActiveUsersStrip } from "@/components/users/AdminActiveUsersStrip";
 import CodoAcknowledgementGate from "@/components/codo/CodoAcknowledgementGate";
+import { WorkspaceLaunchSkeleton } from "@/components/onboarding/WorkspaceLaunchSkeleton";
 
 // Non-critical widgets: loaded in separate chunks so they never block first paint.
 const FirebaseListener = lazy(() => import("../messaging/FirebaseListener"));
@@ -186,6 +187,22 @@ export const MainLayout = ({ children }: MainLayoutProps) => {
   }
 
   const role = getEffectiveRole(currentUser);
+
+  // Why: Pending employees can only use the mandatory wizard, so don't mount the
+  // dashboard, sidebar or widgets behind it — that avoided work is what used to
+  // flash on screen (and fire API calls) before the wizard opened.
+  if (userHasPendingOnboarding(currentUser)) {
+    return (
+      <>
+        <div className="pointer-events-none" aria-hidden="true">
+          <MainLayoutSkeleton />
+        </div>
+        <Suspense fallback={<WorkspaceLaunchSkeleton />}>
+          <OnboardingGuard />
+        </Suspense>
+      </>
+    );
+  }
 
   return (
     <GlobalSearchProvider onCloseSidebar={() => setSidebarOpen(false)}>
