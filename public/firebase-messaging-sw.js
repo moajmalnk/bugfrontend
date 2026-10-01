@@ -13,6 +13,12 @@ firebase.initializeApp({
 
 const messaging = firebase.messaging();
 
+// Firebase's pushsubscriptionchange handler reads swRegistration.pushManager, which the SW build
+// never assigns — without this a revoked/rotated subscription throws "reading 'pushManager'".
+if (messaging._delegate && !messaging._delegate.swRegistration) {
+  messaging._delegate.swRegistration = self.registration;
+}
+
 function toAbsoluteUrl(url) {
   if (!url) {
     return self.location.origin + '/';

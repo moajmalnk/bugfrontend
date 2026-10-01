@@ -5,6 +5,8 @@ import { getMessaging, getToken, isSupported } from "firebase/messaging";
 
 const TOKEN_CACHE_KEY = "fcm_registration_signature";
 const TOKEN_PWA_STATE_KEY = "fcm_registration_pwa_state";
+const PENDING_SAVE_KEY = "fcm_pending_save";
+const BACKGROUND_SAVE_DELAYS_MS = [0, 3_000, 10_000, 30_000];
 const FCM_EPOCH_KEY = "fcm_token_epoch_seen";
 const MAIN_SW_URL = "/service-worker.js";
 const MAIN_SW_SCOPE = "/";
@@ -188,6 +190,10 @@ export function setupFcmPwaAutoSync(): () => void {
   const onInstalled = () => syncIfGranted();
   window.addEventListener("appinstalled", onInstalled);
 
+  const onOnline = () => void flushPendingFcmTokenSave();
+  window.addEventListener("online", onOnline);
+  void flushPendingFcmTokenSave();
+
   const standaloneMq = window.matchMedia("(display-mode: standalone)");
   const onDisplayMode = () => {
     if (isPwaInstalledMode()) {
@@ -202,6 +208,7 @@ export function setupFcmPwaAutoSync(): () => void {
 
   return () => {
     window.removeEventListener("appinstalled", onInstalled);
+    window.removeEventListener("online", onOnline);
     standaloneMq.removeEventListener?.("change", onDisplayMode);
   };
 }
@@ -337,6 +344,7 @@ async function clearFirebaseMessagingDatabases(): Promise<void> {
 /** Soft reset — never unregister the PWA service worker (that causes Chrome storage errors). */
 async function softResetPushState(): Promise<void> {
   clearFcmRegistrationCache();
+  writePendingSave(null);
   await unsubscribeAllPushSubscriptions();
   await clearFirebaseMessagingDatabases();
   await sleep(1000);
@@ -570,10 +578,26 @@ export function hasFcmTokenOnThisDevice(): boolean {
     return false;
   }
   try {
-    return Boolean(localStorage.getItem(TOKEN_CACHE_KEY));
+    return Boolean(localStorage.getItem(TOKEN_CACHE_KEY) || localStorage.getItem(PENDING_SAVE_KEY));
   } catch {
     return false;
   }
+}
+
+/**
+ * Warm the push service worker while the prompt is visible, so the user's tap
+ * only has to run getToken instead of installing/activating a worker first.
+ */
+export function warmUpPushRegistration(): void {
+  if (typeof window === "undefined" || !navigator?.serviceWorker || !isMessagingAllowedDomain()) {
+    return;
+  }
+  if (getNotificationPermissionState() === "denied" || needsSafariPwaForPush()) {
+    return;
+  }
+  void isSupported()
+    .then((supported) => (supported ? resolveServiceWorkerRegistration(getSwAttemptOrder()[0]) : null))
+    .catch(() => undefined);
 }
 
 export function needsPushRegistrationOnThisDevice(): boolean {
@@ -711,6 +735,66 @@ async function saveFcmToken(token: string, options?: { force?: boolean }): Promi
   clearFcmRegistrationCache();
   console.warn("[FCM] save-fcm-token failed across all endpoints:", lastError);
   return false;
+}
+
+type PendingSave = { token: string; force: boolean };
+
+function readPendingSave(): PendingSave | null {
+  try {
+    const raw = localStorage.getItem(PENDING_SAVE_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as Partial<PendingSave>;
+    return typeof parsed.token === "string" && parsed.token
+      ? { token: parsed.token, force: Boolean(parsed.force) }
+      : null;
+  } catch {
+    return null;
+  }
+}
+
+function writePendingSave(pending: PendingSave | null): void {
+  try {
+    if (pending) localStorage.setItem(PENDING_SAVE_KEY, JSON.stringify(pending));
+    else localStorage.removeItem(PENDING_SAVE_KEY);
+  } catch {
+    // Storage unavailable — the in-memory flush below still runs once.
+  }
+}
+
+let backgroundSaveRunning = false;
+
+/**
+ * Why: getToken is what proves this device can receive push. The backend POST
+ * can wait behind dashboard requests (6-slot API queue) or a busy database, so
+ * the token is persisted and saved in the background with backoff instead of
+ * holding the "Registering…" button. A token that still fails stays pending and
+ * is flushed on the next session sync or when the browser comes back online,
+ * so the server always receives the token and device details.
+ */
+function queueFcmTokenSave(token: string, force: boolean): void {
+  const pending = readPendingSave();
+  writePendingSave({ token, force: force || Boolean(pending?.force && pending.token === token) });
+  void flushPendingFcmTokenSave();
+}
+
+export async function flushPendingFcmTokenSave(): Promise<boolean> {
+  if (backgroundSaveRunning) return false;
+  if (!readPendingSave()) return true;
+  backgroundSaveRunning = true;
+  try {
+    for (const delay of BACKGROUND_SAVE_DELAYS_MS) {
+      if (delay) await sleep(delay);
+      const current = readPendingSave();
+      if (!current) return true;
+      if (await saveFcmToken(current.token, { force: current.force })) {
+        if (readPendingSave()?.token === current.token) writePendingSave(null);
+        return true;
+      }
+    }
+    return false;
+  } finally {
+    backgroundSaveRunning = false;
+  }
 }
 
 /**
@@ -885,11 +969,7 @@ export async function requestNotificationPermission(options?: {
       return "skipped";
     }
 
-    const saved = await saveFcmToken(token, { force: forceSave });
-    if (!saved) {
-      return "skipped";
-    }
-
+    queueFcmTokenSave(token, forceSave);
     return "granted";
   } catch (error) {
     if (isFcmStorageError(error)) {

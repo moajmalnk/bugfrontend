@@ -14,6 +14,7 @@ import {
   isSafariWebBrowser,
   needsSafariPwaForPush,
   resetPushBrowserState,
+  warmUpPushRegistration,
 } from "@/firebase-messaging-sw";
 import { useAuth } from "@/context/AuthContext";
 import { cn, userHasPendingOnboarding } from "@/lib/utils";
@@ -343,6 +344,10 @@ export function PWAEngagementPrompt() {
       document.removeEventListener("visibilitychange", onVisible);
     };
   }, [currentUser, notificationState, refreshPermission]);
+
+  useEffect(() => {
+    if (open) warmUpPushRegistration();
+  }, [open]);
 
   // Quietly refresh FCM token when already granted (shared with AuthContext via in-flight promise)
   useEffect(() => {
