@@ -3,7 +3,7 @@ import { MalayalamBadge } from '@/components/ui/DateDisplay';
 import { useMalayalamToggle } from '@/hooks/useMalayalamToggle';
 import { formatLocalDate } from '@/lib/utils/dateUtils';
 import { cn } from '@/lib/utils';
-import { CheckCircle2, Clock, User } from 'lucide-react';
+import { Check, CheckCircle2, Clock, User } from 'lucide-react';
 
 interface ComplianceCheckRowProps {
   title: string;
@@ -16,6 +16,10 @@ interface ComplianceCheckRowProps {
   verifiedBy?: string | null;
   disabled?: boolean;
   onToggle?: () => void;
+  /** Admin bulk mode: card click selects the rule instead of verifying it. */
+  selectMode?: boolean;
+  selected?: boolean;
+  onSelect?: () => void;
 }
 
 function TranslatableField({
@@ -61,48 +65,73 @@ export function ComplianceCheckRow({
   verifiedBy,
   disabled = false,
   onToggle,
+  selectMode = false,
+  selected = false,
+  onSelect,
 }: ComplianceCheckRowProps) {
-  const canToggle = !disabled && !!onToggle;
+  const selecting = selectMode && !!onSelect;
+  const canToggle = selecting || (!disabled && !!onToggle);
   const structured = Boolean(ruleKey);
+  const activate = () => {
+    if (selecting) onSelect?.();
+    else if (canToggle) onToggle?.();
+  };
 
   const handleCardClick = () => {
-    if (canToggle) onToggle?.();
+    if (canToggle) activate();
   };
 
   const handleCardKeyDown = (e: React.KeyboardEvent) => {
     if (!canToggle) return;
     if (e.key === 'Enter' || e.key === ' ') {
       e.preventDefault();
-      onToggle?.();
+      activate();
     }
   };
 
   return (
     <div
-      role={canToggle ? 'button' : undefined}
+      role={selecting ? 'checkbox' : canToggle ? 'button' : undefined}
+      aria-checked={selecting ? selected : undefined}
       tabIndex={canToggle ? 0 : undefined}
       onClick={handleCardClick}
       onKeyDown={handleCardKeyDown}
       aria-label={
-        canToggle
-          ? verified
-            ? `Unverify: ${title}`
-            : `Verify: ${title}`
-          : undefined
+        selecting
+          ? `Select: ${title}`
+          : canToggle
+            ? verified
+              ? `Unverify: ${title}`
+              : `Verify: ${title}`
+            : undefined
       }
       className={cn(
         'group relative w-full overflow-hidden rounded-2xl border p-4 sm:p-5 text-left transition-all duration-300',
         'border-gray-200/50 dark:border-gray-700/50 bg-white/80 dark:bg-gray-900/80 backdrop-blur-sm shadow-sm',
         verified &&
           'border-emerald-300/60 dark:border-emerald-800/50 bg-emerald-50/40 dark:bg-emerald-950/20',
+        selecting && selected && 'ring-2 ring-indigo-500/70 border-indigo-400/60 dark:border-indigo-600/60',
         canToggle &&
           'cursor-pointer hover:shadow-lg hover:-translate-y-0.5 hover:border-blue-300/50 dark:hover:border-blue-700/50 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/50',
-        disabled && 'cursor-not-allowed opacity-70'
+        disabled && !selecting && 'cursor-not-allowed opacity-70'
       )}
     >
       <div className="absolute inset-0 bg-gradient-to-br from-blue-50/40 via-transparent to-emerald-50/40 dark:from-blue-950/10 dark:via-transparent dark:to-emerald-950/10 opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none" />
 
       <div className="relative flex items-start gap-4">
+        {selecting && (
+          <span
+            className={cn(
+              'mt-2 flex h-5 w-5 shrink-0 items-center justify-center rounded-md border-2 transition-colors',
+              selected
+                ? 'border-indigo-500 bg-indigo-500 text-white'
+                : 'border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900'
+            )}
+            aria-hidden
+          >
+            {selected && <Check className="h-3.5 w-3.5" />}
+          </span>
+        )}
         <span
           className={cn(
             'flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border-2 transition-all duration-200',

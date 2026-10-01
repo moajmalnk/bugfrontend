@@ -1051,6 +1051,15 @@ function formatShortYmd(ymd: string): string {
   });
 }
 
+/** KPI hints read "Fixed today" / "Fixed this week" / "Fixed in October 2026". */
+function periodPhrase(title: string): string {
+  const lower = title.toLowerCase();
+  if (lower === "today" || lower === "yesterday" || lower === "all time") return lower;
+  if (lower.startsWith("this ") || lower.startsWith("last ")) return lower;
+  if (lower === "custom range") return "in selected range";
+  return `in ${title}`;
+}
+
 function resolveWorkPeriod(
   preset: WorkPeriodPreset,
   customFrom: string,
@@ -2048,7 +2057,7 @@ export default function AdminDashboard() {
         {
           title: "Fixed",
           value: view.bugCounts.fixed,
-          hint: `In ${period.title.toLowerCase()}`,
+          hint: `Fixed ${periodPhrase(period.title)}`,
           icon: CheckCircle2,
           gradient: "from-emerald-500 to-teal-600",
           chip: "from-emerald-50 to-teal-50 dark:from-emerald-950/30 dark:to-teal-950/30 border-emerald-200 dark:border-emerald-800",
@@ -2060,7 +2069,7 @@ export default function AdminDashboard() {
           value: periodBugStats?.retests?.pending ?? 0,
           hint:
             (periodBugStats?.retests?.total ?? 0) > 0
-              ? `${periodBugStats?.retests?.total ?? 0} verified in ${period.title.toLowerCase()}`
+              ? `${periodBugStats?.retests?.total ?? 0} verified ${periodPhrase(period.title)}`
               : "Awaiting tester verification",
           icon: ClipboardCheck,
           gradient: "from-violet-500 to-purple-600",

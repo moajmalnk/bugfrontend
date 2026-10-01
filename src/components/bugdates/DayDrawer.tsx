@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { lazy, Suspense, useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { Link, useNavigate } from 'react-router-dom';
 import {
@@ -15,7 +15,6 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { toast } from '@/components/ui/use-toast';
 import {
-  generateBugCreativeCard,
   generateBugDatesTodo,
   saveGrowthSession,
   type BugDatesCalendarItem,
@@ -24,6 +23,10 @@ import {
 import { bugDatesItemChipClass } from '@/lib/bugDatesUi';
 import { DayAttendanceSection } from './DayAttendanceSection';
 import { format, parseISO } from 'date-fns';
+
+const PosterStudioModal = lazy(() => import('@/components/posters/PosterStudioModal'));
+
+const POSTER_LAYERS = ['observance', 'holiday', 'company_event', 'growth_program'];
 
 const MILESTONE_LABELS: Record<string, string> = {
   deadline_date: 'Deadline',
@@ -101,6 +104,9 @@ export function DayDrawer({
 }: Props) {
   const navigate = useNavigate();
   const [busy, setBusy] = useState<string | null>(null);
+  const [posterItem, setPosterItem] = useState<BugDatesCalendarItem | null>(null);
+  const posterOpenRef = useRef(false);
+  posterOpenRef.current = posterItem !== null;
   const [teamCovered, setTeamCovered] = useState(true);
   const [sessionForm, setSessionForm] = useState({
     event_id: 0,
@@ -111,7 +117,11 @@ export function DayDrawer({
 
   useEffect(() => {
     if (!open) return;
-    const onPop = () => onClose();
+    // The poster studio owns the newer history entry; let it handle that Back press.
+    const onPop = () => {
+      if (posterOpenRef.current) return;
+      onClose();
+    };
     window.history.pushState({ modal: 'bugdates-day' }, '');
     window.addEventListener('popstate', onPop);
     return () => window.removeEventListener('popstate', onPop);
@@ -156,28 +166,14 @@ export function DayDrawer({
     }
   })();
 
-  const handleCreative = async (item: BugDatesCalendarItem) => {
-    if (!item.id || busy) return;
-    setBusy(`creative-${item.id}`);
-    try {
-      const res = await generateBugCreativeCard({
-        event_id: item.id,
-        occurrence_date: date,
-      });
-      toast({
-        title: res.already_exists ? 'Creative card already queued' : 'Creative card created',
-        description: 'Opening BugCreative…',
-      });
-      navigate('../bugcreative');
-    } catch (e) {
-      toast({
-        title: 'Could not generate creative',
-        description: e instanceof Error ? e.message : 'Try again',
-        variant: 'destructive',
-      });
-    } finally {
-      setBusy(null);
-    }
+  const posterSession = posterItem
+    ? sessions.find((s) => s.event_id === posterItem.id && s.session_date === date) ?? null
+    : null;
+
+  const handlePosterSaved = (assetId: string) => {
+    setPosterItem(null);
+    onClose();
+    navigate(`../bugcreative?asset=${encodeURIComponent(assetId)}`);
   };
 
   const handleTodo = async (item: BugDatesCalendarItem) => {
@@ -347,24 +343,18 @@ export function DayDrawer({
                     )}
 
                     <div className="flex flex-col gap-2 pt-1 sm:flex-row sm:flex-wrap">
-                      {(layer === 'observance' || layer === 'holiday' || layer === 'company_event') &&
-                        canCreative &&
-                        !!item.id && (
-                          <Button
-                            type="button"
-                            size="sm"
-                            className="h-10 w-full rounded-xl bg-gradient-to-r from-blue-600 to-indigo-700 font-semibold text-white shadow-md hover:from-blue-700 hover:to-indigo-800 sm:w-auto"
-                            disabled={!!busy}
-                            onClick={() => handleCreative(item)}
-                          >
-                            {busy === `creative-${item.id}` ? (
-                              <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                            ) : (
-                              <Palette className="h-3.5 w-3.5" />
-                            )}
-                            <span className="ms-1.5">Generate BugCreative Card</span>
-                          </Button>
-                        )}
+                      {canCreative && ((POSTER_LAYERS.includes(layer) && !!item.id) || layer === 'birthday') && (
+                        <Button
+                          type="button"
+                          size="sm"
+                          className="h-10 w-full rounded-xl bg-gradient-to-r from-blue-600 to-indigo-700 font-semibold text-white shadow-md hover:from-blue-700 hover:to-indigo-800 sm:w-auto"
+                          disabled={!!busy || posterItem !== null}
+                          onClick={() => setPosterItem(item)}
+                        >
+                          <Palette className="h-3.5 w-3.5" />
+                          <span className="ms-1.5">Design Poster</span>
+                        </Button>
+                      )}
                       {(layer === 'growth_program' || layer === 'milestone' || layer === 'project_milestone') &&
                         canManage &&
                         !!item.id && (
@@ -488,6 +478,23 @@ export function DayDrawer({
           )}
         </div>
       </aside>
+      {posterItem && (
+        <Suspense
+          fallback={
+            <div className="fixed inset-0 z-[110] flex items-center justify-center bg-black/60">
+              <Loader2 className="h-8 w-8 animate-spin text-white" aria-label="Loading poster studio" />
+            </div>
+          }
+        >
+          <PosterStudioModal
+            item={posterItem}
+            occurrenceDate={date}
+            session={posterSession}
+            onClose={() => setPosterItem(null)}
+            onSaved={handlePosterSaved}
+          />
+        </Suspense>
+      )}
     </div>,
     document.body
   );

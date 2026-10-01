@@ -42,6 +42,30 @@ class ComplianceService {
     return response.data.data;
   }
 
+  /** Admin-only: verify / unverify one, several, or all rules of a matrix in one request. */
+  async adminSetChecks(
+    projectId: string,
+    phase: 'developer' | 'tester',
+    target: { ruleKeys: string[] } | { all: true },
+    verified: boolean
+  ): Promise<ProjectComplianceData & { changed?: number }> {
+    const response = await apiClient.put<{
+      success: boolean;
+      data: ProjectComplianceData & { changed?: number };
+      message?: string;
+    }>('/projects/compliance/admin_set_checks.php', {
+      project_id: projectId,
+      phase,
+      verified,
+      ...('all' in target ? { all: true } : { rule_keys: target.ruleKeys }),
+    });
+
+    if (!response.data.success || !response.data.data) {
+      throw new Error(response.data.message || 'Failed to update compliance checks');
+    }
+    return response.data.data;
+  }
+
   async authorizeEmergencyBypass(
     projectId: string,
     reason: string

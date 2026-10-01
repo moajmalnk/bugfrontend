@@ -55,7 +55,7 @@ export const workToolsArticles: HelpArticle[] = [
               },
               {
                 title: "Act on an item",
-                body: "From the day panel: Generate BugCreative Card (holidays, observances, company events), Create BugToDo (programs and milestones), or Open project (project milestones).",
+                body: "From the day panel: Design Poster (holidays, observances, company events, Growth Glimpse programs), Create BugToDo (programs and milestones), or Open project (project milestones).",
               },
             ],
           },

@@ -42,6 +42,9 @@ export type BugDatesCalendarItem = BugDatesEvent & {
   wfh_request_id?: number;
   user_id?: string;
   username?: string | null;
+  /** Birthday overlay: teammate's job title and profile photo path. */
+  job_title?: string | null;
+  avatar?: string | null;
   leave_type_code?: string | null;
   leave_type_name?: string | null;
   is_half_day?: boolean;
@@ -306,16 +309,49 @@ export async function generateBugCreativeCard(input: {
   title?: string;
   hook_content?: string;
   material_type?: string;
+  uploaded_file_path?: string;
+  preview_thumbnail_url?: string | null;
+  template_key?: string;
 }): Promise<{
   asset_id: string;
   title?: string;
   scheduled_date?: string;
   already_exists?: boolean;
+  updated?: boolean;
 }> {
   const res = await fetch(`${API}/generate_creative.php`, {
     method: 'POST',
     headers: authHeaders(),
     body: JSON.stringify(input),
+  });
+  const data = await parseJson(res);
+  return data.data;
+}
+
+export type PosterCopySuggestion = {
+  headline: string;
+  subline: string;
+  quote: string;
+  quote_author: string;
+  tagline_en: string;
+  tagline_ml: string;
+  hashtag: string;
+};
+
+export async function getPosterCopy(
+  input: {
+    event_id: number;
+    occurrence_date: string;
+    template_key?: string;
+    agenda_topic?: string | null;
+  },
+  signal?: AbortSignal
+): Promise<PosterCopySuggestion> {
+  const res = await fetch(`${API}/poster_copy.php`, {
+    method: 'POST',
+    headers: authHeaders(),
+    body: JSON.stringify(input),
+    signal,
   });
   const data = await parseJson(res);
   return data.data;

@@ -123,7 +123,7 @@ export const creatorGuideArticles: HelpArticle[] = [
           {
             type: "callout",
             variant: "tip",
-            text: "From BugDates, Generate BugCreative Card drafts a poster for a holiday, observance, or company event.",
+            text: "From BugDates, Design Poster opens the Poster Studio: pick a CODO template, polish the copy (AI suggest helps), add an image, then Save to BugCreative to attach the finished poster to a Draft card.",
           },
         ],
       },

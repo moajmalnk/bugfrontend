@@ -9,6 +9,7 @@ import {
 } from '@/components/compliance/ComplianceSegmentTabs';
 import { EmergencyBypassDialog } from '@/components/compliance/EmergencyBypassDialog';
 import { AddComplianceRuleDialog } from '@/components/compliance/AddComplianceRuleDialog';
+import { AdminBulkVerifyBar } from '@/components/compliance/AdminBulkVerifyBar';
 import {
   DEVELOPER_RULES,
   QA_STRESS_RULES,
@@ -64,6 +65,57 @@ export function CodoCompliancePanel({
   const [bypassChecked, setBypassChecked] = useState(false);
   const [addRuleDialogOpen, setAddRuleDialogOpen] = useState(false);
   const [addRulePhase, setAddRulePhase] = useState<'developer' | 'tester' | 'project'>('developer');
+  const isAdmin = effectiveRole === 'admin';
+  const [adminBusy, setAdminBusy] = useState(false);
+  const [selectMode, setSelectMode] = useState(false);
+  const [selectedKeys, setSelectedKeys] = useState<Set<string>>(() => new Set());
+
+  useEffect(() => {
+    setSelectMode(false);
+    setSelectedKeys(new Set());
+  }, [activeTab, projectId]);
+
+  const toggleSelected = (key: string) =>
+    setSelectedKeys((prev) => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      return next;
+    });
+
+  const handleAdminSet = async (
+    phase: 'developer' | 'tester',
+    target: { ruleKeys: string[] } | { all: true },
+    verified: boolean,
+    singleKey?: string
+  ) => {
+    if (!projectId || adminBusy || togglingKey) return;
+    setAdminBusy(true);
+    if (singleKey) setTogglingKey(singleKey);
+    try {
+      const result = await complianceService.adminSetChecks(projectId, phase, target, verified);
+      setData(result);
+      setSelectedKeys(new Set());
+      notifyAdminNavCountsChanged();
+      if (!singleKey) {
+        const changed = Number(result.changed ?? 0);
+        toast({
+          title: verified ? 'Rules verified' : 'Rules unverified',
+          description: `${changed} rule${changed === 1 ? '' : 's'} updated.`,
+        });
+      }
+    } catch (err) {
+      await loadCompliance();
+      toast({
+        title: 'Update failed',
+        description: err instanceof Error ? err.message : 'Could not update checks',
+        variant: 'destructive',
+      });
+    } finally {
+      setAdminBusy(false);
+      setTogglingKey(null);
+    }
+  };
 
   const loadCompliance = useCallback(async () => {
     if (!projectId) return;
@@ -250,6 +302,19 @@ export function CodoCompliancePanel({
     verifiedAt: check?.verified_at || null,
   });
 
+  /** Admin row props for Developer / Tester matrices; other roles keep handleToggle. */
+  const adminRowProps = (
+    phase: 'developer' | 'tester',
+    ruleKey: string,
+    verified: boolean
+  ) => ({
+    disabled: adminBusy || togglingKey === ruleKey,
+    onToggle: () => handleAdminSet(phase, { ruleKeys: [ruleKey] }, !verified, ruleKey),
+    selectMode,
+    selected: selectedKeys.has(ruleKey),
+    onSelect: () => toggleSelected(ruleKey),
+  });
+
   const renderCustomRules = (
     rules: ComplianceCustomRule[],
     phase: 'developer' | 'tester' | 'project',
@@ -260,6 +325,8 @@ export function CodoCompliancePanel({
       const check = checksMap.get(rule.rule_key);
       const verified = check?.verified ?? false;
       const { verifiedBy, verifiedAt } = getVerifiedMeta(check);
+      const adminProps =
+        isAdmin && phase !== 'project' && check ? adminRowProps(phase, rule.rule_key, verified) : null;
       return (
         <ComplianceCheckRow
           key={rule.rule_key}
@@ -275,9 +342,59 @@ export function CodoCompliancePanel({
               ? () => handleToggle(phase, rule.rule_key, verified)
               : undefined
           }
+          {...(adminProps ?? {})}
         />
       );
     });
+
+  const matrixKeys = (
+    builtin: { key: string }[],
+    custom: ComplianceCustomRule[],
+    checksMap: Map<string, ComplianceCheckItem>
+  ) => [
+    ...builtin.map((r) => r.key),
+    ...custom.map((r) => r.rule_key).filter((k) => checksMap.has(k)),
+  ];
+
+  const renderAdminBar = (
+    phase: 'developer' | 'tester',
+    keys: string[],
+    checksMap: Map<string, ComplianceCheckItem>
+  ) => {
+    if (!isAdmin) return null;
+    const isVerified = (k: string) => checksMap.get(k)?.verified ?? false;
+    const pending = keys.filter((k) => !isVerified(k));
+    const selected = keys.filter((k) => selectedKeys.has(k));
+    return (
+      <AdminBulkVerifyBar
+        matrixLabel={phase === 'developer' ? 'Developer' : 'Tester'}
+        totalCount={keys.length}
+        pendingCount={pending.length}
+        selectMode={selectMode}
+        selectedCount={selected.length}
+        selectedPendingCount={selected.filter((k) => !isVerified(k)).length}
+        selectedVerifiedCount={selected.filter(isVerified).length}
+        busy={adminBusy}
+        onToggleSelectMode={() => {
+          setSelectMode((v) => !v);
+          setSelectedKeys(new Set());
+        }}
+        onSelectAll={() => setSelectedKeys(new Set(keys))}
+        onClearSelection={() => setSelectedKeys(new Set())}
+        onRun={(action) =>
+          handleAdminSet(
+            phase,
+            action.scope === 'all'
+              ? { all: true }
+              : {
+                  ruleKeys: selected.filter((k) => isVerified(k) !== action.verified),
+                },
+            action.verified
+          )
+        }
+      />
+    );
+  };
 
   if (isLoading) {
     return (
@@ -346,6 +463,11 @@ export function CodoCompliancePanel({
                     </Button>
                   )}
                 </div>
+                {renderAdminBar(
+                  'developer',
+                  matrixKeys(builtinDevRules, customDevRules, devChecksMap),
+                  devChecksMap
+                )}
                 <div className="space-y-3">
                   {builtinDevRules.map((rule) => {
                     const check = devChecksMap.get(rule.key);
@@ -366,6 +488,7 @@ export function CodoCompliancePanel({
                             ? () => handleToggle('developer', rule.key, verified)
                             : undefined
                         }
+                        {...(isAdmin ? adminRowProps('developer', rule.key, verified) : {})}
                       />
                     );
                   })}
@@ -425,7 +548,13 @@ export function CodoCompliancePanel({
                   <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900 dark:border-amber-800/40 dark:bg-amber-950/20 dark:text-amber-200">
                     Complete all {data.developer_progress.total} Developer rules before QA
                     verification can begin.
+                    {isAdmin && ' As admin you can still verify QA rules here.'}
                   </div>
+                )}
+                {renderAdminBar(
+                  'tester',
+                  matrixKeys(builtinQaRules, customQaRules, qaChecksMap),
+                  qaChecksMap
                 )}
                 <div className="space-y-3">
                   {builtinQaRules.map((rule) => {
@@ -446,6 +575,7 @@ export function CodoCompliancePanel({
                         onToggle={
                           canToggle ? () => handleToggle('tester', rule.key, verified) : undefined
                         }
+                        {...(isAdmin ? adminRowProps('tester', rule.key, verified) : {})}
                       />
                     );
                   })}
