@@ -1,6 +1,16 @@
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import {
   Dialog,
   DialogContent,
   DialogDescription,
@@ -885,6 +895,7 @@ export function OnboardingWizard({
   const [submitError, setSubmitError] = useState<{ message: string; step: number | null } | null>(null);
   const [wfhBusy, setWfhBusy] = useState(false);
   const [wfhMapOpen, setWfhMapOpen] = useState(false);
+  const [discardConfirmOpen, setDiscardConfirmOpen] = useState(false);
   const [hydrated, setHydrated] = useState(false);
   const [hasExistingAadhaar, setHasExistingAadhaar] = useState(false);
   const [hasExistingPan, setHasExistingPan] = useState(false);
@@ -1154,13 +1165,9 @@ export function OnboardingWizard({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, userId, editMode, adminMode]);
 
-  const closeWizard = useCallback(() => {
+  const discardAndCloseWizard = useCallback(() => {
     if (!canCloseWizard || loading) return;
-    const dirty =
-      hydrated &&
-      baselineSigRef.current !== null &&
-      formSignature(form) !== baselineSigRef.current;
-    if (dirty && !window.confirm("Discard unsaved onboarding changes?")) return;
+    setDiscardConfirmOpen(false);
     draftDiscardRef.current = true;
     hasDraftRef.current = false;
     restoreNoticeRef.current = null;
@@ -1173,14 +1180,25 @@ export function OnboardingWizard({
   }, [
     canCloseWizard,
     loading,
-    hydrated,
-    form,
     draftStoreKey,
     searchParams,
     setSearchParams,
     onOpenChange,
     urlParam,
   ]);
+
+  const closeWizard = useCallback(() => {
+    if (!canCloseWizard || loading) return;
+    const dirty =
+      hydrated &&
+      baselineSigRef.current !== null &&
+      formSignature(form) !== baselineSigRef.current;
+    if (dirty) {
+      setDiscardConfirmOpen(true);
+      return;
+    }
+    discardAndCloseWizard();
+  }, [canCloseWizard, loading, hydrated, form, discardAndCloseWizard]);
   // Browser back/forward within onboarding steps
   useEffect(() => {
     if (!open || !hydrated) return;
@@ -1745,15 +1763,20 @@ export function OnboardingWizard({
     }
   };
 
+  /**
+   * Why: Admin fill never blocks on photo (Google / later employee upload).
+   * Self onboarding and Profile edit require a photo when none is on file yet.
+   */
+  const hasPhotoOnFile = !!form.profile_photo || !!existingAvatarUrl;
+  const photoRequired = !adminMode && !hasPhotoOnFile;
+
   const step1Valid = useMemo(() => {
-    const hasPhoto =
-      !!form.profile_photo || ((editMode || adminMode) && !!existingAvatarUrl);
     const contactsOk = skipEmployeeOtp
       ? form.emergency_contact.replace(/\D/g, "").length >= 10 &&
         isValidContactEmail(form.contact_email)
       : form.emergency_contact_verified && form.contact_email_verified;
     return (
-      hasPhoto &&
+      (adminMode || hasPhotoOnFile) &&
       form.emergency_contact.replace(/\D/g, "").length >= 10 &&
       !emgConflictMsg &&
       contactsOk &&
@@ -1772,10 +1795,9 @@ export function OnboardingWizard({
     );
   }, [
     form,
-    editMode,
     adminMode,
+    hasPhotoOnFile,
     skipEmployeeOtp,
-    existingAvatarUrl,
     emgConflictMsg,
     mailConflictMsg,
   ]);
@@ -1839,7 +1861,7 @@ export function OnboardingWizard({
       return "Connect Google to continue — needed for Docs, Sheets, and Meet";
     }
     if (step !== 0) return null;
-    if (!(form.profile_photo || ((editMode || adminMode) && existingAvatarUrl))) {
+    if (photoRequired) {
       return "Upload a profile photo to continue";
     }
     if (form.emergency_contact.replace(/\D/g, "").length < 10) {
@@ -1869,10 +1891,9 @@ export function OnboardingWizard({
     canNext,
     step,
     form,
-    editMode,
     adminMode,
     skipEmployeeOtp,
-    existingAvatarUrl,
+    photoRequired,
     emgConflictMsg,
     mailConflictMsg,
     googleConnected,
@@ -2169,16 +2190,14 @@ export function OnboardingWizard({
   };
 
   const handleFinalize = async () => {
-    const hasPhoto =
-      !!form.profile_photo || ((editMode || adminMode) && !!existingAvatarUrl);
     const hasAadhaar =
       !!form.aadhaar_file || ((editMode || adminMode) && hasExistingAadhaar);
     if (loading) return;
     // Why: Deep links / OAuth returns can land on Review with earlier steps incomplete —
     // never let Save silently no-op or submit blanks; send the user to the gap.
     const firstInvalid = [!!step1Valid, step2Valid, !!step3Valid].findIndex((ok) => !ok);
-    if (firstInvalid >= 0 || !hasPhoto || !hasAadhaar) {
-      const target = firstInvalid >= 0 ? firstInvalid : !hasPhoto ? 0 : 1;
+    if (firstInvalid >= 0 || photoRequired || !hasAadhaar) {
+      const target = firstInvalid >= 0 ? firstInvalid : photoRequired ? 0 : 1;
       toast({
         title: "Some details are missing",
         description: `Complete the ${STEPS[target]?.label ?? "highlighted"} step, then save again.`,
@@ -2461,6 +2480,13 @@ export function OnboardingWizard({
                         ? "Edit onboarding details"
                         : "Set up your workspace"}
                   </DialogTitle>
+                  <DialogDescription className="sr-only">
+                    {adminMode
+                      ? "Fill or update this employee’s address, documents, banking, and legal agreements."
+                      : editMode
+                        ? "Update your onboarding details across address, documents, banking, and legal agreements."
+                        : "Complete address, documents, banking, workspace access, and legal agreements."}
+                  </DialogDescription>
                 </div>
                 <div className="flex items-start gap-2 shrink-0">
                   <div className="rounded-2xl border border-border/60 bg-background/70 px-3 py-1.5 sm:px-3.5 sm:py-2 text-right">
@@ -2569,12 +2595,21 @@ export function OnboardingWizard({
                     <div className="min-w-0 flex-1 text-center sm:text-left space-y-2">
                       <div>
                         <p className="text-[13px] font-medium text-foreground/90">
-                          Profile photo <span className="text-primary/80">*</span>
+                          Profile photo
+                          {!adminMode ? (
+                            <span className="text-primary/80"> *</span>
+                          ) : (
+                            <span className="text-muted-foreground font-normal"> (optional)</span>
+                          )}
                         </p>
                         <p className="text-xs text-muted-foreground mt-1">
-                          {(editMode || adminMode) && existingAvatarUrl && !form.profile_photo
-                            ? "Current photo on file · resize to adjust the crop or replace with a new photo"
-                            : "Square crop required · JPG / PNG / WebP · used across BugRicer"}
+                          {adminMode
+                            ? existingAvatarUrl && !form.profile_photo
+                              ? "Google / current photo kept if you skip · replace only when needed"
+                              : "Optional for admin fill — employee Google photo is used when available"
+                            : existingAvatarUrl && !form.profile_photo
+                              ? "Current photo on file · resize to adjust the crop or replace with a new photo"
+                              : "Required · square crop · JPG / PNG / WebP · used across BugRicer"}
                         </p>
                         {fileErrors.profile_photo ? (
                           <p className="text-xs text-destructive mt-1">{fileErrors.profile_photo}</p>
@@ -2622,7 +2657,9 @@ export function OnboardingWizard({
                             className="rounded-xl h-9 text-muted-foreground hover:text-destructive"
                             onClick={() => {
                               setForm((p) => ({ ...p, profile_photo: null }));
-                              if (!editMode || !existingAvatarUrl) {
+                              // Why: Removing a new crop falls back to Google/existing;
+                              // only self-serve without any photo on file stays blocked.
+                              if (!adminMode && !existingAvatarUrl) {
                                 setFileErrors((p) => ({
                                   ...p,
                                   profile_photo: "Profile photo is required",
@@ -3003,7 +3040,9 @@ export function OnboardingWizard({
                 </FieldShell>
 
                 <FieldShell label="Gender" required className="col-span-12 md:col-span-4">
+                  {/* Why: Remount after hydrate so Radix never flips uncontrolled → controlled. */}
                   <Select
+                    key={hydrated ? "gender-ready" : "gender-boot"}
                     value={form.gender || undefined}
                     onValueChange={(v) => setForm((p) => ({ ...p, gender: v }))}
                   >
@@ -3021,6 +3060,7 @@ export function OnboardingWizard({
 
                 <FieldShell label="Marital status" required className="col-span-12 md:col-span-4">
                   <Select
+                    key={hydrated ? "marital-ready" : "marital-boot"}
                     value={form.marital_status || undefined}
                     onValueChange={(v) => setForm((p) => ({ ...p, marital_status: v }))}
                   >
@@ -4360,6 +4400,29 @@ export function OnboardingWizard({
           toast({ title: "Profile photo ready" });
         }}
       />
+
+      <AlertDialog open={discardConfirmOpen} onOpenChange={setDiscardConfirmOpen}>
+        <AlertDialogContent
+          className="z-[1100] max-w-[400px] rounded-2xl"
+          overlayClassName="z-[1100]"
+        >
+          <AlertDialogHeader>
+            <AlertDialogTitle>Discard unsaved changes?</AlertDialogTitle>
+            <AlertDialogDescription>
+              You have unsaved onboarding changes. Close anyway and lose them?
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel className="rounded-xl">Keep editing</AlertDialogCancel>
+            <AlertDialogAction
+              className="rounded-xl bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              onClick={discardAndCloseWizard}
+            >
+              Discard
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </>
   );
 }
