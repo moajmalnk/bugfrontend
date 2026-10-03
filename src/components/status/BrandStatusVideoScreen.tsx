@@ -25,7 +25,8 @@ export function BrandStatusVideoScreen({
   return (
     <div
       className={cn(
-        "min-h-screen flex flex-col items-center justify-center px-4 py-8",
+        "min-h-dvh flex flex-col items-center justify-center",
+        "px-3 py-4 sm:px-6 sm:py-8",
         "bg-[#0f172a] text-slate-100",
         className
       )}
@@ -38,7 +39,8 @@ export function BrandStatusVideoScreen({
         <h1 className="sr-only">{VARIANT_HEADINGS[variant]}</h1>
       )}
 
-      <div className="flex w-full max-w-3xl flex-col items-center gap-6">
+      {/* Why: One shared column so the brand video and status card align on every breakpoint. */}
+      <div className="flex w-full max-w-xl flex-col items-stretch gap-4 sm:gap-6">
         <video
           src={BRAND_STATUS_VIDEO_SRC}
           autoPlay
@@ -47,14 +49,19 @@ export function BrandStatusVideoScreen({
           playsInline
           preload="auto"
           aria-hidden={showOverlay}
-          className="w-full max-h-[min(70vh,720px)] rounded-2xl object-contain shadow-2xl ring-1 ring-white/10"
+          className={cn(
+            "w-full rounded-2xl object-contain shadow-2xl ring-1 ring-white/10",
+            showOverlay
+              ? "max-h-[min(38vh,320px)] sm:max-h-[min(42vh,400px)]"
+              : "max-h-[min(70vh,720px)]"
+          )}
         />
 
         {showOverlay && children ? (
           <div
             className={cn(
-              "w-full max-w-lg rounded-2xl border border-white/10",
-              "bg-slate-900/80 backdrop-blur-sm p-6 sm:p-8 text-center shadow-xl"
+              "w-full rounded-2xl border border-white/10",
+              "bg-slate-900/80 backdrop-blur-sm p-5 sm:p-8 text-center shadow-xl"
             )}
           >
             {children}
