@@ -1,21 +1,28 @@
+import { CODO_LOGO_ASSETS } from '../brand/brandKit';
 import { CodoLogo } from '../brand/CodoLogo';
 import type { PosterTemplateProps } from '../types';
 import { PosterFrame } from './shared';
 
 /**
  * Responsive CODO logo artwork for icons, profile pictures and website logos.
- * Wide canvases (≥ 2.2:1) get the full wordmark; everything else gets the mark only.
+ * Wide canvases use the official agency lockup; square icons keep the SVG mark.
  */
 export function BrandLogoTemplate({ palette, size }: PosterTemplateProps) {
   const { width: w, height: h } = size;
   const ratio = w / h;
   const wide = ratio >= 2.2;
-  // Mark + gap + 4-letter wordmark is ~3.6× the mark height.
-  const logoHeight = wide ? Math.min(h * 0.62, (w * 0.9) / 3.6) : Math.min(w, h) * 0.58;
+  const full = ratio >= 2.8;
   const background =
     palette.background === 'transparent'
       ? 'transparent'
       : `linear-gradient(140deg, ${palette.background} 0%, ${palette.backgroundAlt} 100%)`;
+
+  const assetKey = full ? 'full' : palette.logo === 'light' ? 'light' : 'dark';
+  const meta = CODO_LOGO_ASSETS[assetKey];
+  // Fit the official logo inside ~90% of the canvas while keeping aspect ratio.
+  const logoHeight = wide
+    ? Math.min(h * 0.72, (w * 0.9 * meta.height) / meta.width)
+    : Math.min(w, h) * 0.58;
 
   return (
     <PosterFrame size={size} background={background}>
@@ -28,7 +35,11 @@ export function BrandLogoTemplate({ palette, size }: PosterTemplateProps) {
           justifyContent: 'center',
         }}
       >
-        <CodoLogo height={logoHeight} showWordmark={wide} color={palette.ink} />
+        {wide ? (
+          <CodoLogo height={logoHeight} showWordmark asset={assetKey} />
+        ) : (
+          <CodoLogo height={logoHeight} showWordmark={false} color={palette.ink} asset={false} />
+        )}
       </div>
     </PosterFrame>
   );

@@ -43,7 +43,7 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useAuth } from "@/context/AuthContext";
 import { toLocalCalendarDateString } from "@/lib/dateUtils";
-import { cn, getEffectiveRole, hasPermissionOrAdmin, isWorkforceUser } from "@/lib/utils";
+import { cn, getEffectiveRole, hasPermissionOrAdmin, isAttendanceRosterUser } from "@/lib/utils";
 import { usePermissions } from "@/hooks/usePermissions";
 import {
   formatProjectDate,
@@ -458,10 +458,9 @@ async function loadDashboardData() {
     active: activeUsers.length,
     inactive: users.length - activeUsers.length,
   };
-  const trackableUsers = activeUsers.filter(
-    (u) => (u.role === "developer" || u.role === "tester") && isWorkforceUser(u)
-  );
-  const checkedIn = activeUsers.filter((u) => u.checked_in_today);
+  // Why: Hours / check-in pool = developers, creators, CODO testers (not admins/clients).
+  const trackableUsers = activeUsers.filter((u) => isAttendanceRosterUser(u));
+  const checkedIn = trackableUsers.filter((u) => u.checked_in_today);
   const onlineNow = activeUsers.filter((u) => u.status === "active" || u.status === "idle");
   const notCheckedIn = trackableUsers.filter((u) => !u.checked_in_today);
 
@@ -963,6 +962,63 @@ function buildWorkRetentionRows(
     .sort((a, b) => b.hours - a.hours || a.user.username.localeCompare(b.user.username));
 }
 
+/**
+ * Why: Ops Overview period-hours KPIs must match Work Retention and the
+ * attendance roster (active developers, creators, CODO testers).
+ * getTeamPeriodDetails summary also includes admins, client testers, etc.
+ */
+function sumWorkforcePeriodHours(
+  trackableUsers: User[],
+  teamPeriodStats:
+    | {
+        submissions?: Array<Record<string, unknown>>;
+        tasks?: { completed?: Array<{ username?: string }> };
+      }
+    | null
+    | undefined
+) {
+  const rows = buildWorkRetentionRows(
+    trackableUsers,
+    teamPeriodStats?.submissions
+  );
+  const trackableIds = new Set(trackableUsers.map((u) => String(u.id)));
+  const trackableNames = new Set(
+    trackableUsers
+      .map((u) => String(u.username || "").toLowerCase())
+      .filter(Boolean)
+  );
+
+  let workHours = 0;
+  let leaveHours = 0;
+  for (const sub of teamPeriodStats?.submissions || []) {
+    if (!trackableIds.has(String(sub.user_id ?? ""))) continue;
+    const hours = Number(sub.hours ?? sub.hours_today ?? 0) || 0;
+    // Leave-only synthetic rows have no submission id; work rows keep theirs.
+    const isLeaveOnlyRow = sub.id == null || sub.id === "";
+    if (isLeaveOnlyRow) {
+      leaveHours += hours;
+    } else {
+      workHours += hours;
+    }
+  }
+
+  const hoursCredited = rows.reduce((sum, r) => sum + r.hours, 0);
+  const hoursOt = rows.reduce((sum, r) => sum + r.overtime, 0);
+  const tasksCompleted = (teamPeriodStats?.tasks?.completed || []).filter(
+    (t) => trackableNames.has(String(t.username || "").toLowerCase())
+  ).length;
+
+  return {
+    hoursCredited,
+    workHours,
+    leaveHours: leaveHours > 0 ? leaveHours : Math.max(0, hoursCredited - workHours),
+    hoursOt,
+    hoursNet: hoursCredited + hoursOt,
+    tasksCompleted,
+    withHours: rows.filter((r) => r.hours > 0 || r.days > 0).length,
+  };
+}
+
 function workStatusBadgeClass(status: WorkRetentionRow["status"]): string {
   if (status === "checked_in") {
     return "bg-emerald-100 text-emerald-800 dark:bg-emerald-950/50 dark:text-emerald-300";
@@ -1351,7 +1407,7 @@ function WorkRetentionTab({
           {
             title: "Worked in period",
             value: totals.withHours,
-            hint: `of ${trackableUsers.length} devs & testers`,
+            hint: `of ${trackableUsers.length} staff`,
             icon: CheckCircle2,
             gradient: "from-emerald-500 to-teal-600",
             chip: "from-emerald-50 to-teal-50 dark:from-emerald-950/30 dark:to-teal-950/30 border-emerald-200 dark:border-emerald-800",
@@ -2009,15 +2065,20 @@ export default function AdminDashboard() {
   const hasUpdatesFilters =
     updatesProjectFilter !== "all" || updatesStatusFilter !== "all";
 
-  const hoursWorkedMembers = useMemo(() => {
-    if (!data?.trackableUsers?.length || !teamPeriodStats?.submissions) {
-      return 0;
+  const workforcePeriodHours = useMemo(() => {
+    if (!data?.trackableUsers?.length) {
+      return {
+        hoursCredited: 0,
+        workHours: 0,
+        leaveHours: 0,
+        hoursOt: 0,
+        hoursNet: 0,
+        tasksCompleted: 0,
+        withHours: 0,
+      };
     }
-    return buildWorkRetentionRows(
-      data.trackableUsers,
-      teamPeriodStats.submissions
-    ).filter((r) => r.hours > 0 || r.days > 0).length;
-  }, [data?.trackableUsers, teamPeriodStats?.submissions]);
+    return sumWorkforcePeriodHours(data.trackableUsers, teamPeriodStats);
+  }, [data?.trackableUsers, teamPeriodStats]);
 
   if (!isAdmin) {
     return (
@@ -2134,24 +2195,23 @@ export default function AdminDashboard() {
       ]
     : [];
 
-  const hoursSummary = teamPeriodStats?.summary;
-  const hoursTasksCompleted = Array.isArray(teamPeriodStats?.tasks?.completed)
-    ? teamPeriodStats.tasks.completed.length
-    : 0;
-  const hoursWork = Number(hoursSummary?.work_hours ?? hoursSummary?.hours ?? 0) || 0;
-  const hoursLeave = Number(hoursSummary?.leave_hours ?? 0) || 0;
-  const hoursCredited = Number(hoursSummary?.hours ?? 0) || 0;
-  const hoursOt = Number(hoursSummary?.overtime_hours ?? 0) || 0;
-  const hoursNet = Number(
-    hoursSummary?.net_hours ?? hoursCredited + hoursOt
-  ) || 0;
+  const hoursReady = Boolean(teamPeriodStats) || !teamPeriodLoading;
+  const {
+    hoursCredited,
+    workHours: hoursWork,
+    leaveHours: hoursLeave,
+    hoursOt,
+    hoursNet,
+    tasksCompleted: hoursTasksCompleted,
+    withHours: hoursWorkedMembers,
+  } = workforcePeriodHours;
 
   const hoursKpiCards =
     data && view
       ? [
           {
             title: period.hoursLabel,
-            value: teamPeriodLoading && !hoursSummary ? "…" : formatKpiHours(hoursCredited),
+            value: !hoursReady ? "…" : formatKpiHours(hoursCredited),
             hint:
               hoursLeave > 0
                 ? `Work ${formatKpiHours(hoursWork)} · Leave ${formatKpiHours(hoursLeave)}`
@@ -2164,7 +2224,7 @@ export default function AdminDashboard() {
           },
           {
             title: "Approved OT",
-            value: teamPeriodLoading && !hoursSummary ? "…" : formatKpiHours(hoursOt),
+            value: !hoursReady ? "…" : formatKpiHours(hoursOt),
             hint: `Avg ${
               hoursWorkedMembers > 0
                 ? formatKpiHours(hoursOt / hoursWorkedMembers)
@@ -2178,7 +2238,7 @@ export default function AdminDashboard() {
           },
           {
             title: "Net hours",
-            value: teamPeriodLoading && !hoursSummary ? "…" : formatKpiHours(hoursNet),
+            value: !hoursReady ? "…" : formatKpiHours(hoursNet),
             hint: "Credited + approved OT",
             icon: Target,
             gradient: "from-sky-500 to-cyan-600",
@@ -2188,10 +2248,7 @@ export default function AdminDashboard() {
           },
           {
             title: "Tasks done",
-            value:
-              teamPeriodLoading && !teamPeriodStats
-                ? "…"
-                : hoursTasksCompleted.toLocaleString(),
+            value: !hoursReady ? "…" : hoursTasksCompleted.toLocaleString(),
             hint:
               hoursWorkedMembers > 0
                 ? `${hoursWorkedMembers} members with hours`

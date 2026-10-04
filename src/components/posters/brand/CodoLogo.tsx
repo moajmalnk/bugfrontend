@@ -1,21 +1,57 @@
-import { LOGO_COLORS } from './brandKit';
+import { CODO_LOGO_ASSETS, LOGO_COLORS, type CodoLogoAssetKey } from './brandKit';
 
 type Props = {
   variant?: 'dark' | 'light' | 'mono';
-  /** Height of the mark in px; the wordmark scales with it. */
+  /** Height of the mark / logo row in px. */
   height?: number;
   showWordmark?: boolean;
+  /** Force mono SVG fill (used when a palette needs a single ink colour). */
   color?: string;
-  /** Optional brand accent for the bottom-right petal and final "O" (CODO social lockup). */
+  /** Optional brand accent for the SVG petal and final "O". */
   accent?: string;
+  /**
+   * Prefer an official agency logo asset. Defaults to the matching dark/light
+   * WebP when no custom `color` is set. Pass `false` to force the SVG mark.
+   */
+  asset?: CodoLogoAssetKey | false;
 };
 
 /**
- * Code-drawn approximation of the CODO four-petal mark + wordmark.
- * Why: the poster export must not depend on a remote image; an inline SVG
- * renders identically in preview and in the exported WebP.
+ * CODO logo for posters. Uses the official agency WebP when possible so exports
+ * match brand guidelines; falls back to an inline SVG mark when a custom mono
+ * colour is required (icons, single-ink layouts).
  */
-export function CodoLogo({ variant = 'dark', height = 48, showWordmark = true, color, accent }: Props) {
+export function CodoLogo({
+  variant = 'dark',
+  height = 48,
+  showWordmark = true,
+  color,
+  accent,
+  asset,
+}: Props) {
+  const preferAsset = asset !== false && !color && variant !== 'mono';
+  const assetKey: CodoLogoAssetKey =
+    asset === 'dark' || asset === 'light' || asset === 'full'
+      ? asset
+      : variant === 'light'
+        ? 'light'
+        : 'dark';
+
+  if (preferAsset && showWordmark) {
+    const meta = CODO_LOGO_ASSETS[assetKey];
+    const width = (height * meta.width) / meta.height;
+    return (
+      <img
+        src={meta.src}
+        alt="CODO"
+        width={width}
+        height={height}
+        crossOrigin="anonymous"
+        style={{ display: 'block', width, height, objectFit: 'contain' }}
+      />
+    );
+  }
+
   const fill =
     color ?? (variant === 'mono' ? 'currentColor' : LOGO_COLORS[variant === 'light' ? 'light' : 'dark']);
   const markSize = height;
@@ -39,22 +75,18 @@ export function CodoLogo({ variant = 'dark', height = 48, showWordmark = true, c
         aria-hidden="true"
         style={{ display: 'block', flexShrink: 0 }}
       >
-        {/* Top-left petal: rounded outward, tight inner corner */}
         <path
           d="M47 47 H22 A20 20 0 0 1 2 27 V22 A20 20 0 0 1 22 2 H27 A20 20 0 0 1 47 22 Z"
           fill={fill}
         />
-        {/* Top-right petal */}
         <path
           d="M53 47 V22 A20 20 0 0 1 73 2 H78 A20 20 0 0 1 98 22 V27 A20 20 0 0 1 78 47 Z"
           fill={fill}
         />
-        {/* Bottom-left play triangle */}
         <path
           d="M8 53 H41 A6 6 0 0 1 47 59 V92 A6 6 0 0 1 37 96 L4 63 A6 6 0 0 1 8 53 Z"
           fill={fill}
         />
-        {/* Bottom-right petal */}
         <path
           d="M53 53 H78 A20 20 0 0 1 98 73 V78 A20 20 0 0 1 78 98 H73 A20 20 0 0 1 53 78 Z"
           fill={accent ?? fill}

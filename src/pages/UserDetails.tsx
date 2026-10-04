@@ -41,7 +41,7 @@ import { VerifiedBlueTick, isFullFledgedUser } from "@/components/ui/VerifiedBlu
 import { userService } from "@/services/userService";
 import { onboardingService } from "@/services/onboardingService";
 import type { User } from "@/types";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { formatDistanceToNow } from "date-fns";
 import {
   Activity,
@@ -258,6 +258,11 @@ export default function UserDetails() {
   const [onboardingNote, setOnboardingNote] = useState("");
   const [isRequestingOnboarding, setIsRequestingOnboarding] = useState(false);
   const [isAccountToggleLoading, setIsAccountToggleLoading] = useState(false);
+  /** Why: Controlled confirm so Activate/Deactivate can show in-button loading without closing early. */
+  const [accountConfirmMode, setAccountConfirmMode] = useState<
+    "activate" | "deactivate" | null
+  >(null);
+  const queryClient = useQueryClient();
 
   const { data: user, isLoading, refetch } = useQuery({
     queryKey: ["userDetails", userId],
@@ -427,19 +432,32 @@ export default function UserDetails() {
   };
 
   const toggleAccountActive = async (nextActive: boolean) => {
-    if (!user?.id) return;
+    if (!user?.id || isAccountToggleLoading) return;
     setIsAccountToggleLoading(true);
     try {
-      await userService.updateUser(user.id, { account_active: nextActive ? 1 : 0 });
-      toast({
-        title: nextActive ? "Account activated" : "Account deactivated",
-        description: `${user.name} ${nextActive ? "can sign in again" : "has been signed out and blocked from signing in"}.`,
+      const updated = await userService.updateUser(user.id, {
+        account_active: nextActive ? 1 : 0,
       });
-      await refetch();
+      queryClient.setQueryData<User | null>(["userDetails", userId], (prev) =>
+        prev
+          ? { ...prev, ...updated, account_active: nextActive ? 1 : 0 }
+          : updated
+      );
+      void queryClient.invalidateQueries({ queryKey: ["users"] });
+      setAccountConfirmMode(null);
+      toast({
+        title: nextActive ? "Employee activated" : "Employee deactivated",
+        description: `${user.name} ${
+          nextActive
+            ? "can sign in again"
+            : "has been signed out and blocked from signing in"
+        }.`,
+      });
     } catch (err) {
       toast({
-        title: "Failed",
-        description: err instanceof Error ? err.message : "Could not update account status",
+        title: "Could not update status",
+        description:
+          err instanceof Error ? err.message : "Could not update account status",
         variant: "destructive",
       });
     } finally {
@@ -1058,71 +1076,23 @@ export default function UserDetails() {
                     )}
 
                     {canAdminManageAccount && !isAccountDeactivated && user.role !== "admin" && (
-                      <AlertDialog>
-                        <AlertDialogTrigger asChild>
-                          <UserActionCard
-                            icon={UserX}
-                            label="Deactivate"
-                            tone="warning"
-                            disabled={isAccountToggleLoading}
-                          />
-                        </AlertDialogTrigger>
-                        <AlertDialogContent className="sm:max-w-md">
-                          <AlertDialogHeader>
-                            <AlertDialogTitle>Deactivate this account?</AlertDialogTitle>
-                            <AlertDialogDescription className="space-y-2">
-                              <span className="block">
-                                {user.name} will be signed out immediately and won’t be able to sign in.
-                                Their data will remain intact.
-                              </span>
-                            </AlertDialogDescription>
-                          </AlertDialogHeader>
-                          <AlertDialogFooter>
-                            <AlertDialogCancel disabled={isAccountToggleLoading}>
-                              Cancel
-                            </AlertDialogCancel>
-                            <AlertDialogAction
-                              disabled={isAccountToggleLoading}
-                              onClick={() => void toggleAccountActive(false)}
-                              className="bg-red-600 hover:bg-red-700"
-                            >
-                              Deactivate
-                            </AlertDialogAction>
-                          </AlertDialogFooter>
-                        </AlertDialogContent>
-                      </AlertDialog>
+                      <UserActionCard
+                        icon={UserX}
+                        label="Deactivate"
+                        tone="warning"
+                        disabled={isAccountToggleLoading}
+                        onClick={() => setAccountConfirmMode("deactivate")}
+                      />
                     )}
 
                     {canAdminManageAccount && isAccountDeactivated && (
-                      <AlertDialog>
-                        <AlertDialogTrigger asChild>
-                          <UserActionCard
-                            icon={UserCheck}
-                            label="Activate"
-                            tone="success"
-                            disabled={isAccountToggleLoading}
-                          />
-                        </AlertDialogTrigger>
-                        <AlertDialogContent className="sm:max-w-md">
-                          <AlertDialogHeader>
-                            <AlertDialogTitle>Activate this account?</AlertDialogTitle>
-                            <AlertDialogDescription>
-                              {user.name} will be able to sign in again.
-                            </AlertDialogDescription>
-                          </AlertDialogHeader>
-                          <AlertDialogFooter>
-                            <AlertDialogCancel disabled={isAccountToggleLoading}>
-                              Cancel
-                            </AlertDialogCancel>
-                            <AlertDialogAction
-                              disabled={isAccountToggleLoading}
-                              onClick={() => void toggleAccountActive(true)}
-                            >
-                              Activate
-                            </AlertDialogAction>
-                          </AlertDialogFooter>
-                        </AlertDialogContent>
-                      </AlertDialog>
+                      <UserActionCard
+                        icon={UserCheck}
+                        label="Activate"
+                        tone="success"
+                        disabled={isAccountToggleLoading}
+                        onClick={() => setAccountConfirmMode("activate")}
+                      />
                     )}
 
                     {effectiveRole === "admin" && currentUser?.id !== user.id && (
@@ -1202,85 +1172,29 @@ export default function UserDetails() {
 
                     {canAdminManageAccount && !isAccountDeactivated && user.role !== "admin" && (
                       <div>
-                        <AlertDialog>
-                          <AlertDialogTrigger asChild>
-                            <Button
-                              variant="secondary"
-                              className="h-11 lg:h-10 rounded-xl w-full inline-flex items-center justify-center gap-2"
-                              disabled={isAccountToggleLoading}
-                            >
-                              {isAccountToggleLoading ? (
-                                <Loader2 className="h-4 w-4 shrink-0 animate-spin" />
-                              ) : (
-                                <UserX className="h-4 w-4 shrink-0" />
-                              )}
-                              Deactivate
-                            </Button>
-                          </AlertDialogTrigger>
-                        <AlertDialogContent className="sm:max-w-md">
-                          <AlertDialogHeader>
-                            <AlertDialogTitle>Deactivate this account?</AlertDialogTitle>
-                            <AlertDialogDescription className="space-y-2">
-                              <span className="block">
-                                {user.name} will be signed out immediately and won’t be able to sign in.
-                                Their data will remain intact.
-                              </span>
-                            </AlertDialogDescription>
-                          </AlertDialogHeader>
-                          <AlertDialogFooter>
-                            <AlertDialogCancel disabled={isAccountToggleLoading}>
-                              Cancel
-                            </AlertDialogCancel>
-                            <AlertDialogAction
-                              disabled={isAccountToggleLoading}
-                              onClick={() => void toggleAccountActive(false)}
-                              className="bg-red-600 hover:bg-red-700"
-                            >
-                              Deactivate
-                            </AlertDialogAction>
-                          </AlertDialogFooter>
-                        </AlertDialogContent>
-                      </AlertDialog>
+                        <Button
+                          variant="secondary"
+                          className="h-11 lg:h-10 rounded-xl w-full inline-flex items-center justify-center gap-2"
+                          disabled={isAccountToggleLoading}
+                          onClick={() => setAccountConfirmMode("deactivate")}
+                        >
+                          <UserX className="h-4 w-4 shrink-0" />
+                          Deactivate
+                        </Button>
                       </div>
                     )}
 
                     {canAdminManageAccount && isAccountDeactivated && (
                       <div>
-                        <AlertDialog>
-                          <AlertDialogTrigger asChild>
-                            <Button
-                              variant="secondary"
-                              className="h-11 lg:h-10 rounded-xl w-full inline-flex items-center justify-center gap-2"
-                              disabled={isAccountToggleLoading}
-                            >
-                              {isAccountToggleLoading ? (
-                                <Loader2 className="h-4 w-4 shrink-0 animate-spin" />
-                              ) : (
-                                <UserCheck className="h-4 w-4 shrink-0" />
-                              )}
-                              Activate
-                            </Button>
-                          </AlertDialogTrigger>
-                        <AlertDialogContent className="sm:max-w-md">
-                          <AlertDialogHeader>
-                            <AlertDialogTitle>Activate this account?</AlertDialogTitle>
-                            <AlertDialogDescription>
-                              {user.name} will be able to sign in again.
-                            </AlertDialogDescription>
-                          </AlertDialogHeader>
-                          <AlertDialogFooter>
-                            <AlertDialogCancel disabled={isAccountToggleLoading}>
-                              Cancel
-                            </AlertDialogCancel>
-                            <AlertDialogAction
-                              disabled={isAccountToggleLoading}
-                              onClick={() => void toggleAccountActive(true)}
-                            >
-                              Activate
-                            </AlertDialogAction>
-                          </AlertDialogFooter>
-                        </AlertDialogContent>
-                      </AlertDialog>
+                        <Button
+                          variant="secondary"
+                          className="h-11 lg:h-10 rounded-xl w-full inline-flex items-center justify-center gap-2"
+                          disabled={isAccountToggleLoading}
+                          onClick={() => setAccountConfirmMode("activate")}
+                        >
+                          <UserCheck className="h-4 w-4 shrink-0" />
+                          Activate
+                        </Button>
                       </div>
                     )}
 
@@ -1304,6 +1218,61 @@ export default function UserDetails() {
                 </CardContent>
               </div>
             </Card>
+
+            <AlertDialog
+              open={accountConfirmMode !== null}
+              onOpenChange={(open) => {
+                if (!open && !isAccountToggleLoading) {
+                  setAccountConfirmMode(null);
+                }
+              }}
+            >
+              <AlertDialogContent className="max-w-[400px] rounded-2xl">
+                <AlertDialogHeader>
+                  <AlertDialogTitle>
+                    {accountConfirmMode === "activate"
+                      ? "Activate employee"
+                      : "Deactivate employee"}
+                  </AlertDialogTitle>
+                  <AlertDialogDescription>
+                    {accountConfirmMode === "activate"
+                      ? `Activate ${user.name}? Employee will be marked active again.`
+                      : `${user.name} will be signed out immediately and won’t be able to sign in. Their data will remain intact.`}
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel
+                    className="rounded-xl"
+                    disabled={isAccountToggleLoading}
+                  >
+                    Cancel
+                  </AlertDialogCancel>
+                  <AlertDialogAction
+                    className={cn(
+                      "rounded-xl",
+                      accountConfirmMode === "deactivate" &&
+                        "bg-red-600 hover:bg-red-700"
+                    )}
+                    disabled={isAccountToggleLoading}
+                    onClick={(e) => {
+                      e.preventDefault();
+                      void toggleAccountActive(accountConfirmMode === "activate");
+                    }}
+                  >
+                    {isAccountToggleLoading ? (
+                      <>
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        {accountConfirmMode === "activate"
+                          ? "Activating…"
+                          : "Deactivating…"}
+                      </>
+                    ) : (
+                      "Confirm"
+                    )}
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
 
             {/* Detail tabs — under action buttons */}
             <Tabs

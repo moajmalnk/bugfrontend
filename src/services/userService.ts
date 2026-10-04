@@ -59,6 +59,8 @@ export interface UserAnalyticsMember {
   username: string;
   name: string;
   role: string;
+  /** Why: Check-in roster is developers + CODO testers only (not client testers). */
+  tester_type?: string | null;
   account_active?: number;
   current_period: {
     days: number;
@@ -81,6 +83,8 @@ export interface UserAnalyticsMember {
     avg_check_in_label: string | null;
     bugs_reported: number;
     bugs_fixed: number;
+    retests?: number;
+    updates?: number;
     projects?: string[];
   };
   lookback: {
@@ -124,7 +128,7 @@ export interface UsersAnalyticsPayload {
     total_net_hours?: number;
   };
   roles: Record<
-    'admin' | 'developer' | 'tester',
+    'admin' | 'developer' | 'tester' | 'creator',
     {
       summary: UsersAnalyticsPayload['team_summary'];
       users: UserAnalyticsMember[];

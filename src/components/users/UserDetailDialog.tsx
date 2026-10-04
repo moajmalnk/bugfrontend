@@ -136,6 +136,9 @@ export function UserDetailDialog({
   const [isLoading, setIsLoading] = useState(true);
   const [isGeneratingLink, setIsGeneratingLink] = useState(false);
   const [isAccountToggleLoading, setIsAccountToggleLoading] = useState(false);
+  const [accountConfirmMode, setAccountConfirmMode] = useState<
+    "activate" | "deactivate" | null
+  >(null);
 
   const isAccountDeactivated = user.account_active === 0;
   const canAdminManageAccount =

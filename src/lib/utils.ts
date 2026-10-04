@@ -82,6 +82,12 @@ export const userHasEmployeeRecords = (user: {
   userRequiresOnboarding(user) || getEffectiveRole(user || {}) === "creator";
 
 /**
+ * Why: Attendance / period-hours roster is CODO staff who submit work —
+ * developers, creators, and CODO testers. Admins and client testers stay out.
+ */
+export const isAttendanceRosterUser = userHasEmployeeRecords;
+
+/**
  * Incomplete mandatory onboarding — employees (developers + CODO testers) are
  * locked into the wizard. Mirrors backend br_user_requires_onboarding().
  */

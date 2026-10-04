@@ -7,7 +7,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Switch } from "@/components/ui/switch";
 import { toast } from "@/components/ui/use-toast";
 import { currentMonthKey, type MonthFilterValue } from "@/lib/monthFilter";
-import { cn } from "@/lib/utils";
+import { cn, isAttendanceRosterUser } from "@/lib/utils";
 import {
   userService,
   type UserAnalyticsMember,
@@ -29,6 +29,7 @@ import {
   FileText,
   Filter,
   Loader2,
+  Palette,
   Palmtree,
   Search,
   Shield,
@@ -45,7 +46,7 @@ type UserAnalyticsProps = {
   rolePath?: string;
 };
 
-type RoleKey = "admin" | "developer" | "tester";
+type RoleKey = "admin" | "developer" | "tester" | "creator";
 
 const ROLE_META: Record<
   RoleKey,
@@ -69,9 +70,15 @@ const ROLE_META: Record<
     badgeClass: "bg-amber-100 text-amber-900 dark:bg-amber-900/40 dark:text-amber-200",
     accentClass: "from-amber-500/15 to-yellow-500/10",
   },
+  creator: {
+    label: "Creators",
+    icon: Palette,
+    badgeClass: "bg-fuchsia-100 text-fuchsia-800 dark:bg-fuchsia-900/40 dark:text-fuchsia-200",
+    accentClass: "from-fuchsia-500/15 to-pink-500/10",
+  },
 };
 
-const ROLE_ORDER: RoleKey[] = ["developer", "tester", "admin"];
+const ROLE_ORDER: RoleKey[] = ["developer", "tester", "creator", "admin"];
 
 const RANKING_LABELS: Record<string, string> = {
   avg_hours_per_day: "Avg hours / day",
@@ -89,7 +96,9 @@ function hasActivity(user: UserAnalyticsMember): boolean {
     Number(current.tasks_completed || 0) > 0 ||
     Number(current.overtime_hours || 0) > 0 ||
     Number(current.bugs_reported || 0) > 0 ||
-    Number(current.bugs_fixed || 0) > 0
+    Number(current.bugs_fixed || 0) > 0 ||
+    Number(current.retests || 0) > 0 ||
+    Number(current.updates || 0) > 0
   );
 }
 
@@ -101,6 +110,25 @@ function hasCheckedIn(user: UserAnalyticsMember): boolean {
     Number(current.days || 0) > 0 ||
     Boolean(current.avg_check_in_label)
   );
+}
+
+/**
+ * Why: Active developers, creators, and CODO testers must check in. Admins,
+ * client testers and deactivated accounts are excluded from Checked-in X/Y.
+ * Matches Ops Dashboard trackableUsers / isAttendanceRosterUser().
+ */
+function isAttendanceCheckInUser(user: UserAnalyticsMember): boolean {
+  if (Number(user.account_active ?? 1) === 0) return false;
+  return isAttendanceRosterUser({
+    role: user.role,
+    tester_type: user.tester_type,
+  });
+}
+
+function getAttendanceCheckInPool(
+  users: UserAnalyticsMember[]
+): UserAnalyticsMember[] {
+  return users.filter(isAttendanceCheckInUser);
 }
 
 /**
@@ -118,22 +146,39 @@ function formatTeamAnalyticsCopy(
       : data.period.name;
 
   const allUsers = ROLE_ORDER.flatMap((role) => data.roles[role]?.users ?? []);
-  const roster = sortByMetric(allUsers.filter(hasCheckedIn), "hours");
-  const trackedCount = data.team_summary.user_count || allUsers.length;
+  const checkInPool = getAttendanceCheckInPool(allUsers);
+  const roster = sortByMetric(checkInPool.filter(hasCheckedIn), "hours");
+  const trackedCount = checkInPool.length;
 
   let bugsReported = 0;
   let bugsFixed = 0;
+  let retests = 0;
+  let updates = 0;
   let tasksCompleted = 0;
-  for (const user of allUsers) {
+  let totalHours = 0;
+  let personalLeaveDays = 0;
+  let personalLeaveHours = 0;
+  let officialLeaveDays = 0;
+  let officialLeaveHours = 0;
+  for (const user of checkInPool) {
     const c = user.current_period;
     bugsReported += Number(c.bugs_reported || 0);
     bugsFixed += Number(c.bugs_fixed || 0);
+    retests += Number(c.retests || 0);
+    updates += Number(c.updates || 0);
     tasksCompleted += Number(c.tasks_completed || 0);
+    totalHours += Number(c.hours || 0);
+    personalLeaveDays += Number(c.other_leave_days || 0);
+    personalLeaveHours += Number(c.other_leave_hours || 0);
+    officialLeaveDays += Number(c.official_leave_days || 0);
+    officialLeaveHours += Number(c.official_leave_hours || 0);
   }
 
-  const devUsers = data.roles.developer?.users ?? [];
-  const testerUsers = data.roles.tester?.users ?? [];
+  const devUsers = checkInPool.filter((u) => u.role === "developer");
+  const creatorUsers = checkInPool.filter((u) => u.role === "creator");
+  const testerUsers = checkInPool.filter((u) => u.role === "tester");
   const devIn = devUsers.filter(hasCheckedIn).length;
+  const creatorIn = creatorUsers.filter(hasCheckedIn).length;
   const testerIn = testerUsers.filter(hasCheckedIn).length;
 
   const lines: string[] = [
@@ -141,9 +186,11 @@ function formatTeamAnalyticsCopy(
     periodLabel,
     "",
     `Checked in: ${roster.length}/${trackedCount}`,
-    `Total hours: ${data.team_summary.total_hours.toFixed(0)}h`,
+    `Total hours: ${totalHours.toFixed(0)}h`,
+    `Personal leave: ${personalLeaveDays}d (${personalLeaveHours.toFixed(0)}h) · Official leave: ${officialLeaveDays}d (${officialLeaveHours.toFixed(0)}h)`,
     `Tasks: ${tasksCompleted} · Bugs: ${bugsReported} · Fixes: ${bugsFixed}`,
-    `Devs: ${devIn}/${devUsers.length} · Testers: ${testerIn}/${testerUsers.length}`,
+    `Retests: ${retests} · Updates: ${updates}`,
+    `Devs: ${devIn}/${devUsers.length} · Creators: ${creatorIn}/${creatorUsers.length} · CODO testers: ${testerIn}/${testerUsers.length}`,
     "",
     "*Roster*",
   ];
@@ -170,6 +217,14 @@ function formatTeamAnalyticsCopy(
       }
       if (Number(c.overtime_hours || 0) > 0) {
         detailParts.push(`OT ${Number(c.overtime_hours).toFixed(1)}h`);
+      }
+      const personalLeaveD = Number(c.other_leave_days || 0);
+      const officialLeaveD = Number(c.official_leave_days || 0);
+      if (personalLeaveD > 0) {
+        detailParts.push(`Leave ${personalLeaveD}d`);
+      }
+      if (officialLeaveD > 0) {
+        detailParts.push(`Official ${officialLeaveD}d`);
       }
       if (projects.length > 0) {
         const shown = projects.slice(0, 3);
@@ -200,10 +255,27 @@ type AnalyticsExportRow = {
   checkIn: string;
   tasksCompleted: number;
   overtimeHours: number;
+  personalLeaveDays: number;
+  personalLeaveHours: number;
+  officialLeaveDays: number;
+  officialLeaveHours: number;
   bugsReported: number;
   bugsFixed: number;
+  retests: number;
+  updates: number;
   projects: string;
 };
+
+function formatLeaveChip(days: number, hours: number): string {
+  const d = Math.max(0, Math.round(days));
+  const h = Math.max(0, Math.round(hours * 10) / 10);
+  if (d <= 0 && h <= 0) return "0d";
+  if (d > 0 && h > 0 && Math.abs(h - d * 8) > 0.05) {
+    return `${d}d · ${Number.isInteger(h) ? h : h.toFixed(1)}h`;
+  }
+  if (d > 0) return `${d}d`;
+  return Number.isInteger(h) ? `${h}h` : `${h.toFixed(1)}h`;
+}
 
 function buildAnalyticsExportMeta(
   data: UsersAnalyticsPayload,
@@ -214,17 +286,35 @@ function buildAnalyticsExportMeta(
       ? `${data.period.name} (${data.period.range})`
       : data.period.name;
   const allUsers = ROLE_ORDER.flatMap((role) => data.roles[role]?.users ?? []);
-  const roster = sortByMetric(allUsers.filter(hasCheckedIn), "hours");
-  const trackedCount = data.team_summary.user_count || allUsers.length;
+  const checkInPool = getAttendanceCheckInPool(allUsers);
+  const roster = sortByMetric(checkInPool.filter(hasCheckedIn), "hours");
+  const trackedCount = checkInPool.length;
   let bugsReported = 0;
   let bugsFixed = 0;
+  let retests = 0;
+  let updates = 0;
   let tasksCompleted = 0;
-  for (const user of allUsers) {
+  let personalLeaveDays = 0;
+  let personalLeaveHours = 0;
+  let officialLeaveDays = 0;
+  let officialLeaveHours = 0;
+  let totalHours = 0;
+  // Why: PDF/CSV chips must match the attendance roster (developers, creators,
+  // CODO testers), not team_summary which also rolls up admins/client testers.
+  for (const user of checkInPool) {
     const c = user.current_period;
     bugsReported += Number(c.bugs_reported || 0);
     bugsFixed += Number(c.bugs_fixed || 0);
+    retests += Number(c.retests || 0);
+    updates += Number(c.updates || 0);
     tasksCompleted += Number(c.tasks_completed || 0);
+    personalLeaveDays += Number(c.other_leave_days || 0);
+    personalLeaveHours += Number(c.other_leave_hours || 0);
+    officialLeaveDays += Number(c.official_leave_days || 0);
+    officialLeaveHours += Number(c.official_leave_hours || 0);
+    totalHours += Number(c.hours || 0);
   }
+
   const fileStamp =
     monthFilter === "all"
       ? "all-time"
@@ -235,8 +325,14 @@ function buildAnalyticsExportMeta(
     trackedCount,
     bugsReported,
     bugsFixed,
+    retests,
+    updates,
     tasksCompleted,
-    totalHours: data.team_summary.total_hours,
+    personalLeaveDays,
+    personalLeaveHours,
+    officialLeaveDays,
+    officialLeaveHours,
+    totalHours,
     fileStamp,
     lastUpdated: data.last_updated || "",
   };
@@ -258,8 +354,14 @@ function buildAnalyticsExportRows(
       checkIn: c.avg_check_in_label || "—",
       tasksCompleted: Number(c.tasks_completed || 0),
       overtimeHours: Number(c.overtime_hours || 0),
+      personalLeaveDays: Number(c.other_leave_days || 0),
+      personalLeaveHours: Number(c.other_leave_hours || 0),
+      officialLeaveDays: Number(c.official_leave_days || 0),
+      officialLeaveHours: Number(c.official_leave_hours || 0),
       bugsReported: Number(c.bugs_reported || 0),
       bugsFixed: Number(c.bugs_fixed || 0),
+      retests: Number(c.retests || 0),
+      updates: Number(c.updates || 0),
       projects: (c.projects ?? []).filter(Boolean).join("; "),
     };
   });
@@ -337,35 +439,32 @@ type CodoPdfDoc = {
   save: (name: string) => unknown;
 };
 
+const CODO_LOGO_SRC = `${typeof window !== "undefined" ? window.location.origin : ""}/CODO%20AI%20INNOVATION%20blue.png`;
+
 /**
- * Why: Vector CODO four-petal mark for PDFs — no letter-pad PNG dependency.
- * Paths match frontend/src/components/posters/brand/CodoLogo.tsx.
+ * Why: Official CODO lockup for attendance PDFs. Downscales the large public
+ * asset so jsPDF stays fast while keeping crisp print quality.
  */
-async function renderCodoMarkPng(sizePx = 160): Promise<string | null> {
+async function loadCodoOfficialLogoPng(
+  maxWidthPx = 1200
+): Promise<{ dataUrl: string; aspect: number } | null> {
   try {
-    const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${sizePx}" height="${sizePx}" viewBox="0 0 100 100">
-      <path d="M47 47 H22 A20 20 0 0 1 2 27 V22 A20 20 0 0 1 22 2 H27 A20 20 0 0 1 47 22 Z" fill="#0F2342"/>
-      <path d="M53 47 V22 A20 20 0 0 1 73 2 H78 A20 20 0 0 1 98 22 V27 A20 20 0 0 1 78 47 Z" fill="#0F2342"/>
-      <path d="M8 53 H41 A6 6 0 0 1 47 59 V92 A6 6 0 0 1 37 96 L4 63 A6 6 0 0 1 8 53 Z" fill="#0F2342"/>
-      <path d="M53 53 H78 A20 20 0 0 1 98 73 V78 A20 20 0 0 1 78 98 H73 A20 20 0 0 1 53 78 Z" fill="#17A95A"/>
-    </svg>`;
-    const blob = new Blob([svg], { type: "image/svg+xml;charset=utf-8" });
-    const url = URL.createObjectURL(blob);
-    try {
-      const img = new Image();
-      img.decoding = "async";
-      img.src = url;
-      await img.decode();
-      const canvas = document.createElement("canvas");
-      canvas.width = sizePx;
-      canvas.height = sizePx;
-      const ctx = canvas.getContext("2d");
-      if (!ctx) return null;
-      ctx.drawImage(img, 0, 0, sizePx, sizePx);
-      return canvas.toDataURL("image/png");
-    } finally {
-      URL.revokeObjectURL(url);
-    }
+    const img = new Image();
+    img.decoding = "async";
+    img.src = CODO_LOGO_SRC;
+    await img.decode();
+    if (!img.naturalWidth || !img.naturalHeight) return null;
+
+    const aspect = img.naturalWidth / img.naturalHeight;
+    const widthPx = Math.min(maxWidthPx, img.naturalWidth);
+    const heightPx = Math.max(1, Math.round(widthPx / aspect));
+    const canvas = document.createElement("canvas");
+    canvas.width = widthPx;
+    canvas.height = heightPx;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return null;
+    ctx.drawImage(img, 0, 0, widthPx, heightPx);
+    return { dataUrl: canvas.toDataURL("image/png"), aspect };
   } catch {
     return null;
   }
@@ -386,8 +485,8 @@ function drawCodoBrandRule(
 }
 
 /**
- * Why: Drawn CODO letterhead model for attendance PDFs — structured header,
- * summary chips, brand rule, footer. Does not use the letter-pad image file.
+ * Why: Drawn CODO letterhead model for attendance PDFs — official logo lockup,
+ * structured meta card, brand rule, footer.
  */
 async function drawCodoAttendanceLetterhead(
   doc: CodoPdfDoc,
@@ -399,6 +498,12 @@ async function drawCodoAttendanceLetterhead(
     tasksCompleted: number;
     bugsReported: number;
     bugsFixed: number;
+    retests: number;
+    updates: number;
+    personalLeaveDays: number;
+    personalLeaveHours: number;
+    officialLeaveDays: number;
+    officialLeaveHours: number;
     lastUpdated: string;
   }
 ): Promise<number> {
@@ -412,38 +517,38 @@ async function drawCodoAttendanceLetterhead(
   doc.setFillColor(...CODO_GREEN);
   doc.rect(pageWidth * 0.85, 0, pageWidth * 0.15, 4, "F");
 
-  const markSize = 34;
-  const brandY = 18;
-  const markPng = await renderCodoMarkPng(180);
-  if (markPng) {
-    doc.addImage(markPng, "PNG", marginX, brandY, markSize, markSize, undefined, "FAST");
-  } else {
-    doc.setFillColor(...CODO_NAVY);
-    doc.roundedRect(marginX, brandY, markSize, markSize, 6, 6, "F");
-    doc.setFillColor(...CODO_GREEN);
-    doc.roundedRect(
-      marginX + markSize * 0.52,
-      brandY + markSize * 0.52,
-      markSize * 0.4,
-      markSize * 0.4,
-      4,
-      4,
-      "F"
-    );
-  }
+  const brandY = 16;
+  const logoHeight = 38;
+  const logo = await loadCodoOfficialLogoPng(1400);
+  let brandBlockH = logoHeight;
 
-  const wordX = marginX + markSize + 10;
-  doc.setFont("helvetica", "bold");
-  doc.setFontSize(20);
-  doc.setTextColor(...CODO_NAVY);
-  doc.text("COD", wordX, brandY + 16);
-  const codW = doc.getTextWidth("COD");
-  doc.setTextColor(...CODO_GREEN);
-  doc.text("O", wordX + codW, brandY + 16);
-  doc.setFont("helvetica", "normal");
-  doc.setFontSize(8);
-  doc.setTextColor(...CODO_MUTED);
-  doc.text("AI INNOVATIONS", wordX, brandY + 28);
+  if (logo) {
+    const logoWidth = Math.min(160, logoHeight * logo.aspect);
+    doc.addImage(
+      logo.dataUrl,
+      "PNG",
+      marginX,
+      brandY,
+      logoWidth,
+      logoHeight,
+      undefined,
+      "FAST"
+    );
+  } else {
+    // Fallback wordmark if the official logo asset fails to load
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(18);
+    doc.setTextColor(...CODO_NAVY);
+    doc.text("COD", marginX, brandY + 18);
+    const codW = doc.getTextWidth("COD");
+    doc.setTextColor(...CODO_GREEN);
+    doc.text("O", marginX + codW, brandY + 18);
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(8);
+    doc.setTextColor(...CODO_MUTED);
+    doc.text("AI Innovations", marginX, brandY + 30);
+    brandBlockH = 34;
+  }
 
   doc.setFont("helvetica", "bold");
   doc.setFontSize(8);
@@ -458,11 +563,11 @@ async function drawCodoAttendanceLetterhead(
     align: "right",
   });
 
-  drawCodoBrandRule(doc, marginX, brandY + markSize + 10, contentWidth, 2);
+  drawCodoBrandRule(doc, marginX, brandY + brandBlockH + 10, contentWidth, 2);
 
-  // Structured meta card
-  const cardY = brandY + markSize + 20;
-  const cardH = 72;
+  // Structured meta card — attendance · leave · delivery
+  const cardY = brandY + brandBlockH + 20;
+  const cardH = 128;
   doc.setFillColor(...CODO_SOFT);
   doc.setDrawColor(...CODO_LINE);
   doc.setLineWidth(0.6);
@@ -471,48 +576,64 @@ async function drawCodoAttendanceLetterhead(
   doc.setFont("helvetica", "bold");
   doc.setFontSize(14);
   doc.setTextColor(...CODO_NAVY);
-  doc.text("Team Attendance", marginX + 14, cardY + 20);
+  doc.text("Team Attendance", marginX + 14, cardY + 16);
 
   doc.setFont("helvetica", "normal");
   doc.setFontSize(9);
   doc.setTextColor(...CODO_MUTED);
-  doc.text(meta.periodLabel, pageWidth - marginX - 14, cardY + 20, {
+  doc.text(meta.periodLabel, pageWidth - marginX - 14, cardY + 16, {
     align: "right",
   });
 
-  const chips: Array<{ label: string; value: string }> = [
-    {
-      label: "Checked in",
-      value: `${meta.rosterCount}/${meta.trackedCount}`,
-    },
-    {
-      label: "Total hours",
-      value: `${Math.round(meta.totalHours).toLocaleString()}h`,
-    },
-    { label: "Tasks", value: String(meta.tasksCompleted) },
-    { label: "Bugs", value: String(meta.bugsReported) },
-    { label: "Fixes", value: String(meta.bugsFixed) },
+  const chipRows: Array<Array<{ label: string; value: string }>> = [
+    [
+      {
+        label: "Checked in",
+        value: `${meta.rosterCount}/${meta.trackedCount}`,
+      },
+      {
+        label: "Credited hours",
+        value: `${Math.round(meta.totalHours).toLocaleString()}h`,
+      },
+      {
+        label: "Personal leave",
+        value: formatLeaveChip(meta.personalLeaveDays, meta.personalLeaveHours),
+      },
+      {
+        label: "Official leave",
+        value: formatLeaveChip(meta.officialLeaveDays, meta.officialLeaveHours),
+      },
+    ],
+    [
+      { label: "Tasks", value: String(meta.tasksCompleted) },
+      { label: "Bugs", value: String(meta.bugsReported) },
+      { label: "Fixes", value: String(meta.bugsFixed) },
+      { label: "Retests", value: String(meta.retests) },
+      { label: "Updates", value: String(meta.updates) },
+    ],
   ];
 
-  const chipY = cardY + 32;
   const chipH = 22;
   const chipGap = 8;
-  const chipW =
-    (contentWidth - 28 - chipGap * (chips.length - 1)) / chips.length;
-  chips.forEach((chip, i) => {
-    const x = marginX + 14 + i * (chipW + chipGap);
-    doc.setFillColor(255, 255, 255);
-    doc.setDrawColor(...CODO_LINE);
-    doc.roundedRect(x, chipY, chipW, chipH, 6, 6, "FD");
-    doc.setFont("helvetica", "bold");
-    doc.setFontSize(9);
-    doc.setTextColor(...CODO_NAVY);
-    doc.text(chip.value, x + 8, chipY + 14);
-    const valueW = doc.getTextWidth(chip.value);
-    doc.setFont("helvetica", "normal");
-    doc.setFontSize(7);
-    doc.setTextColor(...CODO_MUTED);
-    doc.text(chip.label, x + 8 + valueW + 5, chipY + 14);
+  chipRows.forEach((chips, rowIndex) => {
+    const chipY = cardY + 28 + rowIndex * (chipH + 8);
+    const chipW =
+      (contentWidth - 28 - chipGap * (chips.length - 1)) / chips.length;
+    chips.forEach((chip, i) => {
+      const x = marginX + 14 + i * (chipW + chipGap);
+      doc.setFillColor(255, 255, 255);
+      doc.setDrawColor(...CODO_LINE);
+      doc.roundedRect(x, chipY, chipW, chipH, 6, 6, "FD");
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(8.5);
+      doc.setTextColor(...CODO_NAVY);
+      doc.text(chip.value, x + 7, chipY + 14);
+      const valueW = doc.getTextWidth(chip.value);
+      doc.setFont("helvetica", "normal");
+      doc.setFontSize(6.5);
+      doc.setTextColor(...CODO_MUTED);
+      doc.text(chip.label, x + 7 + valueW + 4, chipY + 14);
+    });
   });
 
   if (meta.lastUpdated) {
@@ -522,7 +643,7 @@ async function drawCodoAttendanceLetterhead(
     doc.text(`Generated ${meta.lastUpdated}`, marginX + 14, cardY + cardH - 8);
   }
 
-  return cardY + cardH + 12;
+  return cardY + cardH + 10;
 }
 
 function drawCodoAttendanceFooter(doc: CodoPdfDoc, page: number, pageCount: number) {
@@ -568,10 +689,16 @@ function downloadTeamAnalyticsCsv(
     "Hours",
     "Avg h/day",
     "Check-in",
+    "Personal leave days",
+    "Personal leave hours",
+    "Official leave days",
+    "Official leave hours",
     "Tasks",
     "OT hours",
     "Bugs",
     "Fixes",
+    "Retests",
+    "Updates",
     "Projects",
   ];
   const lines = [
@@ -579,9 +706,15 @@ function downloadTeamAnalyticsCsv(
     `Period,${escapeCsvCell(meta.periodLabel)}`,
     `Checked in,${meta.roster.length}/${meta.trackedCount}`,
     `Total hours,${meta.totalHours.toFixed(1)}`,
+    `Personal leave days,${meta.personalLeaveDays}`,
+    `Personal leave hours,${meta.personalLeaveHours.toFixed(1)}`,
+    `Official leave days,${meta.officialLeaveDays}`,
+    `Official leave hours,${meta.officialLeaveHours.toFixed(1)}`,
     `Tasks,${meta.tasksCompleted}`,
     `Bugs,${meta.bugsReported}`,
     `Fixes,${meta.bugsFixed}`,
+    `Retests,${meta.retests}`,
+    `Updates,${meta.updates}`,
     meta.lastUpdated ? `Generated,${escapeCsvCell(meta.lastUpdated)}` : "",
     "",
     header.join(","),
@@ -595,10 +728,16 @@ function downloadTeamAnalyticsCsv(
         row.hours.toFixed(1),
         row.avgHoursPerDay.toFixed(1),
         escapeCsvCell(row.checkIn),
+        row.personalLeaveDays,
+        row.personalLeaveHours.toFixed(1),
+        row.officialLeaveDays,
+        row.officialLeaveHours.toFixed(1),
         row.tasksCompleted,
         row.overtimeHours.toFixed(1),
         row.bugsReported,
         row.bugsFixed,
+        row.retests,
+        row.updates,
         escapeCsvCell(row.projects),
       ].join(",")
     ),
@@ -638,6 +777,12 @@ async function downloadTeamAnalyticsPdf(
     tasksCompleted: meta.tasksCompleted,
     bugsReported: meta.bugsReported,
     bugsFixed: meta.bugsFixed,
+    retests: meta.retests,
+    updates: meta.updates,
+    personalLeaveDays: meta.personalLeaveDays,
+    personalLeaveHours: meta.personalLeaveHours,
+    officialLeaveDays: meta.officialLeaveDays,
+    officialLeaveHours: meta.officialLeaveHours,
     lastUpdated: meta.lastUpdated,
   });
 
@@ -650,12 +795,14 @@ async function downloadTeamAnalyticsPdf(
         "Role",
         "Days",
         "Hours",
-        "Avg/day",
-        "Check-in",
+        "Leave",
+        "Official",
         "Tasks",
         "OT",
         "Bugs",
         "Fixes",
+        "Retest",
+        "Upd",
         "Projects",
       ],
     ],
@@ -665,17 +812,23 @@ async function downloadTeamAnalyticsPdf(
       row.role,
       row.days,
       row.hours.toFixed(1),
-      row.avgHoursPerDay.toFixed(1),
-      row.checkIn,
+      row.personalLeaveDays > 0 || row.personalLeaveHours > 0
+        ? formatLeaveChip(row.personalLeaveDays, row.personalLeaveHours)
+        : "—",
+      row.officialLeaveDays > 0 || row.officialLeaveHours > 0
+        ? formatLeaveChip(row.officialLeaveDays, row.officialLeaveHours)
+        : "—",
       row.tasksCompleted,
       row.overtimeHours.toFixed(1),
       row.bugsReported,
       row.bugsFixed,
+      row.retests,
+      row.updates,
       row.projects || "—",
     ]),
     styles: {
-      fontSize: 8,
-      cellPadding: { top: 5, right: 4, bottom: 5, left: 4 },
+      fontSize: 7,
+      cellPadding: { top: 3.5, right: 2.5, bottom: 3.5, left: 2.5 },
       overflow: "linebreak",
       valign: "middle",
       textColor: CODO_NAVY,
@@ -686,25 +839,27 @@ async function downloadTeamAnalyticsPdf(
       fillColor: CODO_NAVY,
       textColor: 255,
       fontStyle: "bold",
-      fontSize: 7.5,
-      cellPadding: { top: 7, right: 4, bottom: 7, left: 4 },
+      fontSize: 6.5,
+      cellPadding: { top: 5, right: 2.5, bottom: 5, left: 2.5 },
     },
     alternateRowStyles: { fillColor: CODO_SOFT },
     columnStyles: {
-      0: { cellWidth: 22, halign: "center" },
-      1: { cellWidth: 88 },
-      2: { cellWidth: 54 },
-      3: { cellWidth: 34, halign: "center" },
-      4: { cellWidth: 42, halign: "right" },
-      5: { cellWidth: 42, halign: "right" },
-      6: { cellWidth: 52, halign: "center" },
-      7: { cellWidth: 36, halign: "center" },
-      8: { cellWidth: 32, halign: "right" },
-      9: { cellWidth: 34, halign: "center" },
-      10: { cellWidth: 34, halign: "center" },
-      11: { cellWidth: "auto" },
+      0: { cellWidth: 18, halign: "center" },
+      1: { cellWidth: 76 },
+      2: { cellWidth: 48 },
+      3: { cellWidth: 28, halign: "center" },
+      4: { cellWidth: 36, halign: "right" },
+      5: { cellWidth: 42, halign: "center" },
+      6: { cellWidth: 42, halign: "center" },
+      7: { cellWidth: 32, halign: "center" },
+      8: { cellWidth: 28, halign: "right" },
+      9: { cellWidth: 28, halign: "center" },
+      10: { cellWidth: 28, halign: "center" },
+      11: { cellWidth: 32, halign: "center" },
+      12: { cellWidth: 28, halign: "center" },
+      13: { cellWidth: "auto" },
     },
-    margin: { left: marginX, right: marginX, top: 28, bottom: 46 },
+    margin: { left: marginX, right: marginX, top: 24, bottom: 46 },
     tableLineColor: CODO_LINE,
     tableLineWidth: 0.3,
   });
@@ -860,6 +1015,10 @@ function UserCompactCard({
         <span>Check-in: {user.current_period.avg_check_in_label || "—"}</span>
         <span>
           Bugs/Fixes: {user.current_period.bugs_reported}/{user.current_period.bugs_fixed}
+          {" · "}
+          Retests: {Number(user.current_period.retests || 0)}
+          {" · "}
+          Updates: {Number(user.current_period.updates || 0)}
         </span>
       </div>
     </div>
@@ -922,6 +1081,8 @@ function AllUsersOverview({
   const aggregates = useMemo(() => {
     let bugsReported = 0;
     let bugsFixed = 0;
+    let retests = 0;
+    let updates = 0;
     let tasksPending = 0;
     let tasksOngoing = 0;
     let tasksCompleted = 0;
@@ -941,6 +1102,8 @@ function AllUsersOverview({
       const l = user.lookback;
       bugsReported += Number(c.bugs_reported || 0);
       bugsFixed += Number(c.bugs_fixed || 0);
+      retests += Number(c.retests || 0);
+      updates += Number(c.updates || 0);
       tasksPending += Number(c.tasks_pending || 0);
       tasksOngoing += Number(c.tasks_ongoing || 0);
       tasksCompleted += Number(c.tasks_completed || 0);
@@ -960,6 +1123,8 @@ function AllUsersOverview({
     return {
       bugsReported,
       bugsFixed,
+      retests,
+      updates,
       tasksPending,
       tasksOngoing,
       tasksCompleted,
@@ -1068,6 +1233,12 @@ function AllUsersOverview({
           value={`${aggregates.tasksCompleted}`}
           detail={`${aggregates.tasksPending} pending · ${aggregates.tasksOngoing} ongoing`}
           icon={<CheckCircle2 className="h-3.5 w-3.5" />}
+        />
+        <MetricTile
+          label="Bugs / fixes"
+          value={`${aggregates.bugsReported}/${aggregates.bugsFixed}`}
+          detail={`${aggregates.retests} retests · ${aggregates.updates} updates`}
+          icon={<Bug className="h-3.5 w-3.5" />}
         />
         <MetricTile
           label="Approved OT"
@@ -1330,7 +1501,9 @@ function AllUsersOverview({
                 <th className="py-2 pr-3 font-medium">OT</th>
                 <th className="py-2 pr-3 font-medium">Check-in</th>
                 <th className="py-2 pr-3 font-medium">Bugs</th>
-                <th className="py-2 font-medium">Fixes</th>
+                <th className="py-2 pr-3 font-medium">Fixes</th>
+                <th className="py-2 pr-3 font-medium">Retests</th>
+                <th className="py-2 font-medium">Updates</th>
               </tr>
             </thead>
             <tbody>
@@ -1371,12 +1544,18 @@ function AllUsersOverview({
                     {user.current_period.avg_check_in_label || "—"}
                   </td>
                   <td className="py-2 pr-3 tabular-nums">{user.current_period.bugs_reported}</td>
-                  <td className="py-2 tabular-nums">{user.current_period.bugs_fixed}</td>
+                  <td className="py-2 pr-3 tabular-nums">{user.current_period.bugs_fixed}</td>
+                  <td className="py-2 pr-3 tabular-nums">
+                    {Number(user.current_period.retests || 0)}
+                  </td>
+                  <td className="py-2 tabular-nums">
+                    {Number(user.current_period.updates || 0)}
+                  </td>
                 </tr>
               ))}
               {roster.length === 0 ? (
                 <tr>
-                  <td colSpan={12} className="py-8 text-center text-sm text-muted-foreground">
+                  <td colSpan={14} className="py-8 text-center text-sm text-muted-foreground">
                     No users match this search/filter.
                   </td>
                 </tr>
@@ -1417,11 +1596,13 @@ function RoleAnalyticsSection({
         (acc, u) => {
           acc.reported += Number(u.current_period.bugs_reported || 0);
           acc.fixed += Number(u.current_period.bugs_fixed || 0);
+          acc.retests += Number(u.current_period.retests || 0);
+          acc.updates += Number(u.current_period.updates || 0);
           acc.pending += Number(u.current_period.tasks_pending || 0);
           acc.ongoing += Number(u.current_period.tasks_ongoing || 0);
           return acc;
         },
-        { reported: 0, fixed: 0, pending: 0, ongoing: 0 }
+        { reported: 0, fixed: 0, retests: 0, updates: 0, pending: 0, ongoing: 0 }
       ),
     [data.users]
   );
@@ -1479,7 +1660,11 @@ function RoleAnalyticsSection({
             label="Avg overtime"
             value={`${data.summary.avg_overtime_hours.toFixed(1)}h`}
           />
-          <MetricTile label="Bugs / fixes" value={`${roleBugs.reported}/${roleBugs.fixed}`} />
+          <MetricTile
+            label="Bugs / fixes"
+            value={`${roleBugs.reported}/${roleBugs.fixed}`}
+            detail={`${roleBugs.retests} retests · ${roleBugs.updates} updates`}
+          />
           <MetricTile label="Total hours" value={`${data.summary.total_hours.toFixed(0)}h`} />
         </div>
 
@@ -1576,6 +1761,8 @@ function RoleAnalyticsSection({
                       <th className="py-2 pr-3 font-medium">Check-in</th>
                       <th className="py-2 pr-3 font-medium">Bugs</th>
                       <th className="py-2 pr-3 font-medium">Fixes</th>
+                      <th className="py-2 pr-3 font-medium">Retests</th>
+                      <th className="py-2 pr-3 font-medium">Updates</th>
                       <th className="py-2 font-medium">Lookback</th>
                     </tr>
                   </thead>
@@ -1612,6 +1799,12 @@ function RoleAnalyticsSection({
                           {user.current_period.bugs_reported}
                         </td>
                         <td className="py-2 pr-3 tabular-nums">{user.current_period.bugs_fixed}</td>
+                        <td className="py-2 pr-3 tabular-nums">
+                          {Number(user.current_period.retests || 0)}
+                        </td>
+                        <td className="py-2 pr-3 tabular-nums">
+                          {Number(user.current_period.updates || 0)}
+                        </td>
                         <td className="py-2 text-xs tabular-nums text-muted-foreground">
                           {user.lookback.avg_hours_per_day.toFixed(1)}h/d
                         </td>
@@ -1655,6 +1848,12 @@ function RoleAnalyticsSection({
                             {user.current_period.bugs_reported}
                           </td>
                           <td className="py-2 pr-3 tabular-nums">{user.current_period.bugs_fixed}</td>
+                          <td className="py-2 pr-3 tabular-nums">
+                            {Number(user.current_period.retests || 0)}
+                          </td>
+                          <td className="py-2 pr-3 tabular-nums">
+                            {Number(user.current_period.updates || 0)}
+                          </td>
                           <td className="py-2 text-xs tabular-nums">
                             {user.lookback.avg_hours_per_day.toFixed(1)}h/d
                           </td>

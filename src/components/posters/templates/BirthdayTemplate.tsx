@@ -54,7 +54,7 @@ export function BirthdayTemplate({ data, size }: PosterTemplateProps) {
       ))}
 
       <div style={{ position: 'absolute', top: 72, left: 0, right: 0, display: 'flex', justifyContent: 'center' }}>
-        <CodoLogo height={78} color={BD.white} accent={BD.accent} />
+        <CodoLogo height={78} asset="light" />
       </div>
 
       <div

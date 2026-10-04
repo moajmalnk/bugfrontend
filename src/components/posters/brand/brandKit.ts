@@ -106,3 +106,17 @@ export const LOGO_COLORS = {
   dark: '#4A2C22',
   light: '#FFFFFF',
 } as const;
+
+/**
+ * Official CODO logo WebPs (from agency masters in public/).
+ * - dark: navy + green — light backgrounds
+ * - light: soft grey + green — dark / branded backgrounds
+ * - full: navy + green with "AI Innovations" lockup — wide banners
+ */
+export const CODO_LOGO_ASSETS = {
+  dark: { src: '/posters/codo-logo-dark.webp', width: 1060, height: 546 },
+  light: { src: '/posters/codo-logo-light.webp', width: 1060, height: 546 },
+  full: { src: '/posters/codo-logo-full.webp', width: 1600, height: 532 },
+} as const;
+
+export type CodoLogoAssetKey = keyof typeof CODO_LOGO_ASSETS;
