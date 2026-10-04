@@ -100,9 +100,10 @@ export type CreditableSubmission = {
 };
 
 /**
- * Why: Approved / changed overtime is stored apart from `hours_today`, so month
- * totals must add it. Legacy rows may already hold OT inside `hours_today`
- * (e.g. 10h), hence max(worked, regular ≤8 + approved) to avoid double counting.
+ * Why: Combined work + approved OT for submit / month-to-date UIs that do not
+ * also show overtime separately. Team Analytics and individual Work Stats use
+ * raw hours_today and add OT once for Net instead. Legacy rows may already hold
+ * OT inside `hours_today` (e.g. 10h), hence max(worked, regular ≤8 + approved).
  * Keep in sync with br_credited_hours_sql() on the backend.
  */
 export function creditedHours(s: CreditableSubmission): number {
