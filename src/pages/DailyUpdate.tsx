@@ -126,19 +126,84 @@ export default function DailyUpdate() {
     }
   }
 
-  function computeTotalsInRange(list: any[], from: string, to: string) {
-    // Compare YYYY-MM-DD strings directly to avoid timezone drift
+  function formatDaysHoursChip(days: number, hours: number): string {
+    const safeDays = Math.max(0, days);
+    const safeHours = Math.round(Math.max(0, hours) * 10) / 10;
+    if (safeDays <= 0 && safeHours <= 0) return "—";
+    const hLabel = Number.isInteger(safeHours)
+      ? `${safeHours}h`
+      : `${safeHours.toFixed(1)}h`;
+    if (safeDays <= 0) return hLabel;
+    if (safeHours <= 0) return `${safeDays}d`;
+    return `${safeDays}d · ${hLabel}`;
+  }
+
+  /**
+   * Why: Month chips must separate credited work from personal leave, official
+   * leave, admin addon hours, and unpaid deduction days so BugUpdate matches
+   * attendance / analytics breakdowns.
+   */
+  function computeMonthBreakdown(list: any[], from: string, to: string) {
     const dateSet = new Set<string>();
     let hours = 0;
+    let personalLeaveDays = 0;
+    let personalLeaveHours = 0;
+    let officialLeaveDays = 0;
+    let officialLeaveHours = 0;
+    let addonDays = 0;
+    let addonHours = 0;
+    let deductionDays = 0;
+    let deductionHours = 0;
+    let otHours = 0;
+
     for (const s of list) {
       const d = String(s.submission_date || "");
-      if (!d) continue;
-      if (d >= from && d <= to) {
-        dateSet.add(d);
-        hours += creditedHours(s);
+      if (!d || d < from || d > to) continue;
+      dateSet.add(d);
+
+      const credited = creditedHours(s);
+      hours += credited;
+      otHours += effectiveOvertimeHoursForStats(s);
+
+      const dayStatus = String(s.day_status || "").toLowerCase();
+      const leaveCode = String(s.leave_type_code || "").toLowerCase();
+      const isLeave = dayStatus === "leave" || dayStatus === "half_day";
+      const isAdminAddon = !isLeave && isAdminHoursSubmission(s);
+
+      if (isLeave && leaveCode === "corporate") {
+        officialLeaveDays += 1;
+        officialLeaveHours += credited;
+      } else if (isLeave && leaveCode === "unpaid") {
+        // Unpaid leave credits 0h — treat as deduction against a standard workday.
+        deductionDays += 1;
+        deductionHours += 8;
+      } else if (isLeave) {
+        personalLeaveDays += 1;
+        personalLeaveHours += credited;
+      } else if (isAdminAddon) {
+        addonDays += 1;
+        addonHours += credited;
       }
     }
-    return { days: dateSet.size, hours: Math.round(hours * 100) / 100 };
+
+    return {
+      days: dateSet.size,
+      hours: Math.round(hours * 100) / 100,
+      personalLeaveDays,
+      personalLeaveHours: Math.round(personalLeaveHours * 100) / 100,
+      officialLeaveDays,
+      officialLeaveHours: Math.round(officialLeaveHours * 100) / 100,
+      addonDays,
+      addonHours: Math.round(addonHours * 100) / 100,
+      deductionDays,
+      deductionHours: Math.round(deductionHours * 100) / 100,
+      otHours: Math.round(otHours * 100) / 100,
+    };
+  }
+
+  function computeTotalsInRange(list: any[], from: string, to: string) {
+    const breakdown = computeMonthBreakdown(list, from, to);
+    return { days: breakdown.days, hours: breakdown.hours };
   }
 
   // Handle month tab clicks and update URL
@@ -179,23 +244,47 @@ export default function DailyUpdate() {
     return { monthHours: totals.hours, monthDays: totals.days };
   }, [submissions]);
 
+  function monthBreakdownExtras(b: ReturnType<typeof computeMonthBreakdown>): string[] {
+    const parts: string[] = [];
+    if (b.personalLeaveDays > 0 || b.personalLeaveHours > 0) {
+      parts.push(`Leave ${formatDaysHoursChip(b.personalLeaveDays, b.personalLeaveHours)}`);
+    }
+    if (b.officialLeaveDays > 0 || b.officialLeaveHours > 0) {
+      parts.push(`Official ${formatDaysHoursChip(b.officialLeaveDays, b.officialLeaveHours)}`);
+    }
+    if (b.addonDays > 0 || b.addonHours > 0) {
+      parts.push(`Addon ${formatDaysHoursChip(b.addonDays, b.addonHours)}`);
+    }
+    if (b.deductionDays > 0 || b.deductionHours > 0) {
+      parts.push(`Deduction ${formatDaysHoursChip(b.deductionDays, b.deductionHours)}`);
+    }
+    if (b.otHours > 0) {
+      parts.push(`OT ${formatDaysHoursChip(0, b.otHours)}`);
+    }
+    return parts;
+  }
+
   function monthLabel(key: string, list: any[]) {
     const { from, to } = getCalendarMonthPeriod(key);
-    const { days, hours } = computeTotalsInRange(list, from, to);
+    const breakdown = computeMonthBreakdown(list, from, to);
     const title = formatCalendarMonthTitle(key);
     const range = formatCalendarMonthRange(key);
-    return `${title} · ${range} · ${hours} hours · ${days} ${days === 1 ? 'day' : 'days'}`;
+    const extras = monthBreakdownExtras(breakdown);
+    const base = `${title} · ${range} · ${breakdown.hours} hours · ${breakdown.days} ${breakdown.days === 1 ? 'day' : 'days'}`;
+    return extras.length ? `${base} · ${extras.join(' · ')}` : base;
   }
 
   function monthTabLines(key: string, list: any[]) {
     const { from, to } = getCalendarMonthPeriod(key);
-    const { days, hours } = computeTotalsInRange(list, from, to);
+    const breakdown = computeMonthBreakdown(list, from, to);
     const title = formatCalendarMonthTitle(key);
     const range = formatCalendarMonthRange(key);
+    const extras = monthBreakdownExtras(breakdown);
+    const compactCore = `${range} · ${breakdown.hours} h · ${breakdown.days} ${breakdown.days === 1 ? 'day' : 'days'}`;
     return {
       full: monthLabel(key, list),
       compactTitle: title,
-      compactMeta: `${range} · ${hours} h · ${days} ${days === 1 ? 'day' : 'days'}`,
+      compactMeta: extras.length ? `${compactCore} · ${extras.join(' · ')}` : compactCore,
     };
   }
 
@@ -541,12 +630,11 @@ export default function DailyUpdate() {
         ? allUserRequestSubmissions.filter(hasApprovalRequest)
         : submissions;
     const { from, to } = getCalendarMonthPeriod(activeMonth);
-    const { days, hours } = computeTotalsInRange(source, from, to);
+    const breakdown = computeMonthBreakdown(source, from, to);
     return {
       title: formatCalendarMonthTitle(activeMonth),
       range: formatCalendarMonthRange(activeMonth),
-      days,
-      hours,
+      ...breakdown,
     };
   }, [activeMonth, submissions, allUserRequestSubmissions, currentUser?.role, showRequestsOnly]);
 
@@ -884,19 +972,85 @@ export default function DailyUpdate() {
 
             {activeTab === 'all-submissions' && activeMonthSummary && (
               <div className="mb-6 rounded-2xl border border-blue-200/60 dark:border-blue-800/50 bg-gradient-to-r from-blue-600/95 to-emerald-600/95 text-white shadow-lg overflow-hidden">
-                <div className="px-4 sm:px-6 py-4 flex flex-col xl:flex-row xl:items-center xl:justify-between gap-3 min-w-0">
-                  <div className="min-w-0">
-                    <p className="text-lg sm:text-xl font-bold tracking-tight">{activeMonthSummary.title}</p>
-                    <p className="text-sm text-white/85 mt-0.5">{activeMonthSummary.range}</p>
+                <div className="px-4 sm:px-6 py-4 flex flex-col gap-3 min-w-0">
+                  <div className="flex flex-col xl:flex-row xl:items-center xl:justify-between gap-3 min-w-0">
+                    <div className="min-w-0">
+                      <p className="text-lg sm:text-xl font-bold tracking-tight">{activeMonthSummary.title}</p>
+                      <p className="text-sm text-white/85 mt-0.5">{activeMonthSummary.range}</p>
+                    </div>
+                    <div className="flex flex-wrap items-center gap-2 sm:gap-3 text-sm">
+                      <span className="rounded-xl bg-white/15 px-3 py-1.5 font-semibold tabular-nums">
+                        {activeMonthSummary.hours} hours
+                      </span>
+                      <span className="rounded-xl bg-white/15 px-3 py-1.5 font-semibold tabular-nums">
+                        {activeMonthSummary.days} {activeMonthSummary.days === 1 ? 'day' : 'days'}
+                      </span>
+                      {activeMonthSummary.otHours > 0 ? (
+                        <span className="rounded-xl bg-orange-400/25 px-3 py-1.5 font-semibold tabular-nums">
+                          OT {formatDaysHoursChip(0, activeMonthSummary.otHours)}
+                        </span>
+                      ) : null}
+                    </div>
                   </div>
-                  <div className="flex flex-wrap items-center gap-2 sm:gap-3 text-sm">
-                    <span className="rounded-lg bg-white/15 px-3 py-1.5 font-semibold tabular-nums">
-                      {activeMonthSummary.hours} hours
-                    </span>
-                    <span className="rounded-lg bg-white/15 px-3 py-1.5 font-semibold tabular-nums">
-                      {activeMonthSummary.days} {activeMonthSummary.days === 1 ? 'day' : 'days'}
-                    </span>
-                  </div>
+                  {(activeMonthSummary.personalLeaveDays > 0 ||
+                    activeMonthSummary.personalLeaveHours > 0 ||
+                    activeMonthSummary.officialLeaveDays > 0 ||
+                    activeMonthSummary.officialLeaveHours > 0 ||
+                    activeMonthSummary.addonDays > 0 ||
+                    activeMonthSummary.addonHours > 0 ||
+                    activeMonthSummary.deductionDays > 0 ||
+                    activeMonthSummary.deductionHours > 0) && (
+                    <div className="flex flex-wrap items-center gap-2 text-xs sm:text-sm border-t border-white/15 pt-3">
+                      {(activeMonthSummary.personalLeaveDays > 0 ||
+                        activeMonthSummary.personalLeaveHours > 0) && (
+                        <span
+                          className="rounded-xl bg-teal-400/20 px-3 py-1.5 font-medium tabular-nums"
+                          title="Personal / paid leave credited in this month"
+                        >
+                          Leave {formatDaysHoursChip(
+                            activeMonthSummary.personalLeaveDays,
+                            activeMonthSummary.personalLeaveHours
+                          )}
+                        </span>
+                      )}
+                      {(activeMonthSummary.officialLeaveDays > 0 ||
+                        activeMonthSummary.officialLeaveHours > 0) && (
+                        <span
+                          className="rounded-xl bg-amber-400/25 px-3 py-1.5 font-medium tabular-nums"
+                          title="Official leave / company holiday hours"
+                        >
+                          Official {formatDaysHoursChip(
+                            activeMonthSummary.officialLeaveDays,
+                            activeMonthSummary.officialLeaveHours
+                          )}
+                        </span>
+                      )}
+                      {(activeMonthSummary.addonDays > 0 ||
+                        activeMonthSummary.addonHours > 0) && (
+                        <span
+                          className="rounded-xl bg-indigo-400/25 px-3 py-1.5 font-medium tabular-nums"
+                          title="Admin-added hours (forgot checkout)"
+                        >
+                          Addon {formatDaysHoursChip(
+                            activeMonthSummary.addonDays,
+                            activeMonthSummary.addonHours
+                          )}
+                        </span>
+                      )}
+                      {(activeMonthSummary.deductionDays > 0 ||
+                        activeMonthSummary.deductionHours > 0) && (
+                        <span
+                          className="rounded-xl bg-rose-400/25 px-3 py-1.5 font-medium tabular-nums"
+                          title="Unpaid leave — no hours credited (standard day equivalent)"
+                        >
+                          Deduction {formatDaysHoursChip(
+                            activeMonthSummary.deductionDays,
+                            activeMonthSummary.deductionHours
+                          )}
+                        </span>
+                      )}
+                    </div>
+                  )}
                 </div>
               </div>
             )}
@@ -926,6 +1080,7 @@ export default function DailyUpdate() {
                       const isLeave = String(s.day_status || '').toLowerCase() === 'leave';
                       const leaveCode = String(s.leave_type_code || '').toLowerCase();
                       const isOfficialLeave = isLeave && leaveCode === 'corporate';
+                      const isUnpaidLeave = isLeave && leaveCode === 'unpaid';
                       const isAdminEntry = !isLeave && isAdminHoursSubmission(s);
                       const leaveName = String(s.leave_type_name || s.leave_type_code || 'Leave').trim();
                       const officialTitle = String(s.leave_reason || leaveName || 'Official Leave').trim();
@@ -935,10 +1090,12 @@ export default function DailyUpdate() {
                   <div key={cardKey} className={`bg-white/60 dark:bg-gray-800/60 border rounded-2xl p-4 sm:p-6 hover:shadow-lg transition-all duration-200 min-w-0 ${
                     isOfficialLeave
                       ? 'border-amber-200/70 dark:border-amber-800/50 hover:border-amber-300 dark:hover:border-amber-700'
-                      : isLeave
+                      : isUnpaidLeave
+                        ? 'border-rose-200/70 dark:border-rose-800/50 hover:border-rose-300 dark:hover:border-rose-700'
+                        : isLeave
                         ? 'border-teal-200/70 dark:border-teal-800/50 hover:border-teal-300 dark:hover:border-teal-700'
                         : isAdminEntry
-                          ? 'border-red-200/70 dark:border-red-800/50 hover:border-red-300 dark:hover:border-red-700'
+                          ? 'border-indigo-200/70 dark:border-indigo-800/50 hover:border-indigo-300 dark:hover:border-indigo-700'
                           : 'border-gray-200/60 dark:border-gray-700/60 hover:border-gray-300 dark:hover:border-gray-600'
                   }`}>
                     <div className="flex flex-col gap-3 xl:flex-row xl:items-start xl:justify-between mb-3 min-w-0">
@@ -949,14 +1106,18 @@ export default function DailyUpdate() {
                             <span className="inline-flex items-center rounded-xl border border-amber-200 bg-amber-100 px-2 py-0.5 text-[10px] font-medium text-amber-950 dark:border-amber-800 dark:bg-amber-950/50 dark:text-amber-200">
                               Official leave{officialTitle ? ` (${officialTitle})` : ''}
                             </span>
+                          ) : isUnpaidLeave ? (
+                            <span className="inline-flex items-center rounded-xl border border-rose-200 bg-rose-100 px-2 py-0.5 text-[10px] font-medium text-rose-900 dark:border-rose-800 dark:bg-rose-950/50 dark:text-rose-200">
+                              Unpaid leave (deduction)
+                            </span>
                           ) : isLeave ? (
                             <span className="inline-flex items-center rounded-xl border border-teal-200 bg-teal-100 px-2 py-0.5 text-[10px] font-medium text-teal-900 dark:border-teal-800 dark:bg-teal-950/50 dark:text-teal-200">
-                              On leave{leaveName ? ` (${leaveName})` : ''}
+                              Leave{leaveName ? ` (${leaveName})` : ''}
                             </span>
                           ) : null}
                           {isAdminEntry ? (
-                            <span className="inline-flex items-center rounded-xl border border-red-200 bg-red-100 px-2 py-0.5 text-[10px] font-medium text-red-900 dark:border-red-800 dark:bg-red-950/50 dark:text-red-200">
-                              Admin entry
+                            <span className="inline-flex items-center rounded-xl border border-indigo-200 bg-indigo-100 px-2 py-0.5 text-[10px] font-medium text-indigo-900 dark:border-indigo-800 dark:bg-indigo-950/50 dark:text-indigo-200">
+                              Addon hours
                             </span>
                           ) : null}
                         </div>
@@ -968,10 +1129,12 @@ export default function DailyUpdate() {
                         <div className="text-xs text-gray-500 dark:text-gray-400 break-words mt-1">
                           {isOfficialLeave
                             ? `Official leave · ${officialTitle}`
-                            : isLeave
+                            : isUnpaidLeave
+                              ? 'Unpaid leave · no hours credited'
+                              : isLeave
                               ? `Leave day · ${leaveName}`
                               : isAdminEntry
-                                ? 'Admin hours entry (forgot checkout)'
+                                ? 'Addon hours (admin entry — forgot checkout)'
                                 : checkInLabel
                                   ? `Checked in at ${checkInLabel}`
                                   : s.start_time
