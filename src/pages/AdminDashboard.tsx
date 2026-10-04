@@ -93,6 +93,7 @@ import {
   Megaphone,
   RefreshCw,
   Rocket,
+  Target,
   Timer,
   Users,
   UsersRound,
@@ -1755,6 +1756,20 @@ export default function AdminDashboard() {
     placeholderData: (prev) => prev,
   });
 
+  // Shared with WorkRetentionTab — period hours / OT / tasks for the 3rd KPI row
+  const {
+    data: teamPeriodStats,
+    isLoading: teamPeriodLoading,
+    isFetching: teamPeriodFetching,
+  } = useQuery({
+    queryKey: ["admin-ops-work-retention", period.from, period.to],
+    queryFn: () => userService.getTeamPeriodDetails(period.from, period.to),
+    enabled: isAdmin && Boolean(period.from && period.to),
+    staleTime: 60_000,
+    refetchOnWindowFocus: false,
+    placeholderData: (prev) => prev,
+  });
+
   /** Bugs/updates scoped to the shared period filter; KPIs use server COUNTs. */
   const view = useMemo(() => {
     if (!data) return null;
@@ -1993,6 +2008,17 @@ export default function AdminDashboard() {
 
   const hasUpdatesFilters =
     updatesProjectFilter !== "all" || updatesStatusFilter !== "all";
+
+  const hoursWorkedMembers = useMemo(() => {
+    if (!data?.trackableUsers?.length || !teamPeriodStats?.submissions) {
+      return 0;
+    }
+    return buildWorkRetentionRows(
+      data.trackableUsers,
+      teamPeriodStats.submissions
+    ).filter((r) => r.hours > 0 || r.days > 0).length;
+  }, [data?.trackableUsers, teamPeriodStats?.submissions]);
+
   if (!isAdmin) {
     return (
       <div className="min-w-0 w-full">
@@ -2011,6 +2037,14 @@ export default function AdminDashboard() {
       </div>
     );
   }
+
+  const formatKpiHours = (hours: number) => {
+    if (!Number.isFinite(hours)) return "—";
+    const rounded = Math.round(hours * 10) / 10;
+    return Number.isInteger(rounded)
+      ? `${rounded.toLocaleString()}h`
+      : `${rounded.toFixed(1)}h`;
+  };
 
   const kpiCards = data && view
     ? [
@@ -2100,6 +2134,77 @@ export default function AdminDashboard() {
       ]
     : [];
 
+  const hoursSummary = teamPeriodStats?.summary;
+  const hoursTasksCompleted = Array.isArray(teamPeriodStats?.tasks?.completed)
+    ? teamPeriodStats.tasks.completed.length
+    : 0;
+  const hoursWork = Number(hoursSummary?.work_hours ?? hoursSummary?.hours ?? 0) || 0;
+  const hoursLeave = Number(hoursSummary?.leave_hours ?? 0) || 0;
+  const hoursCredited = Number(hoursSummary?.hours ?? 0) || 0;
+  const hoursOt = Number(hoursSummary?.overtime_hours ?? 0) || 0;
+  const hoursNet = Number(
+    hoursSummary?.net_hours ?? hoursCredited + hoursOt
+  ) || 0;
+
+  const hoursKpiCards =
+    data && view
+      ? [
+          {
+            title: period.hoursLabel,
+            value: teamPeriodLoading && !hoursSummary ? "…" : formatKpiHours(hoursCredited),
+            hint:
+              hoursLeave > 0
+                ? `Work ${formatKpiHours(hoursWork)} · Leave ${formatKpiHours(hoursLeave)}`
+                : period.rangeLabel,
+            icon: Hourglass,
+            gradient: "from-indigo-500 to-violet-600",
+            chip: "from-indigo-50 to-violet-50 dark:from-indigo-950/30 dark:to-violet-950/30 border-indigo-200 dark:border-indigo-800",
+            valueClass: "text-indigo-700 dark:text-indigo-300",
+            tab: "work" as DashboardTab,
+          },
+          {
+            title: "Approved OT",
+            value: teamPeriodLoading && !hoursSummary ? "…" : formatKpiHours(hoursOt),
+            hint: `Avg ${
+              hoursWorkedMembers > 0
+                ? formatKpiHours(hoursOt / hoursWorkedMembers)
+                : "0h"
+            } / member`,
+            icon: Timer,
+            gradient: "from-rose-500 to-orange-600",
+            chip: "from-rose-50 to-orange-50 dark:from-rose-950/30 dark:to-orange-950/30 border-rose-200 dark:border-rose-800",
+            valueClass: "text-rose-700 dark:text-rose-300",
+            tab: "work" as DashboardTab,
+          },
+          {
+            title: "Net hours",
+            value: teamPeriodLoading && !hoursSummary ? "…" : formatKpiHours(hoursNet),
+            hint: "Credited + approved OT",
+            icon: Target,
+            gradient: "from-sky-500 to-cyan-600",
+            chip: "from-sky-50 to-cyan-50 dark:from-sky-950/30 dark:to-cyan-950/30 border-sky-200 dark:border-sky-800",
+            valueClass: "text-sky-700 dark:text-sky-300",
+            tab: "work" as DashboardTab,
+          },
+          {
+            title: "Tasks done",
+            value:
+              teamPeriodLoading && !teamPeriodStats
+                ? "…"
+                : hoursTasksCompleted.toLocaleString(),
+            hint:
+              hoursWorkedMembers > 0
+                ? `${hoursWorkedMembers} members with hours`
+                : period.title,
+            icon: ListChecks,
+            gradient: "from-fuchsia-500 to-pink-600",
+            chip: "from-fuchsia-50 to-pink-50 dark:from-fuchsia-950/30 dark:to-pink-950/30 border-fuchsia-200 dark:border-fuchsia-800",
+            valueClass: "text-fuchsia-700 dark:text-fuchsia-300",
+            tab: "work" as DashboardTab,
+          },
+        ]
+      : [];
+
   return (
     <div className="min-w-0 w-full space-y-6 sm:space-y-8">
         <TeamBirthdayBanner />
@@ -2134,7 +2239,7 @@ export default function AdminDashboard() {
                   onPresetChange={setPeriodPreset}
                   onCustomFromChange={setCustomFrom}
                   onCustomToChange={setCustomTo}
-                  isFetching={periodStatsFetching}
+                  isFetching={periodStatsFetching || teamPeriodFetching}
                 />
               </div>
             </div>
@@ -2155,6 +2260,18 @@ export default function AdminDashboard() {
                 </div>
               ))}
             </div>
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+              {Array.from({ length: 4 }).map((_, i) => (
+                <div
+                  key={`hours-skel-${i}`}
+                  className="rounded-2xl border border-gray-200/50 dark:border-gray-700/50 bg-white/80 dark:bg-gray-900/80 p-4 space-y-3"
+                >
+                  <Skeleton className="h-8 w-8 rounded-lg" />
+                  <Skeleton className="h-3 w-24" />
+                  <Skeleton className="h-8 w-16" />
+                </div>
+              ))}
+            </div>
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
               <Skeleton className="h-72 rounded-2xl" />
               <Skeleton className="h-72 rounded-2xl" />
@@ -2171,7 +2288,7 @@ export default function AdminDashboard() {
           </div>
         ) : (
           <>
-            {/* KPI cards */}
+            {/* KPI cards — rows 1–2 */}
             <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 2xl:grid-cols-8 gap-3 sm:gap-4">
               {kpiCards.map((card) => {
                 const cardClass = cn(
@@ -2209,6 +2326,51 @@ export default function AdminDashboard() {
                   </button>
                 );
               })}
+            </div>
+
+            {/* KPI row 3 — period hours & related (follows dashboard date filter) */}
+            <div
+              className={cn(
+                "grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4",
+                teamPeriodFetching && !teamPeriodLoading ? "opacity-90" : null
+              )}
+            >
+              {hoursKpiCards.map((card) => (
+                <button
+                  key={card.title}
+                  type="button"
+                  onClick={() => setActiveTab(card.tab)}
+                  className={cn(
+                    "group relative overflow-hidden rounded-2xl border bg-gradient-to-br p-4 sm:p-5 shadow-sm transition-all duration-300 hover:shadow-lg hover:-translate-y-0.5 text-left w-full min-w-0",
+                    card.chip
+                  )}
+                >
+                  <div className="flex items-start justify-between gap-2 mb-3">
+                    <span className="text-[10px] sm:text-[11px] font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400 leading-snug line-clamp-2 min-w-0">
+                      {card.title}
+                    </span>
+                    <div
+                      className={cn(
+                        "p-2 rounded-xl bg-gradient-to-br text-white shadow-md shrink-0",
+                        card.gradient
+                      )}
+                    >
+                      <card.icon className="h-3.5 w-3.5" />
+                    </div>
+                  </div>
+                  <p
+                    className={cn(
+                      "text-2xl sm:text-3xl font-bold tabular-nums tracking-tight",
+                      card.valueClass
+                    )}
+                  >
+                    {card.value}
+                  </p>
+                  <p className="text-xs text-muted-foreground mt-1.5 line-clamp-1 font-medium">
+                    {card.hint}
+                  </p>
+                </button>
+              ))}
             </div>
 
             <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6 sm:space-y-8">

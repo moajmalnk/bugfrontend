@@ -137,7 +137,7 @@ function formatTeamAnalyticsCopy(
   const testerIn = testerUsers.filter(hasCheckedIn).length;
 
   const lines: string[] = [
-    "*BugRicer — Attendance*",
+    "*CODO — Attendance*",
     periodLabel,
     "",
     `Checked in: ${roster.length}/${trackedCount}`,
@@ -284,6 +284,272 @@ function downloadBlob(filename: string, blob: Blob) {
   window.setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 
+const CODO_NAVY: [number, number, number] = [15, 35, 66];
+const CODO_GREEN: [number, number, number] = [23, 169, 90];
+const CODO_MUTED: [number, number, number] = [100, 116, 139];
+const CODO_LINE: [number, number, number] = [226, 232, 240];
+const CODO_SOFT: [number, number, number] = [248, 250, 252];
+
+type CodoPdfDoc = {
+  setFillColor: (...args: number[]) => unknown;
+  setDrawColor: (...args: number[]) => unknown;
+  setTextColor: (...args: number[]) => unknown;
+  setFont: (face: string, style?: string) => unknown;
+  setFontSize: (size: number) => unknown;
+  setLineWidth: (w: number) => unknown;
+  text: (
+    text: string,
+    x: number,
+    y: number,
+    options?: { align?: "left" | "center" | "right" }
+  ) => unknown;
+  rect: (
+    x: number,
+    y: number,
+    w: number,
+    h: number,
+    style?: string
+  ) => unknown;
+  roundedRect: (
+    x: number,
+    y: number,
+    w: number,
+    h: number,
+    rx: number,
+    ry: number,
+    style?: string
+  ) => unknown;
+  line: (x1: number, y1: number, x2: number, y2: number) => unknown;
+  addImage: (
+    data: string,
+    format: string,
+    x: number,
+    y: number,
+    w: number,
+    h: number,
+    alias?: string,
+    compression?: string
+  ) => unknown;
+  getTextWidth: (text: string) => number;
+  internal: { pageSize: { getWidth: () => number; getHeight: () => number } };
+  getNumberOfPages: () => number;
+  setPage: (n: number) => unknown;
+  save: (name: string) => unknown;
+};
+
+/**
+ * Why: Vector CODO four-petal mark for PDFs — no letter-pad PNG dependency.
+ * Paths match frontend/src/components/posters/brand/CodoLogo.tsx.
+ */
+async function renderCodoMarkPng(sizePx = 160): Promise<string | null> {
+  try {
+    const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${sizePx}" height="${sizePx}" viewBox="0 0 100 100">
+      <path d="M47 47 H22 A20 20 0 0 1 2 27 V22 A20 20 0 0 1 22 2 H27 A20 20 0 0 1 47 22 Z" fill="#0F2342"/>
+      <path d="M53 47 V22 A20 20 0 0 1 73 2 H78 A20 20 0 0 1 98 22 V27 A20 20 0 0 1 78 47 Z" fill="#0F2342"/>
+      <path d="M8 53 H41 A6 6 0 0 1 47 59 V92 A6 6 0 0 1 37 96 L4 63 A6 6 0 0 1 8 53 Z" fill="#0F2342"/>
+      <path d="M53 53 H78 A20 20 0 0 1 98 73 V78 A20 20 0 0 1 78 98 H73 A20 20 0 0 1 53 78 Z" fill="#17A95A"/>
+    </svg>`;
+    const blob = new Blob([svg], { type: "image/svg+xml;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    try {
+      const img = new Image();
+      img.decoding = "async";
+      img.src = url;
+      await img.decode();
+      const canvas = document.createElement("canvas");
+      canvas.width = sizePx;
+      canvas.height = sizePx;
+      const ctx = canvas.getContext("2d");
+      if (!ctx) return null;
+      ctx.drawImage(img, 0, 0, sizePx, sizePx);
+      return canvas.toDataURL("image/png");
+    } finally {
+      URL.revokeObjectURL(url);
+    }
+  } catch {
+    return null;
+  }
+}
+
+function drawCodoBrandRule(
+  doc: CodoPdfDoc,
+  x: number,
+  y: number,
+  width: number,
+  thickness = 2.5
+) {
+  const navyW = width * 0.82;
+  doc.setFillColor(...CODO_NAVY);
+  doc.rect(x, y, navyW, thickness, "F");
+  doc.setFillColor(...CODO_GREEN);
+  doc.rect(x + navyW, y, width - navyW, thickness, "F");
+}
+
+/**
+ * Why: Drawn CODO letterhead model for attendance PDFs — structured header,
+ * summary chips, brand rule, footer. Does not use the letter-pad image file.
+ */
+async function drawCodoAttendanceLetterhead(
+  doc: CodoPdfDoc,
+  meta: {
+    periodLabel: string;
+    rosterCount: number;
+    trackedCount: number;
+    totalHours: number;
+    tasksCompleted: number;
+    bugsReported: number;
+    bugsFixed: number;
+    lastUpdated: string;
+  }
+): Promise<number> {
+  const pageWidth = doc.internal.pageSize.getWidth();
+  const marginX = 32;
+  const contentWidth = pageWidth - marginX * 2;
+
+  // Top accent bar
+  doc.setFillColor(...CODO_NAVY);
+  doc.rect(0, 0, pageWidth * 0.85, 4, "F");
+  doc.setFillColor(...CODO_GREEN);
+  doc.rect(pageWidth * 0.85, 0, pageWidth * 0.15, 4, "F");
+
+  const markSize = 34;
+  const brandY = 18;
+  const markPng = await renderCodoMarkPng(180);
+  if (markPng) {
+    doc.addImage(markPng, "PNG", marginX, brandY, markSize, markSize, undefined, "FAST");
+  } else {
+    doc.setFillColor(...CODO_NAVY);
+    doc.roundedRect(marginX, brandY, markSize, markSize, 6, 6, "F");
+    doc.setFillColor(...CODO_GREEN);
+    doc.roundedRect(
+      marginX + markSize * 0.52,
+      brandY + markSize * 0.52,
+      markSize * 0.4,
+      markSize * 0.4,
+      4,
+      4,
+      "F"
+    );
+  }
+
+  const wordX = marginX + markSize + 10;
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(20);
+  doc.setTextColor(...CODO_NAVY);
+  doc.text("COD", wordX, brandY + 16);
+  const codW = doc.getTextWidth("COD");
+  doc.setTextColor(...CODO_GREEN);
+  doc.text("O", wordX + codW, brandY + 16);
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(8);
+  doc.setTextColor(...CODO_MUTED);
+  doc.text("AI INNOVATIONS", wordX, brandY + 28);
+
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(8);
+  doc.setTextColor(...CODO_NAVY);
+  doc.text("INTERNAL DOCUMENT", pageWidth - marginX, brandY + 14, {
+    align: "right",
+  });
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(7.5);
+  doc.setTextColor(...CODO_MUTED);
+  doc.text("Attendance report", pageWidth - marginX, brandY + 26, {
+    align: "right",
+  });
+
+  drawCodoBrandRule(doc, marginX, brandY + markSize + 10, contentWidth, 2);
+
+  // Structured meta card
+  const cardY = brandY + markSize + 20;
+  const cardH = 72;
+  doc.setFillColor(...CODO_SOFT);
+  doc.setDrawColor(...CODO_LINE);
+  doc.setLineWidth(0.6);
+  doc.roundedRect(marginX, cardY, contentWidth, cardH, 10, 10, "FD");
+
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(14);
+  doc.setTextColor(...CODO_NAVY);
+  doc.text("Team Attendance", marginX + 14, cardY + 20);
+
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(9);
+  doc.setTextColor(...CODO_MUTED);
+  doc.text(meta.periodLabel, pageWidth - marginX - 14, cardY + 20, {
+    align: "right",
+  });
+
+  const chips: Array<{ label: string; value: string }> = [
+    {
+      label: "Checked in",
+      value: `${meta.rosterCount}/${meta.trackedCount}`,
+    },
+    {
+      label: "Total hours",
+      value: `${Math.round(meta.totalHours).toLocaleString()}h`,
+    },
+    { label: "Tasks", value: String(meta.tasksCompleted) },
+    { label: "Bugs", value: String(meta.bugsReported) },
+    { label: "Fixes", value: String(meta.bugsFixed) },
+  ];
+
+  const chipY = cardY + 32;
+  const chipH = 22;
+  const chipGap = 8;
+  const chipW =
+    (contentWidth - 28 - chipGap * (chips.length - 1)) / chips.length;
+  chips.forEach((chip, i) => {
+    const x = marginX + 14 + i * (chipW + chipGap);
+    doc.setFillColor(255, 255, 255);
+    doc.setDrawColor(...CODO_LINE);
+    doc.roundedRect(x, chipY, chipW, chipH, 6, 6, "FD");
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(9);
+    doc.setTextColor(...CODO_NAVY);
+    doc.text(chip.value, x + 8, chipY + 14);
+    const valueW = doc.getTextWidth(chip.value);
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(7);
+    doc.setTextColor(...CODO_MUTED);
+    doc.text(chip.label, x + 8 + valueW + 5, chipY + 14);
+  });
+
+  if (meta.lastUpdated) {
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(7);
+    doc.setTextColor(...CODO_MUTED);
+    doc.text(`Generated ${meta.lastUpdated}`, marginX + 14, cardY + cardH - 8);
+  }
+
+  return cardY + cardH + 12;
+}
+
+function drawCodoAttendanceFooter(doc: CodoPdfDoc, page: number, pageCount: number) {
+  const pageWidth = doc.internal.pageSize.getWidth();
+  const pageHeight = doc.internal.pageSize.getHeight();
+  const marginX = 32;
+  const contentWidth = pageWidth - marginX * 2;
+  const footerY = pageHeight - 30;
+
+  drawCodoBrandRule(doc, marginX, footerY - 12, contentWidth, 2);
+
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(7);
+  doc.setTextColor(...CODO_MUTED);
+  doc.text(
+    "CODO AI Innovations  ·  +91 8086 995 559  ·  info@codoai.in  ·  www.codoai.in",
+    pageWidth / 2,
+    footerY,
+    { align: "center" }
+  );
+  doc.setFontSize(7);
+  doc.setTextColor(148, 163, 184);
+  doc.text(`Page ${page} of ${pageCount}  ·  Internal`, pageWidth / 2, footerY + 11, {
+    align: "center",
+  });
+}
+
 /**
  * Why: Spreadsheet export for payroll/ops — full roster columns, filter-scoped.
  */
@@ -309,7 +575,7 @@ function downloadTeamAnalyticsCsv(
     "Projects",
   ];
   const lines = [
-    "BugRicer Team Attendance",
+    "CODO AI Innovations — Team Attendance",
     `Period,${escapeCsvCell(meta.periodLabel)}`,
     `Checked in,${meta.roster.length}/${meta.trackedCount}`,
     `Total hours,${meta.totalHours.toFixed(1)}`,
@@ -339,7 +605,7 @@ function downloadTeamAnalyticsCsv(
   ].filter((line, i, arr) => !(line === "" && arr[i - 1] === ""));
 
   downloadBlob(
-    `bugricer-attendance-${meta.fileStamp}.csv`,
+    `codo-attendance-${meta.fileStamp}.csv`,
     new Blob(["\uFEFF" + lines.join("\n")], {
       type: "text/csv;charset=utf-8;",
     })
@@ -347,7 +613,7 @@ function downloadTeamAnalyticsCsv(
 }
 
 /**
- * Why: Printable PDF for management share — summary + roster table.
+ * Why: Printable CODO letterhead PDF — drawn brand model, not letter-pad PNG.
  */
 async function downloadTeamAnalyticsPdf(
   data: UsersAnalyticsPayload,
@@ -357,30 +623,26 @@ async function downloadTeamAnalyticsPdf(
   const rows = buildAnalyticsExportRows(meta.roster);
   const { jsPDF } = await import("jspdf");
   const { default: autoTable } = await import("jspdf-autotable");
-  const doc = new jsPDF({ orientation: "landscape", unit: "pt", format: "a4" });
+  const doc = new jsPDF({
+    orientation: "landscape",
+    unit: "pt",
+    format: "a4",
+  }) as unknown as CodoPdfDoc;
 
-  doc.setFontSize(16);
-  doc.setFont("helvetica", "bold");
-  doc.text("BugRicer — Team Attendance", 40, 36);
+  const marginX = 32;
+  const startY = await drawCodoAttendanceLetterhead(doc, {
+    periodLabel: meta.periodLabel,
+    rosterCount: meta.roster.length,
+    trackedCount: meta.trackedCount,
+    totalHours: meta.totalHours,
+    tasksCompleted: meta.tasksCompleted,
+    bugsReported: meta.bugsReported,
+    bugsFixed: meta.bugsFixed,
+    lastUpdated: meta.lastUpdated,
+  });
 
-  doc.setFontSize(10);
-  doc.setFont("helvetica", "normal");
-  doc.setTextColor(80);
-  doc.text(meta.periodLabel, 40, 54);
-  doc.text(
-    `Checked in: ${meta.roster.length}/${meta.trackedCount}   ·   Total hours: ${meta.totalHours.toFixed(0)}h   ·   Tasks: ${meta.tasksCompleted}   ·   Bugs: ${meta.bugsReported}   ·   Fixes: ${meta.bugsFixed}`,
-    40,
-    70
-  );
-  if (meta.lastUpdated) {
-    doc.setFontSize(8);
-    doc.setTextColor(120);
-    doc.text(`Generated: ${meta.lastUpdated}`, 40, 84);
-  }
-  doc.setTextColor(0);
-
-  autoTable(doc, {
-    startY: meta.lastUpdated ? 96 : 84,
+  autoTable(doc as never, {
+    startY,
     head: [
       [
         "#",
@@ -413,40 +675,47 @@ async function downloadTeamAnalyticsPdf(
     ]),
     styles: {
       fontSize: 8,
-      cellPadding: 4,
+      cellPadding: { top: 5, right: 4, bottom: 5, left: 4 },
       overflow: "linebreak",
       valign: "middle",
+      textColor: CODO_NAVY,
+      lineColor: CODO_LINE,
+      lineWidth: 0.4,
     },
     headStyles: {
-      fillColor: [79, 70, 229],
+      fillColor: CODO_NAVY,
       textColor: 255,
       fontStyle: "bold",
-      fontSize: 8,
+      fontSize: 7.5,
+      cellPadding: { top: 7, right: 4, bottom: 7, left: 4 },
     },
-    alternateRowStyles: { fillColor: [248, 250, 252] },
+    alternateRowStyles: { fillColor: CODO_SOFT },
     columnStyles: {
-      0: { cellWidth: 24 },
-      1: { cellWidth: 90 },
-      2: { cellWidth: 55 },
-      11: { cellWidth: 160 },
+      0: { cellWidth: 22, halign: "center" },
+      1: { cellWidth: 88 },
+      2: { cellWidth: 54 },
+      3: { cellWidth: 34, halign: "center" },
+      4: { cellWidth: 42, halign: "right" },
+      5: { cellWidth: 42, halign: "right" },
+      6: { cellWidth: 52, halign: "center" },
+      7: { cellWidth: 36, halign: "center" },
+      8: { cellWidth: 32, halign: "right" },
+      9: { cellWidth: 34, halign: "center" },
+      10: { cellWidth: 34, halign: "center" },
+      11: { cellWidth: "auto" },
     },
-    margin: { left: 40, right: 40 },
+    margin: { left: marginX, right: marginX, top: 28, bottom: 46 },
+    tableLineColor: CODO_LINE,
+    tableLineWidth: 0.3,
   });
 
   const pageCount = doc.getNumberOfPages();
   for (let i = 1; i <= pageCount; i++) {
     doc.setPage(i);
-    doc.setFontSize(8);
-    doc.setTextColor(140);
-    doc.text(
-      `Page ${i} of ${pageCount}  ·  BugRicer`,
-      doc.internal.pageSize.getWidth() / 2,
-      doc.internal.pageSize.getHeight() - 20,
-      { align: "center" }
-    );
+    drawCodoAttendanceFooter(doc, i, pageCount);
   }
 
-  doc.save(`bugricer-attendance-${meta.fileStamp}.pdf`);
+  doc.save(`codo-attendance-${meta.fileStamp}.pdf`);
 }
 
 function MetricTile({
