@@ -369,21 +369,35 @@ export default function DailyUpdate() {
       const periodLabel = formatWorkingDaysPeriodLabel(s.submission_date);
       const credited = Number(s.hours_today || 0);
       const leaveCode = String(s.leave_type_code || '').toLowerCase();
+      const leaveReason = String(s.leave_reason || '').trim();
       const creditNote =
         leaveCode === 'corporate'
           ? 'Official leave credited as 8 work hours for this day.'
           : leaveCode === 'paid' || leaveCode === 'personal'
             ? 'Leave credited as 8 work hours for this day.'
             : 'Attendance blocked for this approved leave day.';
-      const leaveLabel =
+      const leaveKind =
         leaveCode === 'corporate'
-          ? String(s.leave_reason || leaveName || 'Official Leave').trim()
-          : leaveName;
+          ? 'Official leave'
+          : leaveCode === 'unpaid'
+            ? 'Unpaid leave'
+            : 'Leave day';
+      // Why: Official leave stores the holiday title in leave_reason; personal/unpaid
+      // store the employee reason — always surface it separately from the type name.
+      const typeLine =
+        leaveCode === 'corporate'
+          ? `${leaveKind} · ${leaveReason || leaveName || 'Official Leave'}`
+          : `${leaveKind} · ${leaveName}`;
+      const reasonLine =
+        leaveCode !== 'corporate' && leaveReason
+          ? `\n📝 Reason: ${leaveReason}`
+          : '';
       return (
         `🧾 CODO Daily Work Update — User\n` +
         `📅 Date: ${dateText}\n` +
-        `🏖 ${leaveCode === 'corporate' ? 'Official leave' : 'Leave day'} · ${leaveLabel}\n` +
-        `⏱ Today's Working Hours: ${credited} Hours\n` +
+        `🏖 ${typeLine}` +
+        reasonLine +
+        `\n⏱ Today's Working Hours: ${credited} Hours\n` +
         `✅ ${creditNote}` +
         (s.leave_request_id ? ` · Request #${s.leave_request_id}` : '') +
         `\n📊 Total Working Days (${periodLabel}): ${days} ${days === 1 ? 'Day' : 'Days'}` +
@@ -1083,9 +1097,21 @@ export default function DailyUpdate() {
                       const isUnpaidLeave = isLeave && leaveCode === 'unpaid';
                       const isAdminEntry = !isLeave && isAdminHoursSubmission(s);
                       const leaveName = String(s.leave_type_name || s.leave_type_code || 'Leave').trim();
-                      const officialTitle = String(s.leave_reason || leaveName || 'Official Leave').trim();
+                      const leaveReason = String(s.leave_reason || '').trim();
+                      const officialTitle = leaveReason || leaveName || 'Official Leave';
                       const leaveOnly = isLeave && !s.id;
                       const cardKey = s.id ?? `leave-${s.leave_request_id ?? 'x'}-${s.submission_date}`;
+                      const leaveSubtitle = isOfficialLeave
+                        ? `Official leave · ${officialTitle}`
+                        : isUnpaidLeave
+                          ? leaveReason
+                            ? `Unpaid leave · ${leaveReason}`
+                            : 'Unpaid leave · no hours credited'
+                          : isLeave
+                            ? leaveReason
+                              ? `${leaveName} · ${leaveReason}`
+                              : `Leave day · ${leaveName}`
+                            : '';
                       return (
                   <div key={cardKey} className={`bg-white/60 dark:bg-gray-800/60 border rounded-2xl p-4 sm:p-6 hover:shadow-lg transition-all duration-200 min-w-0 ${
                     isOfficialLeave
@@ -1127,13 +1153,9 @@ export default function DailyUpdate() {
                           </div>
                         )}
                         <div className="text-xs text-gray-500 dark:text-gray-400 break-words mt-1">
-                          {isOfficialLeave
-                            ? `Official leave · ${officialTitle}`
-                            : isUnpaidLeave
-                              ? 'Unpaid leave · no hours credited'
-                              : isLeave
-                              ? `Leave day · ${leaveName}`
-                              : isAdminEntry
+                          {isLeave
+                            ? leaveSubtitle
+                            : isAdminEntry
                                 ? 'Addon hours (admin entry — forgot checkout)'
                                 : checkInLabel
                                   ? `Checked in at ${checkInLabel}`
