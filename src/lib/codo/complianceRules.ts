@@ -455,6 +455,13 @@ export const DEVELOPER_RULES: DeveloperRule[] = [
     description:
       'A feature is not complete because it works on the developer\'s machine. Before release it must be fully implemented, code reviewed, tested, security checked, performance checked, browser checked where applicable, verified as a production build, deployed, and smoke-tested on its critical flow in production.\n\nMalayalam: ഡെവലപ്പറുടെ മെഷീനിൽ പ്രവർത്തിച്ചതുകൊണ്ട് ഫീച്ചർ പൂർത്തിയായി എന്നല്ല. റിലീസിന് മുമ്പ് കോഡ് റിവ്യൂ, ടെസ്റ്റ്, സെക്യൂരിറ്റി, പെർഫോമൻസ്, ബ്രൗസർ പരിശോധന, പ്രൊഡക്ഷൻ ബിൽഡ്, ഡിപ്ലോയ്മെന്റ്, പ്രൊഡക്ഷൻ സ്മോക്ക് ടെസ്റ്റ് എന്നിവ പൂർത്തിയാകണം.',
   },
+  {
+    key: 'dev_rule_68',
+    number: 68,
+    titleEn: 'Embedded WebView Payment Gateway & Intent Scheme Interception',
+    description:
+      'In Flutter/native WebViews that host payment gateways, select the User-Agent dynamically by platform (Android → Mobile Chrome; iOS → Safari). Explicitly intercept non-HTTP(S) schemes such as upi://, intent://, and gpay://: deny in-WebView navigation and delegate to the external app with LaunchMode.externalApplication so UPI/app grids populate and deep-link returns succeed.\n\nMalayalam: പേയ്മെന്റ് ഗേറ്റ്‌വേ ഹോസ്റ്റ് ചെയ്യുന്ന Flutter/native WebView-കളിൽ User-Agent പ്ലാറ്റ്‌ഫോം അനുസരിച്ച് ഡൈനാമിക് ആയി തിരഞ്ഞെടുക്കുക (Android → Mobile Chrome; iOS → Safari). upi://, intent://, gpay:// പോലുള്ള non-HTTP(S) സ്കീമുകൾ WebView-യിൽ ALLOW ചെയ്യരുത്; LaunchMode.externalApplication വഴി ബാഹ്യ ആപ്പിലേക്ക് ഡെലിഗേറ്റ് ചെയ്യുക.',
+  },
 ];
 
 export const QA_STRESS_RULES: QaStressRule[] = [
@@ -661,6 +668,12 @@ export const QA_STRESS_RULES: QaStressRule[] = [
     title: 'Final Release Acceptance',
     description:
       'Before production approval confirm: critical flows pass, no blocking defects, no critical console errors, no data integrity, authentication or authorization issues, no major loading issues, no obvious browser inconsistencies, no major performance regression, and the production smoke test passes.\n\nMalayalam: പ്രൊഡക്ഷൻ അംഗീകാരത്തിന് മുമ്പ്: പ്രധാന ഫ്ലോകൾ പാസ്, ബ്ലോക്കിംഗ് ഡിഫെക്ട് ഇല്ല, കൺസോൾ എറർ ഇല്ല, ഡാറ്റ/ഓതന്റിക്കേഷൻ/ഓതറൈസേഷൻ പ്രശ്നങ്ങൾ ഇല്ല, ബ്രൗസർ പൊരുത്തക്കേട് ഇല്ല, പെർഫോമൻസ് റിഗ്രഷൻ ഇല്ല, പ്രൊഡക്ഷൻ സ്മോക്ക് ടെസ്റ്റ് പാസ് എന്ന് ഉറപ്പാക്കുക.',
+  },
+  {
+    key: 'qa_in_app_payment_upi',
+    title: 'In-App Payment Gateway & UPI App Switch Drill',
+    description:
+      'On physical Android and iOS devices, open an in-app payment gateway WebView and verify: UPI/payment app grids are populated on both platforms, custom-scheme intents (upi://, intent://, gpay://) trigger an external app handshake, and return deep-link callbacks restore session integrity without forcing re-login or losing payment context. Reject emulator-only verification or a blank UPI grid.\n\nMalayalam: യഥാർത്ഥ Android/iOS ഡിവൈസുകളിൽ in-app പേയ്മെന്റ് WebView തുറന്ന് പരിശോധിക്കുക: രണ്ട് പ്ലാറ്റ്‌ഫോമിലും UPI ആപ്പ് ഗ്രിഡ് നിറഞ്ഞിരിക്കണം, intent ട്രിഗറുകൾ ബാഹ്യ ആപ്പ് ഹാൻഡ്‌ഷേക്ക് ചെയ്യണം, റിട്ടേൺ കോൾബാക്ക് സെഷൻ നഷ്ടപ്പെടാതെ നിലനിർത്തണം. എമുലേറ്റർ മാത്രം ടെസ്റ്റ് ചെയ്താലോ ശൂന്യ UPI ഗ്രിഡ് വന്നാലോ റിജക്ട് ചെയ്യുക.',
   },
 ];
 

@@ -656,8 +656,26 @@ Then fix the cause (e.g. missing query invalidation), not the symptom.`,
 5. Critical flow smoke-tested in production`,
     language: 'QA Checklist',
   },
+  dev_rule_68: {
+    bad: `// Same static UA on every OS; custom schemes allowed in-WebView
+user: 'Mozilla/5.0 (Linux; Android 13) AppleWebKit/537.36 Chrome/120.0.0.0 Mobile Safari/537.36',
+navigationDelegate: (req) => NavigationDecision.navigate, // ALLOW upi:// intent://`,
+    good: `final ua = Platform.isIOS
+    ? 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 Version/17.0 Mobile/15E148 Safari/604.1'
+    : 'Mozilla/5.0 (Linux; Android 13) AppleWebKit/537.36 Chrome/120.0.0.0 Mobile Safari/537.36';
 
-  // ── Tester / QA Stress Matrix (34) ─────────────────────────────────────
+navigationDelegate: (NavigationRequest req) async {
+  final uri = Uri.tryParse(req.url);
+  if (uri != null && uri.scheme != 'http' && uri.scheme != 'https') {
+    await launchUrl(uri, mode: LaunchMode.externalApplication);
+    return NavigationDecision.prevent;
+  }
+  return NavigationDecision.navigate;
+},`,
+    language: 'Dart',
+  },
+
+  // ── Tester / QA Stress Matrix (35) ─────────────────────────────────────
   qa_apple_sandbox: {
     bad: 'Checked Chrome on desktop only — skipped Safari / iOS WebKit.',
     good: `1. Open primary screens in Safari (macOS + iOS/WebKit when available)
@@ -938,6 +956,15 @@ Then fix the cause (e.g. missing query invalidation), not the symptom.`,
 4. No major loading issues or browser inconsistencies
 5. No major performance regression
 6. Production smoke test passes`,
+    language: 'QA Checklist',
+  },
+  qa_in_app_payment_upi: {
+    bad: 'Checked the payment WebView on an Android emulator only and assumed UPI apps would appear.',
+    good: `1. Physical Android and iOS devices (not emulator-only)
+2. Confirm UPI / payment app grids are populated on both platforms
+3. Tap a UPI option — external app handshake must fire (upi:// / intent:// / gpay://)
+4. Complete or cancel and return — session and payment context must remain intact
+5. Pass only if both platforms hand off and return correctly`,
     language: 'QA Checklist',
   },
 };
