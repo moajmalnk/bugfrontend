@@ -68,7 +68,7 @@ import {
   adminVerifyWeek,
   canShiftYearMonth,
   clampYearMonth,
-  currentYearMonth,
+  defaultPayVerifyYearMonth,
   deleteHourlyRate,
   deleteMonthAdjustment,
   employeeVerifyMonth,
@@ -82,6 +82,10 @@ import {
   adminMonthVerifyLabel,
   employeeWeekVerifyLabel,
   adminWeekVerifyLabel,
+  canVerifyMonthPeriod,
+  canVerifyWeekPeriod,
+  payVerifyPeriodHint,
+  payVerifyPeriodState,
   seedPayVerifyRates,
   seedSeptemberAdjustments,
   setHourlyRate,
@@ -266,13 +270,15 @@ export default function PayVerify() {
   const isAdmin = (user?.role || '').toLowerCase() === 'admin';
   const [searchParams, setSearchParams] = useSearchParams();
 
-  const month = searchParams.get('month') || currentYearMonth();
+  const month = searchParams.get('month') || defaultPayVerifyYearMonth();
   const role = (searchParams.get('role') as PayVerifyRoleFilter) || (isAdmin ? 'all' : 'mine');
-  const statusParam = (searchParams.get('status') || 'all').toLowerCase();
+  const statusParam = (searchParams.get('status') || 'pending').toLowerCase();
   const statusFilter: PayStatusFilter =
     statusParam === 'pending' || statusParam === 'completed' || statusParam === 'paid'
       ? statusParam
-      : 'all';
+      : statusParam === 'all'
+        ? 'all'
+        : 'pending';
 
   const [data, setData] = useState<PayVerifyMonthResponse | null>(null);
   const [loading, setLoading] = useState(true);
@@ -315,6 +321,22 @@ export default function PayVerify() {
     else next.set('status', s);
     setSearchParams(next, { replace: true });
   };
+
+  // Why: First visit should land on salary month (previous completed) + Pending tab.
+  useEffect(() => {
+    const next = new URLSearchParams(searchParams);
+    let dirty = false;
+    if (!searchParams.get('month')) {
+      next.set('month', defaultPayVerifyYearMonth());
+      dirty = true;
+    }
+    if (!searchParams.get('status')) {
+      next.set('status', 'pending');
+      dirty = true;
+    }
+    if (dirty) setSearchParams(next, { replace: true });
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- run once on mount for URL defaults
+  }, []);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -661,7 +683,7 @@ export default function PayVerify() {
                   </h1>
                   <div className="mt-2 h-1 w-20 rounded-full bg-gradient-to-r from-emerald-500 to-teal-600" />
                   <p className="mt-3 max-w-2xl text-sm font-medium text-muted-foreground sm:text-base">
-                    Confirm weekly hours, then mark the month Paid with estimated salary
+                    Confirm weekly hours,
                     {data?.period_label ? ` · ${data.period_label}` : ''}.
                   </p>
                 </div>
@@ -723,12 +745,7 @@ export default function PayVerify() {
                   </Button>
                 </div>
                 {monthBounds ? (
-                  <p className="px-1 text-center text-[10px] text-muted-foreground sm:text-left">
-                    {formatYearMonthLabel(monthBounds.min)}
-                    {' – '}
-                    {formatYearMonthLabel(monthBounds.max)}
-                    <span className="text-muted-foreground/80"> · joining to today</span>
-                  </p>
+                  <p className="px-1 text-center text-[10px] text-muted-foreground sm:text-left"></p>
                 ) : null}
               </div>
             </div>
@@ -967,6 +984,11 @@ export default function PayVerify() {
             const weeksAdminDone = entry.weeks.filter((w) => w.admin_status === 'approved').length;
             const userMonthLabel = employeeMonthVerifyLabel(m);
             const adminMonthLabel = adminMonthVerifyLabel(m);
+            const monthPeriodStart = String(m.period_start || data?.period_start || `${month}-01`);
+            const monthPeriodEnd = String(m.period_end || data?.period_end || `${month}-28`);
+            const monthCompletable = canVerifyMonthPeriod(monthPeriodStart, monthPeriodEnd);
+            const monthPeriodState = payVerifyPeriodState(monthPeriodStart, monthPeriodEnd);
+            const monthPeriodHint = payVerifyPeriodHint(monthPeriodState, monthPeriodEnd);
 
             return (
               <article
@@ -1068,19 +1090,44 @@ export default function PayVerify() {
                   {open && (
                     <div className="mt-3 flex flex-col gap-2">
                       {entry.weeks.map((week) => {
+                        const periodState = payVerifyPeriodState(week.week_start, week.week_end);
+                        const weekCompletable = canVerifyWeekPeriod(week);
+                        const periodHint = payVerifyPeriodHint(periodState, week.week_end);
                         return (
                           <div
                             key={week.week_start}
-                            className="flex flex-col gap-2 rounded-xl border border-gray-200/80 bg-white px-3 py-2.5 dark:border-gray-700 dark:bg-gray-900/80 sm:flex-row sm:items-center sm:justify-between"
+                            className={cn(
+                              'flex flex-col gap-2 rounded-xl border px-3 py-2.5 sm:flex-row sm:items-center sm:justify-between',
+                              periodState === 'upcoming'
+                                ? 'border-dashed border-gray-200/80 bg-muted/20 dark:border-gray-700'
+                                : periodState === 'in_progress'
+                                  ? 'border-sky-200/80 bg-sky-50/40 dark:border-sky-900/40 dark:bg-sky-950/20'
+                                  : 'border-gray-200/80 bg-white dark:border-gray-700 dark:bg-gray-900/80'
+                            )}
                           >
                             <div className="min-w-0">
-                              <p className="text-sm font-medium text-foreground">
-                                {shortWeek(week.week_start, week.week_end)}
-                              </p>
+                              <div className="flex flex-wrap items-center gap-2">
+                                <p className="text-sm font-medium text-foreground">
+                                  {shortWeek(week.week_start, week.week_end)}
+                                </p>
+                                {periodState !== 'completed' ? (
+                                  <span
+                                    className={cn(
+                                      'rounded-lg px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide',
+                                      periodState === 'in_progress'
+                                        ? 'bg-sky-100 text-sky-800 dark:bg-sky-950/50 dark:text-sky-200'
+                                        : 'bg-muted text-muted-foreground'
+                                    )}
+                                  >
+                                    {periodState === 'in_progress' ? 'In progress' : 'Upcoming'}
+                                  </span>
+                                ) : null}
+                              </div>
                               <p className="text-xs text-muted-foreground">
                                 {formatHours(week.worked_hours)} worked · leave {week.leave_days ?? 0}d · OT{' '}
                                 {formatHours(week.ot_hours)}
                               </p>
+                              <p className="mt-0.5 text-[11px] text-muted-foreground">{periodHint}</p>
                               <div className="mt-1.5">
                                 <VerifyRoleBadges
                                   userLabel={employeeWeekVerifyLabel(week)}
@@ -1090,7 +1137,15 @@ export default function PayVerify() {
                               </div>
                             </div>
                             <div className="flex flex-wrap items-center gap-2">
-                              {(self || isAdmin) &&
+                              {!weekCompletable ? (
+                                <span className="text-[11px] text-muted-foreground">
+                                  {periodState === 'upcoming'
+                                    ? 'Available after this week starts and ends'
+                                    : 'Verify after the week ends'}
+                                </span>
+                              ) : null}
+                              {weekCompletable &&
+                                (self || isAdmin) &&
                                 week.employee_status !== 'verified' &&
                                 week.admin_status !== 'approved' && (
                                   <>
@@ -1130,7 +1185,8 @@ export default function PayVerify() {
                                     </Button>
                                   </>
                                 )}
-                              {isAdmin &&
+                              {weekCompletable &&
+                                isAdmin &&
                                 week.employee_status === 'verified' &&
                                 week.admin_status !== 'approved' && (
                                   <>
@@ -1233,13 +1289,22 @@ export default function PayVerify() {
                 </div>
 
                 {/* Actions */}
-                <div className="flex flex-wrap gap-2 border-t border-gray-100 pt-3 dark:border-gray-800">
+                <div className="flex flex-col gap-2 border-t border-gray-100 pt-3 dark:border-gray-800">
+                  {!monthCompletable && !monthLocked ? (
+                    <p className="text-[11px] text-muted-foreground">{monthPeriodHint}</p>
+                  ) : null}
+                  <div className="flex flex-wrap gap-2">
                   {(self || isAdmin) && m.employee_status !== 'verified' && !monthLocked && (
                     <>
                       <Button
                         type="button"
                         className="rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 text-white hover:from-emerald-700 hover:to-teal-700"
-                        disabled={busy}
+                        disabled={busy || !monthCompletable}
+                        title={
+                          monthCompletable
+                            ? 'Verify completed month hours'
+                            : monthPeriodHint
+                        }
                         onClick={() => setNoteAction({ kind: 'emp-month', entry, status: 'verified' })}
                       >
                         <CheckCircle2 className="mr-1.5 h-4 w-4" />
@@ -1249,7 +1314,12 @@ export default function PayVerify() {
                         type="button"
                         variant="outline"
                         className="rounded-xl"
-                        disabled={busy}
+                        disabled={busy || !monthCompletable}
+                        title={
+                          monthCompletable
+                            ? 'Flag month for correction'
+                            : monthPeriodHint
+                        }
                         onClick={() =>
                           setNoteAction({ kind: 'emp-month', entry, status: 'correction_needed' })
                         }
@@ -1308,6 +1378,7 @@ export default function PayVerify() {
                       )}
                     </>
                   )}
+                  </div>
                 </div>
               </article>
             );

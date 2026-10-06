@@ -225,12 +225,84 @@ export function currentYearMonth(): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
 }
 
+/** Why: Same IST calendar day the backend uses for verify gates. */
+export function todayIsoIst(): string {
+  try {
+    return new Intl.DateTimeFormat('en-CA', {
+      timeZone: 'Asia/Kolkata',
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+    }).format(new Date());
+  } catch {
+    return new Date().toISOString().slice(0, 10);
+  }
+}
+
+export type PayVerifyPeriodState = 'completed' | 'in_progress' | 'upcoming';
+
+/**
+ * Why: Only fully finished weeks/months may be verified — never tomorrow or open weeks.
+ * Completed = period_end is strictly before today's IST date.
+ */
+export function payVerifyPeriodState(
+  periodStart: string,
+  periodEnd: string,
+  today: string = todayIsoIst()
+): PayVerifyPeriodState {
+  if (periodEnd < today) return 'completed';
+  if (periodStart > today) return 'upcoming';
+  return 'in_progress';
+}
+
+export function canVerifyWeekPeriod(
+  week: Pick<PayVerifyWeek, 'week_start' | 'week_end'>,
+  today: string = todayIsoIst()
+): boolean {
+  return payVerifyPeriodState(week.week_start, week.week_end, today) === 'completed';
+}
+
+export function canVerifyMonthPeriod(
+  periodStart: string,
+  periodEnd: string,
+  today: string = todayIsoIst()
+): boolean {
+  return payVerifyPeriodState(periodStart, periodEnd, today) === 'completed';
+}
+
+export function payVerifyPeriodHint(
+  state: PayVerifyPeriodState,
+  periodEnd: string
+): string {
+  if (state === 'completed') return 'Ready to verify';
+  if (state === 'upcoming') return 'Not started yet';
+  try {
+    const end = new Date(`${periodEnd}T12:00:00`);
+    const endLabel = end.toLocaleDateString('en-GB', {
+      weekday: 'short',
+      day: 'numeric',
+      month: 'short',
+    });
+    return `In progress · verify after ${endLabel}`;
+  } catch {
+    return 'In progress · verify after this period ends';
+  }
+}
+
 export function shiftYearMonth(ym: string, delta: number): string {
   const [yStr, mStr] = ym.split('-');
   const y = Number(yStr);
   const m = Number(mStr);
   const d = new Date(y, m - 1 + delta, 1);
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+}
+
+/**
+ * Why: Salary for month M is reviewed during M+1. Until 1 Nov, default is September;
+ * from 1 Nov the default becomes October. Always the previous calendar month in IST.
+ */
+export function defaultPayVerifyYearMonth(): string {
+  return shiftYearMonth(currentYearMonth(), -1);
 }
 
 /** Clamp YYYY-MM into [min, max] inclusive. */

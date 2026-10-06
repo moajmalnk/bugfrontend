@@ -17,7 +17,7 @@ import { cn } from '@/lib/utils';
 import {
   canShiftYearMonth,
   clampYearMonth,
-  currentYearMonth,
+  defaultPayVerifyYearMonth,
   fetchPayVerifyUserMonth,
   formatHours,
   formatInr,
@@ -121,7 +121,7 @@ function PayHoursSkeleton() {
 }
 
 export function UserPayVerify({ userId, isAdmin = false, isSelf = false }: Props) {
-  const [month, setMonth] = useState(currentYearMonth());
+  const [month, setMonth] = useState(defaultPayVerifyYearMonth());
   const [data, setData] = useState<PayVerifyUserMonthResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
