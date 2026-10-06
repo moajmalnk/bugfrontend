@@ -73,6 +73,7 @@ import {
   addMonthAdjustment,
   adminLockMonth,
   adminVerifyWeek,
+  adjustmentTypeLabel,
   canShiftYearMonth,
   clampYearMonth,
   defaultPayVerifyYearMonth,
@@ -81,6 +82,7 @@ import {
   employeeVerifyMonth,
   employeeVerifyWeek,
   fetchPayVerifyMonth,
+  fetchPayVerifyUserProjects,
   fetchRateHistory,
   formatHours,
   formatInr,
@@ -98,6 +100,8 @@ import {
   setHourlyRate,
   shiftYearMonth,
   type PayVerifyAdjustment,
+  type PayVerifyAdjustmentType,
+  type PayVerifyIncentiveProject,
   type PayVerifyMonthResponse,
   type PayVerifyRateHistoryItem,
   type PayVerifyRoleFilter,
@@ -399,7 +403,11 @@ export default function PayVerify() {
   const [rateHistoryLoading, setRateHistoryLoading] = useState(false);
   const [adjAmount, setAdjAmount] = useState('');
   const [adjReason, setAdjReason] = useState('');
-  const [adjType, setAdjType] = useState<'advance' | 'deduction' | 'credit' | 'other'>('advance');
+  const [adjType, setAdjType] = useState<PayVerifyAdjustmentType>('advance');
+  const [adjProjectId, setAdjProjectId] = useState('');
+  const [adjProjects, setAdjProjects] = useState<PayVerifyIncentiveProject[]>([]);
+  const [adjProjectsLoading, setAdjProjectsLoading] = useState(false);
+  const [adjProjectsError, setAdjProjectsError] = useState<string | null>(null);
   const [search, setSearch] = useState('');
   const [adjustmentToDelete, setAdjustmentToDelete] = useState<PayVerifyAdjustment | null>(null);
   const [rateToDelete, setRateToDelete] = useState<PayVerifyRateHistoryItem | null>(null);
@@ -533,6 +541,30 @@ export default function PayVerify() {
     setAdjAmount('');
     setAdjReason('');
     setAdjType('advance');
+    setAdjProjectId('');
+    setAdjProjects([]);
+    setAdjProjectsLoading(false);
+    setAdjProjectsError(null);
+  };
+
+  const openAdjustment = async (entry: PayVerifyRosterEntry) => {
+    setAdjAmount('');
+    setAdjReason('');
+    setAdjType('advance');
+    setAdjProjectId('');
+    setAdjProjects([]);
+    setAdjProjectsError(null);
+    setNoteAction({ kind: 'adjustment', entry });
+    setAdjProjectsLoading(true);
+    try {
+      const projects = await fetchPayVerifyUserProjects(entry.user.id);
+      setAdjProjects(projects);
+    } catch (e) {
+      setAdjProjects([]);
+      setAdjProjectsError(extractApiErrorMessage(e) || 'Could not load projects');
+    } finally {
+      setAdjProjectsLoading(false);
+    }
   };
 
   const loadRateIntoForm = (row: PayVerifyRateHistoryItem) => {
@@ -717,18 +749,34 @@ export default function PayVerify() {
         return;
       } else if (noteAction.kind === 'adjustment') {
         const amount = Number(adjAmount);
-        if (!Number.isFinite(amount) || amount === 0 || !adjReason.trim()) {
+        const isIncentive = adjType === 'project_incentive';
+        if (!Number.isFinite(amount) || amount === 0) {
+          toast({ title: 'Enter a valid amount', variant: 'destructive' });
+          return;
+        }
+        if (isIncentive && !adjProjectId) {
+          toast({ title: 'Select a project for this incentive', variant: 'destructive' });
+          return;
+        }
+        if (!isIncentive && !adjReason.trim()) {
           toast({ title: 'Amount and reason required', variant: 'destructive' });
           return;
         }
+        const projectName =
+          adjProjects.find((p) => p.id === adjProjectId)?.name?.trim() || '';
         await addMonthAdjustment({
           user_id: noteAction.entry.user.id,
           month,
           type: adjType,
-          amount,
+          amount: Math.abs(amount),
           reason: adjReason.trim(),
+          project_id: isIncentive ? adjProjectId : undefined,
         });
-        toast({ title: 'Adjustment added' });
+        toast({
+          title: isIncentive
+            ? `Project incentive added${projectName ? ` · ${projectName}` : ''}`
+            : 'Adjustment added',
+        });
       }
       notifyAdminNavCountsChanged();
       closeNote();
@@ -1407,30 +1455,50 @@ export default function PayVerify() {
                       Adjustments
                     </p>
                     <div className="flex flex-col gap-2">
-                      {m.adjustments!.map((adj) => (
-                        <div key={adj.id} className="flex items-center justify-between gap-2 text-sm">
-                          <span className="min-w-0 truncate text-muted-foreground">
-                            <span className="font-medium capitalize text-foreground">{adj.type}</span>
-                            {': '}
-                            {adj.reason}
-                          </span>
-                          <div className="flex shrink-0 items-center gap-2">
-                            <span className="font-semibold tabular-nums">{formatInr(adj.amount)}</span>
-                            {isAdmin && !monthLocked && (
-                              <Button
-                                type="button"
-                                size="sm"
-                                variant="ghost"
-                                className="h-7 rounded-xl px-2"
-                                disabled={busy}
-                                onClick={() => setAdjustmentToDelete(adj)}
-                              >
-                                Remove
-                              </Button>
-                            )}
+                      {m.adjustments!.map((adj) => {
+                        const isIncentive = adj.type === 'project_incentive';
+                        const title = isIncentive
+                          ? `Project incentive${adj.project_name ? ` · ${adj.project_name}` : ''}`
+                          : adjustmentTypeLabel(adj.type);
+                        const note = isIncentive
+                          ? (adj.reason || '').includes(' — ')
+                            ? (adj.reason || '').split(' — ').slice(1).join(' — ').trim()
+                            : ''
+                          : adj.reason || '';
+                        return (
+                          <div
+                            key={adj.id}
+                            className="flex items-center justify-between gap-2 text-sm"
+                          >
+                            <span className="min-w-0 truncate text-muted-foreground">
+                              <span className="font-medium text-foreground">{title}</span>
+                              {note ? (
+                                <>
+                                  {': '}
+                                  {note}
+                                </>
+                              ) : null}
+                            </span>
+                            <div className="flex shrink-0 items-center gap-2">
+                              <span className="font-semibold tabular-nums">
+                                {formatInr(adj.amount)}
+                              </span>
+                              {isAdmin && !monthLocked && (
+                                <Button
+                                  type="button"
+                                  size="sm"
+                                  variant="ghost"
+                                  className="h-7 rounded-xl px-2"
+                                  disabled={busy}
+                                  onClick={() => setAdjustmentToDelete(adj)}
+                                >
+                                  Remove
+                                </Button>
+                              )}
+                            </div>
                           </div>
-                        </div>
-                      ))}
+                        );
+                      })}
                     </div>
                   </div>
                 )}
@@ -1523,7 +1591,7 @@ export default function PayVerify() {
                           variant="outline"
                           className="rounded-xl"
                           disabled={busy}
-                          onClick={() => setNoteAction({ kind: 'adjustment', entry })}
+                          onClick={() => void openAdjustment(entry)}
                         >
                           Add adjustment
                         </Button>
@@ -1568,7 +1636,11 @@ export default function PayVerify() {
         <DialogContent
           className={cn(
             'rounded-2xl',
-            noteAction?.kind === 'rate' ? 'sm:max-w-[680px]' : 'sm:max-w-[420px]'
+            noteAction?.kind === 'rate'
+              ? 'sm:max-w-[680px]'
+              : noteAction?.kind === 'adjustment'
+                ? 'sm:max-w-[520px]'
+                : 'sm:max-w-[420px]'
           )}
         >
           <DialogHeader>
@@ -1885,9 +1957,18 @@ export default function PayVerify() {
                 <Label htmlFor="adj-type">Type</Label>
                 <Select
                   value={adjType}
-                  onValueChange={(v) =>
-                    setAdjType(v as 'advance' | 'deduction' | 'credit' | 'other')
-                  }
+                  onValueChange={(v) => {
+                    const next = v as PayVerifyAdjustmentType;
+                    setAdjType(next);
+                    if (next !== 'project_incentive') {
+                      setAdjProjectId('');
+                    } else if (
+                      adjProjects.length === 1 &&
+                      !adjProjectId
+                    ) {
+                      setAdjProjectId(adjProjects[0].id);
+                    }
+                  }}
                 >
                   <SelectTrigger id="adj-type" className="h-10 rounded-xl">
                     <SelectValue placeholder="Select type" />
@@ -1902,33 +1983,106 @@ export default function PayVerify() {
                     <SelectItem value="credit" className="rounded-lg">
                       Credit
                     </SelectItem>
+                    <SelectItem value="project_incentive" className="rounded-lg">
+                      Project incentive
+                    </SelectItem>
                     <SelectItem value="other" className="rounded-lg">
                       Other
                     </SelectItem>
                   </SelectContent>
                 </Select>
               </div>
+
+              {adjType === 'project_incentive' ? (
+                <div className="flex flex-col gap-2">
+                  <Label htmlFor="adj-project">Project</Label>
+                  {adjProjectsLoading ? (
+                    <div className="flex items-center gap-2 rounded-xl border border-border/70 px-3 py-2.5 text-sm text-muted-foreground">
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                      Loading assigned projects…
+                    </div>
+                  ) : adjProjectsError ? (
+                    <div className="rounded-xl border border-rose-200/70 bg-rose-50/60 px-3 py-2 text-xs text-rose-800 dark:border-rose-900/40 dark:bg-rose-950/30 dark:text-rose-200">
+                      {adjProjectsError}
+                    </div>
+                  ) : adjProjects.length === 0 ? (
+                    <div className="rounded-xl border border-dashed border-border/80 bg-muted/20 px-3 py-3 text-xs text-muted-foreground">
+                      No completed projects assigned to this employee. Incentives can only be added
+                      after a project is marked completed.
+                    </div>
+                  ) : (
+                    <Select value={adjProjectId || undefined} onValueChange={setAdjProjectId}>
+                      <SelectTrigger id="adj-project" className="h-10 rounded-xl">
+                        <SelectValue placeholder="Choose a completed project" />
+                      </SelectTrigger>
+                      <SelectContent position="popper" className="z-[120] rounded-xl">
+                        {adjProjects.map((project) => (
+                          <SelectItem
+                            key={project.id}
+                            value={project.id}
+                            className="rounded-lg"
+                          >
+                            <span className="flex min-w-0 items-center gap-2">
+                              <span className="truncate">{project.name}</span>
+                              <span className="shrink-0 text-[10px] uppercase tracking-wide text-emerald-600 dark:text-emerald-400">
+                                Completed
+                              </span>
+                            </span>
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  )}
+                  <p className="text-xs text-muted-foreground">
+                    Only completed projects this person is assigned to can receive an incentive.
+                  </p>
+                </div>
+              ) : null}
+
               <div className="flex flex-col gap-2">
                 <Label htmlFor="adj-amount">Amount (₹)</Label>
                 <Input
                   id="adj-amount"
                   inputMode="decimal"
                   value={adjAmount}
-                  onChange={(e) => setAdjAmount(e.target.value.replace(/[^\d.-]/g, '').slice(0, 12))}
+                  onChange={(e) =>
+                    setAdjAmount(
+                      e.target.value.replace(/[^\d.]/g, '').replace(/(\..*)\./g, '$1').slice(0, 12)
+                    )
+                  }
                   className="rounded-xl"
-                  placeholder="5200"
+                  placeholder={adjType === 'project_incentive' ? '2500' : '5200'}
                 />
-                <p className="text-xs text-muted-foreground">Advances and deductions reduce net pay.</p>
+                <p className="text-xs text-muted-foreground">
+                  {adjType === 'project_incentive' || adjType === 'credit'
+                    ? 'Adds to net pay.'
+                    : adjType === 'advance' || adjType === 'deduction'
+                      ? 'Reduces net pay.'
+                      : 'Use a positive amount; sign follows the type.'}
+                </p>
               </div>
+
               <div className="flex flex-col gap-2">
-                <Label htmlFor="adj-reason">Reason</Label>
+                <Label htmlFor="adj-reason">
+                  {adjType === 'project_incentive' ? 'Note (optional)' : 'Reason'}
+                </Label>
                 <Input
                   id="adj-reason"
                   value={adjReason}
                   maxLength={500}
                   onChange={(e) => setAdjReason(e.target.value.slice(0, 500))}
                   className="rounded-xl"
+                  placeholder={
+                    adjType === 'project_incentive'
+                      ? 'e.g. Milestone bonus, client appreciation…'
+                      : 'Why this adjustment?'
+                  }
                 />
+                {adjType === 'project_incentive' ? (
+                  <p className="text-xs text-muted-foreground">
+                    Project name is stored automatically. Add a short note only if needed.
+                  </p>
+                ) : null}
               </div>
             </div>
           ) : (
@@ -1966,7 +2120,14 @@ export default function PayVerify() {
                 (noteAction?.kind === 'rate' &&
                   (!rateValue.trim() ||
                     Number(rateValue) < 0 ||
-                    !/^\d{4}-\d{2}-\d{2}$/.test(rateEffectiveFrom)))
+                    !/^\d{4}-\d{2}-\d{2}$/.test(rateEffectiveFrom))) ||
+                (noteAction?.kind === 'adjustment' &&
+                  (!adjAmount.trim() ||
+                    !Number.isFinite(Number(adjAmount)) ||
+                    Number(adjAmount) === 0 ||
+                    (adjType === 'project_incentive'
+                      ? !adjProjectId || adjProjectsLoading
+                      : !adjReason.trim())))
               }
               onClick={() => void submitNoteAction()}
             >
@@ -1974,6 +2135,8 @@ export default function PayVerify() {
                 <Loader2 className="h-4 w-4 animate-spin" />
               ) : noteAction?.kind === 'rate' ? (
                 editingRateId ? 'Update hike' : 'Save hike'
+              ) : noteAction?.kind === 'adjustment' && adjType === 'project_incentive' ? (
+                'Add incentive'
               ) : (
                 'Confirm'
               )}
@@ -1993,7 +2156,11 @@ export default function PayVerify() {
             <AlertDialogTitle>Remove adjustment?</AlertDialogTitle>
             <AlertDialogDescription>
               {adjustmentToDelete
-                ? `${adjustmentToDelete.type}: ${adjustmentToDelete.reason} (${formatInr(adjustmentToDelete.amount)}). This cannot be undone.`
+                ? `${adjustmentTypeLabel(adjustmentToDelete.type)}${
+                    adjustmentToDelete.project_name
+                      ? ` · ${adjustmentToDelete.project_name}`
+                      : ''
+                  }: ${adjustmentToDelete.reason || '—'} (${formatInr(adjustmentToDelete.amount)}). This cannot be undone.`
                 : null}
             </AlertDialogDescription>
           </AlertDialogHeader>

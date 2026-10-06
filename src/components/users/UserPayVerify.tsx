@@ -15,6 +15,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { extractApiErrorMessage } from '@/lib/apiError';
 import { cn } from '@/lib/utils';
 import {
+  adjustmentTypeLabel,
   canShiftYearMonth,
   clampYearMonth,
   defaultPayVerifyYearMonth,
@@ -487,21 +488,36 @@ export function UserPayVerify({ userId, isAdmin = false, isSelf = false }: Props
                 Adjustments
               </p>
               <div className="flex flex-col gap-2">
-                {m.adjustments!.map((adj) => (
-                  <div
-                    key={adj.id}
-                    className="grid grid-cols-12 items-center gap-2 text-sm"
-                  >
-                    <span className="col-span-8 truncate text-muted-foreground sm:col-span-9">
-                      <span className="font-medium capitalize text-foreground">{adj.type}</span>
-                      {': '}
-                      {adj.reason}
-                    </span>
-                    <span className="col-span-4 text-right font-semibold tabular-nums sm:col-span-3">
-                      {formatInr(adj.amount)}
-                    </span>
-                  </div>
-                ))}
+                {m.adjustments!.map((adj) => {
+                  const isIncentive = adj.type === 'project_incentive';
+                  const title = isIncentive
+                    ? `Project incentive${adj.project_name ? ` · ${adj.project_name}` : ''}`
+                    : adjustmentTypeLabel(adj.type);
+                  const note = isIncentive
+                    ? (adj.reason || '').includes(' — ')
+                      ? (adj.reason || '').split(' — ').slice(1).join(' — ').trim()
+                      : ''
+                    : adj.reason || '';
+                  return (
+                    <div
+                      key={adj.id}
+                      className="grid grid-cols-12 items-center gap-2 text-sm"
+                    >
+                      <span className="col-span-8 truncate text-muted-foreground sm:col-span-9">
+                        <span className="font-medium text-foreground">{title}</span>
+                        {note ? (
+                          <>
+                            {': '}
+                            {note}
+                          </>
+                        ) : null}
+                      </span>
+                      <span className="col-span-4 text-right font-semibold tabular-nums sm:col-span-3">
+                        {formatInr(adj.amount)}
+                      </span>
+                    </div>
+                  );
+                })}
               </div>
             </div>
           )}

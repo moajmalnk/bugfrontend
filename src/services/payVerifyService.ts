@@ -32,14 +32,31 @@ export type PayVerifyWeek = {
   attendance_days?: Array<Record<string, unknown>>;
 };
 
+export type PayVerifyAdjustmentType =
+  | 'advance'
+  | 'deduction'
+  | 'credit'
+  | 'other'
+  | 'project_incentive';
+
 export type PayVerifyAdjustment = {
   id: string;
   month_verification_id?: string;
-  type: 'advance' | 'deduction' | 'credit' | 'other';
+  type: PayVerifyAdjustmentType;
   amount: number | string;
   reason: string;
+  project_id?: string | null;
+  project_name?: string | null;
+  project_status?: string | null;
   created_by?: string | null;
   created_at?: string;
+};
+
+export type PayVerifyIncentiveProject = {
+  id: string;
+  name: string;
+  status?: string | null;
+  member_role?: string | null;
 };
 
 export type PayVerifyMonth = {
@@ -457,15 +474,44 @@ export async function deleteHourlyRate(id: string): Promise<{
 export async function addMonthAdjustment(payload: {
   user_id: string;
   month: string;
-  type: 'advance' | 'deduction' | 'credit' | 'other';
+  type: PayVerifyAdjustmentType;
   amount: number;
   reason: string;
+  project_id?: string | null;
 }): Promise<{ month: PayVerifyMonth }> {
   return postJson(`${baseUrl()}?action=adjustment`, payload);
 }
 
 export async function deleteMonthAdjustment(id: string): Promise<{ month: PayVerifyMonth }> {
   return postJson(`${baseUrl()}?action=delete-adjustment`, { id });
+}
+
+/** Why: Project incentives must pick from projects this employee is assigned to. */
+export async function fetchPayVerifyUserProjects(
+  userId: string
+): Promise<PayVerifyIncentiveProject[]> {
+  const data = await getJson<{ projects?: PayVerifyIncentiveProject[] }>(
+    `${baseUrl()}?action=user-projects&user_id=${encodeURIComponent(userId)}`
+  );
+  return data.projects ?? [];
+}
+
+/** Why: Human labels for payroll adjustment types (not raw enum strings). */
+export function adjustmentTypeLabel(type: string): string {
+  switch (type) {
+    case 'project_incentive':
+      return 'Project incentive';
+    case 'advance':
+      return 'Advance';
+    case 'deduction':
+      return 'Deduction';
+    case 'credit':
+      return 'Credit';
+    case 'other':
+      return 'Other';
+    default:
+      return type.replace(/_/g, ' ');
+  }
 }
 
 export async function seedPayVerifyRates(): Promise<{ inserted: number }> {
