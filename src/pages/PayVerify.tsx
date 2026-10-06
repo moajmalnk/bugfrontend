@@ -979,7 +979,7 @@ export default function PayVerify() {
             const self = isSelf(entry);
             const monthLocked = m.admin_status === 'approved';
             const displayName = entry.user.name || entry.user.username;
-            const open = expandedId === entry.user.id || filteredRoster.length === 1;
+            const open = expandedId === entry.user.id;
             const weeksUserDone = entry.weeks.filter((w) => w.employee_status === 'verified').length;
             const weeksAdminDone = entry.weeks.filter((w) => w.admin_status === 'approved').length;
             const userMonthLabel = employeeMonthVerifyLabel(m);
@@ -1092,17 +1092,33 @@ export default function PayVerify() {
                       {entry.weeks.map((week) => {
                         const periodState = payVerifyPeriodState(week.week_start, week.week_end);
                         const weekCompletable = canVerifyWeekPeriod(week);
-                        const periodHint = payVerifyPeriodHint(periodState, week.week_end);
+                        const needsCorrection =
+                          week.employee_status === 'correction_needed' ||
+                          week.admin_status === 'correction_requested';
+                        const correctionNote =
+                          (week.admin_status === 'correction_requested'
+                            ? week.admin_note
+                            : week.employee_note) ||
+                          week.employee_note ||
+                          week.admin_note ||
+                          null;
+                        const periodHint = needsCorrection
+                          ? week.admin_status === 'correction_requested'
+                            ? 'Admin requested a fix — re-verify after updating attendance'
+                            : 'Flagged for correction — fix attendance, then re-verify'
+                          : payVerifyPeriodHint(periodState, week.week_end);
                         return (
                           <div
                             key={week.week_start}
                             className={cn(
                               'flex flex-col gap-2 rounded-xl border px-3 py-2.5 sm:flex-row sm:items-center sm:justify-between',
-                              periodState === 'upcoming'
-                                ? 'border-dashed border-gray-200/80 bg-muted/20 dark:border-gray-700'
-                                : periodState === 'in_progress'
-                                  ? 'border-sky-200/80 bg-sky-50/40 dark:border-sky-900/40 dark:bg-sky-950/20'
-                                  : 'border-gray-200/80 bg-white dark:border-gray-700 dark:bg-gray-900/80'
+                              needsCorrection
+                                ? 'border-amber-300/80 bg-amber-50/50 dark:border-amber-800/50 dark:bg-amber-950/25'
+                                : periodState === 'upcoming'
+                                  ? 'border-dashed border-gray-200/80 bg-muted/20 dark:border-gray-700'
+                                  : periodState === 'in_progress'
+                                    ? 'border-sky-200/80 bg-sky-50/40 dark:border-sky-900/40 dark:bg-sky-950/20'
+                                    : 'border-gray-200/80 bg-white dark:border-gray-700 dark:bg-gray-900/80'
                             )}
                           >
                             <div className="min-w-0">
@@ -1110,7 +1126,11 @@ export default function PayVerify() {
                                 <p className="text-sm font-medium text-foreground">
                                   {shortWeek(week.week_start, week.week_end)}
                                 </p>
-                                {periodState !== 'completed' ? (
+                                {needsCorrection ? (
+                                  <span className="rounded-lg bg-amber-100 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-amber-900 dark:bg-amber-950/60 dark:text-amber-200">
+                                    Correction
+                                  </span>
+                                ) : periodState !== 'completed' ? (
                                   <span
                                     className={cn(
                                       'rounded-lg px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide',
@@ -1127,7 +1147,21 @@ export default function PayVerify() {
                                 {formatHours(week.worked_hours)} worked · leave {week.leave_days ?? 0}d · OT{' '}
                                 {formatHours(week.ot_hours)}
                               </p>
-                              <p className="mt-0.5 text-[11px] text-muted-foreground">{periodHint}</p>
+                              <p
+                                className={cn(
+                                  'mt-0.5 text-[11px]',
+                                  needsCorrection
+                                    ? 'font-medium text-amber-800 dark:text-amber-200'
+                                    : 'text-muted-foreground'
+                                )}
+                              >
+                                {periodHint}
+                              </p>
+                              {correctionNote ? (
+                                <p className="mt-1 line-clamp-3 text-[11px] text-amber-900/90 dark:text-amber-100/90">
+                                  Note: {correctionNote}
+                                </p>
+                              ) : null}
                               <div className="mt-1.5">
                                 <VerifyRoleBadges
                                   userLabel={employeeWeekVerifyLabel(week)}
