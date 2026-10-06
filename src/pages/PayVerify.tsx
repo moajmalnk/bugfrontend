@@ -4,11 +4,14 @@ import {
   AlertTriangle,
   Banknote,
   Calendar,
+  Check,
   CheckCircle2,
   ChevronLeft,
   ChevronRight,
   CircleDashed,
+  Copy,
   IndianRupee,
+  Landmark,
   Loader2,
   Lock,
   Pencil,
@@ -57,6 +60,10 @@ import { useAuth } from '@/context/AuthContext';
 import { extractApiErrorMessage } from '@/lib/apiError';
 import { cn } from '@/lib/utils';
 import { notifyAdminNavCountsChanged } from '@/services/adminNavCountsService';
+import {
+  onboardingService,
+  type UserOnboardingDetails,
+} from '@/services/onboardingService';
 import { PayVerifyPendingBanner } from '@/components/attendance/PayVerifyPendingBanner';
 import {
   ListPageTabTrigger,
@@ -244,6 +251,105 @@ function weekDotTone(week: PayVerifyWeek): string {
   return 'bg-gray-400 dark:bg-gray-500';
 }
 
+type BankDetailsView = Pick<
+  UserOnboardingDetails,
+  | 'account_holder_name'
+  | 'bank_name'
+  | 'account_number'
+  | 'ifsc_code'
+  | 'branch_name'
+  | 'account_type'
+  | 'upi_id'
+  | 'upi_linked_phone'
+>;
+
+function pickBankDetails(details: UserOnboardingDetails | null | undefined): BankDetailsView | null {
+  if (!details) return null;
+  const hasAny = [
+    details.account_holder_name,
+    details.bank_name,
+    details.account_number,
+    details.ifsc_code,
+    details.branch_name,
+    details.account_type,
+    details.upi_id,
+    details.upi_linked_phone,
+  ].some((v) => String(v || '').trim());
+  if (!hasAny) return null;
+  return {
+    account_holder_name: details.account_holder_name ?? null,
+    bank_name: details.bank_name ?? null,
+    account_number: details.account_number ?? null,
+    ifsc_code: details.ifsc_code ?? null,
+    branch_name: details.branch_name ?? null,
+    account_type: details.account_type ?? null,
+    upi_id: details.upi_id ?? null,
+    upi_linked_phone: details.upi_linked_phone ?? null,
+  };
+}
+
+function BankDetailRow({
+  label,
+  value,
+  mono,
+  copyable,
+}: {
+  label: string;
+  value?: string | null;
+  mono?: boolean;
+  copyable?: boolean;
+}) {
+  const [copied, setCopied] = useState(false);
+  const text = String(value || '').trim();
+  if (!text) return null;
+
+  const copy = async () => {
+    try {
+      await navigator.clipboard.writeText(text);
+      setCopied(true);
+      window.setTimeout(() => setCopied(false), 1500);
+    } catch {
+      toast({ title: 'Could not copy', variant: 'destructive' });
+    }
+  };
+
+  return (
+    <div className="col-span-12 rounded-xl border border-border/70 bg-muted/30 px-3 py-2.5 sm:col-span-6">
+      <div className="flex items-start justify-between gap-2">
+        <div className="min-w-0">
+          <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+            {label}
+          </p>
+          <p
+            className={cn(
+              'mt-0.5 break-all text-sm font-medium text-foreground',
+              mono && 'font-mono tabular-nums tracking-wide'
+            )}
+          >
+            {text}
+          </p>
+        </div>
+        {copyable ? (
+          <Button
+            type="button"
+            size="sm"
+            variant="ghost"
+            className="h-8 w-8 shrink-0 rounded-xl p-0"
+            title={`Copy ${label}`}
+            onClick={() => void copy()}
+          >
+            {copied ? (
+              <Check className="h-3.5 w-3.5 text-emerald-600" />
+            ) : (
+              <Copy className="h-3.5 w-3.5" />
+            )}
+          </Button>
+        ) : null}
+      </div>
+    </div>
+  );
+}
+
 function RosterCardSkeleton() {
   return (
     <div className="rounded-2xl border border-gray-200/60 bg-white/80 p-5 dark:border-gray-700/60 dark:bg-gray-900/80 sm:p-6">
@@ -298,6 +404,10 @@ export default function PayVerify() {
   const [adjustmentToDelete, setAdjustmentToDelete] = useState<PayVerifyAdjustment | null>(null);
   const [rateToDelete, setRateToDelete] = useState<PayVerifyRateHistoryItem | null>(null);
   const [editingRateId, setEditingRateId] = useState<string | null>(null);
+  const [bankEntry, setBankEntry] = useState<PayVerifyRosterEntry | null>(null);
+  const [bankDetails, setBankDetails] = useState<BankDetailsView | null>(null);
+  const [bankLoading, setBankLoading] = useState(false);
+  const [bankError, setBankError] = useState<string | null>(null);
 
   const setMonth = (ym: string) => {
     const next = new URLSearchParams(searchParams);
@@ -457,6 +567,29 @@ export default function PayVerify() {
       setRateHistory([]);
     } finally {
       setRateHistoryLoading(false);
+    }
+  };
+
+  const closeBankDetails = () => {
+    setBankEntry(null);
+    setBankDetails(null);
+    setBankError(null);
+    setBankLoading(false);
+  };
+
+  const openBankDetails = async (entry: PayVerifyRosterEntry) => {
+    setBankEntry(entry);
+    setBankDetails(null);
+    setBankError(null);
+    setBankLoading(true);
+    try {
+      const res = await onboardingService.get(entry.user.id);
+      setBankDetails(pickBankDetails(res?.details ?? null));
+    } catch (e) {
+      setBankError(extractApiErrorMessage(e) || 'Could not load bank details');
+      setBankDetails(null);
+    } finally {
+      setBankLoading(false);
     }
   };
 
@@ -1369,6 +1502,16 @@ export default function PayVerify() {
                         variant="outline"
                         className="rounded-xl gap-1.5"
                         disabled={busy}
+                        onClick={() => void openBankDetails(entry)}
+                      >
+                        <Landmark className="h-3.5 w-3.5" />
+                        Bank details
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        className="rounded-xl gap-1.5"
+                        disabled={busy}
                         onClick={() => void openSalaryHike(entry)}
                       >
                         <TrendingUp className="h-3.5 w-3.5" />
@@ -1945,6 +2088,83 @@ export default function PayVerify() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <Dialog
+        open={!!bankEntry}
+        onOpenChange={(open) => {
+          if (!open && !bankLoading) closeBankDetails();
+        }}
+      >
+        <DialogContent className="max-w-[600px] rounded-2xl">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Landmark className="h-4 w-4 text-muted-foreground" />
+              Bank details
+            </DialogTitle>
+            <DialogDescription>
+              {bankEntry
+                ? `${bankEntry.user.name || bankEntry.user.username} · @${bankEntry.user.username}`
+                : 'Salary payout account'}
+            </DialogDescription>
+          </DialogHeader>
+
+          {bankLoading ? (
+            <div className="grid grid-cols-12 gap-3 py-2">
+              {Array.from({ length: 6 }).map((_, i) => (
+                <Skeleton key={i} className="col-span-12 h-16 rounded-xl sm:col-span-6" />
+              ))}
+            </div>
+          ) : bankError ? (
+            <div className="rounded-xl border border-rose-200/70 bg-rose-50/60 px-3 py-3 text-sm text-rose-800 dark:border-rose-900/40 dark:bg-rose-950/30 dark:text-rose-200">
+              {bankError}
+            </div>
+          ) : !bankDetails ? (
+            <div className="rounded-xl border border-dashed border-border/80 bg-muted/20 px-3 py-6 text-center text-sm text-muted-foreground">
+              No bank details on file for this employee yet.
+            </div>
+          ) : (
+            <div className="grid grid-cols-12 gap-3">
+              <BankDetailRow label="Account holder" value={bankDetails.account_holder_name} />
+              <BankDetailRow label="Bank" value={bankDetails.bank_name} />
+              <BankDetailRow
+                label="Account number"
+                value={bankDetails.account_number}
+                mono
+                copyable
+              />
+              <BankDetailRow label="IFSC" value={bankDetails.ifsc_code} mono copyable />
+              <BankDetailRow label="Branch" value={bankDetails.branch_name} />
+              <BankDetailRow
+                label="Account type"
+                value={
+                  bankDetails.account_type
+                    ? String(bankDetails.account_type).replace(/_/g, ' ')
+                    : null
+                }
+              />
+              <BankDetailRow label="UPI ID" value={bankDetails.upi_id} mono copyable />
+              <BankDetailRow
+                label="UPI phone"
+                value={bankDetails.upi_linked_phone}
+                mono
+                copyable
+              />
+            </div>
+          )}
+
+          <DialogFooter>
+            <Button
+              type="button"
+              variant="outline"
+              className="rounded-xl"
+              disabled={bankLoading}
+              onClick={closeBankDetails}
+            >
+              Close
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
