@@ -22,9 +22,11 @@ import {
   formatHours,
   formatInr,
   formatYearMonthLabel,
-  monthStatusLabel,
+  employeeMonthVerifyLabel,
+  adminMonthVerifyLabel,
+  employeeWeekVerifyLabel,
+  adminWeekVerifyLabel,
   shiftYearMonth,
-  weekStatusLabel,
   type PayVerifyUserMonthResponse,
   type PayVerifyWeek,
 } from '@/services/payVerifyService';
@@ -51,13 +53,25 @@ function shortWeekRange(weekStart: string, weekEnd: string): string {
 
 function statusTone(label: string): string {
   const l = label.toLowerCase();
-  if (l === 'paid' || l === 'done' || l.includes('locked') || l.includes('approved')) {
+  if (
+    l === 'paid' ||
+    l === 'done' ||
+    l === 'verified' ||
+    l === 'approved' ||
+    l.includes('locked')
+  ) {
     return 'border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-300';
   }
   if (l === 'correction' || l.includes('correction')) {
     return 'border-amber-200 bg-amber-50 text-amber-800 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-300';
   }
-  if (l === 'ready to pay' || l === 'completed' || l === 'reviewed' || l.includes('awaiting')) {
+  if (
+    l === 'ready to pay' ||
+    l === 'completed' ||
+    l === 'reviewed' ||
+    l === 'awaiting' ||
+    l.includes('awaiting')
+  ) {
     return 'border-sky-200 bg-sky-50 text-sky-800 dark:border-sky-800 dark:bg-sky-950/40 dark:text-sky-300';
   }
   return 'border-gray-200 bg-gray-50 text-gray-600 dark:border-gray-700 dark:bg-gray-800/60 dark:text-gray-300';
@@ -65,7 +79,7 @@ function statusTone(label: string): string {
 
 function StatusBadge({ label }: { label: string }) {
   const l = label.toLowerCase();
-  const isPaid = l === 'paid' || l === 'done';
+  const isOk = l === 'paid' || l === 'done' || l === 'verified' || l === 'approved';
   const isPending = l === 'pending';
   return (
     <span
@@ -74,7 +88,7 @@ function StatusBadge({ label }: { label: string }) {
         statusTone(label)
       )}
     >
-      {isPaid ? (
+      {isOk ? (
         <CheckCircle2 className="h-3 w-3 shrink-0" aria-hidden />
       ) : isPending ? (
         <CircleDashed className="h-3 w-3 shrink-0" aria-hidden />
@@ -151,13 +165,14 @@ export function UserPayVerify({ userId, isAdmin = false, isSelf = false }: Props
     data?.rate_info?.current_rate ?? m?.hourly_rate_used ?? m?.hourly_rate ?? 0
   );
   const rateSince = data?.rate_info?.effective_from ?? null;
-  const monthLabel = m ? monthStatusLabel(m) : '';
+  const userMonthLabel = m ? employeeMonthVerifyLabel(m) : 'Pending';
+  const adminMonthLabel = m ? adminMonthVerifyLabel(m) : 'Pending';
 
-  const weeksVerified = useMemo(() => {
-    const weeks = data?.weeks ?? [];
-    return weeks.filter(
-      (w) => w.employee_status === 'verified' || w.admin_status === 'approved'
-    ).length;
+  const weeksUserDone = useMemo(() => {
+    return (data?.weeks ?? []).filter((w) => w.employee_status === 'verified').length;
+  }, [data?.weeks]);
+  const weeksAdminDone = useMemo(() => {
+    return (data?.weeks ?? []).filter((w) => w.admin_status === 'approved').length;
   }, [data?.weeks]);
 
   const metrics = m
@@ -312,31 +327,44 @@ export function UserPayVerify({ userId, isAdmin = false, isSelf = false }: Props
             <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border/80 bg-muted/25 px-4 py-3">
               <div className="min-w-0">
                 <p className="text-sm font-semibold text-foreground">Weekly verification</p>
-                <p className="text-xs text-muted-foreground">
-                  {weeksVerified}/{data?.weeks?.length ?? 0} weeks verified · Mon–Sat overlapping{' '}
-                  {monthTitle(month)}
+                <p className="text-xs tabular-nums text-muted-foreground">
+                  User {weeksUserDone}/{data?.weeks?.length ?? 0} verified
+                  <span className="mx-1.5 text-border">·</span>
+                  Admin {weeksAdminDone}/{data?.weeks?.length ?? 0} approved
                 </p>
               </div>
-              <StatusBadge label={monthLabel} />
+              <div className="flex flex-wrap gap-1.5">
+                <div className="inline-flex items-center gap-1.5 rounded-xl border border-border/70 bg-background/80 px-2 py-1">
+                  <span className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+                    User
+                  </span>
+                  <StatusBadge label={userMonthLabel} />
+                </div>
+                <div className="inline-flex items-center gap-1.5 rounded-xl border border-border/70 bg-background/80 px-2 py-1">
+                  <span className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+                    Admin
+                  </span>
+                  <StatusBadge label={adminMonthLabel} />
+                </div>
+              </div>
             </div>
 
             {/* Column headers (desktop) */}
             <div className="hidden grid-cols-12 gap-3 border-b border-border/60 bg-muted/10 px-4 py-2 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground sm:grid">
-              <div className="col-span-5">Week</div>
+              <div className="col-span-4">Week</div>
               <div className="col-span-2 text-right">Hours</div>
               <div className="col-span-2 text-right">Leave</div>
-              <div className="col-span-3 text-right">Status</div>
+              <div className="col-span-4 text-right">User / Admin</div>
             </div>
 
             <div className="divide-y divide-border/60">
               {(data?.weeks ?? []).map((week) => {
-                const label = weekStatusLabel(week);
                 return (
                   <div
                     key={week.week_start}
                     className="grid grid-cols-12 items-center gap-2 px-4 py-3 sm:gap-3"
                   >
-                    <div className="col-span-12 flex min-w-0 items-center gap-2 sm:col-span-5">
+                    <div className="col-span-12 flex min-w-0 items-center gap-2 sm:col-span-4">
                       <span className={cn('h-2 w-2 shrink-0 rounded-full', weekDot(week))} />
                       <div className="min-w-0">
                         <p className="truncate text-sm font-medium text-foreground">
@@ -353,8 +381,19 @@ export function UserPayVerify({ userId, isAdmin = false, isSelf = false }: Props
                     <div className="col-span-4 hidden text-right text-sm tabular-nums text-muted-foreground sm:col-span-2 sm:block">
                       {week.leave_days ?? 0}d
                     </div>
-                    <div className="col-span-12 flex justify-end sm:col-span-3">
-                      <StatusBadge label={label} />
+                    <div className="col-span-12 flex flex-wrap justify-end gap-1.5 sm:col-span-4">
+                      <div className="inline-flex items-center gap-1 rounded-xl border border-border/60 px-1.5 py-0.5">
+                        <span className="text-[9px] font-semibold uppercase text-muted-foreground">
+                          User
+                        </span>
+                        <StatusBadge label={employeeWeekVerifyLabel(week)} />
+                      </div>
+                      <div className="inline-flex items-center gap-1 rounded-xl border border-border/60 px-1.5 py-0.5">
+                        <span className="text-[9px] font-semibold uppercase text-muted-foreground">
+                          Admin
+                        </span>
+                        <StatusBadge label={adminWeekVerifyLabel(week)} />
+                      </div>
                     </div>
                   </div>
                 );

@@ -413,6 +413,20 @@ export function weekStatusLabel(week: PayVerifyWeek): string {
   return 'Pending';
 }
 
+/** Why: Cards show employee vs admin progress separately — not one blended status. */
+export function employeeWeekVerifyLabel(week: PayVerifyWeek): string {
+  if (week.employee_status === 'verified') return 'Verified';
+  if (week.employee_status === 'correction_needed') return 'Correction';
+  return 'Pending';
+}
+
+export function adminWeekVerifyLabel(week: PayVerifyWeek): string {
+  if (week.admin_status === 'approved') return 'Approved';
+  if (week.admin_status === 'correction_requested') return 'Correction';
+  if (week.employee_status === 'verified') return 'Awaiting';
+  return 'Pending';
+}
+
 /**
  * Why: Payments UI should read as Pending → Ready to pay → Paid (not internal verify jargon).
  */
@@ -422,5 +436,18 @@ export function monthStatusLabel(month: PayVerifyMonth): string {
     return 'Correction';
   }
   if (month.employee_status === 'verified') return 'Completed';
+  return 'Pending';
+}
+
+export function employeeMonthVerifyLabel(month: PayVerifyMonth): string {
+  if (month.employee_status === 'verified') return 'Verified';
+  if (month.employee_status === 'correction_needed') return 'Correction';
+  return 'Pending';
+}
+
+export function adminMonthVerifyLabel(month: PayVerifyMonth): string {
+  if (month.admin_status === 'approved') return 'Paid';
+  if (month.admin_status === 'correction_requested') return 'Correction';
+  if (month.employee_status === 'verified') return 'Awaiting';
   return 'Pending';
 }

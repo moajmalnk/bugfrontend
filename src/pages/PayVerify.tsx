@@ -78,12 +78,14 @@ import {
   formatHours,
   formatInr,
   formatYearMonthLabel,
-  monthStatusLabel,
+  employeeMonthVerifyLabel,
+  adminMonthVerifyLabel,
+  employeeWeekVerifyLabel,
+  adminWeekVerifyLabel,
   seedPayVerifyRates,
   seedSeptemberAdjustments,
   setHourlyRate,
   shiftYearMonth,
-  weekStatusLabel,
   type PayVerifyAdjustment,
   type PayVerifyMonthResponse,
   type PayVerifyRateHistoryItem,
@@ -145,9 +147,25 @@ type Tone = 'ok' | 'warn' | 'info' | 'muted' | 'danger';
 
 function statusTone(label: string): Tone {
   const l = label.toLowerCase();
-  if (l === 'paid' || l === 'done' || l.includes('locked') || l.includes('approved')) return 'ok';
+  if (
+    l === 'paid' ||
+    l === 'done' ||
+    l === 'verified' ||
+    l === 'approved' ||
+    l.includes('locked')
+  ) {
+    return 'ok';
+  }
   if (l === 'correction' || l.includes('correction')) return 'warn';
-  if (l === 'completed' || l === 'ready to pay' || l === 'reviewed' || l.includes('awaiting')) return 'info';
+  if (
+    l === 'completed' ||
+    l === 'ready to pay' ||
+    l === 'reviewed' ||
+    l === 'awaiting' ||
+    l.includes('awaiting')
+  ) {
+    return 'info';
+  }
   if (l === 'pending') return 'muted';
   return 'muted';
 }
@@ -162,6 +180,7 @@ const TONE_CLASS: Record<Tone, string> = {
 
 function StatusPill({ label, className }: { label: string; className?: string }) {
   const tone = statusTone(label);
+  const lower = label.toLowerCase();
   return (
     <span
       className={cn(
@@ -172,11 +191,43 @@ function StatusPill({ label, className }: { label: string; className?: string })
     >
       {tone === 'ok' ? (
         <CheckCircle2 className="h-3 w-3 shrink-0" aria-hidden />
-      ) : tone === 'muted' && label.toLowerCase() === 'pending' ? (
+      ) : tone === 'muted' && lower === 'pending' ? (
         <CircleDashed className="h-3 w-3 shrink-0" aria-hidden />
       ) : null}
       {label}
     </span>
+  );
+}
+
+function VerifyRoleBadges({
+  userLabel,
+  adminLabel,
+  align = 'end',
+}: {
+  userLabel: string;
+  adminLabel: string;
+  align?: 'start' | 'end';
+}) {
+  return (
+    <div
+      className={cn(
+        'flex flex-wrap gap-1.5',
+        align === 'end' ? 'justify-end' : 'justify-start'
+      )}
+    >
+      <div className="inline-flex items-center gap-1.5 rounded-xl border border-border/70 bg-background/80 px-2 py-1">
+        <span className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+          User
+        </span>
+        <StatusPill label={userLabel} className="border-0 bg-transparent px-1.5 py-0" />
+      </div>
+      <div className="inline-flex items-center gap-1.5 rounded-xl border border-border/70 bg-background/80 px-2 py-1">
+        <span className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+          Admin
+        </span>
+        <StatusPill label={adminLabel} className="border-0 bg-transparent px-1.5 py-0" />
+      </div>
+    </div>
   );
 }
 
@@ -903,7 +954,6 @@ export default function PayVerify() {
         <div className="grid grid-cols-12 gap-4">
           {filteredRoster.map((entry) => {
             const m = entry.month;
-            const monthLabel = monthStatusLabel(m);
             const rate = Number(
               entry.rate_info?.current_rate ?? m.hourly_rate_used ?? m.hourly_rate ?? 0
             );
@@ -913,7 +963,10 @@ export default function PayVerify() {
             const monthLocked = m.admin_status === 'approved';
             const displayName = entry.user.name || entry.user.username;
             const open = expandedId === entry.user.id || filteredRoster.length === 1;
-            const weeksVerified = entry.weeks.filter((w) => w.employee_status === 'verified' || w.admin_status === 'approved').length;
+            const weeksUserDone = entry.weeks.filter((w) => w.employee_status === 'verified').length;
+            const weeksAdminDone = entry.weeks.filter((w) => w.admin_status === 'approved').length;
+            const userMonthLabel = employeeMonthVerifyLabel(m);
+            const adminMonthLabel = adminMonthVerifyLabel(m);
 
             return (
               <article
@@ -936,7 +989,7 @@ export default function PayVerify() {
                       </p>
                     </div>
                   </div>
-                  <StatusPill label={monthLabel} />
+                  <VerifyRoleBadges userLabel={userMonthLabel} adminLabel={adminMonthLabel} />
                 </div>
 
                 {/* Metrics */}
@@ -976,10 +1029,17 @@ export default function PayVerify() {
 
                 {/* Week timeline */}
                 <div className="rounded-xl border border-gray-200/70 bg-gray-50/50 p-3 dark:border-gray-800 dark:bg-gray-800/30">
-                  <div className="mb-2 flex items-center justify-between gap-2">
-                    <p className="text-xs font-semibold text-muted-foreground">
-                      Weeks in {monthTitle(month)} · {weeksVerified}/{entry.weeks.length} verified
-                    </p>
+                  <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+                    <div className="min-w-0">
+                      <p className="text-xs font-semibold text-muted-foreground">
+                        Weeks in {monthTitle(month)}
+                      </p>
+                      <p className="mt-0.5 text-[11px] tabular-nums text-muted-foreground">
+                        User {weeksUserDone}/{entry.weeks.length} verified
+                        <span className="mx-1.5 text-border">·</span>
+                        Admin {weeksAdminDone}/{entry.weeks.length} approved
+                      </p>
+                    </div>
                     <Button
                       type="button"
                       variant="ghost"
@@ -996,7 +1056,7 @@ export default function PayVerify() {
                     {entry.weeks.map((week) => (
                       <div
                         key={week.week_start}
-                        title={`${shortWeek(week.week_start, week.week_end)} · ${weekStatusLabel(week)}`}
+                        title={`${shortWeek(week.week_start, week.week_end)} · User ${employeeWeekVerifyLabel(week)} · Admin ${adminWeekVerifyLabel(week)}`}
                         className="inline-flex items-center gap-1.5 rounded-xl border border-gray-200 bg-white px-2 py-1 text-[11px] dark:border-gray-700 dark:bg-gray-900"
                       >
                         <span className={cn('h-2 w-2 rounded-full', weekDotTone(week))} />
@@ -1008,7 +1068,6 @@ export default function PayVerify() {
                   {open && (
                     <div className="mt-3 flex flex-col gap-2">
                       {entry.weeks.map((week) => {
-                        const wLabel = weekStatusLabel(week);
                         return (
                           <div
                             key={week.week_start}
@@ -1022,9 +1081,15 @@ export default function PayVerify() {
                                 {formatHours(week.worked_hours)} worked · leave {week.leave_days ?? 0}d · OT{' '}
                                 {formatHours(week.ot_hours)}
                               </p>
+                              <div className="mt-1.5">
+                                <VerifyRoleBadges
+                                  userLabel={employeeWeekVerifyLabel(week)}
+                                  adminLabel={adminWeekVerifyLabel(week)}
+                                  align="start"
+                                />
+                              </div>
                             </div>
                             <div className="flex flex-wrap items-center gap-2">
-                              <StatusPill label={wLabel} />
                               {(self || isAdmin) &&
                                 week.employee_status !== 'verified' &&
                                 week.admin_status !== 'approved' && (
@@ -1044,7 +1109,7 @@ export default function PayVerify() {
                                       }
                                     >
                                       <CheckCircle2 className="mr-1 h-3.5 w-3.5" />
-                                      Verify
+                                      User verify
                                     </Button>
                                     <Button
                                       type="button"
@@ -1061,7 +1126,7 @@ export default function PayVerify() {
                                         })
                                       }
                                     >
-                                      Correction
+                                      User correction
                                     </Button>
                                   </>
                                 )}
@@ -1083,7 +1148,7 @@ export default function PayVerify() {
                                         })
                                       }
                                     >
-                                      Approve
+                                      Admin approve
                                     </Button>
                                     <Button
                                       type="button"
@@ -1100,7 +1165,7 @@ export default function PayVerify() {
                                         })
                                       }
                                     >
-                                      Request fix
+                                      Admin fix
                                     </Button>
                                   </>
                                 )}
