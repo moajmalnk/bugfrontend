@@ -198,6 +198,7 @@ const MyTasks = lazy(() =>
 );
 const DailyUpdate = lazy(() => import("@/pages/DailyUpdate"));
 const WeeklyReports = lazy(() => import("@/pages/WeeklyReports"));
+const PayVerify = lazy(() => import("@/pages/PayVerify"));
 const AdminOvertimeRequests = lazy(() => import("@/pages/AdminOvertimeRequests"));
 const AdminOvertimeUserDetail = lazy(() => import("@/pages/AdminOvertimeUserDetail"));
 const AdminAddWorkHours = lazy(() => import("@/pages/AdminAddWorkHours"));
@@ -392,6 +393,7 @@ const RouteConfig = () => {
       <Route path="/notifications" element={<RolePathRedirect suffix="notifications" />} />
       <Route path="/daily-work-update" element={<RolePathRedirect suffix="daily-work-update" />} />
       <Route path="/weekly-report" element={<RolePathRedirect suffix="weekly-report" />} />
+      <Route path="/pay-verify" element={<RolePathRedirect suffix="pay-verify" />} />
       <Route path="/overtime-requests" element={<RolePathRedirect suffix="overtime-requests" />} />
       <Route path="/leave" element={<RolePathRedirect suffix="leave" />} />
       <Route path="/leave-requests" element={<RolePathRedirect suffix="leave-requests" />} />
@@ -489,6 +491,7 @@ const RouteConfig = () => {
           <Route element={<WorkforceRoute />}>
             <Route path="daily-update" element={<DailyUpdate />} />
             <Route path="weekly-report" element={<WeeklyReports />} />
+            <Route path="pay-verify" element={<PayVerify />} />
             <Route path="daily-work-update" element={<DailyWorkUpdate />} />
             <Route path="leave" element={<LeaveRequests />} />
           </Route>

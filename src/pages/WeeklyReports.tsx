@@ -46,6 +46,7 @@ import { toast } from '@/components/ui/use-toast';
 import { useAuth } from '@/context/AuthContext';
 import { extractApiErrorMessage } from '@/lib/apiError';
 import { notifyAdminNavCountsChanged } from '@/services/adminNavCountsService';
+import { PayVerifyPendingBanner } from '@/components/attendance/PayVerifyPendingBanner';
 import {
   adminDeleteWeeklyReport,
   adminUpdateWeeklyReport,
@@ -398,6 +399,7 @@ export default function WeeklyReports() {
 
   return (
     <div className="min-w-0 w-full space-y-6 sm:space-y-8 overflow-x-hidden">
+        <PayVerifyPendingBanner />
         <div className="relative overflow-hidden rounded-2xl">
           <div className="absolute inset-0 bg-gradient-to-r from-indigo-50/50 via-transparent to-violet-50/50 dark:from-indigo-950/20 dark:via-transparent dark:to-violet-950/20" />
           <div className="relative rounded-2xl border border-gray-200/50 bg-white/80 p-6 backdrop-blur-sm dark:border-gray-700/50 dark:bg-gray-900/80 sm:p-8">

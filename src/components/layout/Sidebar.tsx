@@ -40,6 +40,7 @@ import {
   Trash2,
   CalendarClock,
   ClipboardList,
+  Banknote,
   UserRoundSearch,
   Palette,
   Server,
@@ -49,6 +50,7 @@ import { NotificationPopover } from "@/components/notifications/NotificationPopo
 import { ImpersonateIndicator } from "@/components/ui/ImpersonateBanner";
 import { useGlobalSearchModal } from "@/context/GlobalSearchContext";
 import { useAdminNavCounts } from "@/hooks/useAdminNavCounts";
+import type { AdminNavCounts } from "@/types/adminNavCounts";
 import {
   getArticleCountForRole,
   getHelpRoleFilterForUser,
@@ -104,7 +106,8 @@ export const Sidebar = ({ className, closeSidebar }: SidebarProps) => {
   };
 
   const wantsNavCounts = Boolean(currentUser);
-  const navCounts = useAdminNavCounts(wantsNavCounts);
+  const navCounts: AdminNavCounts = useAdminNavCounts(wantsNavCounts);
+  const payVerifyCount = navCounts.payVerify;
   const helpCount = getArticleCountForRole(getHelpRoleFilterForUser(role || "admin"));
 
   const NavLink = ({
@@ -408,6 +411,28 @@ export const Sidebar = ({ className, closeSidebar }: SidebarProps) => {
                   role === "admin"
                     ? `${navCounts.weeklyReport} team weekly report${navCounts.weeklyReport === 1 ? "" : "s"}`
                     : `${navCounts.weeklyReport} weekly report${navCounts.weeklyReport === 1 ? "" : "s"}`
+                }
+              />
+            )}
+
+
+            {isWorkforce &&
+              (role === "admin" ||
+                role === "developer" ||
+                role === "creator" ||
+                isCodoTester ||
+                can("DAILY_UPDATE_VIEW") ||
+                can("USERS_VIEW")) && (
+              <NavLink
+                to="/pay-verify"
+                icon={<Banknote className="h-5 w-5" />}
+                label="Pay Verify"
+                badge={formatNavCount(payVerifyCount)}
+                badgeTone={payVerifyCount > 0 ? "alert" : "default"}
+                badgeTitle={
+                  role === "admin"
+                    ? "Pay Verify — hours and salary estimates"
+                    : `${payVerifyCount} hour verification${payVerifyCount === 1 ? "" : "s"} pending`
                 }
               />
             )}

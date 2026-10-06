@@ -8,6 +8,7 @@ import { UserWorkStats } from "@/components/users/UserWorkStats";
 import { UserLeaveDetails } from "@/components/users/UserLeaveDetails";
 import { UserOfficeWfhCalendar } from "@/components/users/UserOfficeWfhCalendar";
 import { UserAttendanceExceptions } from "@/components/users/UserAttendanceExceptions";
+import { UserPayVerify } from "@/components/users/UserPayVerify";
 import { UserProjectPortfolio } from "@/components/users/UserProjectPortfolio";
 import { UserAvatar } from "@/components/users/UserAvatar";
 import { OnboardingProfileSection } from "@/components/onboarding/OnboardingProfileSection";
@@ -116,6 +117,8 @@ function parseUserDetailsTab(
   raw: string | null,
   isAdmin: boolean
 ): UserDetailsTab {
+  // Why: Pay / Hours was folded into Payments; keep old ?tab=pay-hours links working.
+  if (raw === "pay-hours") return "payments";
   const match = USER_DETAILS_TABS.find((t) => t.value === raw);
   if (!match) return "personal";
   if (match.adminOnly && !isAdmin) return "personal";
@@ -1380,38 +1383,49 @@ export default function UserDetails() {
 
               <TabsContent value="payments" className="mt-0 focus-visible:outline-none">
                 {activeTab === "payments" ? (
-                  userHasEmployeeRecords(user) ? (
-                    <OnboardingProfileSection
-                      userId={user.id}
-                      onboardingCompleted={user.onboarding_completed}
-                      canVerify={isAdmin}
-                      visibleSections={["banking"]}
-                      employeeName={user.name || user.username}
-                      employeeUsername={user.username}
-                      employeeEmail={user.email}
-                      employeePhone={user.phone}
-                      employeeRole={user.role}
-                      employeeAvatar={user.avatar}
-                      employeeJoiningDate={user.joining_date}
-                      employeeCode={employeeCodeDisplay}
-                      employeeJobTitle={user.job_title}
-                      employeeJobLevel={user.job_level}
-                      employeeDepartment={user.department}
-                      employeeReportsTo={user.reports_to_username}
-                      employeeContractType={user.contract_type}
-                      employeeOfferLetterIssued={user.offer_letter_issued}
-                      employeeOfferLetterSharedDate={user.offer_letter_shared_date}
-                      employeeProbationEndDate={user.probation_end_date}
-                    />
-                  ) : (
-                    <Card className="rounded-2xl shadow-sm border-border/60">
-                      <CardContent className="p-5 sm:p-6">
-                        <p className="text-sm text-muted-foreground">
-                          Banking details apply to employee accounts — developers, CODO testers and creators.
-                        </p>
+                  <div className="flex flex-col gap-4 sm:gap-6">
+                    {userHasEmployeeRecords(user) ? (
+                      <OnboardingProfileSection
+                        userId={user.id}
+                        onboardingCompleted={user.onboarding_completed}
+                        canVerify={isAdmin}
+                        visibleSections={["banking"]}
+                        employeeName={user.name || user.username}
+                        employeeUsername={user.username}
+                        employeeEmail={user.email}
+                        employeePhone={user.phone}
+                        employeeRole={user.role}
+                        employeeAvatar={user.avatar}
+                        employeeJoiningDate={user.joining_date}
+                        employeeCode={employeeCodeDisplay}
+                        employeeJobTitle={user.job_title}
+                        employeeJobLevel={user.job_level}
+                        employeeDepartment={user.department}
+                        employeeReportsTo={user.reports_to_username}
+                        employeeContractType={user.contract_type}
+                        employeeOfferLetterIssued={user.offer_letter_issued}
+                        employeeOfferLetterSharedDate={user.offer_letter_shared_date}
+                        employeeProbationEndDate={user.probation_end_date}
+                      />
+                    ) : (
+                      <Card className="rounded-2xl shadow-sm border-border/60">
+                        <CardContent className="p-5 sm:p-6">
+                          <p className="text-sm text-muted-foreground">
+                            Banking details apply to employee accounts — developers, CODO testers and creators.
+                          </p>
+                        </CardContent>
+                      </Card>
+                    )}
+                    <Card className="border-border/60 bg-card/60 backdrop-blur rounded-2xl">
+                      <CardContent className="p-5 sm:p-6 space-y-6">
+                        <UserPayVerify
+                          userId={user.id}
+                          isAdmin={isAdmin}
+                          isSelf={currentUser?.id === user.id}
+                        />
                       </CardContent>
                     </Card>
-                  )
+                  </div>
                 ) : null}
               </TabsContent>
 

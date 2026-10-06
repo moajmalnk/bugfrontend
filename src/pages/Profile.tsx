@@ -17,6 +17,7 @@ import {
 } from "@/components/ui/dialog";
 import { UserProjectPortfolio } from "@/components/users/UserProjectPortfolio";
 import { UserWorkStats } from "@/components/users/UserWorkStats";
+import { UserPayVerify } from "@/components/users/UserPayVerify";
 import { ActiveHours } from "@/components/users/ActiveHours";
 import { UserLeaveDetails } from "@/components/users/UserLeaveDetails";
 import { EditOwnProfileDialog } from "@/components/profile/EditOwnProfileDialog";
@@ -1276,6 +1277,12 @@ export default function Profile() {
                       </p>
                     </div>
                     <UserWorkStats userId={currentUser.id} />
+                  </CardContent>
+                </Card>
+
+                <Card className="border-border/60 bg-card/60 backdrop-blur shadow-sm rounded-2xl">
+                  <CardContent className="p-5 sm:p-6 space-y-5">
+                    <UserPayVerify userId={currentUser.id} isSelf />
                   </CardContent>
                 </Card>
 

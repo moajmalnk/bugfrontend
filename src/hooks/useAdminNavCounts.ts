@@ -5,15 +5,17 @@ import {
   EMPTY_ADMIN_NAV_COUNTS,
   fetchAdminNavCounts,
   subscribeAdminNavCountsChanged,
-  type AdminNavCounts,
 } from '@/services/adminNavCountsService';
+import type { AdminNavCounts } from '@/types/adminNavCounts';
+
+export type { AdminNavCounts } from '@/types/adminNavCounts';
 
 /**
  * Why: Keep Administration nav badges in sync without loading each list page.
  */
 export function useAdminNavCounts(enabled: boolean): AdminNavCounts {
   const queryClient = useQueryClient();
-  const { data } = useQuery({
+  const { data } = useQuery<AdminNavCounts>({
     queryKey: ADMIN_NAV_COUNTS_QUERY_KEY,
     queryFn: fetchAdminNavCounts,
     enabled,
