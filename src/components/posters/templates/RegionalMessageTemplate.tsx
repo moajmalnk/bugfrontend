@@ -30,7 +30,7 @@ export function RegionalMessageTemplate({ data, palette, size }: PosterTemplateP
           justifyContent: 'space-between',
         }}
       >
-        <CodoLogo variant={palette.logo} height={64} />
+        <CodoLogo variant={palette.logo} height={56} />
         <WebsiteTag color={palette.ink} fontSize={26} />
       </div>
 

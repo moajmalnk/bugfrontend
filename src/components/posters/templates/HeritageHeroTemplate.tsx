@@ -26,7 +26,7 @@ export function HeritageHeroTemplate({ data, palette, size }: PosterTemplateProp
           justifyContent: 'space-between',
         }}
       >
-        <CodoLogo variant={palette.logo} height={64 * s} color={palette.logo === 'light' ? undefined : palette.inkMuted} />
+        <CodoLogo variant={palette.logo} height={56 * s} />
         {data.showContacts && <SocialIcons color={palette.inkMuted} size={36 * s} />}
       </div>
 

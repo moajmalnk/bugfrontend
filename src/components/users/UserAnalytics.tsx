@@ -439,7 +439,7 @@ type CodoPdfDoc = {
   save: (name: string) => unknown;
 };
 
-const CODO_LOGO_SRC = `${typeof window !== "undefined" ? window.location.origin : ""}/CODO%20AI%20INNOVATION%20blue.png`;
+const CODO_LOGO_SRC = `${typeof window !== "undefined" ? window.location.origin : ""}/posters/codo-logo-full.png`;
 
 /**
  * Why: Official CODO lockup for attendance PDFs. Downscales the large public

@@ -60,7 +60,7 @@ export function SpeakerSessionTemplate({ data, palette, size }: PosterTemplatePr
           justifyContent: 'space-between',
         }}
       >
-        <CodoLogo variant={palette.logo} height={64 * s} />
+        <CodoLogo variant={palette.logo} height={56 * s} />
         <WebsiteTag color={palette.ink} fontSize={26 * s} />
       </div>
 

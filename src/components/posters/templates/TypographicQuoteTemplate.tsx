@@ -88,7 +88,7 @@ export function TypographicQuoteTemplate({ data, palette, size }: PosterTemplate
           justifyContent: 'center',
         }}
       >
-        <CodoLogo variant="dark" height={60} color={palette.accent} />
+        <CodoLogo variant={palette.logo} height={52} />
       </div>
     </PosterFrame>
   );

@@ -5,6 +5,7 @@
  */
 export const CODO_BRAND = {
   name: 'CODO',
+  fullName: 'CODO AI Innovations',
   website: 'www.codoai.in',
   email: 'info@codoai.in',
   phone: '+91 8086 995 559',
@@ -30,6 +31,7 @@ export type PosterPalette = {
   inkMuted: string;
   accent: string;
   accentSoft: string;
+  /** Which official logo lockup contrasts with this background. */
   logo: 'dark' | 'light';
 };
 
@@ -102,21 +104,31 @@ export const POSTER_PALETTES: Record<PosterPaletteKey, PosterPalette> = {
   },
 };
 
+/** Brand navy / green used by the SVG mark fallback (matches agency masters). */
 export const LOGO_COLORS = {
-  dark: '#4A2C22',
+  dark: '#0B1F33',
   light: '#FFFFFF',
+  accent: '#2EB660',
 } as const;
 
 /**
- * Official CODO logo WebPs (from agency masters in public/).
- * - dark: navy + green — light backgrounds
- * - light: soft grey + green — dark / branded backgrounds
- * - full: navy + green with "AI Innovations" lockup — wide banners
+ * Official CODO agency logo assets (masters in public/, optimized under /posters/).
+ *
+ * | Key   | Master file                      | Use on                          |
+ * |-------|----------------------------------|---------------------------------|
+ * | dark  | Logo Agnecy.Bluepng.png          | Light / cream / parchment bg    |
+ * | light | Logo Agnecy.png                  | Dark / green / branded bg       |
+ * | full  | CODO AI INNOVATION blue.png      | Wide banners / website lockups  |
  */
 export const CODO_LOGO_ASSETS = {
   dark: { src: '/posters/codo-logo-dark.webp', width: 1060, height: 546 },
   light: { src: '/posters/codo-logo-light.webp', width: 1060, height: 546 },
-  full: { src: '/posters/codo-logo-full.webp', width: 1600, height: 532 },
+  full: { src: '/posters/codo-logo-full.webp', width: 2000, height: 664 },
 } as const;
 
 export type CodoLogoAssetKey = keyof typeof CODO_LOGO_ASSETS;
+
+/** Pick the official lockup that contrasts with the active palette background. */
+export function logoAssetForPalette(palette: Pick<PosterPalette, 'logo'>): Exclude<CodoLogoAssetKey, 'full'> {
+  return palette.logo === 'light' ? 'light' : 'dark';
+}

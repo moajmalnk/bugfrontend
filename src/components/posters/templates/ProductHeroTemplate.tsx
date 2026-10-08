@@ -132,7 +132,7 @@ export function ProductHeroTemplate({ data, palette, size }: PosterTemplateProps
           justifyContent: 'center',
         }}
       >
-        <CodoLogo variant={palette.logo} height={78} color={palette.ink} />
+        <CodoLogo variant={palette.logo} height={64} />
       </div>
     </PosterFrame>
   );

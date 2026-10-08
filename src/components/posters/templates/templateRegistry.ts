@@ -140,7 +140,7 @@ export const POSTER_TEMPLATES: Record<PosterTemplateKey, PosterTemplateDefinitio
   brand_logo: {
     key: 'brand_logo',
     label: 'Brand Logo',
-    description: 'CODO logo for app icons, profile pictures and website logos',
+    description: 'Official CODO lockup — mark for icons, wordmark or AI Innovations banner for wide sizes',
     defaultPalette: 'growthGreen',
     palettes: ['growthGreen', 'logoBlack', 'logoWhite', 'heritage', 'espresso'],
     fields: [],

@@ -1,25 +1,30 @@
-import { CODO_LOGO_ASSETS, LOGO_COLORS, type CodoLogoAssetKey } from './brandKit';
+import {
+  CODO_LOGO_ASSETS,
+  LOGO_COLORS,
+  type CodoLogoAssetKey,
+} from './brandKit';
 
 type Props = {
   variant?: 'dark' | 'light' | 'mono';
   /** Height of the mark / logo row in px. */
   height?: number;
   showWordmark?: boolean;
-  /** Force mono SVG fill (used when a palette needs a single ink colour). */
+  /** Force mono SVG fill (icons / single-ink layouts only). Ignored for official assets. */
   color?: string;
   /** Optional brand accent for the SVG petal and final "O". */
   accent?: string;
   /**
-   * Prefer an official agency logo asset. Defaults to the matching dark/light
-   * WebP when no custom `color` is set. Pass `false` to force the SVG mark.
+   * Prefer an official agency logo asset.
+   * Defaults to dark/light from `variant`. Pass `full` for the AI Innovations lockup.
+   * Pass `false` to force the SVG mark (app icons, mono-ink layouts).
    */
   asset?: CodoLogoAssetKey | false;
 };
 
 /**
- * CODO logo for posters. Uses the official agency WebP when possible so exports
- * match brand guidelines; falls back to an inline SVG mark when a custom mono
- * colour is required (icons, single-ink layouts).
+ * CODO logo for posters. Uses the official agency WebP lockup whenever a
+ * wordmark is shown so exports match brand guidelines. The inline SVG mark is
+ * reserved for icon-only canvases and mono-ink layouts (`asset={false}`).
  */
 export function CodoLogo({
   variant = 'dark',
@@ -29,7 +34,7 @@ export function CodoLogo({
   accent,
   asset,
 }: Props) {
-  const preferAsset = asset !== false && !color && variant !== 'mono';
+  const preferAsset = asset !== false && showWordmark && variant !== 'mono';
   const assetKey: CodoLogoAssetKey =
     asset === 'dark' || asset === 'light' || asset === 'full'
       ? asset
@@ -37,16 +42,17 @@ export function CodoLogo({
         ? 'light'
         : 'dark';
 
-  if (preferAsset && showWordmark) {
+  if (preferAsset) {
     const meta = CODO_LOGO_ASSETS[assetKey];
     const width = (height * meta.width) / meta.height;
     return (
       <img
         src={meta.src}
-        alt="CODO"
+        alt="CODO AI Innovations"
         width={width}
         height={height}
         crossOrigin="anonymous"
+        decoding="async"
         style={{ display: 'block', width, height, objectFit: 'contain' }}
       />
     );
@@ -54,6 +60,7 @@ export function CodoLogo({
 
   const fill =
     color ?? (variant === 'mono' ? 'currentColor' : LOGO_COLORS[variant === 'light' ? 'light' : 'dark']);
+  const accentFill = accent ?? (color ? fill : LOGO_COLORS.accent);
   const markSize = height;
   const gap = height * 0.22;
   const fontSize = height * 0.78;
@@ -89,7 +96,7 @@ export function CodoLogo({
         />
         <path
           d="M53 53 H78 A20 20 0 0 1 98 73 V78 A20 20 0 0 1 78 98 H73 A20 20 0 0 1 53 78 Z"
-          fill={accent ?? fill}
+          fill={accentFill}
         />
       </svg>
       {showWordmark && (
@@ -102,7 +109,7 @@ export function CodoLogo({
             color: fill,
           }}
         >
-          COD<span style={{ color: accent ?? fill }}>O</span>
+          COD<span style={{ color: accentFill }}>O</span>
         </span>
       )}
     </div>

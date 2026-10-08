@@ -1,11 +1,14 @@
-import { CODO_LOGO_ASSETS } from '../brand/brandKit';
+import { CODO_LOGO_ASSETS, logoAssetForPalette } from '../brand/brandKit';
 import { CodoLogo } from '../brand/CodoLogo';
 import type { PosterTemplateProps } from '../types';
 import { PosterFrame } from './shared';
 
 /**
  * Responsive CODO logo artwork for icons, profile pictures and website logos.
- * Wide canvases use the official agency lockup; square icons keep the SVG mark.
+ *
+ * - Wide banners → full "CODO AI Innovations" lockup
+ * - Medium-wide → dark/light agency wordmark matching the palette
+ * - Square / portrait → SVG mark only (app icons, avatars)
  */
 export function BrandLogoTemplate({ palette, size }: PosterTemplateProps) {
   const { width: w, height: h } = size;
@@ -17,7 +20,7 @@ export function BrandLogoTemplate({ palette, size }: PosterTemplateProps) {
       ? 'transparent'
       : `linear-gradient(140deg, ${palette.background} 0%, ${palette.backgroundAlt} 100%)`;
 
-  const assetKey = full ? 'full' : palette.logo === 'light' ? 'light' : 'dark';
+  const assetKey = full ? 'full' : logoAssetForPalette(palette);
   const meta = CODO_LOGO_ASSETS[assetKey];
   // Fit the official logo inside ~90% of the canvas while keeping aspect ratio.
   const logoHeight = wide
