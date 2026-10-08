@@ -243,7 +243,7 @@ export const DEVELOPER_RULES: DeveloperRule[] = [
     number: 33,
     titleEn: 'Canonical Tag Injection',
     description:
-      'Ensure all rendered pages include a self-referencing canonical tag.\n\nMalayalam: എല്ലാ റെൻഡർ ചെയ്യുന്ന പേജുകളിലും സെൽഫ്-റഫറൻസിംഗ് canonical ടാഗ് ഉണ്ടായിരിക്കണം.',
+      'Ensure every indexable page outputs a self-referencing canonical to its final preferred URL (usually no trailing slash). Never point Page A\'s canonical at Page B to clear a Search Console warning — that removes A from search. Canonical alone is not enough if the article body is missing from the first HTML response (see Rule 69).\n\nMalayalam: ഓരോ indexable പേജും സ്വന്തം final URL-ലേക്ക് self-referencing canonical നൽകണം. Search Console warning മാറ്റാൻ ഒരു പേജിന്റെ canonical മറ്റൊരു പേജിലേക്ക് ചൂണ്ടിക്കാണിക്കരുത്. Article body ആദ്യ HTML-ൽ ഇല്ലെങ്കിൽ canonical മാത്രം മതിയാവില്ല (Rule 69).',
   },
   {
     key: 'dev_rule_35',
@@ -462,6 +462,34 @@ export const DEVELOPER_RULES: DeveloperRule[] = [
     description:
       'In Flutter/native WebViews that host payment gateways, select the User-Agent dynamically by platform (Android → Mobile Chrome; iOS → Safari). Explicitly intercept non-HTTP(S) schemes such as upi://, intent://, and gpay://: deny in-WebView navigation and delegate to the external app with LaunchMode.externalApplication so UPI/app grids populate and deep-link returns succeed.\n\nMalayalam: പേയ്മെന്റ് ഗേറ്റ്‌വേ ഹോസ്റ്റ് ചെയ്യുന്ന Flutter/native WebView-കളിൽ User-Agent പ്ലാറ്റ്‌ഫോം അനുസരിച്ച് ഡൈനാമിക് ആയി തിരഞ്ഞെടുക്കുക (Android → Mobile Chrome; iOS → Safari). upi://, intent://, gpay:// പോലുള്ള non-HTTP(S) സ്കീമുകൾ WebView-യിൽ ALLOW ചെയ്യരുത്; LaunchMode.externalApplication വഴി ബാഹ്യ ആപ്പിലേക്ക് ഡെലിഗേറ്റ് ചെയ്യുക.',
   },
+  {
+    key: 'dev_rule_69',
+    number: 69,
+    titleEn: 'Bot-Visible Unique Content (SPA Crawlability)',
+    description:
+      'For every public blog/article (and similar content pages) in a client-rendered SPA, the first HTML response to Googlebot must contain that page\'s unique H1, article body (or equivalent main content), self-referencing canonical, and Article/Breadcrumb JSON-LD. Meta tags alone with an empty #root are a defect: Google may merge unrelated URLs into one canonical. Prefer SSR, SSG, prerender, or bot middleware that injects content. Verify with curl -A Googlebot (View Source), not DevTools DOM.\n\nMalayalam: SPA-യിലെ public blog/article പേജുകളുടെ ആദ്യ HTML response-ൽ Googlebot-ന് unique H1, article body, self-canonical, Article/Breadcrumb JSON-LD ഉണ്ടായിരിക്കണം. ശൂന്യ #root + meta മാത്രം defect ആണ്. curl -A Googlebot കൊണ്ട് പരിശോധിക്കുക; DevTools DOM മാത്രം മതിയാവില്ല.',
+  },
+  {
+    key: 'dev_rule_70',
+    number: 70,
+    titleEn: 'Trailing Slash URL Standardization',
+    description:
+      'Pick one URL style sitewide (prefer no trailing slash except root /). Slash variants must 301 once to the preferred URL with no redirect chain. Canonicals, sitemap locs, footer/menu/in-content links, and router paths must all match. Never leave /contact/ and /contact both returning 200.\n\nMalayalam: സൈറ്റ് മുഴുവൻ ഒരേ URL style (root ഒഴികെ trailing slash ഇല്ലാത്തത് preferred). Slash variants preferred URL-ലേക്ക് ഒറ്റ 301 ആയിരിക്കണം. canonical, sitemap, links എല്ലാം ഒരേ style പാലിക്കണം.',
+  },
+  {
+    key: 'dev_rule_71',
+    number: 71,
+    titleEn: 'Unique Per-Page Metadata & Schema Isolation',
+    description:
+      'Each indexable page must emit its own unique <title>, H1, meta description, and self-canonical that match the page. Do not share default titles/descriptions across posts. Do not inject sitewide Organization/WebSite JSON-LD on every article while rewriting WebSite.description to each post excerpt. Related-post modules must be title+link (short excerpt at most) with data-nosnippet when needed — never embed other posts\' full body text.\n\nMalayalam: ഓരോ പേജിനും സ്വന്തം unique title, H1, description, canonical വേണം. എല്ലാ articles-ലും ഒരേ Organization/WebSite schema + post excerpt WebSite.description ആക്കരുത്. Related posts title+link മാത്രം; മറ്റ് posts-ന്റെ full body embed ചെയ്യരുത്.',
+  },
+  {
+    key: 'dev_rule_72',
+    number: 72,
+    titleEn: 'Sitemap Canonical Hygiene',
+    description:
+      'sitemap.xml must return 200 with valid XML under a reliable timeout, list only final canonical URLs (no slash duplicates, no redirected URLs, no noindex pages), and use accurate lastmod only when content actually changes. Prefer an owned endpoint with caching over a flaky upstream proxy that causes Search Console temporary processing errors.\n\nMalayalam: sitemap.xml 200 + valid XML ആയിരിക്കണം; final canonical URLs മാത്രം; slash/redirect/noindex ഒഴിവാക്കുക; lastmod കൃത്യമായിരിക്കണം. GSC temporary processing error ഉണ്ടാക്കുന്ന flaky proxy ഒഴിവാക്കുക.',
+  },
 ];
 
 export const QA_STRESS_RULES: QaStressRule[] = [
@@ -674,6 +702,12 @@ export const QA_STRESS_RULES: QaStressRule[] = [
     title: 'In-App Payment Gateway & UPI App Switch Drill',
     description:
       'On physical Android and iOS devices, open an in-app payment gateway WebView and verify: UPI/payment app grids are populated on both platforms, custom-scheme intents (upi://, intent://, gpay://) trigger an external app handshake, and return deep-link callbacks restore session integrity without forcing re-login or losing payment context. Reject emulator-only verification or a blank UPI grid.\n\nMalayalam: യഥാർത്ഥ Android/iOS ഡിവൈസുകളിൽ in-app പേയ്മെന്റ് WebView തുറന്ന് പരിശോധിക്കുക: രണ്ട് പ്ലാറ്റ്‌ഫോമിലും UPI ആപ്പ് ഗ്രിഡ് നിറഞ്ഞിരിക്കണം, intent ട്രിഗറുകൾ ബാഹ്യ ആപ്പ് ഹാൻഡ്‌ഷേക്ക് ചെയ്യണം, റിട്ടേൺ കോൾബാക്ക് സെഷൻ നഷ്ടപ്പെടാതെ നിലനിർത്തണം. എമുലേറ്റർ മാത്രം ടെസ്റ്റ് ചെയ്താലോ ശൂന്യ UPI ഗ്രിഡ് വന്നാലോ റിജക്ട് ചെയ്യുക.',
+  },
+  {
+    key: 'qa_googlebot_html',
+    title: 'Googlebot HTML Uniqueness Drill',
+    description:
+      'For public content URLs (especially blogs), fetch with curl -A Googlebot or Search Console URL Inspection → Test Live URL → View tested page HTML. Reject if #root is empty, H1/body text is missing, canonical is wrong/shared, slash URLs do not 301 once, or sitemap fails. Browser DevTools Elements panel after JS runs is not acceptance.\n\nMalayalam: Public content URLs curl -A Googlebot അല്ലെങ്കിൽ GSC Test Live URL HTML കൊണ്ട് പരിശോധിക്കുക. ശൂന്യ #root, missing H1/body, wrong canonical, slash 301 ഇല്ലാത്തത്, sitemap fail — reject. JS റൺ ആയ ശേഷമുള്ള DevTools DOM acceptance അല്ല.',
   },
 ];
 

@@ -341,8 +341,10 @@ try {
 
   // ── Section 8: SEO, Tracking & Marketing (selected keys) ───────────────
   dev_rule_33: {
-    bad: '// No canonical — duplicate URLs compete in search',
-    good: '<link rel="canonical" href={currentFullUrl} />',
+    bad: `// Wrong: point this post's canonical at another post to clear GSC
+<link rel="canonical" href="https://www.example.com/blog/other-post" />`,
+    good: `// Self-referencing final URL (no slash); never another page
+<link rel="canonical" href={\`https://www.example.com/blog/\${slug}\`} />`,
     language: 'HTML',
   },
   dev_rule_35: {
@@ -967,6 +969,61 @@ navigationDelegate: (NavigationRequest req) async {
 5. Pass only if both platforms hand off and return correctly`,
     language: 'QA Checklist',
   },
+
+  // ── SPA / Blog SEO crawlability (Albedo-class sites) ───────────────────
+  dev_rule_69: {
+    bad: `// Bot HTML: meta only, empty root — Google merges unrelated posts
+<div id="root"></div>`,
+    good: `// Middleware/SSR for Googlebot injects unique article into first HTML
+<div id="root">
+  <article>
+    <h1>{title}</h1>
+    {/* content_blocks HTML */}
+  </article>
+</div>
+// + Article + BreadcrumbList JSON-LD in <head>
+// Verify: curl -A Googlebot https://www.example.com/blog/{slug}`,
+    language: 'HTML',
+  },
+  dev_rule_70: {
+    bad: '// Both /contact/ and /contact return 200 — duplicate URLs',
+    good: `// vercel.json (or middleware) — single 301, no chain
+{
+  "source": "/:path+/",
+  "destination": "/:path+",
+  "permanent": true
+}
+// Canonical + internal links use no-slash: /contact`,
+    language: 'JavaScript',
+  },
+  dev_rule_71: {
+    bad: `// Same WebSite JSON-LD on every blog with post excerpt as description
+<script type="application/ld+json">{JSON.stringify({
+  "@type": "WebSite",
+  description: postExcerpt, // pollutes every article
+})}</script>`,
+    good: `// Article pages: Article schema only; skip sitewide WebSite/HighSchool
+// Related block: titles + links, short excerpt, data-nosnippet
+<section data-nosnippet>{related.map(r => <a href={\`/blog/\${r.slug}\`}>{r.title}</a>)}</section>`,
+    language: 'JavaScript',
+  },
+  dev_rule_72: {
+    bad: '// Proxy sitemap to flaky upstream → GSC "Temporary processing error"',
+    good: `// Owned /api/sitemap with timeout + Cache-Control
+// Only final canonical locs; no trailing-slash duplicates; no noindex pages
+response.setHeader("Cache-Control", "public, s-maxage=3600");`,
+    language: 'JavaScript',
+  },
+  qa_googlebot_html: {
+    bad: 'Opened the blog in Chrome, Viewed Elements after JS, assumed Google sees the same HTML.',
+    good: `1. curl -A Googlebot https://www.example.com/blog/{slug} (or GSC Test Live URL HTML)
+2. Confirm unique H1 + body text + self-canonical in first response
+3. Confirm /path/ → 301 → /path once
+4. Confirm sitemap.xml 200 valid XML
+5. Pass only if DevTools-after-JS is NOT the acceptance evidence`,
+    language: 'QA Checklist',
+  },
+
 };
 
 /** Split stored description into English requirement + Malayalam body. */

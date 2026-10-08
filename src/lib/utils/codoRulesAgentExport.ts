@@ -117,7 +117,7 @@ const PHASE_LABEL: Record<CodoRulePhase, string> = {
 
 const PHASE_ORDER: CodoRulePhase[] = ['developer', 'tester', 'project'];
 
-/** Builtin catalog as CodoCommonRule-shaped rows (64 developer + 35 QA). */
+/** Builtin catalog as CodoCommonRule-shaped rows (68 developer + 36 QA). */
 export function getBuiltinCodoRulesForExport(): CodoCommonRule[] {
   const developer: CodoCommonRule[] = DEVELOPER_RULES.map((r) => ({
     id: r.number,
