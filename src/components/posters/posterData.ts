@@ -1,4 +1,3 @@
-import { format, isValid, parse } from 'date-fns';
 import type { BugDatesCalendarItem, GrowthProgramSession } from '@/services/bugDatesService';
 import { CODO_BRAND } from './brand/brandKit';
 import type { PosterData, PosterFieldKey } from './types';
@@ -33,13 +32,16 @@ export const POSTER_FIELD_LABELS: Record<PosterFieldKey, string> = {
   hashtag: 'Hashtag',
 };
 
+/** Default session time on CODO posters (Growth Glimpse / Team Session standard). */
+export const DEFAULT_POSTER_TIME = '10:30 AM';
+
 export const EMPTY_POSTER_DATA: PosterData = {
   title: '',
   subtitle: '',
   scriptText: '',
   tagline: '',
   dateIso: null,
-  time: '',
+  time: DEFAULT_POSTER_TIME,
   platform: '',
   speakerName: '',
   speakerRole: '',
@@ -56,13 +58,6 @@ const BIRTHDAY_WISH =
 
 const clamp = (key: PosterFieldKey, value: string | null | undefined) =>
   String(value ?? '').trim().slice(0, POSTER_FIELD_LIMITS[key]);
-
-/** "10:30:00" -> "10:30 AM"; returns '' for null or unparseable input. */
-function formatTime(raw: string | null | undefined): string {
-  if (!raw) return '';
-  const d = parse(raw.slice(0, 5), 'HH:mm', new Date());
-  return isValid(d) ? format(d, 'h:mm a') : '';
-}
 
 /**
  * Why: events store a meeting link, but posters should show the platform name, not a URL.
@@ -98,6 +93,28 @@ function hashtagFor(title: string): string {
 }
 
 /**
+ * Why: BugRicer usernames are often snake_case; posters need a polished display name
+ * matching Growth Glimpse artwork (e.g. nadha_rahman → Nadha Rahman).
+ */
+export function posterDisplayName(raw: string | null | undefined): string {
+  const cleaned = String(raw ?? '')
+    .replace(/[._-]+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+  if (!cleaned) return '';
+  return cleaned
+    .split(' ')
+    .map((w) => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase())
+    .join(' ');
+}
+
+/** True when the avatar is a real upload, not the ui-avatars placeholder. */
+export function isRealPosterAvatar(avatar: string | null | undefined): boolean {
+  const raw = String(avatar ?? '').trim();
+  return raw !== '' && !/^https?:\/\/ui-avatars\.com\//i.test(raw);
+}
+
+/**
  * Prefills poster content from a BugDates item (and its Growth Glimpse session when present).
  * Why: designers should start from the real event data, then only polish copy and imagery.
  */
@@ -111,7 +128,8 @@ export function buildPosterData(
   const base: PosterData = {
     ...EMPTY_POSTER_DATA,
     dateIso: occurrenceDate || null,
-    time: clamp('time', formatTime(item.start_time)),
+    // Prefer the branded default; event start_time is often wrong for poster art.
+    time: clamp('time', DEFAULT_POSTER_TIME),
     platform: clamp('platform', platformFromLocation(item.location_or_link)),
   };
 
@@ -134,7 +152,8 @@ export function buildPosterData(
       title: clamp('title', cleanTitle || title),
       subtitle: clamp('subtitle', session?.agenda_topic),
       tagline: clamp('tagline', firstSentence(session?.summary_notes) || firstSentence(item.description)),
-      speakerName: clamp('speakerName', session?.host_name),
+      speakerName: clamp('speakerName', posterDisplayName(session?.host_name)),
+      speakerRole: clamp('speakerRole', session?.host_job_title),
       hashtag: CODO_BRAND.hashtag,
     };
   }

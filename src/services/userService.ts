@@ -444,6 +444,96 @@ class UserService {
     );
   }
 
+  /**
+   * Why: Poster Studio speaker pick lists only active Developers, Testers, and
+   * Creators (not admins / inactive). Prefer the full users list; if that fails
+   * (permissions / proxy), merge the public role directories.
+   */
+  async getStaffDirectory(): Promise<User[]> {
+    const posterRoles = new Set<UserRole>(["developer", "tester", "creator"]);
+    const isPosterSpeaker = (u: Pick<User, "role" | "account_active" | "employment_status">) => {
+      if (!posterRoles.has(u.role)) return false;
+      const activeAccount =
+        u.account_active === undefined ||
+        u.account_active === null ||
+        Number(u.account_active) === 1;
+      if (!activeAccount) return false;
+      const emp = String(u.employment_status ?? "active").toLowerCase();
+      return emp === "active" || emp === "";
+    };
+
+    try {
+      const users = await this.getUsers();
+      const active = users.filter(isPosterSpeaker);
+      if (active.length > 0) return active;
+    } catch {
+      // Fall through to role directories.
+    }
+
+    const token = sessionStorage.getItem("token") || localStorage.getItem("token");
+    const endpoints = [
+      "get_all_developers.php",
+      "get_all_testers.php",
+      "get_all_creators.php",
+    ] as const;
+
+    const roleByEndpoint: Record<(typeof endpoints)[number], UserRole> = {
+      "get_all_developers.php": "developer",
+      "get_all_testers.php": "tester",
+      "get_all_creators.php": "creator",
+    };
+
+    type DirectoryRow = Record<string, unknown> & { role: UserRole };
+
+    const chunks = await Promise.all(
+      endpoints.map(async (ep) => {
+        try {
+          const res = await fetch(`${ENV.API_URL}/${ep}`, {
+            headers: token ? { Authorization: `Bearer ${token}` } : {},
+          });
+          const data = await res.json().catch(() => null);
+          if (!res.ok || !data?.success || !Array.isArray(data.data)) return [] as DirectoryRow[];
+          return (data.data as Array<Record<string, unknown>>).map(
+            (row): DirectoryRow => ({
+              ...row,
+              role: roleByEndpoint[ep],
+            })
+          );
+        } catch {
+          return [] as DirectoryRow[];
+        }
+      })
+    );
+
+    const byId = new Map<string, User>();
+    for (const row of chunks.flat()) {
+      const id = String(row.id ?? "").trim();
+      if (!id || byId.has(id)) continue;
+      const username = String(row.username ?? row.name ?? "User");
+      const role = row.role;
+      const user: User = {
+        id,
+        username,
+        name: username,
+        email: String(row.email ?? ""),
+        role,
+        phone: (row.phone as string | null | undefined) ?? null,
+        avatar: this.resolveUserAvatar(
+          (row.avatar as string | null | undefined) ?? null,
+          username,
+          role
+        ),
+        account_active: 1,
+        employment_status: "active",
+        job_title: (row.job_title as string | null | undefined) ?? null,
+      };
+      if (!isPosterSpeaker(user)) continue;
+      byId.set(id, user);
+    }
+
+    return sortUsersActiveFirst([...byId.values()]);
+  }
+
   async getUser(userId: string): Promise<User> {
     const response = await this.fetchWithAuth(
       `${this.baseUrl}/get.php?id=${encodeURIComponent(userId)}`

@@ -1,4 +1,5 @@
 import { toCanvas } from 'html-to-image';
+import { buildCorsImageUrl } from '@/lib/mediaUrls';
 import { getPosterFontEmbedCss } from './brand/posterFonts';
 import { sameAspect } from './posterSizes';
 import type { PosterSize } from './types';
@@ -143,9 +144,11 @@ export async function imageBlobToPosterDataUrl(blob: Blob): Promise<string> {
 }
 
 export async function imageUrlToPosterDataUrl(url: string, signal?: AbortSignal): Promise<string> {
+  // Why: BugRicer /uploads lack CORS; image.php streams the same file with ACAO.
+  const fetchUrl = buildCorsImageUrl(url);
   let res: Response;
   try {
-    res = await fetch(url, { mode: 'cors', signal });
+    res = await fetch(fetchUrl, { mode: 'cors', credentials: 'omit', signal });
   } catch (err) {
     if ((err as Error)?.name === 'AbortError') throw err;
     throw new Error('That site blocks image downloads. Save the image and upload it instead.');

@@ -8,6 +8,7 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import {
   buildCodoAgentExportContent,
+  buildCodoIdeSettingsJson,
   CODO_AGENT_EXPORT_FORMATS,
   getBuiltinCodoRulesForExport,
   type CodoAgentExportId,
@@ -26,6 +27,7 @@ const targets: Record<CodoAgentExportId, string> = {
 const rules = getBuiltinCodoRulesForExport();
 mkdirSync(join(repoRoot, '.cursor/rules'), { recursive: true });
 mkdirSync(join(repoRoot, 'docs'), { recursive: true });
+mkdirSync(join(repoRoot, '.vscode'), { recursive: true });
 
 for (const fmt of CODO_AGENT_EXPORT_FORMATS) {
   const content = buildCodoAgentExportContent(fmt.id, rules);
@@ -33,3 +35,8 @@ for (const fmt of CODO_AGENT_EXPORT_FORMATS) {
   writeFileSync(outPath, content, 'utf8');
   console.log(`wrote ${outPath} (${content.length} chars, ${rules.length} rules)`);
 }
+
+const settingsPath = join(repoRoot, '.vscode/settings.json');
+const settingsContent = buildCodoIdeSettingsJson();
+writeFileSync(settingsPath, settingsContent, 'utf8');
+console.log(`wrote ${settingsPath} (${settingsContent.length} chars)`);

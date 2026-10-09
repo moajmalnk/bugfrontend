@@ -1,6 +1,39 @@
 import type { BugDatesCalendarItem } from '@/services/bugDatesService';
 import { BUGDATES_LAYER_COLORS } from '@/services/bugDatesService';
 
+/** Query keys for BugDates deep links: ?date=YYYY-MM-DD&poster=<key> */
+export const BUGDATES_DATE_PARAM = 'date';
+export const BUGDATES_POSTER_PARAM = 'poster';
+
+/**
+ * Stable Poster Studio key for URL / restore.
+ * Events use numeric id; birthdays use bday:<user_id> (no event row).
+ */
+export function posterItemKey(item: Pick<BugDatesCalendarItem, 'id' | 'layer' | 'category' | 'user_id'>): string | null {
+  if (item.id != null && Number(item.id) > 0) return String(item.id);
+  const layer = item.layer || item.category || '';
+  if (layer === 'birthday' && item.user_id) return `bday:${item.user_id}`;
+  return null;
+}
+
+export function findPosterItem(
+  items: BugDatesCalendarItem[],
+  key: string | null | undefined
+): BugDatesCalendarItem | null {
+  if (!key) return null;
+  if (key.startsWith('bday:')) {
+    const uid = key.slice(5);
+    return (
+      items.find(
+        (i) => (i.layer || i.category) === 'birthday' && String(i.user_id) === uid
+      ) ?? null
+    );
+  }
+  const id = Number(key);
+  if (!Number.isFinite(id) || id <= 0) return null;
+  return items.find((i) => Number(i.id) === id) ?? null;
+}
+
 /**
  * Why: A busy day can carry 10+ items; the month grid shows only three, so
  * holidays and observances must outrank deadlines and leave or they hide behind "+N more".

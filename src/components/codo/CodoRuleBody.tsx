@@ -1,10 +1,18 @@
 import { CopyTextButton } from '@/components/ui/CopyTextButton';
+import { getCodoRealWorldExample } from '@/lib/codo/codoRealWorldExamples';
+import type { CodoContentLang } from '@/lib/codo/codoContentLang';
 import {
   CODO_SOP_EXAMPLES,
   parseCodoRuleDescription,
 } from '@/lib/codo/sopRuleExamples';
 import { cn } from '@/lib/utils';
-import { CheckCircle2, ClipboardList, Code2, XCircle } from 'lucide-react';
+import {
+  CheckCircle2,
+  ClipboardList,
+  Code2,
+  Lightbulb,
+  XCircle,
+} from 'lucide-react';
 
 type CodoRuleBodyProps = {
   ruleKey: string;
@@ -14,11 +22,24 @@ type CodoRuleBodyProps = {
   className?: string;
   /** Hide the title row (useful inside compliance verify cards). */
   hideHeading?: boolean;
+  /**
+   * English / Malayalam / Both for requirement + real-world copy.
+   * Defaults to Both so juniors always see both languages.
+   */
+  contentLang?: CodoContentLang;
 };
 
 function isChecklistLanguage(language?: string): boolean {
   if (!language) return false;
   return /checklist|procedure|qa/i.test(language);
+}
+
+function showEnglish(lang: CodoContentLang): boolean {
+  return lang === 'en' || lang === 'both';
+}
+
+function showMalayalam(lang: CodoContentLang): boolean {
+  return lang === 'ml' || lang === 'both';
 }
 
 export function CodoRuleBody({
@@ -28,9 +49,11 @@ export function CodoRuleBody({
   description,
   className,
   hideHeading = false,
+  contentLang = 'both',
 }: CodoRuleBodyProps) {
   const { requirement, malayalam } = parseCodoRuleDescription(description);
   const examples = CODO_SOP_EXAMPLES[ruleKey];
+  const realWorld = getCodoRealWorldExample(ruleKey);
   const heading =
     subtitle && /^\s*(Rule|QA Stress)\s+\d+/i.test(subtitle)
       ? `${subtitle}: ${title}`
@@ -38,6 +61,16 @@ export function CodoRuleBody({
   const goodLanguage = examples?.language ?? 'JavaScript';
   const goodIsChecklist = isChecklistLanguage(goodLanguage);
   const GoodIcon = goodIsChecklist ? ClipboardList : Code2;
+
+  const showReqEn = Boolean(requirement) && showEnglish(contentLang);
+  const showReqMl = Boolean(malayalam) && showMalayalam(contentLang);
+  const showRwEn = Boolean(realWorld) && showEnglish(contentLang);
+  const showRwMl = Boolean(realWorld) && showMalayalam(contentLang);
+  const realWorldCopy = realWorld
+    ? [showRwEn ? realWorld.en : '', showRwMl ? `Malayalam: ${realWorld.ml}` : '']
+        .filter(Boolean)
+        .join('\n\n')
+    : '';
 
   return (
     <div className={cn('space-y-3 min-w-0', className)}>
@@ -56,16 +89,16 @@ export function CodoRuleBody({
       ) : null}
 
       <ul className="space-y-2.5 pl-1 text-sm leading-relaxed">
-        {requirement ? (
+        {showReqEn ? (
           <li className="flex gap-2.5 min-w-0">
             <span className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full border border-muted-foreground/50" />
             <div className="flex min-w-0 flex-1 items-start gap-2">
-              <p className="min-w-0 flex-1 break-words text-muted-foreground">
+              <p className="min-w-0 flex-1 break-words text-muted-foreground" lang="en">
                 <span className="font-semibold text-foreground">Requirement:</span>{' '}
                 {requirement}
               </p>
               <CopyTextButton
-                text={requirement}
+                text={requirement!}
                 label="requirement"
                 className="mt-0.5 shrink-0"
               />
@@ -73,13 +106,65 @@ export function CodoRuleBody({
           </li>
         ) : null}
 
-        {malayalam ? (
+        {showReqMl ? (
           <li className="flex gap-2.5 min-w-0">
             <span className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full border border-muted-foreground/50" />
-            <p className="min-w-0 break-words text-muted-foreground">
+            <p className="min-w-0 break-words text-muted-foreground" lang="ml">
               <span className="font-semibold text-foreground">Malayalam:</span>{' '}
               <span className="text-foreground/90">{malayalam}</span>
             </p>
+          </li>
+        ) : null}
+
+        {realWorld && (showRwEn || showRwMl) ? (
+          <li className="flex gap-2.5 min-w-0">
+            <span className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full border border-muted-foreground/50" />
+            <div className="flex min-w-0 flex-1 items-start gap-2">
+              <div className="min-w-0 flex-1 space-y-2">
+                <p className="flex items-center gap-1.5 font-semibold text-foreground">
+                  <Lightbulb className="h-3.5 w-3.5 shrink-0 text-amber-500" />
+                  Real-world example
+                </p>
+                <div
+                  className={cn(
+                    'grid gap-2',
+                    showRwEn && showRwMl ? 'grid-cols-1 md:grid-cols-2' : 'grid-cols-1'
+                  )}
+                >
+                  {showRwEn ? (
+                    <div
+                      className="rounded-xl border border-border bg-muted/30 px-3 py-2.5"
+                      lang="en"
+                    >
+                      <p className="mb-1 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+                        English
+                      </p>
+                      <p className="break-words text-muted-foreground leading-relaxed">
+                        {realWorld.en}
+                      </p>
+                    </div>
+                  ) : null}
+                  {showRwMl ? (
+                    <div
+                      className="rounded-xl border border-amber-500/20 bg-amber-500/5 px-3 py-2.5"
+                      lang="ml"
+                    >
+                      <p className="mb-1 text-[11px] font-semibold uppercase tracking-wide text-amber-700 dark:text-amber-300">
+                        Malayalam
+                      </p>
+                      <p className="break-words text-foreground/90 leading-relaxed">
+                        {realWorld.ml}
+                      </p>
+                    </div>
+                  ) : null}
+                </div>
+              </div>
+              <CopyTextButton
+                text={realWorldCopy}
+                label="real-world example"
+                className="mt-0.5 shrink-0"
+              />
+            </div>
           </li>
         ) : null}
 

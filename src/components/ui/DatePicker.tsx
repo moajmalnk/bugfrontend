@@ -449,6 +449,7 @@ export function DatePicker(props: Props) {
                   }
                   if (e.key === "Escape" && open) {
                     e.preventDefault();
+                    e.stopPropagation();
                     setOpen(false);
                   }
                 }}

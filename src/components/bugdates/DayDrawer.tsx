@@ -1,4 +1,4 @@
-import { lazy, Suspense, useEffect, useRef, useState } from 'react';
+import { lazy, Suspense, useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { Link, useNavigate } from 'react-router-dom';
 import {
@@ -20,7 +20,11 @@ import {
   type BugDatesCalendarItem,
   type GrowthProgramSession,
 } from '@/services/bugDatesService';
-import { bugDatesItemChipClass } from '@/lib/bugDatesUi';
+import {
+  bugDatesItemChipClass,
+  findPosterItem,
+  posterItemKey,
+} from '@/lib/bugDatesUi';
 import { DayAttendanceSection } from './DayAttendanceSection';
 import { format, parseISO } from 'date-fns';
 
@@ -88,6 +92,10 @@ type Props = {
   canManage: boolean;
   canCreative: boolean;
   sessions: GrowthProgramSession[];
+  /** From ?poster= — restores Poster Studio after refresh / share. */
+  posterKey?: string | null;
+  onPosterOpen?: (key: string) => void;
+  onPosterClose?: () => void;
   onClose: () => void;
   onRefresh: () => void;
 };
@@ -99,12 +107,18 @@ export function DayDrawer({
   canManage,
   canCreative,
   sessions,
+  posterKey = null,
+  onPosterOpen,
+  onPosterClose,
   onClose,
   onRefresh,
 }: Props) {
   const navigate = useNavigate();
   const [busy, setBusy] = useState<string | null>(null);
-  const [posterItem, setPosterItem] = useState<BugDatesCalendarItem | null>(null);
+  const posterItem = useMemo(
+    () => findPosterItem(items, posterKey),
+    [items, posterKey]
+  );
   const posterOpenRef = useRef(false);
   posterOpenRef.current = posterItem !== null;
   const [teamCovered, setTeamCovered] = useState(true);
@@ -115,14 +129,16 @@ export function DayDrawer({
     recording_or_drive_link: '',
   });
 
+  /**
+   * Why: URL ?date= already owns the day entry; only intercept Back when the
+   * studio is closed so one Back closes the drawer without a blank pushState.
+   */
   useEffect(() => {
     if (!open) return;
-    // The poster studio owns the newer history entry; let it handle that Back press.
     const onPop = () => {
       if (posterOpenRef.current) return;
       onClose();
     };
-    window.history.pushState({ modal: 'bugdates-day' }, '');
     window.addEventListener('popstate', onPop);
     return () => window.removeEventListener('popstate', onPop);
   }, [open, onClose]);
@@ -171,9 +187,15 @@ export function DayDrawer({
     : null;
 
   const handlePosterSaved = (assetId: string) => {
-    setPosterItem(null);
+    onPosterClose?.();
     onClose();
     navigate(`../bugcreative?asset=${encodeURIComponent(assetId)}`);
+  };
+
+  const handleDesignPoster = (item: BugDatesCalendarItem) => {
+    const key = posterItemKey(item);
+    if (!key || !onPosterOpen) return;
+    onPosterOpen(key);
   };
 
   const handleTodo = async (item: BugDatesCalendarItem) => {
@@ -348,8 +370,8 @@ export function DayDrawer({
                           type="button"
                           size="sm"
                           className="h-10 w-full rounded-xl bg-gradient-to-r from-blue-600 to-indigo-700 font-semibold text-white shadow-md hover:from-blue-700 hover:to-indigo-800 sm:w-auto"
-                          disabled={!!busy || posterItem !== null}
-                          onClick={() => setPosterItem(item)}
+                          disabled={!!busy || posterItem !== null || !onPosterOpen}
+                          onClick={() => handleDesignPoster(item)}
                         >
                           <Palette className="h-3.5 w-3.5" />
                           <span className="ms-1.5">Design Poster</span>
@@ -490,7 +512,8 @@ export function DayDrawer({
             item={posterItem}
             occurrenceDate={date}
             session={posterSession}
-            onClose={() => setPosterItem(null)}
+            posterKey={posterKey}
+            onClose={() => onPosterClose?.()}
             onSaved={handlePosterSaved}
           />
         </Suspense>

@@ -9,7 +9,14 @@ import {
 } from '@/components/codo/CodoAnalyticsPanel';
 import { CodoExportPanel } from '@/components/codo/CodoExportPanel';
 import { CodoStandardCard } from '@/components/codo/CodoStandardCard';
+import { CodoTesterPlaybook } from '@/components/codo/CodoTesterPlaybook';
+import { CodoLangToggle } from '@/components/codo/CodoLangToggle';
 import { CodoRuleBody } from '@/components/codo/CodoRuleBody';
+import {
+  readStoredCodoContentLang,
+  writeStoredCodoContentLang,
+  type CodoContentLang,
+} from '@/lib/codo/codoContentLang';
 import { CodoRuleDialog } from '@/components/codo/CodoRuleDialog';
 import { Button } from '@/components/ui/button';
 import {
@@ -260,6 +267,14 @@ export default function CommonCodoRules() {
   const [expandedAck, setExpandedAck] = useState<Record<number, boolean>>({});
   const [isDownloadingReport, setIsDownloadingReport] = useState(false);
   const [isMobileTabSelectorOpen, setIsMobileTabSelectorOpen] = useState(false);
+  const [contentLang, setContentLang] = useState<CodoContentLang>(() =>
+    readStoredCodoContentLang()
+  );
+
+  const handleContentLangChange = useCallback((next: CodoContentLang) => {
+    setContentLang(next);
+    writeStoredCodoContentLang(next);
+  }, []);
 
   const load = useCallback(async () => {
     if (!canAccess || !modeAllowsView) return;
@@ -812,6 +827,7 @@ export default function CommonCodoRules() {
                   subtitle={rule.subtitle}
                   title={rule.title}
                   description={rule.description}
+                  contentLang={contentLang}
                 />
 
                 {rule.phase === 'project' && (rule.projects?.length || 0) > 0 ? (
@@ -1216,7 +1232,7 @@ export default function CommonCodoRules() {
                   {isAnalytics
                     ? 'Open analytics or filter by phase'
                     : isExport
-                      ? 'Export rules for Cursor, Antigravity, Android Studio, and other agents'
+                      ? 'Export rules and IDE settings.json for Cursor, Antigravity, Android Studio, and other agents'
                       : 'Filter CODO rules by phase'}
                 </DrawerDescription>
               </DrawerHeader>
@@ -1271,7 +1287,16 @@ export default function CommonCodoRules() {
           </Drawer>
 
           <TabsContent value={activeTab} className="space-y-4 sm:space-y-6 md:space-y-8 mt-4 sm:mt-6 min-w-0 w-full overflow-x-hidden">
-            {!loading && !isAnalytics && !isExport && <CodoStandardCard />}
+            {!loading && !isAnalytics && !isExport && (
+              <>
+                <CodoStandardCard />
+                <CodoTesterPlaybook
+                  defaultOpen={activeTab === 'tester'}
+                  contentLang={contentLang}
+                  onContentLangChange={handleContentLangChange}
+                />
+              </>
+            )}
             {!loading && (
               <div className="relative min-w-0">
                 <div className="absolute inset-0 bg-gradient-to-r from-gray-50/30 to-cyan-50/30 dark:from-gray-800/30 dark:to-cyan-900/30 rounded-2xl" />
@@ -1286,12 +1311,18 @@ export default function CommonCodoRules() {
                           Search & Filter
                         </h3>
                       </div>
-                      {hasActiveFilters ? (
-                        <div className="px-2 py-1 bg-cyan-100 dark:bg-cyan-900/30 text-cyan-700 dark:text-cyan-300 rounded-full text-xs font-medium whitespace-nowrap shrink-0">
-                          {activeFilterCount} filter
-                          {activeFilterCount !== 1 ? 's' : ''} active
-                        </div>
-                      ) : null}
+                      <div className="flex flex-wrap items-center gap-2 self-start sm:self-auto">
+                        <CodoLangToggle
+                          lang={contentLang}
+                          onChange={handleContentLangChange}
+                        />
+                        {hasActiveFilters ? (
+                          <div className="px-2 py-1 bg-cyan-100 dark:bg-cyan-900/30 text-cyan-700 dark:text-cyan-300 rounded-full text-xs font-medium whitespace-nowrap shrink-0">
+                            {activeFilterCount} filter
+                            {activeFilterCount !== 1 ? 's' : ''} active
+                          </div>
+                        ) : null}
+                      </div>
                     </div>
 
                     <div className="w-full min-w-0 relative group">

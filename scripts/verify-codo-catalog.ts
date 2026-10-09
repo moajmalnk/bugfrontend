@@ -9,6 +9,7 @@
 import { readdirSync, readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { CODO_REAL_WORLD_EXAMPLES } from '../src/lib/codo/codoRealWorldExamples';
 import { DEVELOPER_RULES, QA_STRESS_RULES } from '../src/lib/codo/complianceRules';
 import { CODO_SOP_EXAMPLES } from '../src/lib/codo/sopRuleExamples';
 
@@ -78,6 +79,10 @@ for (const key of allKeys) {
 for (const r of [...DEVELOPER_RULES, ...QA_STRESS_RULES]) {
   const ex = CODO_SOP_EXAMPLES[r.key];
   if (!ex?.bad || !ex?.good) errors.push(`${r.key} has no Bad/Good example`);
+  const rw = CODO_REAL_WORLD_EXAMPLES[r.key];
+  if (!rw?.en?.trim() || !rw?.ml?.trim()) {
+    errors.push(`${r.key} has no bilingual real-world example (en + ml)`);
+  }
   if (!/\n\nMalayalam:\s*\S/.test(r.description)) errors.push(`${r.key} has no Malayalam line`);
 }
 

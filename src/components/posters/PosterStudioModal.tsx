@@ -12,6 +12,7 @@ import {
   X,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { DatePicker } from '@/components/ui/DatePicker';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
@@ -24,11 +25,20 @@ import {
   type GrowthProgramSession,
 } from '@/services/bugDatesService';
 import { uploadCreativeFile } from '@/services/creativeService';
+import { userService } from '@/services/userService';
 import { notifyAdminNavCountsChanged } from '@/lib/navCountsEvents';
 import { resolveAvatarUrl } from '@/lib/avatarUrl';
+import type { User } from '@/types';
 import { POSTER_PALETTES, type PosterPaletteKey } from './brand/brandKit';
+import { PalettePicker } from './PalettePicker';
 import { loadPosterFonts } from './brand/posterFonts';
-import { buildPosterData, POSTER_FIELD_LABELS, POSTER_FIELD_LIMITS } from './posterData';
+import {
+  buildPosterData,
+  isRealPosterAvatar,
+  posterDisplayName,
+  POSTER_FIELD_LABELS,
+  POSTER_FIELD_LIMITS,
+} from './posterData';
 import {
   exportPosterNode,
   imageBlobToPosterDataUrl,
@@ -50,6 +60,8 @@ type Props = {
   item: BugDatesCalendarItem;
   occurrenceDate: string;
   session: GrowthProgramSession | null;
+  /** Stable key already in ?poster= — used to keep Back / share URLs correct. */
+  posterKey?: string | null;
   onClose: () => void;
   onSaved: (assetId: string) => void;
 };
@@ -59,6 +71,9 @@ type BusyState = null | 'ai' | 'save' | 'download' | 'image';
 
 const MULTILINE_FIELDS: PosterFieldKey[] = ['quote', 'tagline', 'malayalamLine'];
 const THUMB_WIDTH = 96;
+
+/** Flip when poster AI copy is wired and stable again. */
+const SHOW_AI_SUGGEST_COPY = false;
 
 const CHECKERBOARD =
   'repeating-conic-gradient(#d1d5db 0% 25%, #f9fafb 0% 50%) 50% / 16px 16px';
@@ -174,7 +189,14 @@ function PosterComposite({
  * Poster Studio: renders CODO-branded templates from BugDates data, lets the creator
  * polish copy/imagery, then exports a flat image and attaches it to a BugCreative draft.
  */
-export default function PosterStudioModal({ item, occurrenceDate, session, onClose, onSaved }: Props) {
+export default function PosterStudioModal({
+  item,
+  occurrenceDate,
+  session,
+  posterKey = null,
+  onClose,
+  onSaved,
+}: Props) {
   const category = String(item.layer || item.category || 'company_event');
   const templateOrder = useMemo(() => templatesForCategory(category), [category]);
   const initialData = useMemo(
@@ -193,6 +215,12 @@ export default function PosterStudioModal({ item, occurrenceDate, session, onClo
   const [imageError, setImageError] = useState('');
   const [imageUrl, setImageUrl] = useState('');
   const [previewWidth, setPreviewWidth] = useState(0);
+  const [teammates, setTeammates] = useState<User[]>([]);
+  const [teammatesLoading, setTeammatesLoading] = useState(false);
+  const [teammateQuery, setTeammateQuery] = useState('');
+  const [selectedSpeakerId, setSelectedSpeakerId] = useState<string | null>(
+    session?.host_user_id ?? null
+  );
 
   const posterRef = useRef<HTMLDivElement>(null);
   const previewBoxRef = useRef<HTMLDivElement>(null);
@@ -201,6 +229,7 @@ export default function PosterStudioModal({ item, occurrenceDate, session, onClo
   const busyRef = useRef<BusyState>(null);
   const skipConfirmRef = useRef(false);
   const savedRef = useRef(false);
+  const heroLoadedRef = useRef(false);
 
   const def = POSTER_TEMPLATES[templateKey];
   const plan = resolveRenderPlan(def, presetId);
@@ -228,22 +257,68 @@ export default function PosterStudioModal({ item, occurrenceDate, session, onClo
     setBusy(next);
   };
 
-  /** Birthday posters start with the teammate's profile photo; it is part of the baseline, not an edit. */
+  /**
+   * Prefill genuine BugRicer photos: birthday celebrant, or Growth Glimpse host.
+   * Why: posters should start from the real teammate photo, not an empty slot.
+   */
   useEffect(() => {
-    if (category !== 'birthday' || !item.avatar) return;
+    if (heroLoadedRef.current) return;
+    const avatar =
+      category === 'birthday' ? item.avatar : session?.host_avatar ?? null;
+    const label =
+      category === 'birthday'
+        ? item.username ?? 'User'
+        : session?.host_name ?? 'Speaker';
+    if (!isRealPosterAvatar(avatar)) return;
     const controller = new AbortController();
-    imageUrlToPosterDataUrl(resolveAvatarUrl(item.avatar, item.username ?? 'User'), controller.signal)
+    imageUrlToPosterDataUrl(resolveAvatarUrl(avatar, label), controller.signal)
       .then((url) => {
+        heroLoadedRef.current = true;
         setData((prev) => (prev.heroImage ? prev : { ...prev, heroImage: url }));
         setBaseline((prev) => ({ ...prev, heroImage: url }));
+        if (session?.host_user_id) setSelectedSpeakerId(session.host_user_id);
       })
       .catch(() => {
         if (!controller.signal.aborted) {
-          setImageError('Profile photo could not be loaded — upload a photo instead.');
+          setImageError('Profile photo could not be loaded — pick a teammate or upload a photo.');
         }
       });
     return () => controller.abort();
-  }, [category, item.avatar, item.username]);
+  }, [category, item.avatar, item.username, session?.host_avatar, session?.host_name, session?.host_user_id]);
+
+  /** Active Developers, Testers, and Creators only (poster speaker pick). */
+  useEffect(() => {
+    if (!def.usesHeroImage) return;
+    let alive = true;
+    setTeammatesLoading(true);
+    userService
+      .getStaffDirectory()
+      .then((users) => {
+        if (!alive) return;
+        setTeammates(users);
+        if (users.length === 0) {
+          setImageError('No active developers, testers, or creators found — upload a photo instead.');
+        }
+      })
+      .catch(() => {
+        if (alive) setImageError('Could not load teammates — upload a photo instead.');
+      })
+      .finally(() => {
+        if (alive) setTeammatesLoading(false);
+      });
+    return () => {
+      alive = false;
+    };
+  }, [def.usesHeroImage]);
+
+  const filteredTeammates = useMemo(() => {
+    const q = teammateQuery.trim().toLowerCase();
+    if (!q) return teammates;
+    return teammates.filter((u) => {
+      const hay = `${u.name ?? ''} ${u.username ?? ''} ${u.job_title ?? ''} ${u.role ?? ''}`.toLowerCase();
+      return hay.includes(q);
+    });
+  }, [teammates, teammateQuery]);
 
   useEffect(() => {
     let alive = true;
@@ -272,12 +347,23 @@ export default function PosterStudioModal({ item, occurrenceDate, session, onClo
     return () => ro.disconnect();
   }, [target.width, target.height]);
 
-  /** Back button closes the studio before the day drawer (history entry pushed on open). */
+  /**
+   * Why: Parent already pushed ?date=&poster=; we push one more identical entry so
+   * Back closes the studio first while the shareable URL stays correct.
+   */
   useEffect(() => {
-    window.history.pushState({ modal: 'poster-studio' }, '');
+    const params = new URLSearchParams(window.location.search);
+    if (occurrenceDate) params.set('date', occurrenceDate);
+    if (posterKey) params.set('poster', posterKey);
+    const qs = params.toString();
+    const href = `${window.location.pathname}${qs ? `?${qs}` : ''}${window.location.hash}`;
+
+    const repush = () => window.history.pushState({ modal: 'poster-studio' }, '', href);
+    repush();
+
     const onPop = () => {
       if (!skipConfirmRef.current && !savedRef.current && busyRef.current === 'save') {
-        window.history.pushState({ modal: 'poster-studio' }, '');
+        repush();
         return;
       }
       if (
@@ -286,14 +372,14 @@ export default function PosterStudioModal({ item, occurrenceDate, session, onClo
         dirtyRef.current &&
         !window.confirm('You have unsaved poster changes. Discard them?')
       ) {
-        window.history.pushState({ modal: 'poster-studio' }, '');
+        repush();
         return;
       }
       onClose();
     };
     window.addEventListener('popstate', onPop);
     return () => window.removeEventListener('popstate', onPop);
-  }, [onClose]);
+  }, [onClose, occurrenceDate, posterKey]);
 
   const requestClose = useCallback(() => {
     if (busyRef.current === 'save') return;
@@ -304,10 +390,11 @@ export default function PosterStudioModal({ item, occurrenceDate, session, onClo
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') {
-        e.stopPropagation();
-        requestClose();
-      }
+      if (e.key !== 'Escape') return;
+      // Why: nested pickers (poster date) must close before discarding the studio.
+      if (document.querySelector('[data-radix-popper-content-wrapper]')) return;
+      e.stopPropagation();
+      requestClose();
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
@@ -345,6 +432,28 @@ export default function PosterStudioModal({ item, occurrenceDate, session, onClo
       setBusyState(null);
       if (fileInputRef.current) fileInputRef.current.value = '';
     }
+  };
+
+  /** Apply a BugRicer teammate's name, role and genuine profile photo to the poster. */
+  const applyTeammate = async (user: User) => {
+    if (busyRef.current) return;
+    const name = posterDisplayName(user.name || user.username);
+    const role = String(user.job_title ?? '').trim();
+    setSelectedSpeakerId(user.id);
+    setData((prev) => ({
+      ...prev,
+      speakerName: name.slice(0, POSTER_FIELD_LIMITS.speakerName),
+      speakerRole: role
+        ? role.slice(0, POSTER_FIELD_LIMITS.speakerRole)
+        : prev.speakerRole,
+    }));
+    if (!isRealPosterAvatar(user.avatar)) {
+      setImageError(`${name} has no profile photo yet — ask them to upload one, or use Upload.`);
+      return;
+    }
+    await applyImage(() =>
+      imageUrlToPosterDataUrl(resolveAvatarUrl(user.avatar, name || user.username))
+    );
   };
 
   const handleSuggestCopy = async () => {
@@ -622,41 +731,14 @@ export default function PosterStudioModal({ item, occurrenceDate, session, onClo
             </div>
 
             {def.palettes.length > 0 && (
-            <div className="flex flex-col gap-2">
-              <h3 className="text-sm font-bold text-gray-900 dark:text-white">Palette</h3>
-              <div className="flex flex-wrap gap-2">
-                {def.palettes.map((k) => {
-                  const p = POSTER_PALETTES[k];
-                  return (
-                    <button
-                      key={k}
-                      type="button"
-                      onClick={() => setPaletteKey(k)}
-                      aria-pressed={paletteKey === k}
-                      className={`flex h-9 items-center gap-2 rounded-xl border px-2.5 text-xs font-semibold transition ${
-                        paletteKey === k
-                          ? 'border-blue-600 ring-2 ring-blue-600/30'
-                          : 'border-gray-200 dark:border-gray-700'
-                      } text-gray-700 dark:text-gray-200`}
-                    >
-                      <span
-                        className="h-5 w-5 rounded-full border border-black/10"
-                        style={{
-                          background:
-                            p.background === 'transparent'
-                              ? `linear-gradient(135deg, ${p.ink} 50%, transparent 50%), ${CHECKERBOARD}`
-                              : `linear-gradient(135deg, ${p.background} 50%, ${p.accent} 50%)`,
-                        }}
-                      />
-                      {p.label}
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
+              <PalettePicker
+                options={def.palettes}
+                value={paletteKey}
+                onChange={setPaletteKey}
+              />
             )}
 
-            {def.fields.length > 0 && !!item.id && (
+            {SHOW_AI_SUGGEST_COPY && def.fields.length > 0 && !!item.id && (
             <div className="flex flex-col gap-2 rounded-2xl border border-indigo-200/70 bg-indigo-50/60 p-3 dark:border-indigo-900/50 dark:bg-indigo-950/30">
               <Button
                 type="button"
@@ -728,15 +810,17 @@ export default function PosterStudioModal({ item, occurrenceDate, session, onClo
 
               {def.showsDate && (
                 <div className="flex flex-col gap-1.5">
-                  <Label htmlFor="poster-date" className="text-xs font-semibold">
-                    Poster date
-                  </Label>
-                  <Input
-                    id="poster-date"
-                    type="date"
-                    value={data.dateIso ?? ''}
-                    onChange={(e) => setData((prev) => ({ ...prev, dateIso: e.target.value || null }))}
-                    className="h-10 rounded-xl border-gray-200 bg-white dark:border-gray-700 dark:bg-gray-800"
+                  <Label className="text-xs font-semibold">Poster date</Label>
+                  <DatePicker
+                    value={data.dateIso ?? undefined}
+                    onChange={(iso) =>
+                      setData((prev) => ({ ...prev, dateIso: iso.trim() ? iso : null }))
+                    }
+                    placeholder="Pick poster date"
+                    displayFormat="d MMM yyyy"
+                    className="rounded-xl"
+                    fromYear={2024}
+                    toYear={new Date().getFullYear() + 3}
                   />
                 </div>
               )}
@@ -757,22 +841,101 @@ export default function PosterStudioModal({ item, occurrenceDate, session, onClo
             )}
 
             {def.usesHeroImage && (
-              <div className="flex flex-col gap-2">
-                <h3 className="text-sm font-bold text-gray-900 dark:text-white">{def.heroImageLabel ?? 'Image'}</h3>
+              <div className="flex flex-col gap-3">
+                <h3 className="text-sm font-bold text-gray-900 dark:text-white">
+                  {def.heroImageLabel ?? 'Image'}
+                </h3>
+
+                <div className="flex flex-col gap-2 rounded-2xl border border-gray-200/80 bg-gray-50/80 p-3 dark:border-gray-700/80 dark:bg-gray-800/40">
+                  <div className="flex items-center justify-between gap-2">
+                    <p className="text-xs font-semibold text-gray-800 dark:text-gray-200">
+                      Developers, testers & creators
+                    </p>
+                    <span className="text-[10px] tabular-nums text-muted-foreground">
+                      {teammatesLoading
+                        ? 'Loading…'
+                        : `${filteredTeammates.length}${teammateQuery.trim() ? ` / ${teammates.length}` : ''} people`}
+                    </span>
+                  </div>
+                  <Input
+                    type="search"
+                    placeholder="Search name, role or job title…"
+                    maxLength={80}
+                    value={teammateQuery}
+                    onChange={(e) => setTeammateQuery(e.target.value.slice(0, 80))}
+                    className="h-9 rounded-xl border-gray-200 bg-white dark:border-gray-700 dark:bg-gray-900"
+                  />
+                  <div className="grid max-h-64 grid-cols-1 gap-1.5 overflow-y-auto custom-scrollbar sm:grid-cols-2">
+                    {teammatesLoading && (
+                      <div className="col-span-full flex items-center justify-center gap-2 py-6 text-xs text-muted-foreground">
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                        Loading teammates…
+                      </div>
+                    )}
+                    {!teammatesLoading &&
+                      filteredTeammates.map((user) => {
+                      const label = posterDisplayName(user.name || user.username);
+                      const active = selectedSpeakerId === user.id;
+                      const thumb = resolveAvatarUrl(user.avatar, label || user.username);
+                      return (
+                        <button
+                          key={user.id}
+                          type="button"
+                          disabled={busy !== null}
+                          onClick={() => void applyTeammate(user)}
+                          className={`flex min-w-0 items-center gap-2 rounded-xl border px-2 py-1.5 text-start transition ${
+                            active
+                              ? 'border-blue-600 bg-blue-50 ring-2 ring-blue-600/25 dark:bg-blue-950/40'
+                              : 'border-transparent hover:border-gray-200 hover:bg-white dark:hover:border-gray-600 dark:hover:bg-gray-900'
+                          }`}
+                        >
+                          <img
+                            src={thumb}
+                            alt=""
+                            className="h-9 w-9 shrink-0 rounded-full bg-muted object-cover"
+                          />
+                          <span className="min-w-0 flex-1">
+                            <span className="block truncate text-xs font-semibold text-gray-900 dark:text-white">
+                              {label || user.username}
+                            </span>
+                            <span className="block truncate text-[10px] text-muted-foreground">
+                              {user.job_title?.trim() || user.role || user.username}
+                            </span>
+                          </span>
+                        </button>
+                      );
+                    })}
+                    {!teammatesLoading && filteredTeammates.length === 0 && (
+                      <p className="col-span-full px-1 py-2 text-xs text-muted-foreground">
+                        {teammates.length === 0
+                          ? 'No active developers, testers, or creators available.'
+                          : 'No teammates match that search.'}
+                      </p>
+                    )}
+                  </div>
+                </div>
+
                 {data.heroImage ? (
                   <div className="flex items-center gap-3 rounded-xl border border-gray-200 p-2 dark:border-gray-700">
                     <img
                       src={data.heroImage}
                       alt="Selected poster visual"
-                      className="h-16 w-16 rounded-lg bg-gray-100 object-contain dark:bg-gray-800"
+                      className="h-16 w-16 rounded-lg bg-gray-100 object-cover dark:bg-gray-800"
                     />
-                    <span className="min-w-0 flex-1 text-xs text-muted-foreground">Image added</span>
+                    <span className="min-w-0 flex-1 text-xs text-muted-foreground">
+                      {data.speakerName
+                        ? `${data.speakerName}${data.speakerRole ? ` · ${data.speakerRole}` : ''}`
+                        : 'Photo ready'}
+                    </span>
                     <Button
                       type="button"
                       variant="ghost"
                       size="sm"
                       className="h-9 rounded-xl text-red-600 hover:text-red-700"
-                      onClick={() => setData((prev) => ({ ...prev, heroImage: null }))}
+                      onClick={() => {
+                        setSelectedSpeakerId(null);
+                        setData((prev) => ({ ...prev, heroImage: null }));
+                      }}
                       disabled={busy !== null}
                     >
                       <Trash2 className="h-4 w-4" />
@@ -793,7 +956,7 @@ export default function PosterStudioModal({ item, occurrenceDate, session, onClo
                     )}
                     <span className="font-semibold">Upload PNG, JPG or WebP (max 10MB)</span>
                     <span className="text-muted-foreground">
-                      Tip: a transparent cut-out (remove.bg) looks best on these layouts.
+                      Optional: a transparent cut-out looks closest to the master art.
                     </span>
                   </button>
                 )}
@@ -804,7 +967,10 @@ export default function PosterStudioModal({ item, occurrenceDate, session, onClo
                   className="hidden"
                   onChange={(e) => {
                     const f = e.target.files?.[0];
-                    if (f) void applyImage(() => imageBlobToPosterDataUrl(f));
+                    if (f) {
+                      setSelectedSpeakerId(null);
+                      void applyImage(() => imageBlobToPosterDataUrl(f));
+                    }
                   }}
                 />
                 <div className="flex gap-2">
@@ -824,7 +990,10 @@ export default function PosterStudioModal({ item, occurrenceDate, session, onClo
                     variant="outline"
                     className="h-10 rounded-xl"
                     disabled={busy !== null || !/^https?:\/\//i.test(imageUrl.trim())}
-                    onClick={() => applyImage(() => imageUrlToPosterDataUrl(imageUrl.trim()))}
+                    onClick={() => {
+                      setSelectedSpeakerId(null);
+                      void applyImage(() => imageUrlToPosterDataUrl(imageUrl.trim()));
+                    }}
                   >
                     <ImagePlus className="h-4 w-4" />
                     <span className="ms-1">Use</span>

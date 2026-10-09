@@ -104,9 +104,7 @@ const PrivacyPolicy = () => {
                 </p>
                 <ul className="list-disc list-inside space-y-2 text-slate-700 dark:text-slate-300">
                   <li><strong>Sign in with Google (openid, email, profile):</strong> Your Google account ID, email address, name, and profile picture are used to create or sign in to your BugRicer account</li>
-                  <li><strong>Google Docs (documents):</strong> Create and edit BugDocs documents that you start from BugRicer</li>
-                  <li><strong>Google Sheets (spreadsheets):</strong> Create and edit BugSheets spreadsheets that you start from BugRicer</li>
-                  <li><strong>Google Drive (drive.file):</strong> Access only the files BugRicer creates or that you open with BugRicer; we cannot see the rest of your Drive</li>
+                  <li><strong>Google Drive (drive.file):</strong> Create and edit only the Google Docs and Sheets that BugRicer creates or that you open with BugRicer (BugDocs / BugSheets); we cannot see the rest of your Drive</li>
                   <li><strong>Google Calendar events (calendar.events):</strong> Create calendar events with Google Meet links when you schedule a BugMeet meeting</li>
                   <li><strong>Storage:</strong> We store an OAuth refresh token (to keep the integration working) and your Google email on our servers. We do not store the contents of your Google files outside the documents you create through BugRicer</li>
                   <li><strong>No sharing or selling:</strong> Google user data is never sold, used for advertising, or shared with third parties, except as required by law</li>

@@ -1,3 +1,4 @@
+import { getCodoRealWorldExample } from '@/lib/codo/codoRealWorldExamples';
 import { buildCodoStandardMarkdown } from '@/lib/codo/codoStandard';
 import { DEVELOPER_RULES, QA_STRESS_RULES } from '@/lib/codo/complianceRules';
 import {
@@ -12,6 +13,20 @@ export type CodoAgentExportId =
   | 'android-studio'
   | 'generic';
 
+/** Companion IDE settings.json pack for VS Code–compatible editors (Cursor, Antigravity). */
+export type CodoIdeSettingsBundle = {
+  filename: string;
+  mimeType: string;
+  /** Preferred shared path committed to the repo */
+  workspaceTargetPath: string;
+  /** User-level path (macOS) for personal merge */
+  userTargetPathMac: string;
+  /** User-level path (Windows) for personal merge */
+  userTargetPathWindows: string;
+  installHint: string;
+  usageSteps: string[];
+};
+
 export type CodoAgentExportFormat = {
   id: CodoAgentExportId;
   name: string;
@@ -24,6 +39,144 @@ export type CodoAgentExportFormat = {
   installHint: string;
   usageSteps: string[];
   accent: string;
+  /** When set, Export panel also offers a recommended settings.json download. */
+  ideSettings?: CodoIdeSettingsBundle;
+};
+
+/**
+ * Why: Cursor and Antigravity both read VS Code–compatible settings.json.
+ * CODO exports this pack so every IDE user gets the same editor quality defaults
+ * (format-on-save, ESLint, Problems panel, git decorations) alongside rule files.
+ * JSONC comments are intentional — both IDEs accept them.
+ */
+export function buildCodoIdeSettingsJson(): string {
+  return `{
+  // BugRicer CODO — recommended IDE settings (Cursor / Antigravity / VS Code)
+  // Prefer workspace: .vscode/settings.json (shared via git).
+  // Or merge into your User settings.json (see Export → How to use).
+
+  // ── Appearance ──
+  "window.commandCenter": true,
+  "editor.fontSize": 14,
+  "editor.lineHeight": 22,
+  "editor.fontLigatures": true,
+  "editor.bracketPairColorization.enabled": true,
+  "editor.guides.bracketPairs": true,
+  "editor.renderWhitespace": "boundary",
+  "editor.rulers": [80, 120],
+  "breadcrumbs.enabled": true,
+
+  // ── Editing quality (CODO) ──
+  "editor.formatOnSave": true,
+  "editor.codeActionsOnSave": {
+    "source.fixAll.eslint": "explicit",
+    "source.organizeImports": "explicit"
+  },
+  "editor.tabSize": 2,
+  "editor.insertSpaces": true,
+  "editor.linkedEditing": true,
+  "editor.suggestSelection": "first",
+  "editor.quickSuggestions": {
+    "strings": true
+  },
+
+  // ── Files ──
+  "files.autoSave": "afterDelay",
+  "files.autoSaveDelay": 1000,
+  "files.trimTrailingWhitespace": true,
+  "files.insertFinalNewline": true,
+  "files.exclude": {
+    "**/.git": true,
+    "**/node_modules": true,
+    "**/dist": true,
+    "**/.vite": true
+  },
+
+  // ── TypeScript / JavaScript ──
+  "js/ts.updateImportsOnFileMove.enabled": "always",
+  "js/ts.preferences.importModuleSpecifier": "non-relative",
+  "js/ts.suggest.autoImports": true,
+  "js/ts.tsserver.experimental.enableProjectDiagnostics": true,
+
+  // ── Problems panel ──
+  "problems.autoReveal": true,
+  "problems.visibility": true,
+  "problems.decorations.enabled": true,
+  "problems.showCurrentInStatus": true,
+  "problems.sortOrder": "severity",
+  "problems.defaultViewMode": "tree",
+  "editor.renderValidationDecorations": "on",
+  "workbench.editor.decorations.badges": true,
+  "workbench.editor.decorations.colors": true,
+
+  // ── Dart / Flutter (optional — ignore if unused) ──
+  "dart.onlyAnalyzeProjectsWithOpenFiles": false,
+  "dart.showTodos": false,
+
+  // ── Terminal ──
+  "terminal.integrated.enableMultiLinePasteWarning": "never",
+  "explorer.confirmDelete": false,
+
+  // ── Git: always see what changed ──
+  "git.enabled": true,
+  "git.autofetch": true,
+  "git.confirmSync": false,
+  "git.enableSmartCommit": false,
+  "git.openRepositoryInParentFolders": "always",
+  "git.decorations.enabled": true,
+  "explorer.decorations.badges": true,
+  "explorer.decorations.colors": true,
+  "scm.diffDecorations": "all",
+  "scm.diffDecorationsGutterVisibility": "always",
+  "scm.defaultViewMode": "tree",
+  "scm.alwaysShowRepositories": true,
+  "scm.countBadge": "all",
+  "scm.showIncomingChanges": "always",
+  "scm.showOutgoingChanges": "always",
+
+  // ── Misc ──
+  "window.autoDetectColorScheme": false,
+  "editor.accessibilitySupport": "on"
+}
+`;
+}
+
+const CURSOR_IDE_SETTINGS: CodoIdeSettingsBundle = {
+  filename: 'settings.json',
+  mimeType: 'application/json;charset=utf-8',
+  workspaceTargetPath: '.vscode/settings.json',
+  userTargetPathMac: '~/Library/Application Support/Cursor/User/settings.json',
+  userTargetPathWindows: '%APPDATA%\\Cursor\\User\\settings.json',
+  installHint:
+    'VS Code–compatible settings.json — save as workspace `.vscode/settings.json` or merge into Cursor User settings.',
+  usageSteps: [
+    'Click **Download settings.json** (or **Copy settings**) on the Cursor card.',
+    '**Recommended (team):** create `.vscode/` in the repo root and save as `.vscode/settings.json`, then commit it.',
+    '**Personal merge:** open **Cursor → Settings → Open User Settings (JSON)** and merge keys (do not wipe your theme or extensions).',
+    'macOS user file: `~/Library/Application Support/Cursor/User/settings.json`.',
+    'Windows user file: `%APPDATA%\\Cursor\\User\\settings.json`.',
+    'Reload the window (**Developer: Reload Window**) so format-on-save, ESLint, and Problems decorations apply.',
+    'Confirm: Problems panel shows errors, Save runs format + ESLint fix, and git decorations appear in the explorer.',
+  ],
+};
+
+const ANTIGRAVITY_IDE_SETTINGS: CodoIdeSettingsBundle = {
+  filename: 'settings.json',
+  mimeType: 'application/json;charset=utf-8',
+  workspaceTargetPath: '.vscode/settings.json',
+  userTargetPathMac: '~/Library/Application Support/Antigravity/User/settings.json',
+  userTargetPathWindows: '%APPDATA%\\Antigravity\\User\\settings.json',
+  installHint:
+    'VS Code–compatible settings.json — save as workspace `.vscode/settings.json` or merge into Antigravity User settings.',
+  usageSteps: [
+    'Click **Download settings.json** (or **Copy settings**) on the Antigravity card.',
+    '**Recommended (team):** create `.vscode/` in the repo root and save as `.vscode/settings.json`, then commit it (same file works in Cursor and Antigravity).',
+    '**Personal merge:** open **Antigravity → Settings → Open User Settings (JSON)** and merge keys without removing your personal theme.',
+    'macOS user file: `~/Library/Application Support/Antigravity/User/settings.json`.',
+    'Windows user file: `%APPDATA%\\Antigravity\\User\\settings.json`.',
+    'Restart Antigravity or reload the window so editor and git settings take effect.',
+    'Confirm: format-on-save, Problems decorations, and git change badges match the CODO defaults.',
+  ],
 };
 
 export const CODO_AGENT_EXPORT_FORMATS: CodoAgentExportFormat[] = [
@@ -31,41 +184,47 @@ export const CODO_AGENT_EXPORT_FORMATS: CodoAgentExportFormat[] = [
     id: 'cursor',
     name: 'Cursor rules',
     shortName: 'Cursor',
-    description: 'Project rule for Cursor Agent (.mdc with alwaysApply frontmatter).',
+    description:
+      'Project rule (.mdc) plus recommended settings.json for Cursor Agent and editor quality.',
     filename: 'bugricer-codo.mdc',
     fileExtension: '.mdc',
     mimeType: 'text/plain;charset=utf-8',
     targetPath: '.cursor/rules/bugricer-codo.mdc',
-    installHint: 'Text rule file — save under .cursor/rules/ in your repo.',
+    installHint: 'Text rule file — save under .cursor/rules/ in your repo. Also download settings.json below.',
     usageSteps: [
       'Click **Download .mdc** (or **Copy**) to export your selected CODO rules.',
       'In your project repository, create the folder `.cursor/rules/` if it does not exist.',
       'Save the file as `bugricer-codo.mdc` inside `.cursor/rules/`.',
+      'Also download **settings.json** (same card) and save as `.vscode/settings.json` or merge into Cursor User settings — see **IDE settings** steps.',
       'Open the project in **Cursor** — rules with `alwaysApply: true` load automatically for Agent.',
       'Optional: open **Cursor Settings → Rules** to confirm the rule appears and is enabled.',
-      'Commit the file to git so every developer on the team shares the same CODO rules.',
+      'Commit both `.cursor/rules/bugricer-codo.mdc` and `.vscode/settings.json` so the team shares CODO rules and editor defaults.',
     ],
     accent: 'from-violet-500 to-fuchsia-600',
+    ideSettings: CURSOR_IDE_SETTINGS,
   },
   {
     id: 'antigravity',
     name: 'Antigravity rules',
     shortName: 'Antigravity',
-    description: 'Agent instruction pack formatted for Antigravity / agent workspaces.',
+    description:
+      'Agent instruction pack plus recommended settings.json for Antigravity / agent workspaces.',
     filename: 'ANTIGRAVITY_RULES.md',
     fileExtension: '.md',
     mimeType: 'text/plain;charset=utf-8',
     targetPath: 'docs/ANTIGRAVITY_RULES.md',
-    installHint: 'Markdown text file — add to your Antigravity agent workspace.',
+    installHint: 'Markdown text file — add to your Antigravity agent workspace. Also download settings.json below.',
     usageSteps: [
       'Click **Download .md** (or **Copy**) to export your selected CODO rules.',
       'Open your **Antigravity** agent workspace or project folder.',
       'Save the file as `ANTIGRAVITY_RULES.md` in your agent rules folder or `docs/` directory.',
+      'Also download **settings.json** (same card) and save as `.vscode/settings.json` or merge into Antigravity User settings — see **IDE settings** steps.',
       'In Antigravity, point the agent to this file as persistent project instructions (workspace rules).',
       'Start a new agent session so the updated rules are loaded into context.',
-      'Keep the file in version control so rule updates sync across the team.',
+      'Commit both the rules file and `.vscode/settings.json` so rule and editor updates sync across the team.',
     ],
     accent: 'from-sky-500 to-indigo-600',
+    ideSettings: ANTIGRAVITY_IDE_SETTINGS,
   },
   {
     id: 'android-studio',
@@ -169,6 +328,7 @@ function groupByPhase(rules: CodoCommonRule[]): Array<{ phase: CodoRulePhase; ru
 function ruleBlock(rule: CodoCommonRule): string {
   const { requirement, malayalam } = parseCodoRuleDescription(rule.description || '');
   const examples = CODO_SOP_EXAMPLES[rule.rule_key];
+  const realWorld = getCodoRealWorldExample(rule.rule_key);
   const lines = [`### ${rule.title.trim()}`, ''];
 
   if (rule.subtitle?.trim()) {
@@ -184,6 +344,11 @@ function ruleBlock(rule: CodoCommonRule): string {
   }
   if (!requirement && !malayalam) {
     lines.push(rule.description.trim() || '_No description._', '');
+  }
+
+  if (realWorld) {
+    lines.push(`**Real-world example:** ${realWorld.en}`, '');
+    lines.push(`**Malayalam (real-world):** ${realWorld.ml}`, '');
   }
 
   if (examples?.bad) {

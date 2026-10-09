@@ -66,6 +66,10 @@ export type GrowthProgramSession = {
   session_date: string;
   host_user_id?: string | null;
   host_name?: string | null;
+  /** Job title from users.job_title — used on Growth Glimpse name badges. */
+  host_job_title?: string | null;
+  /** Resolved BugRicer profile photo path for the session host. */
+  host_avatar?: string | null;
   agenda_topic?: string | null;
   summary_notes?: string | null;
   recording_or_drive_link?: string | null;

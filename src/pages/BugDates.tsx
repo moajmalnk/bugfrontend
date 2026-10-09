@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import {
   addMonths,
   eachDayOfInterval,
@@ -7,6 +8,8 @@ import {
   format,
   isSameDay,
   isSameMonth,
+  isValid,
+  parseISO,
   startOfMonth,
   startOfWeek,
   subMonths,
@@ -41,11 +44,19 @@ import {
 } from '@/services/bugDatesService';
 import {
   BUGDATES_CONTENT_LAYERS,
+  BUGDATES_DATE_PARAM,
+  BUGDATES_POSTER_PARAM,
   bugDatesItemChipClass,
+  findPosterItem,
   isTentativeBugDatesItem,
   sortBugDatesDayItems,
 } from '@/lib/bugDatesUi';
 import { cn, getEffectiveRole, hasPermissionOrAdmin } from '@/lib/utils';
+
+function isYmd(value: string | null): value is string {
+  if (!value || !/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
+  return isValid(parseISO(value));
+}
 
 const FILTERS: { key: string; label: string; dot: string }[] = [
   { key: 'growth_program', label: 'Programs', dot: 'bg-teal-500' },
@@ -122,6 +133,7 @@ function ConfirmDeleteModal({
 export default function BugDates() {
   const { currentUser } = useAuth();
   const { hasPermission } = usePermissions(null);
+  const [searchParams, setSearchParams] = useSearchParams();
   const role = getEffectiveRole(currentUser);
   const canView =
     hasPermissionOrAdmin(role, hasPermission, 'BUGDATES_VIEW') ||
@@ -132,16 +144,91 @@ export default function BugDates() {
   const canCreative =
     hasPermissionOrAdmin(role, hasPermission, 'CREATIVE_CREATE') || canManage;
 
-  const [cursor, setCursor] = useState(() => startOfMonth(new Date()));
+  const dateFromUrl = searchParams.get(BUGDATES_DATE_PARAM);
+  const posterFromUrl = searchParams.get(BUGDATES_POSTER_PARAM);
+
+  const [cursor, setCursor] = useState(() => {
+    if (isYmd(dateFromUrl)) return startOfMonth(parseISO(dateFromUrl));
+    return startOfMonth(new Date());
+  });
   const [items, setItems] = useState<BugDatesCalendarItem[]>([]);
   const [sessions, setSessions] = useState<GrowthProgramSession[]>([]);
   const [loading, setLoading] = useState(true);
   const [filters, setFilters] = useState<string[]>([]);
-  const [selectedDate, setSelectedDate] = useState<string | null>(null);
+  const [selectedDate, setSelectedDate] = useState<string | null>(() =>
+    isYmd(dateFromUrl) ? dateFromUrl : null
+  );
+  const [posterKey, setPosterKey] = useState<string | null>(() =>
+    posterFromUrl && posterFromUrl.trim() ? posterFromUrl.trim() : null
+  );
   const [formOpen, setFormOpen] = useState(false);
   const [editing, setEditing] = useState<BugDatesEvent | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<BugDatesCalendarItem | null>(null);
   const [deleting, setDeleting] = useState(false);
+
+  /**
+   * Why: Keep the address bar shareable (/bugdates?date=&poster=) and restore
+   * day/poster after refresh or role-prefixed deep links.
+   */
+  const syncBugDatesUrl = useCallback(
+    (nextDate: string | null, nextPoster: string | null, mode: 'push' | 'replace' = 'replace') => {
+      setSearchParams(
+        (prev) => {
+          const next = new URLSearchParams(prev);
+          if (nextDate) next.set(BUGDATES_DATE_PARAM, nextDate);
+          else next.delete(BUGDATES_DATE_PARAM);
+          if (nextPoster) next.set(BUGDATES_POSTER_PARAM, nextPoster);
+          else next.delete(BUGDATES_POSTER_PARAM);
+          return next;
+        },
+        { replace: mode === 'replace' }
+      );
+    },
+    [setSearchParams]
+  );
+
+  const openDay = useCallback(
+    (day: string) => {
+      setSelectedDate(day);
+      setPosterKey(null);
+      setCursor(startOfMonth(parseISO(day)));
+      syncBugDatesUrl(day, null, 'push');
+    },
+    [syncBugDatesUrl]
+  );
+
+  const closeDay = useCallback(() => {
+    setSelectedDate(null);
+    setPosterKey(null);
+    syncBugDatesUrl(null, null, 'replace');
+  }, [syncBugDatesUrl]);
+
+  const openPoster = useCallback(
+    (key: string) => {
+      if (!selectedDate) return;
+      setPosterKey(key);
+      syncBugDatesUrl(selectedDate, key, 'push');
+    },
+    [selectedDate, syncBugDatesUrl]
+  );
+
+  const closePoster = useCallback(() => {
+    setPosterKey(null);
+    if (selectedDate) syncBugDatesUrl(selectedDate, null, 'replace');
+    else syncBugDatesUrl(null, null, 'replace');
+  }, [selectedDate, syncBugDatesUrl]);
+
+  // Browser Back / Forward: mirror search params into local overlay state.
+  useEffect(() => {
+    const date = isYmd(dateFromUrl) ? dateFromUrl : null;
+    const poster = posterFromUrl?.trim() || null;
+    setSelectedDate(date);
+    setPosterKey(date && poster ? poster : null);
+    if (date) {
+      const month = startOfMonth(parseISO(date));
+      setCursor((prev) => (isSameMonth(prev, month) ? prev : month));
+    }
+  }, [dateFromUrl, posterFromUrl]);
 
   const range = useMemo(() => {
     const monthStart = startOfMonth(cursor);
@@ -211,6 +298,15 @@ export default function BugDates() {
     () => items.filter((i) => i.source === 'event' || !i.source).length || items.length,
     [items]
   );
+
+  // Drop stale ?poster= after calendar loads (event deleted / wrong day).
+  useEffect(() => {
+    if (loading || !posterKey || !selectedDate) return;
+    if (!findPosterItem(selectedItems, posterKey)) {
+      setPosterKey(null);
+      syncBugDatesUrl(selectedDate, null, 'replace');
+    }
+  }, [loading, posterKey, selectedDate, selectedItems, syncBugDatesUrl]);
 
   const toggleFilter = (key: string) => {
     setFilters((prev) =>
@@ -412,7 +508,7 @@ export default function BugDates() {
                   <button
                     key={key}
                     type="button"
-                    onClick={() => setSelectedDate(key)}
+                    onClick={() => openDay(key)}
                     className={cn(
                       'min-h-[72px] sm:min-h-[96px] p-1 sm:p-1.5 text-left transition-all duration-200',
                       isHoliday
@@ -503,7 +599,7 @@ export default function BugDates() {
                   <li key={`${item.id ?? item.title}-${item.occurrence_date}`}>
                     <button
                       type="button"
-                      onClick={() => setSelectedDate(item.occurrence_date)}
+                      onClick={() => openDay(item.occurrence_date)}
                       className={cn(
                         'w-full grid grid-cols-12 gap-3 items-start rounded-xl border px-3 py-2.5 text-left transition-all duration-200',
                         'border-gray-200/70 dark:border-gray-700/70 hover:bg-blue-50/60 dark:hover:bg-blue-950/30',
@@ -607,7 +703,10 @@ export default function BugDates() {
         canManage={canManage}
         canCreative={canCreative}
         sessions={sessions}
-        onClose={() => setSelectedDate(null)}
+        posterKey={posterKey}
+        onPosterOpen={openPoster}
+        onPosterClose={closePoster}
+        onClose={closeDay}
         onRefresh={load}
       />
 

@@ -1,3 +1,4 @@
+import { getCodoRealWorldExample } from "@/lib/codo/codoRealWorldExamples";
 import {
   CODO_SOP_EXAMPLES,
   parseCodoRuleDescription,
@@ -75,6 +76,7 @@ export const downloadCodoRulesPdf = async (options: DownloadCodoRulesPdfOptions)
       items: rules.map((rule, index) => {
         const { requirement, malayalam } = parseCodoRuleDescription(rule.description);
         const examples = CODO_SOP_EXAMPLES[rule.ruleKey];
+        const realWorld = getCodoRealWorldExample(rule.ruleKey);
         return {
           ref: formatRef(def.prefix, rule.sortOrder ?? index + 1),
           key: rule.ruleKey,
@@ -83,6 +85,8 @@ export const downloadCodoRulesPdf = async (options: DownloadCodoRulesPdfOptions)
           fields: [
             { kind: "text", label: "Requirement", value: requirement, emphasis: true },
             { kind: "malayalam", label: "Malayalam", value: malayalam },
+            { kind: "text", label: "Real-world example", value: realWorld?.en },
+            { kind: "malayalam", label: "Malayalam (real-world)", value: realWorld?.ml },
             { kind: "bad", label: "Non-compliant", value: examples?.bad },
             {
               kind: "good",
@@ -114,6 +118,7 @@ export const downloadCodoRulesPdf = async (options: DownloadCodoRulesPdfOptions)
     readingGuide: [
       "Each rule has a reference code such as DEV-08 or QA-02. Cite it in code reviews, bug reports, and QA rejections.",
       "The requirement is the enforceable standard. The Malayalam line states the same rule for local teams.",
+      "Real-world example (English + Malayalam) shows a concrete BugRicer-style failure so juniors understand why the rule exists.",
       "Non-compliant shows the pattern reviewers reject; Compliant shows the pattern they accept.",
       "Common CODO governs. Where Cursor Tips or any other guide disagrees, follow CODO.",
     ],

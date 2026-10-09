@@ -87,11 +87,7 @@ export function SpeakerSessionTemplate({ data, palette, size }: PosterTemplatePr
           }}
         />
         {data.heroImage ? (
-          <HeroImage
-            src={data.heroImage}
-            alt={data.speakerName || 'Speaker'}
-            grayscale
-            fit="cover"
+          <div
             style={{
               position: 'absolute',
               left: 0,
@@ -99,9 +95,25 @@ export function SpeakerSessionTemplate({ data, palette, size }: PosterTemplatePr
               bottom: 0,
               width: '100%',
               height: '100%',
-              objectPosition: 'top center',
+              overflow: 'hidden',
+              WebkitMaskImage:
+                'linear-gradient(to bottom, #000 0%, #000 78%, rgba(0,0,0,0.45) 92%, transparent 100%)',
+              maskImage:
+                'linear-gradient(to bottom, #000 0%, #000 78%, rgba(0,0,0,0.45) 92%, transparent 100%)',
             }}
-          />
+          >
+            <HeroImage
+              src={data.heroImage}
+              alt={data.speakerName || 'Speaker'}
+              grayscale
+              fit="cover"
+              style={{
+                width: '100%',
+                height: '100%',
+                objectPosition: 'top center',
+              }}
+            />
+          </div>
         ) : (
           <div
             style={{
@@ -185,15 +197,26 @@ export function SpeakerSessionTemplate({ data, palette, size }: PosterTemplatePr
                 fontSize: 76 * s,
                 fontWeight: 800,
                 color: palette.accent,
+                lineHeight: 1,
               }}
             >
               {date.day}
             </div>
-            <div style={{ lineHeight: 1.1 }}>
-              <div style={{ fontSize: 46 * s, fontWeight: 600 }}>
+            <div
+              style={{
+                display: 'flex',
+                flexDirection: 'column',
+                justifyContent: 'center',
+                gap: 2,
+                lineHeight: 1.12,
+              }}
+            >
+              <div style={{ fontSize: 44 * s, fontWeight: 600, whiteSpace: 'nowrap' }}>
                 {date.monthShort} {date.year}
               </div>
-              <div style={{ fontSize: 46 * s, fontWeight: 600, color: palette.accent }}>{date.weekday}</div>
+              <div style={{ fontSize: 44 * s, fontWeight: 600, color: palette.accent }}>
+                {date.weekday}
+              </div>
             </div>
           </div>
         )}

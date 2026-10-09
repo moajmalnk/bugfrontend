@@ -3,6 +3,7 @@
  * Why: one constant feeds both the Common CODO page card and every agent
  * export (.mdc, AGENTS.md, …) so the published standard never drifts.
  */
+import { buildCodoTesterPlaybookMarkdown } from '@/lib/codo/codoTesterPlaybook';
 export const CODO_STANDARD = {
   qualityPrinciple:
     'A feature is not finished because the screen works. It is finished when the data is correct, the state is correct, the API is correct, the database is correct, errors are handled, browsers behave consistently, performance is acceptable, security is verified, and the production deployment has been tested.',
@@ -76,5 +77,6 @@ export function buildCodoStandardMarkdown(): string {
     '',
     s.definitionOfDone.map((item, i) => `${i + 1}. ${item}`).join('\n'),
     '',
+    buildCodoTesterPlaybookMarkdown(),
   ].join('\n');
 }

@@ -12,9 +12,31 @@ const GG = {
 };
 
 /**
- * Official Growth Glimpse poster: the approved master artwork (logo, title,
- * Google Meet pill, arcs) is the background; only session details are overlaid.
- * Coordinates are measured on the 1080 × 1152 master.
+ * Measured from growth-glimpse-bg.webp dark placeholders (1080×1152).
+ * Why: absolute slots must match the master — an oversized/left-shifted photo
+ * clips "Growth Glimpse" and stops feeling responsive to the design grid.
+ */
+const PHOTO = {
+  left: 612,
+  top: 372,
+  width: 386,
+  height: 528,
+  radius: 44,
+} as const;
+
+/** Master name bar under the portrait (full name + role). */
+const BADGE = {
+  left: 668,
+  top: 902,
+  width: 392,
+  minHeight: 108,
+  paddingX: 26,
+  paddingY: 16,
+} as const;
+
+/**
+ * Official Growth Glimpse poster: master artwork for logo/title/Meet; session
+ * copy + a right-column speaker portrait are overlaid into the designed slots.
  */
 export function GrowthGlimpseTemplate({ data, size }: PosterTemplateProps) {
   const date = getDateParts(data.dateIso);
@@ -22,115 +44,127 @@ export function GrowthGlimpseTemplate({ data, size }: PosterTemplateProps) {
   const timeMatch = data.time.trim().match(/^(.*?)\s*(AM|PM)$/i);
   const timeMain = timeMatch ? timeMatch[1] : data.time.trim();
   const timeSuffix = timeMatch ? timeMatch[2].toUpperCase() : '';
-  const hasHero = !!data.heroImage;
+  const speakerName = data.speakerName.trim();
+  const speakerRole = data.speakerRole.trim();
+  const nameSize = fitFont(speakerName, 32, 20, 16);
+  const roleSize = fitFont(speakerRole, 18, 14, 20);
+  const nameNeedsWrap = speakerName.length > 18;
 
   return (
     <PosterFrame size={size} background="#0E7A45">
       <img
         src={GROWTH_GLIMPSE_BG}
         alt=""
+        crossOrigin="anonymous"
         style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', display: 'block' }}
       />
 
       {data.heroImage && (
-        <HeroImage
-          src={data.heroImage}
-          alt={data.speakerName || 'Speaker'}
-          grayscale
+        <div
           style={{
             position: 'absolute',
-            left: 436,
-            top: 181,
-            width: 644,
-            height: 971,
-            objectPosition: 'bottom center',
+            left: PHOTO.left,
+            top: PHOTO.top,
+            width: PHOTO.width,
+            height: PHOTO.height,
+            borderRadius: PHOTO.radius,
+            overflow: 'hidden',
+            background: 'rgba(4, 40, 24, 0.45)',
           }}
-        />
+        >
+          <HeroImage
+            src={data.heroImage}
+            alt={speakerName || 'Speaker'}
+            grayscale
+            fit="cover"
+            style={{
+              width: '100%',
+              height: '100%',
+              objectPosition: 'center 12%',
+            }}
+          />
+          {/* Soft bottom blend into the name bar — export-safe gradient. */}
+          <div
+            aria-hidden
+            style={{
+              position: 'absolute',
+              left: 0,
+              right: 0,
+              bottom: 0,
+              height: '28%',
+              background:
+                'linear-gradient(180deg, transparent 0%, rgba(6,74,43,0.45) 55%, rgba(6,74,43,0.92) 100%)',
+              pointerEvents: 'none',
+            }}
+          />
+        </div>
       )}
 
-      {/* The master already has the name card; redraw it only when a photo covers it. */}
-      {hasHero && (
+      {/* Name bar — sits in the master pill; grows with long names, never ellipsizes. */}
+      {(speakerName || speakerRole) && (
         <div
           style={{
             position: 'absolute',
-            left: 664,
-            top: 884,
-            width: 430,
-            height: 139,
-            borderRadius: 70,
-            background: GG.card,
-            opacity: 0.94,
-          }}
-        />
-      )}
-      {(data.speakerName || data.speakerRole) && (
-        <div
-          style={{
-            position: 'absolute',
-            left: 672,
-            top: 887,
-            width: 400,
-            height: 133,
+            left: BADGE.left,
+            top: BADGE.top,
+            width: BADGE.width,
+            minHeight: BADGE.minHeight,
+            borderRadius: 999,
+            background: 'rgba(6, 74, 43, 0.96)',
             display: 'flex',
             flexDirection: 'column',
             alignItems: 'center',
             justifyContent: 'center',
-            gap: 4,
+            gap: speakerName && speakerRole ? 5 : 0,
             color: GG.white,
             textAlign: 'center',
+            padding: `${BADGE.paddingY}px ${BADGE.paddingX}px`,
+            boxSizing: 'border-box',
           }}
         >
-          {data.speakerName && (
+          {speakerName && (
             <div
               style={{
-                fontSize: fitFont(data.speakerName, 46, 30, 14),
+                fontSize: nameSize,
                 fontWeight: 600,
-                lineHeight: 1.1,
-                whiteSpace: 'nowrap',
+                letterSpacing: -0.2,
+                lineHeight: nameNeedsWrap ? 1.18 : 1.1,
+                maxWidth: '100%',
+                whiteSpace: nameNeedsWrap ? 'normal' : 'nowrap',
+                overflowWrap: 'break-word',
+                wordBreak: nameNeedsWrap ? 'break-word' : 'normal',
               }}
             >
-              {data.speakerName}
+              {speakerName}
             </div>
           )}
-          {data.speakerRole && (
+          {speakerRole && (
             <div
               style={{
-                fontSize: fitFont(data.speakerRole, 26, 18, 28),
-                fontWeight: 600,
-                lineHeight: 1.2,
-                whiteSpace: 'nowrap',
+                fontSize: roleSize,
+                fontWeight: 500,
+                letterSpacing: 0.3,
+                lineHeight: 1.25,
+                color: 'rgba(255,255,255,0.9)',
+                maxWidth: '100%',
+                whiteSpace: 'normal',
+                overflowWrap: 'break-word',
               }}
             >
-              {data.speakerRole}
+              {speakerRole}
             </div>
           )}
-        </div>
-      )}
-      {hasHero && (
-        <div
-          style={{
-            position: 'absolute',
-            left: 822,
-            top: 1050,
-            fontSize: 37,
-            fontStyle: 'italic',
-            fontWeight: 400,
-            color: GG.white,
-            lineHeight: 1.2,
-          }}
-        >
-          #cod<span style={{ color: GG.accent }}>o</span>crew
         </div>
       )}
 
-      {/* Topic + tagline sit between the baked title and the baked date box (y 470–720). */}
+      {/* Topic + tagline — left column only; never under the portrait. */}
       <div
         style={{
           position: 'absolute',
           left: 80,
           top: 470,
-          width: 540,
-          height: 250,
+          width: 480,
+          height: 240,
           display: 'flex',
           flexDirection: 'column',
           gap: 10,
@@ -187,11 +221,22 @@ export function GrowthGlimpseTemplate({ data, size }: PosterTemplateProps) {
           >
             {date.day}
           </div>
-          <div style={{ position: 'absolute', left: 213, top: 731, lineHeight: 1.18 }}>
-            <div style={{ fontSize: 37, fontWeight: 600, color: GG.white }}>
+          <div
+            style={{
+              position: 'absolute',
+              left: 213,
+              top: 730,
+              height: 95,
+              display: 'flex',
+              flexDirection: 'column',
+              justifyContent: 'center',
+              lineHeight: 1.15,
+            }}
+          >
+            <div style={{ fontSize: 36, fontWeight: 600, color: GG.white, whiteSpace: 'nowrap' }}>
               {date.monthLong} {date.year}
             </div>
-            <div style={{ fontSize: 37, fontWeight: 600, color: GG.accent }}>{date.weekday}</div>
+            <div style={{ fontSize: 36, fontWeight: 600, color: GG.accent }}>{date.weekday}</div>
           </div>
         </>
       )}
@@ -204,15 +249,15 @@ export function GrowthGlimpseTemplate({ data, size }: PosterTemplateProps) {
             top: 868,
             height: 68,
             display: 'flex',
-            alignItems: 'center',
-            gap: 10,
+            alignItems: 'baseline',
+            gap: 8,
             color: GG.white,
             fontWeight: 600,
             whiteSpace: 'nowrap',
           }}
         >
-          <span style={{ fontSize: 54, lineHeight: 1 }}>{timeMain}</span>
-          {timeSuffix && <span style={{ fontSize: 38, lineHeight: 1, marginTop: 8 }}>{timeSuffix}</span>}
+          <span style={{ fontSize: 52, lineHeight: 1 }}>{timeMain}</span>
+          {timeSuffix && <span style={{ fontSize: 36, lineHeight: 1 }}>{timeSuffix}</span>}
         </div>
       )}
     </PosterFrame>
