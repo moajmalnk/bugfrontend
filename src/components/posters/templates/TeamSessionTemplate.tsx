@@ -19,14 +19,17 @@ const TOPIC_SLOT = {
   height: 92,
 } as const;
 
+/**
+ * Text column inside the outlined box: baked icons end at x≈512 and the box's
+ * inner edge is x≈628. Row centres match the clock (y≈758) and calendar (y≈822).
+ */
 const META = {
-  left: 498,
-  top: 735,
-  width: 168,
-  /** Matches the outlined box height so rows track clock + calendar icons. */
-  height: 112,
-  timeRow: 48,
-  dateRow: 64,
+  left: 522,
+  width: 104,
+  timeCenterY: 758,
+  timeHeight: 44,
+  dateCenterY: 822,
+  dateHeight: 52,
 } as const;
 
 /**
@@ -69,6 +72,9 @@ export function TeamSessionTemplate({ data, size }: PosterTemplateProps) {
     ? `${date.day}${ordinalSuffix(Number(date.day))} ${date.monthShort.toUpperCase()}`
     : '';
   const topicSize = fitFont(plainTopic, 24, 13, 28);
+  const timeMatch = time.match(/^(.*?)\s*(AM|PM)$/i);
+  const timeMain = timeMatch ? timeMatch[1] : time;
+  const timeSuffix = timeMatch ? timeMatch[2].toUpperCase() : '';
 
   return (
     <PosterFrame size={size} background="#06110D">
@@ -116,74 +122,53 @@ export function TeamSessionTemplate({ data, size }: PosterTemplateProps) {
         </div>
       )}
 
-      {/* Time + date — one row per baked icon, vertically centred. */}
-      {(time || date) && (
+      {/* Time — centred on the baked clock icon, right of it. */}
+      {time && (
         <div
           style={{
             position: 'absolute',
             left: META.left,
-            top: META.top,
+            top: META.timeCenterY - META.timeHeight / 2,
             width: META.width,
-            height: META.height,
+            height: META.timeHeight,
             display: 'flex',
-            flexDirection: 'column',
+            alignItems: 'center',
             color: '#FFFFFF',
-            boxSizing: 'border-box',
+            fontWeight: 600,
+            whiteSpace: 'nowrap',
+            overflow: 'hidden',
           }}
         >
-          <div
-            style={{
-              height: META.timeRow,
-              display: 'flex',
-              alignItems: 'center',
-              fontSize: fitFont(time || ' ', 26, 18, 10),
-              fontWeight: 600,
-              letterSpacing: 0.2,
-              whiteSpace: 'nowrap',
-              lineHeight: 1,
-              overflow: 'hidden',
-              textOverflow: 'ellipsis',
-            }}
-          >
-            {time || '\u00a0'}
-          </div>
-          <div
-            style={{
-              height: META.dateRow,
-              display: 'flex',
-              flexDirection: 'column',
-              justifyContent: 'center',
-              gap: 1,
-              lineHeight: 1.15,
-              overflow: 'hidden',
-            }}
-          >
-            {date ? (
-              <>
-                <div
-                  style={{
-                    fontSize: 20,
-                    fontWeight: 600,
-                    whiteSpace: 'nowrap',
-                    overflow: 'hidden',
-                    textOverflow: 'ellipsis',
-                  }}
-                >
-                  {date.weekday}
-                </div>
-                <div
-                  style={{
-                    fontSize: 19,
-                    fontWeight: 600,
-                    whiteSpace: 'nowrap',
-                    overflow: 'hidden',
-                    textOverflow: 'ellipsis',
-                  }}
-                >
-                  {dayLabel}
-                </div>
-              </>
-            ) : null}
+          <span style={{ display: 'inline-flex', alignItems: 'baseline', gap: 4, lineHeight: 1 }}>
+            <span style={{ fontSize: fitFont(timeMain, 24, 17, 5) }}>{timeMain}</span>
+            {timeSuffix && <span style={{ fontSize: 15 }}>{timeSuffix}</span>}
+          </span>
+        </div>
+      )}
+
+      {/* Weekday + date — centred on the baked calendar icon, right of it. */}
+      {date && (
+        <div
+          style={{
+            position: 'absolute',
+            left: META.left,
+            top: META.dateCenterY - META.dateHeight / 2,
+            width: META.width,
+            height: META.dateHeight,
+            display: 'flex',
+            flexDirection: 'column',
+            justifyContent: 'center',
+            gap: 2,
+            color: '#FFFFFF',
+            fontWeight: 600,
+            lineHeight: 1.1,
+            whiteSpace: 'nowrap',
+            overflow: 'hidden',
+          }}
+        >
+          <div style={{ fontSize: fitFont(date.weekday, 18, 15, 8) }}>{date.weekday}</div>
+          <div style={{ fontSize: fitFont(dayLabel, 17, 14, 8), color: 'rgba(255,255,255,0.88)' }}>
+            {dayLabel}
           </div>
         </div>
       )}

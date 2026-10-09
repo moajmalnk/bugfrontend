@@ -19,19 +19,24 @@ const GG = {
 const PHOTO = {
   left: 612,
   top: 372,
-  width: 386,
-  height: 528,
-  radius: 44,
+  width: 385,
+  height: 408,
+  radius: 128,
 } as const;
 
-/** Master name bar under the portrait (full name + role). */
+/**
+ * Master name bar: left-rounded pill that bleeds off the right edge (x 667→1080,
+ * y 886–1021). The overlay matches it exactly so no second outline shows.
+ */
 const BADGE = {
-  left: 668,
-  top: 902,
-  width: 392,
-  minHeight: 108,
-  paddingX: 26,
-  paddingY: 16,
+  left: 667,
+  top: 886,
+  width: 413,
+  height: 135,
+  radius: 68,
+  paddingLeft: 40,
+  paddingRight: 52,
+  fill: '#03472E',
 } as const;
 
 /**
@@ -83,7 +88,7 @@ export function GrowthGlimpseTemplate({ data, size }: PosterTemplateProps) {
               objectPosition: 'center 12%',
             }}
           />
-          {/* Soft bottom blend into the name bar — export-safe gradient. */}
+          {/* Soft bottom vignette — export-safe gradient (no CSS masks). */}
           <div
             aria-hidden
             style={{
@@ -91,16 +96,16 @@ export function GrowthGlimpseTemplate({ data, size }: PosterTemplateProps) {
               left: 0,
               right: 0,
               bottom: 0,
-              height: '28%',
+              height: '30%',
               background:
-                'linear-gradient(180deg, transparent 0%, rgba(6,74,43,0.45) 55%, rgba(6,74,43,0.92) 100%)',
+                'linear-gradient(180deg, transparent 0%, rgba(1,47,29,0.35) 60%, rgba(1,47,29,0.7) 100%)',
               pointerEvents: 'none',
             }}
           />
         </div>
       )}
 
-      {/* Name bar — sits in the master pill; grows with long names, never ellipsizes. */}
+      {/* Name bar — exactly over the master pill; long names wrap (2 lines) and shrink. */}
       {(speakerName || speakerRole) && (
         <div
           style={{
@@ -108,9 +113,10 @@ export function GrowthGlimpseTemplate({ data, size }: PosterTemplateProps) {
             left: BADGE.left,
             top: BADGE.top,
             width: BADGE.width,
-            minHeight: BADGE.minHeight,
-            borderRadius: 999,
-            background: 'rgba(6, 74, 43, 0.96)',
+            height: BADGE.height,
+            borderTopLeftRadius: BADGE.radius,
+            borderBottomLeftRadius: BADGE.radius,
+            background: BADGE.fill,
             display: 'flex',
             flexDirection: 'column',
             alignItems: 'center',
@@ -118,8 +124,10 @@ export function GrowthGlimpseTemplate({ data, size }: PosterTemplateProps) {
             gap: speakerName && speakerRole ? 5 : 0,
             color: GG.white,
             textAlign: 'center',
-            padding: `${BADGE.paddingY}px ${BADGE.paddingX}px`,
+            paddingLeft: BADGE.paddingLeft,
+            paddingRight: BADGE.paddingRight,
             boxSizing: 'border-box',
+            overflow: 'hidden',
           }}
         >
           {speakerName && (
@@ -133,6 +141,10 @@ export function GrowthGlimpseTemplate({ data, size }: PosterTemplateProps) {
                 whiteSpace: nameNeedsWrap ? 'normal' : 'nowrap',
                 overflowWrap: 'break-word',
                 wordBreak: nameNeedsWrap ? 'break-word' : 'normal',
+                display: '-webkit-box',
+                WebkitLineClamp: 2,
+                WebkitBoxOrient: 'vertical' as const,
+                overflow: 'hidden',
               }}
             >
               {speakerName}
@@ -149,6 +161,10 @@ export function GrowthGlimpseTemplate({ data, size }: PosterTemplateProps) {
                 maxWidth: '100%',
                 whiteSpace: 'normal',
                 overflowWrap: 'break-word',
+                display: '-webkit-box',
+                WebkitLineClamp: nameNeedsWrap ? 1 : 2,
+                WebkitBoxOrient: 'vertical' as const,
+                overflow: 'hidden',
               }}
             >
               {speakerRole}

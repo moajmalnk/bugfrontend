@@ -545,6 +545,32 @@ export const CODO_LOGO_ASSETS = {
 
 export type CodoLogoAssetKey = keyof typeof CODO_LOGO_ASSETS;
 
+/**
+ * Our own brand symbol, cut out of `public/logo.png` (opaque lavender master) into
+ * transparent WebPs so it sits cleanly on any palette.
+ *
+ * | Key   | Inks               | Use on                               |
+ * |-------|--------------------|--------------------------------------|
+ * | color | navy + green       | Light / cream / pastel backgrounds   |
+ * | light | white + green      | Dark / saturated backgrounds         |
+ * | black | solid #111         | Transparent "Black" cut-out exports  |
+ * | white | solid #FFF         | Transparent "White" cut-out exports  |
+ */
+export const BRAND_MARK_ASSETS = {
+  color: { src: '/posters/brand-mark-color.webp', width: 1015, height: 1024 },
+  light: { src: '/posters/brand-mark-light.webp', width: 1015, height: 1024 },
+  black: { src: '/posters/brand-mark-black.webp', width: 1015, height: 1024 },
+  white: { src: '/posters/brand-mark-white.webp', width: 1015, height: 1024 },
+} as const;
+
+export type BrandMarkAssetKey = keyof typeof BRAND_MARK_ASSETS;
+
+/** Brand symbol variant that contrasts with the palette (mono inks for transparent cut-outs). */
+export function brandMarkForPalette(palette: Pick<PosterPalette, 'logo' | 'background'>): BrandMarkAssetKey {
+  if (palette.background === 'transparent') return palette.logo === 'light' ? 'white' : 'black';
+  return palette.logo === 'light' ? 'light' : 'color';
+}
+
 /** Pick the official lockup that contrasts with the active palette background. */
 export function logoAssetForPalette(palette: Pick<PosterPalette, 'logo'>): Exclude<CodoLogoAssetKey, 'full'> {
   return palette.logo === 'light' ? 'light' : 'dark';

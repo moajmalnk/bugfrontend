@@ -4,13 +4,53 @@ import type { PosterTemplateProps } from '../types';
 import { ContactBlock, HeroImage, PosterFrame, SocialIcons, WebsiteTag } from './shared';
 import { fitFont, getDateParts, paperTexture } from './posterUtils';
 
+/** Script (Great Vibes-style) glyphs ≈ this fraction of font-size wide. */
+const SCRIPT_CHAR_WIDTH = 0.42;
+/** Condensed display glyphs ≈ this fraction of font-size wide (incl. letter-spacing). */
+const DISPLAY_CHAR_WIDTH = 0.5;
+const TITLE_MAX_WIDTH = 940;
+
+/**
+ * Largest script size that keeps `text` on one line within `maxWidth`, never
+ * below `min` — long phrases then wrap (max 2 lines) instead of bleeding off the canvas.
+ */
+function fitScript(text: string, max: number, min: number, maxWidth: number): number {
+  const ideal = maxWidth / (Math.max(text.length, 1) * SCRIPT_CHAR_WIDTH);
+  return Math.max(min, Math.min(max, ideal));
+}
+
 /** Gandhi Jayanti style: textured light canvas, big date numeral, condensed title with script overlay, hero cut-out. */
 export function HeritageHeroTemplate({ data, palette, size }: PosterTemplateProps) {
   const s = size.height >= 1350 ? 1 : 0.82;
   const date = getDateParts(data.dateIso);
-  const titleSize = fitFont(data.title.toUpperCase(), 170 * s, 84 * s, 8);
-  const heroTop = size.height * (size.key === 'story' ? 0.4 : size.key === 'square' ? 0.5 : 0.47);
-  const footerH = 150 * s;
+  const title = data.title.toUpperCase();
+  const titleSize = fitFont(title, 170 * s, 84 * s, 8);
+  const scriptMaxWidth = size.width - 140;
+  const scriptSize = data.scriptText
+    ? fitScript(data.scriptText, 150 * s, 60 * s, scriptMaxWidth)
+    : 0;
+  const scriptLines =
+    data.scriptText && data.scriptText.length * scriptSize * SCRIPT_CHAR_WIDTH > scriptMaxWidth ? 2 : 1;
+  const dayFont = 230 * s;
+  // Subtitle sits right of the centred day numeral — only the right half is free.
+  const subtitleMaxWidth = size.width / 2 - (date ? date.day.length * dayFont * 0.28 : 0) - 72;
+  const subtitleSize = data.subtitle ? fitScript(data.subtitle, 76 * s, 36 * s, subtitleMaxWidth) : 0;
+
+  // Estimate where the date + title + script lockup ends so the hero never overlaps it.
+  const lockupTop = size.height * (size.key === 'story' ? 0.14 : 0.16);
+  const titleLines = Math.max(
+    1,
+    Math.ceil((title.length * titleSize * DISPLAY_CHAR_WIDTH) / TITLE_MAX_WIDTH),
+  );
+  const titleBlock = titleLines * titleSize;
+  const scriptBottom = data.scriptText ? titleBlock * 0.42 + scriptLines * scriptSize : 0;
+  const lockupBottom =
+    lockupTop + (date ? dayFont * 0.8 + 18 * s : 0) + 28 * s + Math.max(titleBlock, scriptBottom);
+  const heroTop = Math.max(
+    size.height * (size.key === 'story' ? 0.4 : size.key === 'square' ? 0.5 : 0.47),
+    lockupBottom + 28 * s,
+  );
+  const footerH = (data.showContacts ? 184 : 120) * s;
 
   return (
     <PosterFrame size={size} background={paperTexture(palette.background, palette.backgroundAlt)}>
@@ -45,7 +85,7 @@ export function HeritageHeroTemplate({ data, palette, size }: PosterTemplateProp
       >
         {date && (
           <div style={{ position: 'relative', display: 'flex', alignItems: 'flex-end', lineHeight: 0.8 }}>
-            <span style={{ fontSize: 230 * s, fontWeight: 400, letterSpacing: -6 }}>{date.day}</span>
+            <span style={{ fontSize: dayFont, fontWeight: 400, letterSpacing: -6 }}>{date.day}</span>
             <span
               style={{
                 position: 'absolute',
@@ -69,9 +109,12 @@ export function HeritageHeroTemplate({ data, palette, size }: PosterTemplateProp
                   bottom: 10 * s,
                   marginLeft: 6,
                   fontFamily: POSTER_FONT_STACK.script,
-                  fontSize: 76 * s,
+                  fontSize: subtitleSize,
                   color: palette.accent,
                   whiteSpace: 'nowrap',
+                  maxWidth: subtitleMaxWidth,
+                  overflow: 'hidden',
+                  textOverflow: 'ellipsis',
                 }}
               >
                 {data.subtitle}
@@ -88,10 +131,10 @@ export function HeritageHeroTemplate({ data, palette, size }: PosterTemplateProp
               color: palette.accent,
               letterSpacing: 2,
               textAlign: 'center',
-              maxWidth: 940,
+              maxWidth: TITLE_MAX_WIDTH,
             }}
           >
-            {data.title.toUpperCase()}
+            {title}
           </span>
           {data.scriptText && (
             <span
@@ -99,13 +142,19 @@ export function HeritageHeroTemplate({ data, palette, size }: PosterTemplateProp
                 position: 'absolute',
                 top: '42%',
                 left: '50%',
-                transform: 'translateX(-46%)',
+                transform: 'translateX(-50%)',
+                width: scriptMaxWidth,
                 fontFamily: POSTER_FONT_STACK.script,
-                fontSize: 150 * s,
+                fontSize: scriptSize,
                 lineHeight: 1,
                 color: palette.accent,
                 opacity: 0.85,
-                whiteSpace: 'nowrap',
+                textAlign: 'center',
+                overflowWrap: 'anywhere',
+                display: '-webkit-box',
+                WebkitLineClamp: 2,
+                WebkitBoxOrient: 'vertical' as const,
+                overflow: 'hidden',
               }}
             >
               {data.scriptText}
@@ -144,7 +193,7 @@ export function HeritageHeroTemplate({ data, palette, size }: PosterTemplateProp
             <HeroImage
               src={data.heroImage}
               alt={data.title}
-              style={{ position: 'relative', maxWidth: '100%', maxHeight: '100%' }}
+              style={{ position: 'relative', maxWidth: '100%', maxHeight: '100%', borderRadius: 24 }}
             />
           </>
         ) : (

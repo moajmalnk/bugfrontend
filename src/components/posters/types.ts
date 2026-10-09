@@ -1,4 +1,6 @@
 import type { PosterPalette, PosterPaletteKey } from './brand/brandKit';
+import type { LogoStyleKey } from './brand/logoStyles';
+import type { ModernTemplateKey } from './templates/modern/modernKeys';
 
 /**
  * Layout a template is drawn at. `native` is a fixed artwork size (e.g. the
@@ -31,7 +33,11 @@ export type PosterTemplateKey =
   | 'typographic_quote'
   | 'regional_message'
   | 'brand_logo'
-  | 'birthday';
+  | 'birthday'
+  | ModernTemplateKey;
+
+/** Picker tab a template is listed under. */
+export type PosterTemplateGroup = 'signature' | 'speaker' | 'event' | 'type' | 'quote' | 'celebrate';
 
 /** Editable poster content. Empty strings mean "hide this element". */
 export type PosterData = {
@@ -52,9 +58,14 @@ export type PosterData = {
   /** Same-origin data URL so the export never taints the canvas. */
   heroImage: string | null;
   showContacts: boolean;
+  /** Brand Logo design treatment; other templates ignore it. */
+  logoStyle: LogoStyleKey;
 };
 
-export type PosterFieldKey = Exclude<keyof PosterData, 'heroImage' | 'showContacts' | 'dateIso'>;
+export type PosterFieldKey = Exclude<
+  keyof PosterData,
+  'heroImage' | 'showContacts' | 'dateIso' | 'logoStyle'
+>;
 
 export type PosterTemplateProps = {
   data: PosterData;
@@ -66,6 +77,8 @@ export type PosterTemplateDefinition = {
   key: PosterTemplateKey;
   label: string;
   description: string;
+  /** Picker tab; defaults to `signature`. */
+  group?: PosterTemplateGroup;
   defaultPalette: PosterPaletteKey;
   /** Palettes offered in the studio; empty hides the picker (fixed artwork). */
   palettes: PosterPaletteKey[];

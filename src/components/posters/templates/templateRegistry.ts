@@ -5,6 +5,7 @@ import { BirthdayTemplate } from './BirthdayTemplate';
 import { BrandLogoTemplate } from './BrandLogoTemplate';
 import { GrowthGlimpseTemplate } from './GrowthGlimpseTemplate';
 import { HeritageHeroTemplate } from './HeritageHeroTemplate';
+import { MODERN_TEMPLATE_COMPONENTS, MODERN_TEMPLATES } from './modern/modernRegistry';
 import { ProductHeroTemplate } from './ProductHeroTemplate';
 import { RegionalMessageTemplate } from './RegionalMessageTemplate';
 import { SpeakerSessionTemplate } from './SpeakerSessionTemplate';
@@ -140,9 +141,9 @@ export const POSTER_TEMPLATES: Record<PosterTemplateKey, PosterTemplateDefinitio
   brand_logo: {
     key: 'brand_logo',
     label: 'Brand Logo',
-    description: 'Official CODO lockup — mark for icons, wordmark or AI Innovations banner for wide sizes',
+    description: 'Our brand symbol in 34 responsive designs — app icons, profile pictures, banners and website logos',
     defaultPalette: 'growthGreen',
-    palettes: ['growthGreen', 'logoBlack', 'logoWhite', 'heritage', 'espresso'],
+    palettes: [...STANDARD_PALETTES, 'logoBlack', 'logoWhite'],
     fields: [],
     usesHeroImage: false,
     layouts: ['square'],
@@ -150,6 +151,7 @@ export const POSTER_TEMPLATES: Record<PosterTemplateKey, PosterTemplateDefinitio
     responsive: true,
     showsDate: false,
   },
+  ...MODERN_TEMPLATES,
 };
 
 export const POSTER_TEMPLATE_COMPONENTS: Record<PosterTemplateKey, ComponentType<PosterTemplateProps>> = {
@@ -162,14 +164,15 @@ export const POSTER_TEMPLATE_COMPONENTS: Record<PosterTemplateKey, ComponentType
   regional_message: RegionalMessageTemplate,
   birthday: BirthdayTemplate,
   brand_logo: BrandLogoTemplate,
+  ...MODERN_TEMPLATE_COMPONENTS,
 };
 
 const CATEGORY_TEMPLATES: Record<string, PosterTemplateKey[]> = {
-  birthday: ['birthday'],
-  growth_program: ['growth_glimpse', 'team_session', 'speaker_session', 'typographic_quote'],
-  holiday: ['heritage_hero', 'typographic_quote', 'regional_message', 'product_hero'],
-  observance: ['product_hero', 'heritage_hero', 'typographic_quote', 'regional_message'],
-  company_event: ['team_session', 'speaker_session', 'product_hero', 'typographic_quote', 'regional_message'],
+  birthday: ['birthday', 'modern_celebration', 'modern_achievement'],
+  growth_program: ['growth_glimpse', 'team_session', 'speaker_session', 'typographic_quote', 'modern_webinar', 'modern_spotlight'],
+  holiday: ['heritage_hero', 'typographic_quote', 'regional_message', 'product_hero', 'modern_celebration'],
+  observance: ['product_hero', 'heritage_hero', 'typographic_quote', 'regional_message', 'modern_quote_card'],
+  company_event: ['team_session', 'speaker_session', 'product_hero', 'typographic_quote', 'regional_message', 'modern_announcement'],
 };
 
 /** Templates ordered by relevance for a BugDates category; first entry is the default. */

@@ -1,5 +1,6 @@
 import type { BugDatesCalendarItem, GrowthProgramSession } from '@/services/bugDatesService';
 import { CODO_BRAND } from './brand/brandKit';
+import { DEFAULT_LOGO_STYLE } from './brand/logoStyles';
 import type { PosterData, PosterFieldKey } from './types';
 
 export const POSTER_FIELD_LIMITS: Record<PosterFieldKey, number> = {
@@ -51,6 +52,7 @@ export const EMPTY_POSTER_DATA: PosterData = {
   hashtag: CODO_BRAND.hashtag,
   heroImage: null,
   showContacts: true,
+  logoStyle: DEFAULT_LOGO_STYLE,
 };
 
 const BIRTHDAY_WISH =

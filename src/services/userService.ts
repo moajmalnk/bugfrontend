@@ -1,6 +1,7 @@
 import { ENV } from '@/lib/env';
 import { resolveAvatarUrl } from '@/lib/avatarUrl';
 import { sortUsersActiveFirst } from '@/lib/utils/userSort';
+import { isWorkforceUser } from '@/lib/utils';
 import { StandardsMode, TesterType, User, UserRole } from '@/types';
 import axios from 'axios';
 
@@ -445,14 +446,18 @@ class UserService {
   }
 
   /**
-   * Why: Poster Studio speaker pick lists only active Developers, Testers, and
-   * Creators (not admins / inactive). Prefer the full users list; if that fails
-   * (permissions / proxy), merge the public role directories.
+   * Why: Poster Studio speaker pick lists only active Developers, CODO Testers, and
+   * Creators (not admins, client testers or inactive staff) — posters feature our own
+   * team. Prefer the full users list; if that fails (permissions / proxy), merge the
+   * public role directories.
    */
   async getStaffDirectory(): Promise<User[]> {
     const posterRoles = new Set<UserRole>(["developer", "tester", "creator"]);
-    const isPosterSpeaker = (u: Pick<User, "role" | "account_active" | "employment_status">) => {
+    const isPosterSpeaker = (
+      u: Pick<User, "role" | "account_active" | "employment_status" | "tester_type">
+    ) => {
       if (!posterRoles.has(u.role)) return false;
+      if (!isWorkforceUser(u)) return false;
       const activeAccount =
         u.account_active === undefined ||
         u.account_active === null ||
@@ -526,6 +531,7 @@ class UserService {
         account_active: 1,
         employment_status: "active",
         job_title: (row.job_title as string | null | undefined) ?? null,
+        tester_type: (row.tester_type as TesterType | null | undefined) ?? null,
       };
       if (!isPosterSpeaker(user)) continue;
       byId.set(id, user);

@@ -5,6 +5,9 @@ import type { PosterTemplateProps } from '../types';
 import { HeroImage, PosterFrame, WebsiteTag } from './shared';
 import { fitFont, getDateParts } from './posterUtils';
 
+/** Top-corner radius of the speaker photo frame (scaled by poster size). */
+const PHOTO_RADIUS = 72;
+
 /** Growth Glimpse style: green brand canvas, speaker photo in an arch, date + time + platform blocks. */
 export function SpeakerSessionTemplate({ data, palette, size }: PosterTemplateProps) {
   const s = size.height >= 1350 ? 1 : 0.86;
@@ -96,10 +99,9 @@ export function SpeakerSessionTemplate({ data, palette, size }: PosterTemplatePr
               width: '100%',
               height: '100%',
               overflow: 'hidden',
-              WebkitMaskImage:
-                'linear-gradient(to bottom, #000 0%, #000 78%, rgba(0,0,0,0.45) 92%, transparent 100%)',
-              maskImage:
-                'linear-gradient(to bottom, #000 0%, #000 78%, rgba(0,0,0,0.45) 92%, transparent 100%)',
+              borderTopLeftRadius: PHOTO_RADIUS * s,
+              borderTopRightRadius: PHOTO_RADIUS * s,
+              boxShadow: '0 -18px 60px rgba(0,0,0,0.28)',
             }}
           >
             <HeroImage
@@ -110,7 +112,35 @@ export function SpeakerSessionTemplate({ data, palette, size }: PosterTemplatePr
               style={{
                 width: '100%',
                 height: '100%',
-                objectPosition: 'top center',
+                objectPosition: 'center 12%',
+              }}
+            />
+            {/* Gradient layers instead of CSS masks — masks drop out in html-to-image exports. */}
+            <div
+              style={{
+                position: 'absolute',
+                inset: 0,
+                background: `linear-gradient(180deg, rgba(255,255,255,0.10) 0%, transparent 22%, transparent 52%, ${palette.backgroundAlt} 100%)`,
+                opacity: 0.92,
+              }}
+            />
+            <div
+              style={{
+                position: 'absolute',
+                inset: 0,
+                background:
+                  'linear-gradient(90deg, rgba(0,0,0,0.28) 0%, transparent 18%, transparent 82%, rgba(0,0,0,0.22) 100%)',
+              }}
+            />
+            <div
+              style={{
+                position: 'absolute',
+                inset: 0,
+                borderTopLeftRadius: PHOTO_RADIUS * s,
+                borderTopRightRadius: PHOTO_RADIUS * s,
+                border: '1.5px solid rgba(255,255,255,0.22)',
+                borderBottom: 'none',
+                pointerEvents: 'none',
               }}
             />
           </div>

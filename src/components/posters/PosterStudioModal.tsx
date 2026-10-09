@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useDeferredValue, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import {
   Download,
@@ -31,6 +31,8 @@ import { resolveAvatarUrl } from '@/lib/avatarUrl';
 import type { User } from '@/types';
 import { POSTER_PALETTES, type PosterPaletteKey } from './brand/brandKit';
 import { PalettePicker } from './PalettePicker';
+import { LogoStylePicker } from './LogoStylePicker';
+import { normalizeLogoStyle } from './brand/logoStyles';
 import { loadPosterFonts } from './brand/posterFonts';
 import {
   buildPosterData,
@@ -53,6 +55,8 @@ import {
   sameAspect,
 } from './posterSizes';
 import { PosterSizePicker } from './PosterSizePicker';
+import { TemplatePicker } from './TemplatePicker';
+import { DiscardChangesDialog } from './DiscardChangesDialog';
 import { POSTER_TEMPLATE_COMPONENTS, POSTER_TEMPLATES, templatesForCategory } from './templates/templateRegistry';
 import type { PosterData, PosterFieldKey, PosterSize, PosterTemplateKey } from './types';
 
@@ -251,6 +255,9 @@ export default function PosterStudioModal({
   const canExport = !requiredError && fontState !== 'loading' && busy === null;
   const dirtyRef = useRef(isDirty);
   dirtyRef.current = isDirty;
+  const [confirmDiscard, setConfirmDiscard] = useState(false);
+  const confirmDiscardRef = useRef(confirmDiscard);
+  confirmDiscardRef.current = confirmDiscard;
 
   const setBusyState = (next: BusyState) => {
     busyRef.current = next;
@@ -286,7 +293,7 @@ export default function PosterStudioModal({
     return () => controller.abort();
   }, [category, item.avatar, item.username, session?.host_avatar, session?.host_name, session?.host_user_id]);
 
-  /** Active Developers, Testers, and Creators only (poster speaker pick). */
+  /** Active Developers, CODO Testers, and Creators only (poster speaker pick). */
   useEffect(() => {
     if (!def.usesHeroImage) return;
     let alive = true;
@@ -297,7 +304,7 @@ export default function PosterStudioModal({
         if (!alive) return;
         setTeammates(users);
         if (users.length === 0) {
-          setImageError('No active developers, testers, or creators found — upload a photo instead.');
+          setImageError('No active developers, CODO testers, or creators found — upload a photo instead.');
         }
       })
       .catch(() => {
@@ -366,13 +373,10 @@ export default function PosterStudioModal({
         repush();
         return;
       }
-      if (
-        !skipConfirmRef.current &&
-        !savedRef.current &&
-        dirtyRef.current &&
-        !window.confirm('You have unsaved poster changes. Discard them?')
-      ) {
+      if (!skipConfirmRef.current && !savedRef.current && dirtyRef.current) {
+        // Back already popped our entry: restore it, then let the dialog decide.
         repush();
+        setConfirmDiscard(true);
         return;
       }
       onClose();
@@ -381,16 +385,29 @@ export default function PosterStudioModal({
     return () => window.removeEventListener('popstate', onPop);
   }, [onClose, occurrenceDate, posterKey]);
 
-  const requestClose = useCallback(() => {
-    if (busyRef.current === 'save') return;
-    if (dirtyRef.current && !window.confirm('You have unsaved poster changes. Discard them?')) return;
+  const discardAndClose = useCallback(() => {
+    setConfirmDiscard(false);
     skipConfirmRef.current = true;
     window.history.back();
   }, []);
 
+  const requestClose = useCallback(() => {
+    if (busyRef.current === 'save') return;
+    if (dirtyRef.current) {
+      setConfirmDiscard(true);
+      return;
+    }
+    discardAndClose();
+  }, [discardAndClose]);
+
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.key !== 'Escape') return;
+      if (confirmDiscardRef.current) {
+        e.stopPropagation();
+        setConfirmDiscard(false);
+        return;
+      }
       // Why: nested pickers (poster date) must close before discarding the studio.
       if (document.querySelector('[data-radix-popper-content-wrapper]')) return;
       e.stopPropagation();
@@ -404,11 +421,31 @@ export default function PosterStudioModal({
     setData((prev) => ({ ...prev, [key]: value.slice(0, POSTER_FIELD_LIMITS[key]) }));
   };
 
-  const selectTemplate = (key: PosterTemplateKey) => {
-    const next = POSTER_TEMPLATES[key];
+  const selectTemplate = useCallback((key: PosterTemplateKey) => {
     setTemplateKey(key);
-    setPaletteKey(next.defaultPalette);
-  };
+    setPaletteKey(POSTER_TEMPLATES[key].defaultPalette);
+  }, []);
+
+  /** Thumbnails trail the form at low priority: 40+ full poster renders would otherwise lag every keystroke. */
+  const thumbData = useDeferredValue(data);
+  const renderTemplateThumb = useCallback(
+    (key: PosterTemplateKey) =>
+      fontState === 'loading' ? (
+        <div
+          className="animate-pulse bg-gray-200 dark:bg-gray-700"
+          style={{ width: THUMB_WIDTH * 0.8, height: THUMB_WIDTH }}
+        />
+      ) : (
+        <ScaledPoster
+          templateKey={key}
+          data={thumbData}
+          paletteKey={POSTER_TEMPLATES[key].defaultPalette}
+          layout={resolveRenderPlan(POSTER_TEMPLATES[key], ORIGINAL_PRESET_ID).layout}
+          width={THUMB_WIDTH * 0.8}
+        />
+      ),
+    [fontState, thumbData],
+  );
 
   const applySuggestion = () => {
     if (!suggestion) return;
@@ -690,51 +727,27 @@ export default function PosterStudioModal({
 
           {/* Controls */}
           <section className="col-span-12 flex min-w-0 flex-col gap-5 lg:order-1 lg:col-span-5 lg:min-h-0 lg:overflow-y-auto lg:pe-2 custom-scrollbar">
-            <div className="flex flex-col gap-2">
-              <h3 className="text-sm font-bold text-gray-900 dark:text-white">Template</h3>
-              <div className="grid grid-cols-3 gap-3 sm:grid-cols-5 lg:grid-cols-3 xl:grid-cols-5">
-                {templateOrder.map((key) => (
-                  <button
-                    key={key}
-                    type="button"
-                    onClick={() => selectTemplate(key)}
-                    aria-pressed={templateKey === key}
-                    title={POSTER_TEMPLATES[key].description}
-                    className={`flex min-w-0 flex-col items-center gap-1.5 rounded-xl border p-1.5 text-center transition ${
-                      templateKey === key
-                        ? 'border-blue-600 ring-2 ring-blue-600/30'
-                        : 'border-gray-200 hover:border-gray-300 dark:border-gray-700 dark:hover:border-gray-600'
-                    }`}
-                  >
-                    <div className="pointer-events-none overflow-hidden rounded-lg">
-                      {fontState === 'loading' ? (
-                        <div
-                          className="animate-pulse bg-gray-200 dark:bg-gray-700"
-                          style={{ width: THUMB_WIDTH * 0.8, height: THUMB_WIDTH }}
-                        />
-                      ) : (
-                        <ScaledPoster
-                          templateKey={key}
-                          data={data}
-                          paletteKey={POSTER_TEMPLATES[key].defaultPalette}
-                          layout={resolveRenderPlan(POSTER_TEMPLATES[key], ORIGINAL_PRESET_ID).layout}
-                          width={THUMB_WIDTH * 0.8}
-                        />
-                      )}
-                    </div>
-                    <span className="line-clamp-2 text-[11px] font-semibold leading-tight text-gray-700 dark:text-gray-300">
-                      {POSTER_TEMPLATES[key].label}
-                    </span>
-                  </button>
-                ))}
-              </div>
-            </div>
+            <TemplatePicker
+              order={templateOrder}
+              value={templateKey}
+              onChange={selectTemplate}
+              renderThumb={renderTemplateThumb}
+            />
 
             {def.palettes.length > 0 && (
               <PalettePicker
                 options={def.palettes}
                 value={paletteKey}
                 onChange={setPaletteKey}
+              />
+            )}
+
+            {templateKey === 'brand_logo' && (
+              <LogoStylePicker
+                value={normalizeLogoStyle(data.logoStyle)}
+                onChange={(k) => setData((prev) => ({ ...prev, logoStyle: k }))}
+                data={data}
+                palette={POSTER_PALETTES[paletteKey]}
               />
             )}
 
@@ -849,7 +862,7 @@ export default function PosterStudioModal({
                 <div className="flex flex-col gap-2 rounded-2xl border border-gray-200/80 bg-gray-50/80 p-3 dark:border-gray-700/80 dark:bg-gray-800/40">
                   <div className="flex items-center justify-between gap-2">
                     <p className="text-xs font-semibold text-gray-800 dark:text-gray-200">
-                      Developers, testers & creators
+                      Developers, CODO testers & creators
                     </p>
                     <span className="text-[10px] tabular-nums text-muted-foreground">
                       {teammatesLoading
@@ -908,7 +921,7 @@ export default function PosterStudioModal({
                     {!teammatesLoading && filteredTeammates.length === 0 && (
                       <p className="col-span-full px-1 py-2 text-xs text-muted-foreground">
                         {teammates.length === 0
-                          ? 'No active developers, testers, or creators available.'
+                          ? 'No active developers, CODO testers, or creators available.'
                           : 'No teammates match that search.'}
                       </p>
                     )}
@@ -1037,6 +1050,9 @@ export default function PosterStudioModal({
           )}
         </footer>
       </div>
+      {confirmDiscard && (
+        <DiscardChangesDialog onKeepEditing={() => setConfirmDiscard(false)} onDiscard={discardAndClose} />
+      )}
     </div>,
     document.body
   );
