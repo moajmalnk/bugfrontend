@@ -34,6 +34,7 @@ import {
   type LeaveStatus,
 } from '@/services/leaveService';
 import { format, parseISO } from 'date-fns';
+import { LeaveActivityTimeline } from '@/components/leave/LeaveActivityTimeline';
 
 function LeaveStatusPill({ status }: { status: LeaveStatus | string }) {
   const s = String(status).toLowerCase();
@@ -712,6 +713,11 @@ export default function LeaveRequests() {
                           </Button>
                         ) : null}
                       </div>
+                      <LeaveActivityTimeline
+                        events={r.activity}
+                        omitNote={r.admin_note}
+                        className="relative mt-3"
+                      />
                     </div>
                   ))}
                 </div>

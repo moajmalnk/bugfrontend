@@ -18,6 +18,10 @@ export interface GoogleDocsConnectionStatus {
   email?: string | null;
   scopes_ok?: boolean;
   needs_reauth?: boolean;
+  /** When the Google link was created (server timestamp). */
+  connected_at?: string | null;
+  /** True when an admin is viewing via impersonation. */
+  impersonated?: boolean;
 }
 
 export interface CreateDocumentResponse {
@@ -59,20 +63,24 @@ export interface Template {
 class GoogleDocsService {
   /**
    * Check if user has connected their Google account
-   * Returns connection status and email if connected
+   * Returns connection status and email if connected.
+   * `owner: true` reports the signed-in (or impersonated) user's own link — used by Profile.
+   * Without it, an impersonating admin gets the admin account that Docs/Sheets calls run on.
    */
-  async checkConnection(): Promise<GoogleDocsConnectionStatus> {
+  async checkConnection(opts?: { owner?: boolean }): Promise<GoogleDocsConnectionStatus> {
     try {
       const response = await apiClient.get<{
         success: boolean;
         data: GoogleDocsConnectionStatus;
-      }>('/docs/check-connection.php');
+      }>('/docs/check-connection.php', { params: opts?.owner ? { owner: '1' } : undefined });
 
       const result = {
         connected: response.data.data?.connected || false,
         email: response.data.data?.email || null,
         scopes_ok: response.data.data?.scopes_ok ?? true,
         needs_reauth: response.data.data?.needs_reauth ?? false,
+        connected_at: response.data.data?.connected_at ?? null,
+        impersonated: response.data.data?.impersonated ?? false,
       };
       return result;
     } catch (error) {

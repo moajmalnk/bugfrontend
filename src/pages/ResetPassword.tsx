@@ -525,11 +525,6 @@ const ResetPassword = () => {
             </Link>
           </Button>
         </form>
-
-        <div className="mt-6 flex items-start gap-3 rounded-xl bg-blue-500/5 p-3 text-xs text-muted-foreground dark:bg-blue-500/10">
-          <ShieldCheck className="mt-0.5 h-4 w-4 shrink-0 text-blue-600 dark:text-blue-400" />
-          <span>This reset link works only once. Never share it with anyone.</span>
-        </div>
       </div>
     </AuthShell>
   );

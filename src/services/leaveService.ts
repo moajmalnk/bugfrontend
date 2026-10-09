@@ -12,6 +12,19 @@ export type LeaveBalance = {
   remaining: number;
 };
 
+export type LeaveActivityEvent = {
+  event: 'requested' | 'approved' | 'rejected' | 'cancelled' | 'granted' | 'updated';
+  actor_id?: string | null;
+  actor_name?: string | null;
+  /** Admin who acted while impersonating actor_name. */
+  impersonated_by_name?: string | null;
+  note?: string | null;
+  /** Server time (IST, "YYYY-MM-DD HH:mm:ss"). */
+  at: string;
+  /** Reconstructed from the request row (logged before activity tracking existed). */
+  derived?: boolean;
+};
+
 export type LeaveRequest = {
   id: number;
   user_id: string;
@@ -32,9 +45,12 @@ export type LeaveRequest = {
   status: LeaveStatus;
   reviewed_by?: string | null;
   reviewed_at?: string | null;
+  reviewer_username?: string | null;
   admin_note?: string | null;
   created_at?: string | null;
   updated_at?: string | null;
+  /** Oldest first. */
+  activity?: LeaveActivityEvent[];
 };
 
 export type WorkMode = 'office' | 'wfh';

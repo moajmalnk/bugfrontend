@@ -30,6 +30,7 @@ import { usePermissions } from '@/hooks/usePermissions';
 import { ENV } from '@/lib/env';
 import { notifyAdminNavCountsChanged } from '@/services/adminNavCountsService';
 import { MonthFilterChips } from '@/components/ui/MonthFilterChips';
+import { LeaveActivityTimeline } from '@/components/leave/LeaveActivityTimeline';
 import {
   rangeOverlapsMonthFilter,
   type MonthFilterValue,
@@ -359,7 +360,7 @@ export default function AdminLeaveUserDetail() {
                             {r.days_count} day{r.days_count === 1 ? '' : 's'}
                           </span>
                         </p>
-                        {r.created_at ? (
+                        {r.created_at && !r.activity?.length ? (
                           <p className="text-xs text-muted-foreground">
                             Requested {r.created_at}
                           </p>
@@ -386,6 +387,8 @@ export default function AdminLeaveUserDetail() {
                         <p className="text-sm text-amber-900 dark:text-amber-100">{r.admin_note}</p>
                       </div>
                     ) : null}
+
+                    <LeaveActivityTimeline events={r.activity} omitNote={r.admin_note} className="relative" />
 
                     {r.status === 'pending' ? (
                       <div className="relative space-y-3 pt-3 border-t border-gray-200/60 dark:border-gray-700/60">

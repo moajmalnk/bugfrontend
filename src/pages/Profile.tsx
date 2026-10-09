@@ -63,6 +63,7 @@ import {
   User,
   RefreshCw,
   X,
+  CheckCircle2,
 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
@@ -101,6 +102,12 @@ function formatShortDate(value?: string | null): string | null {
     month: "short",
     year: "numeric",
   });
+}
+
+/** " · 19 Nov 2025" for a MySQL `YYYY-MM-DD HH:MM:SS` link timestamp, or "" when unknown. */
+function formatConnectedAt(value?: string | null): string {
+  const date = formatShortDate(value ? value.slice(0, 10) : null);
+  return date ? ` · ${date}` : "";
 }
 
 /** Why: Group profile content into scannable professional sections. */
@@ -257,6 +264,9 @@ export default function Profile() {
   const [isGoogleConnected, setIsGoogleConnected] = useState(false);
   const [isCheckingGoogleConnection, setIsCheckingGoogleConnection] = useState(true);
   const [connectedGoogleEmail, setConnectedGoogleEmail] = useState<string | null>(null);
+  const [googleConnectedAt, setGoogleConnectedAt] = useState<string | null>(null);
+  /** Admin viewing via impersonation: Google link is read-only (backend also refuses disconnect). */
+  const isImpersonating = Boolean(currentUser?.admin_id && currentUser.admin_id !== currentUser.id);
   const [showDisconnectGoogleDialog, setShowDisconnectGoogleDialog] = useState(false);
   const [isDisconnectingGoogle, setIsDisconnectingGoogle] = useState(false);
   const [photoPreviewOpen, setPhotoPreviewOpen] = useState(false);
@@ -323,13 +333,15 @@ export default function Profile() {
   const checkGoogleConnection = useCallback(async () => {
     setIsCheckingGoogleConnection(true);
     try {
-      const result = await googleDocsService.checkConnection();
+      const result = await googleDocsService.checkConnection({ owner: true });
       setIsGoogleConnected(result.connected);
       setConnectedGoogleEmail(result.email || null);
+      setGoogleConnectedAt(result.connected_at || null);
     } catch (error) {
       console.error('Failed to check Google connection:', error);
       setIsGoogleConnected(false);
       setConnectedGoogleEmail(null);
+      setGoogleConnectedAt(null);
     } finally {
       setIsCheckingGoogleConnection(false);
     }
@@ -1100,11 +1112,21 @@ export default function Profile() {
                     Connected accounts
                   </p>
                   <p className="text-xs text-muted-foreground mt-0.5">
-                    Google powers Docs & Sheets integrations
+                    {isImpersonating
+                      ? `Viewing as admin — only ${currentUser?.username || "this user"} can connect or disconnect Google`
+                      : "Google powers Docs & Sheets integrations"}
                   </p>
                 </div>
                 <div className="flex flex-wrap items-center gap-2">
-                  {!isCheckingGoogleConnection && (
+                  {isCheckingGoogleConnection && (
+                    <div className="h-10 w-48 animate-pulse rounded-xl bg-muted/60" aria-label="Checking Google connection" />
+                  )}
+                  {!isCheckingGoogleConnection && isImpersonating && !isGoogleConnected && (
+                    <span className="inline-flex items-center gap-2 rounded-xl border border-border/50 bg-muted/30 px-3 py-2 text-xs text-muted-foreground">
+                      Google not connected
+                    </span>
+                  )}
+                  {!isCheckingGoogleConnection && !(isImpersonating && !isGoogleConnected) && (
                     <>
                       {!isGoogleConnected ? (
                         <Button
@@ -1130,19 +1152,27 @@ export default function Profile() {
                               <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05"/>
                               <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/>
                             </svg>
-                            <span className="truncate">
-                              {connectedGoogleEmail || "Google connected"}
+                            <span className="flex min-w-0 flex-col">
+                              <span className="truncate font-medium text-foreground">
+                                {connectedGoogleEmail || "Google connected"}
+                              </span>
+                              <span className="truncate text-[11px]">
+                                <CheckCircle2 className="mr-1 inline h-3 w-3 text-emerald-500" aria-hidden />
+                                Connected{formatConnectedAt(googleConnectedAt)}
+                              </span>
                             </span>
                           </span>
-                          <Button
-                            variant="outline"
-                            onClick={() => setShowDisconnectGoogleDialog(true)}
-                            className="h-10 rounded-xl px-4 text-sm font-medium border-destructive/30 text-destructive hover:bg-destructive/10"
-                            aria-label="Disconnect Google"
-                          >
-                            <X className="w-4 h-4 mr-1.5" />
-                            Disconnect
-                          </Button>
+                          {!isImpersonating && (
+                            <Button
+                              variant="outline"
+                              onClick={() => setShowDisconnectGoogleDialog(true)}
+                              className="h-10 rounded-xl px-4 text-sm font-medium border-destructive/30 text-destructive hover:bg-destructive/10"
+                              aria-label="Disconnect Google"
+                            >
+                              <X className="w-4 h-4 mr-1.5" />
+                              Disconnect
+                            </Button>
+                          )}
                         </>
                       )}
                     </>
