@@ -216,6 +216,51 @@ function buildFormData(
   return fd;
 }
 
+export type OnboardingFileField = "aadhaar_file" | "pan_file" | "profile_photo";
+
+const FILE_LABELS: Record<OnboardingFileField, string> = {
+  aadhaar_file: "Aadhaar scan",
+  pan_file: "PAN scan",
+  profile_photo: "Profile photo",
+};
+
+/** Thrown when a picked/restored file can no longer be read from the device. */
+export class OnboardingFileReadError extends Error {
+  readonly field: OnboardingFileField;
+
+  constructor(field: OnboardingFileField) {
+    super(
+      `${FILE_LABELS[field]} could not be read from your device anymore. Please select it again and retry.`
+    );
+    this.name = "OnboardingFileReadError";
+    this.field = field;
+  }
+}
+
+/**
+ * Why: iOS Safari drops access to picked photos when the tab is backgrounded
+ * (OTP in WhatsApp, Google connect redirect) and to some IndexedDB blobs. The
+ * upload then dies as an opaque "Network Error". Reading the bytes up front
+ * turns that into a specific, fixable "re-select this file" error.
+ */
+async function readIntoMemory(file: File | null | undefined, field: OnboardingFileField) {
+  if (!file) return null;
+  try {
+    const bytes = await file.arrayBuffer();
+    return new File([bytes], file.name, {
+      type: file.type || "application/octet-stream",
+      lastModified: file.lastModified,
+    });
+  } catch {
+    throw new OnboardingFileReadError(field);
+  }
+}
+
+function isConnectionDrop(err: unknown): boolean {
+  const e = err as { code?: string; response?: unknown };
+  return !e?.response && e?.code === "ERR_NETWORK";
+}
+
 export const onboardingService = {
   async submit(
     payload: OnboardingPayload,
@@ -229,22 +274,45 @@ export const onboardingService = {
     const hasFiles = !!(payload.aadhaar_file || payload.pan_file || payload.profile_photo);
     // Why: Text-only edits should not wait for the 120s file-upload budget.
     const timeout = options?.timeoutMs ?? (hasFiles ? 120_000 : 25_000);
-    const [aadhaar, pan] = await Promise.all([
-      payload.aadhaar_file ? compressImageFile(payload.aadhaar_file) : null,
-      payload.pan_file ? compressImageFile(payload.pan_file) : null,
+    const [aadhaarRaw, panRaw, photoRaw] = await Promise.all([
+      readIntoMemory(payload.aadhaar_file, "aadhaar_file"),
+      readIntoMemory(payload.pan_file, "pan_file"),
+      readIntoMemory(payload.profile_photo, "profile_photo"),
     ]);
-    const body = buildFormData(
-      { ...payload, aadhaar_file: aadhaar, pan_file: pan },
-      { forUserId: options?.forUserId }
-    );
-    const response = await apiClient.post("/users/submit_onboarding.php", body, {
-      timeout,
-      onUploadProgress: (e: { loaded: number; total?: number }) => {
-        if (!options?.onUploadProgress || !e.total) return;
-        options.onUploadProgress(Math.min(100, Math.round((e.loaded / e.total) * 100)));
-      },
-    } as Parameters<typeof apiClient.post>[2]);
-    return response.data;
+    const [aadhaar, pan, photo] = await Promise.all([
+      aadhaarRaw ? compressImageFile(aadhaarRaw) : null,
+      panRaw ? compressImageFile(panRaw) : null,
+      photoRaw ? compressImageFile(photoRaw) : null,
+    ]);
+
+    const send = () => {
+      let bodyFullySent = false;
+      const body = buildFormData(
+        { ...payload, aadhaar_file: aadhaar, pan_file: pan, profile_photo: photo },
+        { forUserId: options?.forUserId }
+      );
+      const request = apiClient.post("/users/submit_onboarding.php", body, {
+        timeout,
+        onUploadProgress: (e: { loaded: number; total?: number }) => {
+          if (!e.total) return;
+          if (e.loaded >= e.total) bodyFullySent = true;
+          options?.onUploadProgress?.(Math.min(100, Math.round((e.loaded / e.total) * 100)));
+        },
+      } as Parameters<typeof apiClient.post>[2]);
+      return { request, wasBodySent: () => bodyFullySent };
+    };
+
+    const first = send();
+    try {
+      return (await first.request).data;
+    } catch (err) {
+      // Why: Mobile radios drop long uploads mid-body. PHP only runs once the full
+      // body arrives, so retrying an incomplete upload cannot double-submit.
+      if (!isConnectionDrop(err) || first.wasBodySent()) throw err;
+      options?.onUploadProgress?.(0);
+      await new Promise((resolve) => setTimeout(resolve, 1500));
+      return (await send().request).data;
+    }
   },
 
   /**

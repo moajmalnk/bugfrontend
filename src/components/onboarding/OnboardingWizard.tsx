@@ -50,7 +50,7 @@ import {
   slugToStep,
   stepToSlug,
 } from "@/lib/onboardingPersistence";
-import { onboardingService } from "@/services/onboardingService";
+import { OnboardingFileReadError, onboardingService } from "@/services/onboardingService";
 import { googleDocsService } from "@/services/googleDocsService";
 import { WfhLocationMapPicker } from "@/components/onboarding/WfhLocationMapPicker";
 import {
@@ -388,7 +388,7 @@ function stepForSubmitError(message: string): number | null {
   if (/account_|bank|ifsc|branch|upi/.test(m)) return 2;
   if (/google/.test(m)) return 3;
   if (
-    /emergency|contact_email|profile_photo|date_of_birth|gender|marital|github|linkedin|house|city|pin_code|district|state|country|address/.test(
+    /emergency|contact_email|profile_photo|profile photo|date_of_birth|gender|marital|github|linkedin|house|city|pin_code|district|state|country|address/.test(
       m
     )
   ) {
@@ -1268,6 +1268,13 @@ export function OnboardingWizard({
     if (photoCropSrc) URL.revokeObjectURL(photoCropSrc);
     setPhotoCropSrc(URL.createObjectURL(source));
     setPhotoCropOpen(true);
+  };
+
+  const dropUnreadableFile = (err: unknown) => {
+    if (!(err instanceof OnboardingFileReadError)) return;
+    const field = err.field;
+    setForm((p) => ({ ...p, [field]: null }));
+    setFileErrors((p) => ({ ...p, [field]: "Select this file again" }));
   };
 
   const onProfilePhotoPicked = (file: File | null) => {
@@ -2331,6 +2338,7 @@ export function OnboardingWizard({
           null;
         onCompleted({ avatar, updated: true });
       } catch (err) {
+        dropUnreadableFile(err);
         const message = extractApiErrorMessage(err, "Could not save onboarding changes");
         toast({
           title: "Update failed",
@@ -2381,6 +2389,7 @@ export function OnboardingWizard({
       onCompleted({ avatar, updated: false });
       onOpenChange?.(false);
     } catch (err) {
+      dropUnreadableFile(err);
       const message = extractApiErrorMessage(err, "Could not complete onboarding");
       setUploadPercent(null);
       setSubmitError({ message, step: stepForSubmitError(message) });

@@ -70,7 +70,7 @@ export function getNetworkErrorMessage(
   const message = (axiosLike?.message ?? '').trim();
 
   if (code === 'ERR_NETWORK' || message === 'Network Error') {
-    return 'Cannot reach the server. Some Wi-Fi networks block external sites — try mobile data, another network, or complete the Wi-Fi sign-in page if your browser opened one.';
+    return 'Connection to the server was lost. Check your signal and try again — on public or office Wi-Fi, switch to mobile data or complete the Wi-Fi sign-in page.';
   }
 
   if (code === 'ECONNABORTED' || /timeout/i.test(message)) {

@@ -143,7 +143,11 @@ async function getFile(userId: string, key: FileField): Promise<File | null> {
     );
     db.close();
     if (!row?.blob) return null;
-    return new File([row.blob], row.name || key, {
+    // Why: iOS Safari can hand back IndexedDB blobs that fail mid-upload
+    // ("Network Error"); copying the bytes into memory now surfaces a dead blob
+    // as a missing file instead of a failed submit.
+    const bytes = await row.blob.arrayBuffer();
+    return new File([bytes], row.name || key, {
       type: row.type || row.blob.type || "application/octet-stream",
     });
   } catch {
