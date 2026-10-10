@@ -439,9 +439,10 @@ const RouteConfig = () => {
           <Route element={<WorkforceRoute deniedDescription={CODO_STANDARDS_DENIED} />}>
             <Route path="compliance" element={<ComplianceOverview />} />
             <Route path="projects/:projectId/compliance" element={<ProjectCompliance />} />
-            <Route path="common-codo" element={<CommonCodoRules />} />
-            <Route path="cursor-tips" element={<CursorTips />} />
           </Route>
+          {/* Per-user standards mode gates these (client testers default to hidden). */}
+          <Route path="common-codo" element={<CommonCodoRules />} />
+          <Route path="cursor-tips" element={<CursorTips />} />
           <Route path="projects/new" element={<NewProject />} />
           <Route path="projects/:projectId/edit" element={<EditProject />} />
           <Route path="projects/:projectId" element={<ProjectDetails />} />

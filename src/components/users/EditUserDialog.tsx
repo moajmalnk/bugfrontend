@@ -29,9 +29,10 @@ import { toast } from "@/components/ui/use-toast";
 import { DatePicker } from "@/components/ui/DatePicker";
 import { userService } from "@/services/userService";
 import { permissionService } from "@/services/permissionService";
-import { StandardsMode, TesterType, User, UserRole } from "@/types";
+import { OnboardingMode, StandardsMode, TesterType, User, UserRole } from "@/types";
 import { TesterTypeField } from "@/components/users/TesterTypeField";
 import { StandardsAccessField } from "@/components/users/StandardsAccessField";
+import { OnboardingModeField } from "@/components/users/OnboardingModeField";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Loader2, Pencil, RefreshCw } from "lucide-react";
 import React, { useEffect, useRef, useState } from "react";
@@ -39,8 +40,11 @@ import { useForm } from "react-hook-form";
 import { z } from "zod";
 import {
   cn,
+  getOnboardingMode,
   getStandardsMode,
+  isOnboardingConfigurable,
   isStandardsConfigurable,
+  onboardingModeDefault,
   standardsModeDefault,
   type StandardsFeature,
 } from "@/lib/utils";
@@ -65,6 +69,7 @@ const userFormSchema = z
   tester_type: z.string().optional(),
   codo_rules_mode: z.enum(["required", "optional", "hidden"]).optional(),
   cursor_tips_mode: z.enum(["required", "optional", "hidden"]).optional(),
+  onboarding_mode: z.enum(["required", "optional", "off"]).optional(),
   phone: z.string().optional(),
   joining_date: optionalDate,
   employee_code: z.string().optional(),
@@ -171,6 +176,7 @@ function toFormValues(user: User): UserFormValues {
       user.role === "tester" ? (user.tester_type === "codo" ? "codo" : "client") : "",
     codo_rules_mode: getStandardsMode(user, "codo"),
     cursor_tips_mode: getStandardsMode(user, "cursor_tips"),
+    onboarding_mode: getOnboardingMode(user),
     phone: user.phone ? user.phone.replace(/^\+91/, "") : "",
     joining_date: user.joining_date || "",
     employee_code: user.employee_code || "",
@@ -260,6 +266,14 @@ export function EditUserDialog({
   const codoMode = form.watch("codo_rules_mode") ?? standardsDefaults.codo;
   const cursorTipsMode = form.watch("cursor_tips_mode") ?? standardsDefaults.cursor_tips;
 
+  const onboardingConfigurable = isOnboardingConfigurable(selectedRoleName);
+  const onboardingDefault: OnboardingMode = onboardingModeDefault(selectedRoleName, selectedTesterType);
+  const onboardingMode = form.watch("onboarding_mode") ?? onboardingDefault;
+  const savedOnboardingMode = getOnboardingMode(user);
+  const onboardingSubmitted =
+    !!user.onboarding_completed_at ||
+    (savedOnboardingMode === "required" && Number(user.onboarding_completed ?? 0) === 1);
+
   // Why: modes follow the role — switching role or tester type re-applies that role's defaults.
   useEffect(() => {
     const key = `${selectedRoleName}:${selectedTesterType}`;
@@ -273,6 +287,9 @@ export function EditUserDialog({
       standardsModeDefault(selectedRoleName, selectedTesterType, "cursor_tips"),
       { shouldDirty: true }
     );
+    form.setValue("onboarding_mode", onboardingModeDefault(selectedRoleName, selectedTesterType), {
+      shouldDirty: true,
+    });
   }, [selectedRoleName, selectedTesterType, form]);
 
   const handleOpenChange = (next: boolean) => {
@@ -308,6 +325,10 @@ export function EditUserDialog({
             data.codo_rules_mode ?? standardsModeDefault(data.role, data.tester_type, "codo");
           payload.cursor_tips_mode =
             data.cursor_tips_mode ?? standardsModeDefault(data.role, data.tester_type, "cursor_tips");
+        }
+        if (isOnboardingConfigurable(data.role)) {
+          payload.onboarding_mode =
+            data.onboarding_mode ?? onboardingModeDefault(data.role, data.tester_type);
         }
         payload.joining_date = data.joining_date?.trim() || null;
         payload.employee_code = data.employee_code?.trim() || null;
@@ -549,6 +570,23 @@ export function EditUserDialog({
                   <p className="text-[11px] text-muted-foreground leading-snug">
                     Switching to Required asks them to acknowledge every item the next time they open the dashboard.
                   </p>
+                </div>
+              )}
+
+              {isAdminEditor && onboardingConfigurable && (
+                <div className="col-span-12 space-y-2">
+                  <p className="flex items-center gap-2 text-sm font-semibold text-gray-900 dark:text-white">
+                    <span className="h-2 w-2 shrink-0 rounded-full bg-violet-500" />
+                    Onboarding
+                  </p>
+                  <OnboardingModeField
+                    value={onboardingMode}
+                    defaultMode={onboardingDefault}
+                    savedMode={savedOnboardingMode}
+                    hasSubmitted={onboardingSubmitted}
+                    disabled={isSubmitting}
+                    onChange={(mode) => form.setValue("onboarding_mode", mode, { shouldDirty: true })}
+                  />
                 </div>
               )}
 

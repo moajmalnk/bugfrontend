@@ -36,7 +36,7 @@ import { cn, getEffectiveRole } from "@/lib/utils";
 import { getRoleIcon as getRoleIconFn, TesterTypeBadge } from "@/lib/roleBadge";
 import { userService } from "@/services/userService";
 import { notifyAdminNavCountsChanged } from "@/services/adminNavCountsService";
-import { StandardsMode, TesterType, User, UserRole } from "@/types";
+import { OnboardingMode, StandardsMode, TesterType, User, UserRole } from "@/types";
 import { BarChart3, ClipboardList, Palette, Shield, UserCheck, UserRound, Code2, Bug } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
@@ -183,6 +183,7 @@ interface NewUser {
   tester_type?: TesterType;
   codo_rules_mode?: StandardsMode;
   cursor_tips_mode?: StandardsMode;
+  onboarding_mode?: OnboardingMode;
   phone?: string;
   joining_date?: string;
 }
@@ -482,6 +483,7 @@ const Users = () => {
         tester_type: userData.role === "tester" ? userData.tester_type : undefined,
         codo_rules_mode: userData.codo_rules_mode,
         cursor_tips_mode: userData.cursor_tips_mode,
+        onboarding_mode: userData.onboarding_mode,
         phone: userData.phone,
         joining_date: userData.joining_date || undefined,
       };

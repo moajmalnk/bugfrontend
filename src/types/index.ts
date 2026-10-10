@@ -113,6 +113,9 @@ export type TesterType = 'codo' | 'client';
 /** Per-user CODO Rules / Cursor Tips access: forced acknowledgement, readable, or hidden. */
 export type StandardsMode = 'required' | 'optional' | 'hidden';
 
+/** Per-user onboarding: locked into the wizard, fill from Profile any time, or no onboarding. */
+export type OnboardingMode = 'required' | 'optional' | 'off';
+
 export interface Permission {
   id: number;
   permission_key: string;
@@ -143,6 +146,8 @@ export interface User {
   codo_rules_mode?: StandardsMode;
   /** Effective Cursor Tips mode resolved by the backend (role default when unset). */
   cursor_tips_mode?: StandardsMode;
+  /** Effective onboarding mode resolved by the backend (role default when unset). */
+  onboarding_mode?: OnboardingMode;
   role_id?: number | null;
   /** 1 = active, 0 = deactivated by admin (when column exists) */
   account_active?: number;

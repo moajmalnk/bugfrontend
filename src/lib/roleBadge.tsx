@@ -1,5 +1,11 @@
 import { Bug, Code2, Palette, Shield } from "lucide-react";
-import { cn, getStandardsModeLabel, isStandardsConfigurable } from "@/lib/utils";
+import {
+  cn,
+  getOnboardingModeLabel,
+  getStandardsModeLabel,
+  isOnboardingConfigurable,
+  isStandardsConfigurable,
+} from "@/lib/utils";
 
 /**
  * Why: One badge token set so Users, details, and dashboards stay consistent
@@ -104,6 +110,37 @@ export function StandardsModeBadge({
       title={`${label}: ${modeLabel}`}
     >
       {label} · {modeLabel}
+    </span>
+  );
+}
+
+export function OnboardingModeBadge({
+  role,
+  mode,
+  className,
+}: {
+  role?: string | null;
+  mode?: string | null;
+  className?: string;
+}) {
+  if (!role || !isOnboardingConfigurable(role)) return null;
+  const tone =
+    mode === "required"
+      ? "border-violet-500/30 bg-violet-500/10 text-violet-700 dark:text-violet-300"
+      : mode === "off"
+        ? "border-red-500/30 bg-red-500/10 text-red-700 dark:text-red-300"
+        : "border-border bg-muted/50 text-muted-foreground";
+  const modeLabel = getOnboardingModeLabel(mode);
+  return (
+    <span
+      className={cn(
+        "inline-flex items-center rounded-full border px-3 py-1 text-xs font-semibold whitespace-nowrap",
+        tone,
+        className
+      )}
+      title={`Onboarding: ${modeLabel}`}
+    >
+      Onboarding · {modeLabel}
     </span>
   );
 }

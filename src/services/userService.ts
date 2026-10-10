@@ -2,7 +2,7 @@ import { ENV } from '@/lib/env';
 import { resolveAvatarUrl } from '@/lib/avatarUrl';
 import { sortUsersActiveFirst } from '@/lib/utils/userSort';
 import { isWorkforceUser } from '@/lib/utils';
-import { StandardsMode, TesterType, User, UserRole } from '@/types';
+import { OnboardingMode, StandardsMode, TesterType, User, UserRole } from '@/types';
 import axios from 'axios';
 
 export const BIRTHDAY_WISH_MAX_LENGTH = 280;
@@ -151,6 +151,7 @@ interface NewUserData {
   tester_type?: TesterType | null;
   codo_rules_mode?: StandardsMode;
   cursor_tips_mode?: StandardsMode;
+  onboarding_mode?: OnboardingMode;
   joining_date?: string | null;
 }
 
@@ -163,6 +164,7 @@ interface UpdateUserData {
   tester_type?: TesterType | null;
   codo_rules_mode?: StandardsMode;
   cursor_tips_mode?: StandardsMode;
+  onboarding_mode?: OnboardingMode;
   account_active?: boolean | number;
   joining_date?: string | null;
   employee_code?: string | null;

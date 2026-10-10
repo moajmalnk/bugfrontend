@@ -56,50 +56,105 @@ export const getEffectiveRole = (user: { role?: string; role_id?: number | null 
   return user.role || 'user';
 };
 
+type OnboardingModeValue = "required" | "optional" | "off";
+
+type OnboardingUserRow = {
+  role?: string;
+  role_id?: number | null;
+  tester_type?: string | null;
+  onboarding_mode?: OnboardingModeValue | null;
+};
+
+type OnboardingUser = OnboardingUserRow | null | undefined;
+
+/** Developers, creators and testers (CODO and client) are the roles an admin can configure. */
+export const isOnboardingConfigurable = (role: string): boolean =>
+  role === "developer" || role === "creator" || role === "tester";
+
 /**
- * Why: Statutory/banking onboarding is mandatory for employees — developers and
- * CODO testers. Client testers, admins, creators and custom roles skip it.
+ * Why: a NULL onboarding_mode on the server means "role default"; mirror
+ * br_onboarding_default_mode() so forms prefill correctly. Employees
+ * (developers + CODO testers) must onboard; everyone else is off.
  */
-export const userRequiresOnboarding = (user: {
+export const onboardingModeDefault = (
+  role: string,
+  testerType: string | null | undefined
+): OnboardingModeValue => {
+  if (role === "developer") return "required";
+  if (role === "tester" && testerType === "codo") return "required";
+  return "off";
+};
+
+/** Effective onboarding mode; the backend value wins when present. */
+export const getOnboardingMode = (user: OnboardingUser): OnboardingModeValue => {
+  if (!user) return "off";
+  const role = getEffectiveRole(user);
+  if (!isOnboardingConfigurable(role)) return onboardingModeDefault(role, user.tester_type);
+  const stored = user.onboarding_mode;
+  if (stored === "required" || stored === "optional" || stored === "off") return stored;
+  return onboardingModeDefault(role, user.tester_type);
+};
+
+/** Locked into the wizard until the first submit. Mirrors br_user_requires_onboarding(). */
+export const userRequiresOnboarding = (user: OnboardingUser): boolean =>
+  getOnboardingMode(user) === "required";
+
+/** Onboarding records and HR verification apply (required or optional). */
+export const userOnboardingEnabled = (user: OnboardingUser): boolean =>
+  getOnboardingMode(user) !== "off";
+
+/**
+ * Why: Attendance / period-hours roster is CODO staff who submit work —
+ * developers, creators, and CODO testers. Admins and client testers stay out.
+ * Role-based on purpose: switching onboarding off does not remove someone from payroll.
+ */
+export const isAttendanceRosterUser = (user: {
   role?: string;
   role_id?: number | null;
   tester_type?: string | null;
 } | null | undefined): boolean => {
   const role = getEffectiveRole(user || {});
-  if (role === "developer") return true;
-  return role === "tester" && user?.tester_type === "codo";
+  return role === "developer" || role === "creator" || (role === "tester" && user?.tester_type === "codo");
 };
 
 /**
- * Why: Creators are staff too, so HR keeps their personal, employment and banking
- * records — but unlike developers they are never locked into the onboarding wizard.
+ * Why: HR keeps personal, employment and banking records for staff, plus anyone
+ * an admin has opted into onboarding (e.g. a client tester set to Optional).
  */
-export const userHasEmployeeRecords = (user: {
-  role?: string;
-  role_id?: number | null;
-  tester_type?: string | null;
-} | null | undefined): boolean =>
-  userRequiresOnboarding(user) || getEffectiveRole(user || {}) === "creator";
+export const userHasEmployeeRecords = (user: OnboardingUser): boolean =>
+  isAttendanceRosterUser(user) || userOnboardingEnabled(user);
 
 /**
- * Why: Attendance / period-hours roster is CODO staff who submit work —
- * developers, creators, and CODO testers. Admins and client testers stay out.
+ * Incomplete Required onboarding — the user is locked into the wizard.
+ * Mirrors the backend guards that read onboarding_completed.
  */
-export const isAttendanceRosterUser = userHasEmployeeRecords;
-
-/**
- * Incomplete mandatory onboarding — employees (developers + CODO testers) are
- * locked into the wizard. Mirrors backend br_user_requires_onboarding().
- */
-export const userHasPendingOnboarding = (user: {
-  role?: string;
-  role_id?: number | null;
-  tester_type?: string | null;
-  onboarding_completed?: number | null;
-} | null | undefined): boolean =>
+export const userHasPendingOnboarding = (
+  user: (OnboardingUserRow & { onboarding_completed?: number | null }) | null | undefined
+): boolean =>
   !!user &&
   userRequiresOnboarding(user) &&
   Number(user.onboarding_completed ?? 0) === 0;
+
+export const ONBOARDING_MODE_OPTIONS = [
+  {
+    value: "required",
+    label: "Required",
+    description: "Locked into the onboarding wizard until documents, bank details and password are submitted.",
+  },
+  {
+    value: "optional",
+    label: "Optional",
+    description: "Full dashboard access. Can fill onboarding from Profile any time; HR can verify it.",
+  },
+  {
+    value: "off",
+    label: "Off",
+    description: "No onboarding wizard, reminders or verification for this user.",
+  },
+] as const;
+
+export const getOnboardingModeLabel = (mode: string | null | undefined): string =>
+  mode === "required" ? "Required" : mode === "optional" ? "Optional" : "Off";
 
 /**
  * Why: Testers are either CODO in-house staff or external client reviewers.
@@ -118,9 +173,9 @@ export const isWorkforceUser = (user: {
 };
 
 /**
- * Why: CODO Rules, project Compliance and Cursor Tips are internal engineering
- * standards for the CODO team (admins, developers, CODO testers). Client testers
- * are external reviewers and never see them — no acknowledgement gate, nav or pages.
+ * Why: project Compliance is internal to the CODO team (admins, developers, CODO
+ * testers). CODO Rules / Cursor Tips follow the per-user mode instead (see
+ * getStandardsMode), so an admin can opt a client tester in.
  * Mirrors backend br_require_codo_standards_access(); the backend remains the authority.
  */
 export const canAccessCodoStandards = isWorkforceUser;
@@ -136,9 +191,9 @@ type StandardsUser = {
   cursor_tips_mode?: StandardsModeValue | null;
 } | null | undefined;
 
-/** Developers, creators and CODO testers are the only roles an admin can configure. */
-export const isStandardsConfigurable = (role: string, testerType?: string | null): boolean =>
-  role === "developer" || role === "creator" || (role === "tester" && testerType === "codo");
+/** Developers, creators and testers (CODO and client) are the roles an admin can configure. */
+export const isStandardsConfigurable = (role: string, _testerType?: string | null): boolean =>
+  role === "developer" || role === "creator" || role === "tester";
 
 /**
  * Why: a NULL mode on the server means "role default"; mirror
@@ -152,13 +207,15 @@ export const standardsModeDefault = (
 ): StandardsModeValue => {
   if (role === "admin") return "optional";
   if (!isStandardsConfigurable(role, testerType)) return "hidden";
+  // Client testers are external: off until an admin enables them.
+  if (role === "tester" && testerType !== "codo") return "hidden";
   if (feature === "codo" && role !== "creator") return "required";
   return "optional";
 };
 
 /** Effective mode for a user; the backend value wins when present. */
 export const getStandardsMode = (user: StandardsUser, feature: StandardsFeature): StandardsModeValue => {
-  if (!user || !canAccessCodoStandards(user)) return "hidden";
+  if (!user) return "hidden";
   const role = getEffectiveRole(user);
   const stored = feature === "codo" ? user.codo_rules_mode : user.cursor_tips_mode;
   if (stored === "required" || stored === "optional" || stored === "hidden") return stored;

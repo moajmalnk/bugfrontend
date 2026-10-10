@@ -256,12 +256,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [testerTypePending, currentUser?.id]);
 
   /**
-   * Why: an admin can switch a user's CODO Rules / Cursor Tips between
-   * Required, Optional and Hidden at any time. Logins other than /me return
-   * no modes, so hydrate them once, then re-read them (throttled) whenever the
-   * tab regains focus so the sidebar and gates follow without a hard refresh.
+   * Why: an admin can switch a user's CODO Rules / Cursor Tips (Required,
+   * Optional, Hidden) and onboarding (Required, Optional, Off) at any time.
+   * Logins other than /me return no modes, so hydrate them once, then re-read
+   * them (throttled) whenever the tab regains focus so the sidebar, onboarding
+   * lock and gates follow without a hard refresh.
    */
-  const standardsModesMissing = !!currentUser && currentUser.codo_rules_mode === undefined;
+  const standardsModesMissing =
+    !!currentUser &&
+    (currentUser.codo_rules_mode === undefined || currentUser.onboarding_mode === undefined);
   useEffect(() => {
     if (!currentUser?.id) return;
     const userId = currentUser.id;
@@ -282,15 +285,23 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         .then((data) => {
           const next = data?.data;
           if (!data?.success || !next) return;
+          const nextCompleted =
+            next.onboarding_completed === undefined || next.onboarding_completed === null
+              ? undefined
+              : Number(next.onboarding_completed);
           setCurrentUser((prev) =>
             prev &&
             prev.id === userId &&
             (prev.codo_rules_mode !== next.codo_rules_mode ||
-              prev.cursor_tips_mode !== next.cursor_tips_mode)
+              prev.cursor_tips_mode !== next.cursor_tips_mode ||
+              prev.onboarding_mode !== next.onboarding_mode ||
+              (nextCompleted !== undefined && Number(prev.onboarding_completed ?? 0) !== nextCompleted))
               ? {
                   ...prev,
                   codo_rules_mode: next.codo_rules_mode,
                   cursor_tips_mode: next.cursor_tips_mode,
+                  onboarding_mode: next.onboarding_mode,
+                  ...(nextCompleted !== undefined ? { onboarding_completed: nextCompleted } : {}),
                 }
               : prev
           );

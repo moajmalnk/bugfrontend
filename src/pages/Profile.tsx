@@ -27,7 +27,13 @@ import { OnboardingWizard } from "@/components/onboarding/OnboardingWizard";
 import { OnboardingVerificationBadge } from "@/components/onboarding/OnboardingVerificationBanner";
 import { useAuth } from "@/context/AuthContext";
 import { formatLocalDate } from "@/lib/utils/dateUtils";
-import { cn, isWorkforceUser, userHasEmployeeRecords, userRequiresOnboarding } from "@/lib/utils";
+import {
+  cn,
+  isWorkforceUser,
+  userHasEmployeeRecords,
+  userOnboardingEnabled,
+  userRequiresOnboarding,
+} from "@/lib/utils";
 import { API_BASE_URL } from "@/lib/env";
 import { resolveAvatarUrl } from "@/lib/avatarUrl";
 import { onboardingService } from "@/services/onboardingService";
@@ -45,6 +51,7 @@ import {
   Briefcase,
   CalendarDays,
   Code2,
+  FileText,
   Rows3,
   Search,
   Github,
@@ -277,15 +284,16 @@ export default function Profile() {
    * and browser Back restore/close the wizard instead of stranding a stale query.
    */
   const onboardingSlug = searchParams.get("onboarding");
-  const canUseOnboarding = userRequiresOnboarding(currentUser);
+  const isRequiredOnboarding = userRequiresOnboarding(currentUser);
+  const canUseOnboarding = userOnboardingEnabled(currentUser);
   const canEditViaOnboarding =
-    canUseOnboarding && Number(currentUser?.onboarding_completed ?? 0) === 1;
-  const canEditBasicProfile = !canUseOnboarding;
-  // Creators are never forced into the wizard, but an HR onboarding request link opens it.
-  const isOptionalOnboardingUser = !canUseOnboarding && userHasEmployeeRecords(currentUser);
+    isRequiredOnboarding && Number(currentUser?.onboarding_completed ?? 0) === 1;
+  const canEditBasicProfile = !isRequiredOnboarding;
+  // Optional-mode users (and creators via an HR request link) open the wizard from Profile.
+  const isOptionalOnboardingUser = !isRequiredOnboarding && userHasEmployeeRecords(currentUser);
+  const showOptionalOnboardingButton = !isRequiredOnboarding && canUseOnboarding;
   const editOnboardingOpen =
-    ((canUseOnboarding && Number(currentUser?.onboarding_completed ?? 0) === 1) ||
-      isOptionalOnboardingUser) &&
+    (canEditViaOnboarding || isOptionalOnboardingUser) &&
     !!onboardingSlug &&
     (ONBOARDING_STEP_SLUGS as readonly string[]).includes(onboardingSlug);
 
@@ -1010,6 +1018,16 @@ export default function Profile() {
                     >
                       <User className="w-4 h-4 mr-2" />
                       Edit profile
+                    </Button>
+                  ) : null}
+                  {showOptionalOnboardingButton ? (
+                    <Button
+                      variant="outline"
+                      className="h-11 rounded-xl px-5 font-medium"
+                      onClick={() => setEditOnboardingOpen(true)}
+                    >
+                      <FileText className="w-4 h-4 mr-2" />
+                      Onboarding details
                     </Button>
                   ) : null}
                   <Button

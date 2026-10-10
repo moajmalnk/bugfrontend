@@ -1151,7 +1151,9 @@ export function OnboardingProfileSection({
               <p className="text-sm text-muted-foreground">
                 {canVerify
                   ? "No onboarding details on file yet. Fill everything as admin without employee OTP."
-                  : "Could not load onboarding details."}
+                  : isError
+                    ? "Could not load onboarding details."
+                    : "Nothing submitted yet. Use Onboarding details at the top of this page to add your address, documents and bank details."}
               </p>
             </div>
             {canVerify ? (

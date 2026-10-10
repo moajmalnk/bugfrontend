@@ -1,19 +1,19 @@
 import { useAuth } from "@/context/AuthContext";
 import { getOnboardingRejectionLabel } from "@/lib/onboardingRejectionReasons";
-import { userRequiresOnboarding } from "@/lib/utils";
+import { userOnboardingEnabled } from "@/lib/utils";
 import { Clock3, ShieldCheck, XCircle } from "lucide-react";
 import { Link } from "react-router-dom";
 
 /**
  * Why: After onboarding submit, HR still needs to verify docs — surface that
  * clearly without locking the employee out of the dashboard.
- * Only employees (developers + CODO testers) go through mandatory onboarding.
+ * Applies to anyone whose onboarding is Required or Optional.
  */
 export default function OnboardingVerificationBanner() {
   const { currentUser } = useAuth();
   if (
     !currentUser ||
-    !userRequiresOnboarding(currentUser) ||
+    !userOnboardingEnabled(currentUser) ||
     Number(currentUser.onboarding_completed ?? 0) !== 1
   ) {
     return null;

@@ -33,11 +33,21 @@ import { Tabs, TabsContent } from "@/components/ui/tabs";
 import { BottomSheetTabs } from "@/components/ui/BottomSheetTabs";
 import { useAuth } from "@/context/AuthContext";
 import { ENV } from "@/lib/env";
-import { getStandardsMode, userHasEmployeeRecords } from "@/lib/utils";
+import {
+  getOnboardingMode,
+  getStandardsMode,
+  userHasEmployeeRecords,
+  userOnboardingEnabled,
+} from "@/lib/utils";
 import { usePermissions } from "@/hooks/usePermissions";
 import { useToast } from "@/hooks/use-toast";
 import { cn, getEffectiveRole } from "@/lib/utils";
-import { getRoleIcon as roleIcon, StandardsModeBadge, TesterTypeBadge } from "@/lib/roleBadge";
+import {
+  getRoleIcon as roleIcon,
+  OnboardingModeBadge,
+  StandardsModeBadge,
+  TesterTypeBadge,
+} from "@/lib/roleBadge";
 import { VerifiedBlueTick, isFullFledgedUser } from "@/components/ui/VerifiedBlueTick";
 import { userService } from "@/services/userService";
 import { onboardingService } from "@/services/onboardingService";
@@ -363,6 +373,8 @@ export default function UserDetails() {
   const canRequestOnboarding =
     Boolean(user?.id && (user?.email || user?.phone)) &&
     userHasEmployeeRecords(user) &&
+    // Creators can still be asked for records; anyone else needs onboarding switched on.
+    (userOnboardingEnabled(user) || user?.role === "creator") &&
     currentUser?.id !== user?.id &&
     !isAccountDeactivated &&
     (effectiveRole === "admin" || hasPermission("USERS_EDIT"));
@@ -711,6 +723,11 @@ export default function UserDetails() {
                               className="h-7 px-3 py-0 font-semibold whitespace-nowrap"
                             />
                           ) : null}
+                          <OnboardingModeBadge
+                            role={user.role}
+                            mode={getOnboardingMode(user)}
+                            className="h-7 py-0"
+                          />
                           <StandardsModeBadge
                             role={user.role}
                             testerType={user.tester_type}

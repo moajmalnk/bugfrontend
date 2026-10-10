@@ -30,7 +30,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { HourPicker } from '@/components/ui/HourPicker';
 import { StatusDropdown, type StatusOption } from '@/components/ui/StatusDropdown';
 import { useAuth } from '@/context/AuthContext';
-import { cn, userRequiresOnboarding } from '@/lib/utils';
+import { cn, userOnboardingEnabled } from '@/lib/utils';
 import { bugService } from '@/services/bugService';
 import { updateService } from '@/services/updateService';
 import { toLocalCalendarDateString } from '@/lib/dateUtils';
@@ -380,7 +380,7 @@ export function DailyWorkFlowPanel({
   const attendanceBlocked = attendanceGate != null && attendanceGate.allowed === false;
   /** Why: Rejected verification locks check-in/checkout; pending + verified stay open. */
   const verificationRejected =
-    userRequiresOnboarding(currentUser) &&
+    userOnboardingEnabled(currentUser) &&
     Number(currentUser?.onboarding_completed ?? 0) === 1 &&
     String(currentUser?.onboarding_verification_status || '').toLowerCase() === 'rejected';
   const attendanceActionsBlocked = attendanceBlocked || verificationRejected;

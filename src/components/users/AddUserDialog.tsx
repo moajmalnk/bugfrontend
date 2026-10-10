@@ -28,16 +28,24 @@ import {
 import { toast } from "@/components/ui/use-toast";
 import { DatePicker } from "@/components/ui/DatePicker";
 import { Checkbox } from "@/components/ui/checkbox";
-import { StandardsMode, UserRole } from "@/types";
+import { OnboardingMode, StandardsMode, UserRole } from "@/types";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Loader2, UserPlus } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { permissionService } from "@/services/permissionService";
-import { cn, isStandardsConfigurable, standardsModeDefault, type StandardsFeature } from "@/lib/utils";
+import {
+  cn,
+  isOnboardingConfigurable,
+  isStandardsConfigurable,
+  onboardingModeDefault,
+  standardsModeDefault,
+  type StandardsFeature,
+} from "@/lib/utils";
 import { TesterTypeField } from "@/components/users/TesterTypeField";
 import { StandardsAccessField } from "@/components/users/StandardsAccessField";
+import { OnboardingModeField } from "@/components/users/OnboardingModeField";
 
 const userFormSchema = z
   .object({
@@ -56,6 +64,7 @@ const userFormSchema = z
     tester_type: z.string().optional(),
     codo_rules_mode: z.enum(["required", "optional", "hidden"]).optional(),
     cursor_tips_mode: z.enum(["required", "optional", "hidden"]).optional(),
+    onboarding_mode: z.enum(["required", "optional", "off"]).optional(),
     phone: z.string().optional(),
     joining_date: z
       .string()
@@ -160,11 +169,15 @@ export function AddUserDialog({ onUserAdd }: AddUserDialogProps) {
   };
   const codoMode = form.watch("codo_rules_mode") ?? standardsDefaults.codo;
   const cursorTipsMode = form.watch("cursor_tips_mode") ?? standardsDefaults.cursor_tips;
+  const onboardingConfigurable = isOnboardingConfigurable(selectedRoleName);
+  const onboardingDefault: OnboardingMode = onboardingModeDefault(selectedRoleName, selectedTesterType);
+  const onboardingMode = form.watch("onboarding_mode") ?? onboardingDefault;
 
   // Why: modes follow the role — a role or tester type change re-applies that role's defaults.
   useEffect(() => {
     form.setValue("codo_rules_mode", undefined, { shouldDirty: false });
     form.setValue("cursor_tips_mode", undefined, { shouldDirty: false });
+    form.setValue("onboarding_mode", undefined, { shouldDirty: false });
   }, [selectedRoleName, selectedTesterType, form]);
 
   useEffect(() => {
@@ -220,6 +233,12 @@ export function AddUserDialog({ onUserAdd }: AddUserDialogProps) {
                 standardsModeDefault(userData.role, userData.tester_type, "cursor_tips"),
             }
           : {}),
+        ...(isOnboardingConfigurable(userData.role)
+          ? {
+              onboarding_mode:
+                userData.onboarding_mode ?? onboardingModeDefault(userData.role, userData.tester_type),
+            }
+          : {}),
         phone: userData.phone && userData.phone.trim() ? "+91" + userData.phone.trim() : undefined,
         joining_date: userData.joining_date?.trim() || undefined,
       };
@@ -245,6 +264,7 @@ export function AddUserDialog({ onUserAdd }: AddUserDialogProps) {
       tester_type: prev.role === "tester" ? prev.tester_type : "",
       codo_rules_mode: prev.codo_rules_mode,
       cursor_tips_mode: prev.cursor_tips_mode,
+      onboarding_mode: prev.onboarding_mode,
       joining_date: prev.joining_date || "",
     });
     requestAnimationFrame(() => usernameRef.current?.focus());
@@ -279,9 +299,15 @@ export function AddUserDialog({ onUserAdd }: AddUserDialogProps) {
   const handleOpenChange = (next: boolean) => {
     if (!next) {
       if (isSubmitting) return;
-      const { username, email, phone, codo_rules_mode, cursor_tips_mode } = form.getValues();
+      const { username, email, phone, codo_rules_mode, cursor_tips_mode, onboarding_mode } =
+        form.getValues();
       const hasDraft = Boolean(
-        username?.trim() || email?.trim() || phone?.trim() || codo_rules_mode || cursor_tips_mode
+        username?.trim() ||
+          email?.trim() ||
+          phone?.trim() ||
+          codo_rules_mode ||
+          cursor_tips_mode ||
+          onboarding_mode
       );
       if (hasDraft && !window.confirm("You have unsaved changes. Discard this user?")) return;
       form.reset({
@@ -291,6 +317,7 @@ export function AddUserDialog({ onUserAdd }: AddUserDialogProps) {
         tester_type: "",
         codo_rules_mode: undefined,
         cursor_tips_mode: undefined,
+        onboarding_mode: undefined,
         joining_date: "",
         role: defaultRole(),
       });
@@ -321,7 +348,7 @@ export function AddUserDialog({ onUserAdd }: AddUserDialogProps) {
                 Add New User
               </DialogTitle>
               <DialogDescription className="text-sm text-gray-600 dark:text-gray-400 mt-1">
-                Create a new account. They will set their own password during onboarding.
+                Create a new account and decide whether they go through employee onboarding.
               </DialogDescription>
             </div>
           </div>
@@ -464,6 +491,21 @@ export function AddUserDialog({ onUserAdd }: AddUserDialogProps) {
                   <p className="text-xs text-muted-foreground">
                     Required asks them to acknowledge every item before the dashboard opens.
                   </p>
+                </div>
+              )}
+
+              {onboardingConfigurable && (
+                <div className="col-span-12 space-y-2">
+                  <p className="flex items-center gap-2 text-sm font-semibold text-gray-900 dark:text-white">
+                    <span className="h-2 w-2 shrink-0 rounded-full bg-violet-500" />
+                    Onboarding
+                  </p>
+                  <OnboardingModeField
+                    value={onboardingMode}
+                    defaultMode={onboardingDefault}
+                    disabled={isSubmitting}
+                    onChange={(mode) => form.setValue("onboarding_mode", mode, { shouldDirty: true })}
+                  />
                 </div>
               )}
 
