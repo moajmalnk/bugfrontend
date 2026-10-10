@@ -62,6 +62,7 @@ import {
   MessageCircle,
   Pencil,
   Phone,
+  Printer,
   Send,
   Timer,
   Trash2,
@@ -73,7 +74,7 @@ import {
   X,
   type LucideIcon,
 } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   Link,
   useNavigate,
@@ -82,6 +83,10 @@ import {
   useSearchParams,
 } from "react-router-dom";
 import { getReturnPathFromState } from "@/hooks/useUrlPagination";
+import { useUrlDialogParam } from "@/hooks/useUrlDialogParam";
+import { UserReportPrintDialog } from "@/components/users/UserReportPrintDialog";
+import type { UserReportBank, UserReportProfile } from "@/lib/userReportReceipt";
+import { defaultPayVerifyYearMonth } from "@/services/payVerifyService";
 import { buildAdminAddHoursPath } from "@/pages/adminOvertimeShared";
 
 type UserStatus = "active" | "idle" | "offline";
@@ -292,6 +297,50 @@ export default function UserDetails() {
     (user?.employee_code || onboardingData?.user?.employee_code || "").trim() ||
     null;
 
+  const reportDialog = useUrlDialogParam("print", ["month"]);
+  const { value: printParam, close: closeReport, setRelated: setReportParam } = reportDialog;
+  const reportOpen = isAdmin && printParam === "report" && Boolean(user);
+  const reportMonth = reportDialog.searchParams.get("month") || defaultPayVerifyYearMonth();
+  const openReport = () =>
+    reportDialog.open("report", { month: defaultPayVerifyYearMonth() });
+  const setReportMonth = useCallback(
+    (month: string) => setReportParam("month", month),
+    [setReportParam]
+  );
+
+  // Why: Print links are admin-only; strip unknown values or non-admin access instead of opening.
+  useEffect(() => {
+    if (!printParam || !currentUser) return;
+    if (!isAdmin || printParam !== "report") closeReport();
+  }, [printParam, currentUser, isAdmin, closeReport]);
+
+  const reportProfile = useMemo<UserReportProfile | null>(() => {
+    if (!user) return null;
+    const ob = onboardingData?.user;
+    return {
+      id: String(user.id),
+      name: user.name,
+      username: user.username,
+      role: user.role,
+      email: user.email,
+      phone: user.phone ?? ob?.phone ?? null,
+      employee_code: employeeCodeDisplay,
+      job_title: user.job_title ?? ob?.job_title,
+      job_level: user.job_level ?? ob?.job_level,
+      department: user.department ?? ob?.department,
+      reports_to_username: user.reports_to_username ?? ob?.reports_to_username,
+      contract_type: user.contract_type ?? ob?.contract_type,
+      joining_date: user.joining_date ?? ob?.joining_date,
+      probation_end_date: user.probation_end_date ?? ob?.probation_end_date,
+      employment_status: user.employment_status ?? ob?.employment_status,
+    };
+  }, [user, onboardingData, employeeCodeDisplay]);
+
+  const reportBank = useMemo<UserReportBank | null>(
+    () => onboardingData?.details ?? null,
+    [onboardingData]
+  );
+
   const status = useMemo(() => {
     if (!user) return "offline" as const;
     return user.status || computeStatus(user);
@@ -497,7 +546,7 @@ export default function UserDetails() {
                 </div>
 
                 <p className="text-gray-600 dark:text-gray-400 text-base lg:text-lg font-medium max-w-2xl">
-                  Professional profile view with actions, permissions, and work analytics.
+                  Professional profile view with actions.
                 </p>
               </div>
 
@@ -517,6 +566,18 @@ export default function UserDetails() {
                       <Timer className="h-4 w-4 shrink-0 mr-2" />
                       Add / Fix Hours
                     </Link>
+                  </Button>
+                ) : null}
+                {isAdmin && userId ? (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="h-11 w-full sm:w-auto rounded-xl border-sky-200 dark:border-sky-800 bg-white/70 dark:bg-gray-900/50 text-sky-700 dark:text-sky-300 hover:bg-sky-50 dark:hover:bg-sky-950/40"
+                    disabled={!user}
+                    onClick={openReport}
+                  >
+                    <Printer className="h-4 w-4 shrink-0 mr-2" />
+                    Print report
                   </Button>
                 ) : null}
                 {canManageUserProjects && user ? (
@@ -1506,6 +1567,18 @@ export default function UserDetails() {
             </Tabs>
           </div>
         )}
+
+        {isAdmin ? (
+          <UserReportPrintDialog
+            open={reportOpen}
+            onClose={closeReport}
+            month={reportMonth}
+            onMonthChange={setReportMonth}
+            profile={reportProfile}
+            bank={reportBank}
+            printedBy={currentUser?.username}
+          />
+        ) : null}
     </div>
   );
 }

@@ -66,7 +66,12 @@ import {
 import { Project, projectService } from "@/services/projectService";
 import { complianceService } from "@/services/complianceService";
 import { userService } from "@/services/userService";
-import { whatsappService } from "@/services/whatsappService";
+import {
+  whatsappService,
+  type ProjectWhatsAppShareData,
+} from "@/services/whatsappService";
+import { ProjectPrintDialog } from "@/components/projects/ProjectPrintDialog";
+import { useUrlDialogParam } from "@/hooks/useUrlDialogParam";
 import { clientService } from "@/services/clientService";
 import { Client } from "@/types";
 import { useQuery } from "@tanstack/react-query";
@@ -92,6 +97,7 @@ import {
   Undo2,
   Users,
   Plus,
+  Printer,
 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { UndoDeleteNotificationPortal } from "@/components/ui/UndoDeleteNotification";
@@ -314,6 +320,16 @@ const Projects = () => {
   const [projectToUndo, setProjectToUndo] = useState<Project | null>(null);
   const [copyingProjectId, setCopyingProjectId] = useState<string | null>(null);
   const [copiedProjectId, setCopiedProjectId] = useState<string | null>(null);
+  const printDialog = useUrlDialogParam("print");
+  const printParam = printDialog.value;
+  const printProjectId = currentUser?.role === "admin" ? printParam : null;
+  const printProject = useMemo(
+    () =>
+      printProjectId
+        ? projects.find((p) => String(p.id) === printProjectId) ?? null
+        : null,
+    [printProjectId, projects]
+  );
 
   const userProjectMemberships = useMemo(() => {
     if (!currentUser || projects.length === 0) {
@@ -334,12 +350,9 @@ const Projects = () => {
     [currentUser?.role, userProjectMemberships]
   );
 
-  const handleCopyProject = useCallback(
-    async (project: Project) => {
-      if (copyingProjectId) return;
-      setCopyingProjectId(project.id);
-
-      try {
+  /** Why: Copy and thermal Print must show identical numbers, so both read from one builder. */
+  const buildProjectShareData = useCallback(
+    async (project: Project): Promise<ProjectWhatsAppShareData> => {
         const developers = (project.members_detail || [])
           .filter((m) => String(m.role || "").toLowerCase() === "developer")
           .map((m) => m.username || m.email || "Developer");
@@ -378,7 +391,7 @@ const Projects = () => {
         const complianceOn = showProjectCompliance(project);
         const durationDays = computeProjectDurationDays(project);
 
-        const briefing = whatsappService.formatProjectShareMessage({
+        return {
           projectId: project.id,
           projectName: project.name,
           statusLabel: getProjectStatusLabel(project.status),
@@ -471,7 +484,26 @@ const Projects = () => {
             complianceOn && project.tester_compliance_complete_date
               ? formatLocalDate(project.tester_compliance_complete_date, "date")
               : null,
-        });
+        };
+    },
+    [
+      projectBugsCount,
+      projectOpenBugsCount,
+      projectFixedBugsCount,
+      projectMemberCounts,
+      currentUser,
+    ]
+  );
+
+  const handleCopyProject = useCallback(
+    async (project: Project) => {
+      if (copyingProjectId) return;
+      setCopyingProjectId(project.id);
+
+      try {
+        const briefing = whatsappService.formatProjectShareMessage(
+          await buildProjectShareData(project)
+        );
 
         if (navigator.clipboard?.writeText) {
           await navigator.clipboard.writeText(briefing);
@@ -508,15 +540,35 @@ const Projects = () => {
         setCopyingProjectId(null);
       }
     },
-    [
-      copyingProjectId,
-      projectBugsCount,
-      projectOpenBugsCount,
-      projectFixedBugsCount,
-      projectMemberCounts,
-      currentUser,
-    ]
+    [copyingProjectId, buildProjectShareData]
   );
+
+  const loadPrintProjectData = useCallback(() => {
+    if (!printProject) return Promise.reject(new Error("No project selected"));
+    return buildProjectShareData(printProject);
+  }, [printProject, buildProjectShareData]);
+
+  const { open: openPrintParam, close: closePrintDialog } = printDialog;
+  const openPrintDialog = useCallback(
+    (project: Project) => openPrintParam(String(project.id)),
+    [openPrintParam]
+  );
+
+  useEffect(() => {
+    if (!printParam || !currentUser || isLoading || projects.length === 0) return;
+    if (currentUser.role !== "admin") {
+      closePrintDialog();
+      return;
+    }
+    if (!projects.some((p) => String(p.id) === printParam)) {
+      closePrintDialog();
+      toast({
+        title: "Project not found",
+        description: "The project in this print link no longer exists.",
+        variant: "destructive",
+      });
+    }
+  }, [printParam, currentUser, isLoading, projects, closePrintDialog]);
 
   const { data: directoryUsers = [] } = useQuery({
     queryKey: ["users", "directory"],
@@ -2040,15 +2092,22 @@ const Projects = () => {
                       (currentUser?.role === "admin" ||
                         currentUser?.role === "tester") &&
                       canUseProjectActions;
+                    const showPrintBtn = currentUser?.role === "admin";
                     const showDeleteBtn = currentUser?.role === "admin";
-                    /** Why: Pair Copy+Delete when Compliance is off; lone actions span full width. */
-                    const copySpansFull =
-                      showCopyBtn && !showComplianceBtn && !showDeleteBtn;
-                    const deleteSpansFull =
-                      showDeleteBtn && (showComplianceBtn || !showCopyBtn);
-                    const complianceSpansFull =
-                      showComplianceBtn &&
-                      currentUser?.role === "developer";
+                    /** Why: Secondary actions fill the 2-col grid in order; an odd last one spans full width. */
+                    const secondaryActions = [
+                      showComplianceBtn && "compliance",
+                      showCopyBtn && "copy",
+                      showPrintBtn && "print",
+                      showDeleteBtn && "delete",
+                    ].filter(Boolean);
+                    const spansFull = (action: string) =>
+                      secondaryActions.length % 2 === 1 &&
+                      secondaryActions[secondaryActions.length - 1] === action;
+                    const copySpansFull = spansFull("copy");
+                    const printSpansFull = spansFull("print");
+                    const deleteSpansFull = spansFull("delete");
+                    const complianceSpansFull = spansFull("compliance");
 
                     return (
                   <div className="grid grid-cols-2 gap-2 w-full">
@@ -2144,6 +2203,21 @@ const Projects = () => {
                         <span className="truncate text-xs sm:text-sm ml-1.5">
                           {copiedProjectId === project.id ? "Copied" : "Copy"}
                         </span>
+                      </Button>
+                    )}
+                    {showPrintBtn && (
+                      <Button
+                        type="button"
+                        variant="outline"
+                        className={cn(
+                          "h-11 w-full min-w-0 px-2 rounded-xl border-sky-200 dark:border-sky-800 hover:bg-sky-50 dark:hover:bg-sky-950/20 text-sky-700 dark:text-sky-300 font-semibold shadow-sm hover:shadow-md transition-all duration-300",
+                          printSpansFull && "col-span-2"
+                        )}
+                        title="Print project briefing on the USB thermal printer (Chrome / Edge)"
+                        onClick={() => openPrintDialog(project)}
+                      >
+                        <Printer className="h-4 w-4 shrink-0" />
+                        <span className="truncate text-xs sm:text-sm ml-1.5">Print</span>
                       </Button>
                     )}
                     {showDeleteBtn && (
@@ -2433,6 +2507,15 @@ const Projects = () => {
         onUndo={handleUndoClick}
         onConfirmNow={confirmDelete}
       />
+
+      {currentUser?.role === "admin" && (
+        <ProjectPrintDialog
+          project={printProject ? { id: printProject.id, name: printProject.name } : null}
+          onClose={closePrintDialog}
+          loadData={loadPrintProjectData}
+          printedBy={currentUser.username}
+        />
+      )}
     </ListPageShell>
   );
 };

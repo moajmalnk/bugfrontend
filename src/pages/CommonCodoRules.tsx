@@ -1232,7 +1232,7 @@ export default function CommonCodoRules() {
                   {isAnalytics
                     ? 'Open analytics or filter by phase'
                     : isExport
-                      ? 'Export rules and IDE settings.json for Cursor, Antigravity, Android Studio, and other agents'
+                      ? 'Export agent rule files plus the developer IDE setup kit (settings, startup checks, extensions)'
                       : 'Filter CODO rules by phase'}
                 </DrawerDescription>
               </DrawerHeader>
