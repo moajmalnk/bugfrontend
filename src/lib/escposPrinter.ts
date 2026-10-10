@@ -7,6 +7,7 @@
 
 interface UsbEndpoint {
   endpointNumber: number;
+  packetSize: number;
   direction: "in" | "out";
   type: "bulk" | "interrupt" | "isochronous";
 }
@@ -44,9 +45,6 @@ interface UsbDevice {
 
 export type ThermalPrinterDevice = UsbDevice;
 
-/** Stable per-printer key (vendor:product:serial) for printer-side state like a stored logo. */
-export const printerKey = (device: UsbDevice) =>
-  `${device.vendorId.toString(16)}:${device.productId.toString(16)}:${device.serialNumber || "default"}`;
 interface UsbApi {
   getDevices(): Promise<UsbDevice[]>;
   requestDevice(options: {
@@ -61,6 +59,8 @@ const KNOWN_PRINTERS = [{ vendorId: 0x0456, productId: 0x0808 }];
 const CHUNK_SIZE = 512;
 /** Stall recoveries per chunk before giving up; backoff grows 250ms per attempt. */
 const STALL_RETRIES = 4;
+/** Pause before retrying a refused first transfer while the printer finishes a job. */
+const PREAMBLE_RETRY_MS = 1000;
 
 export class ThermalPrinterError extends Error {
   constructor(
@@ -105,7 +105,9 @@ function getUsb(): UsbApi | null {
 
 export const isDirectPrintSupported = (): boolean => getUsb() !== null;
 
-function findOutEndpoint(device: UsbDevice): { iface: number; endpoint: number } | null {
+function findOutEndpoint(
+  device: UsbDevice
+): { iface: number; endpoint: number; packetSize: number } | null {
   const interfaces = device.configuration?.interfaces ?? [];
   const ordered = [
     ...interfaces.filter((i) => i.alternate.interfaceClass === USB_PRINTER_CLASS),
@@ -115,7 +117,13 @@ function findOutEndpoint(device: UsbDevice): { iface: number; endpoint: number }
     const out = iface.alternate.endpoints.find(
       (e) => e.direction === "out" && e.type === "bulk"
     );
-    if (out) return { iface: iface.interfaceNumber, endpoint: out.endpointNumber };
+    if (out) {
+      return {
+        iface: iface.interfaceNumber,
+        endpoint: out.endpointNumber,
+        packetSize: out.packetSize || 64,
+      };
+    }
   }
   return null;
 }
@@ -181,8 +189,21 @@ export async function sendToThermalPrinter(
 
     await device.claimInterface(target.iface);
     claimed = target.iface;
-    // Recover from a halt left by an earlier session (e.g. a failed print).
-    await device.clearHalt("out", target.endpoint).catch(() => undefined);
+    // No unconditional clearHalt: it resets the printer's USB data toggle, and
+    // the next packet (ESC @ + the logo's GS v 0 header) can be dropped as a
+    // "duplicate", so the logo bitmap prints as random characters. writeChunk
+    // clears a real halt. One packet of NULs (ignored by ESC/POS) absorbs a
+    // packet lost that way so the slip itself always starts intact.
+    const preamble = new Uint8Array(target.packetSize);
+    try {
+      await writeChunk(device, target.endpoint, preamble);
+    } catch (error) {
+      // A printer still busy from an earlier job can refuse the first transfer.
+      if (!(error instanceof DOMException && error.name === "NetworkError")) throw error;
+      await device.clearHalt("out", target.endpoint).catch(() => undefined);
+      await sleep(PREAMBLE_RETRY_MS);
+      await writeChunk(device, target.endpoint, preamble);
+    }
 
     for (let job = 0; job < jobs.length; job++) {
       const data = jobs[job];

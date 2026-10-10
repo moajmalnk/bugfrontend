@@ -6,7 +6,6 @@ export const PRINT_DOTS = 384;
 
 const ESC = 0x1b;
 const GS = 0x1d;
-const FS = 0x1c;
 
 const NOT_SET = "Not set";
 
@@ -32,18 +31,11 @@ export type MonoBitmap = {
   previewUrl: string;
 };
 
-/**
- * `nv`: logo already stored in the printer's flash, printed with FS p (4 bytes).
- * `raster`: logo bitmap sent with every slip (works on any printer, ~4.6KB).
- */
-export type ReceiptLogo =
-  | { kind: "nv"; previewUrl: string; width: number; height: number }
-  | { kind: "raster"; bitmap: MonoBitmap };
-
 export type ReceiptStyle = {
   font: ReceiptFont;
   cut: CutMode;
-  logo: ReceiptLogo | null;
+  /** Sent as a raster image with every slip (~4.6KB); works on any printer. */
+  logo: MonoBitmap | null;
   /**
    * Dots the whole slip is shifted right. Why: budget heads (e.g. HOP-H58) sit
    * left of the paper's centre, so slips print with a wide right margin.
@@ -275,22 +267,16 @@ export class ReceiptWriter {
     this.size(0x00);
   }
 
-  /** Centred logo: stored NV image (FS p 1 0) or a raster image (GS v 0). */
+  /** Centred logo as a raster image (GS v 0). */
   header(fallbackText: string) {
     const logo = this.style.logo;
     if (!logo) {
       this.brand(fallbackText);
       return;
     }
-    if (logo.kind === "nv") {
-      // A stored image is fixed at full head width; it cannot follow the offset.
-      this.raw(FS, 0x70, 1, 0);
-      this.block({ type: "image", src: logo.previewUrl, widthDots: logo.width, heightDots: logo.height });
-    } else {
-      const { width, height, rows, previewUrl } = logo.bitmap;
-      this.fullWidthRaster(height, placeRows(rows, width, this.centreStart(width)));
-      this.block({ type: "image", src: previewUrl, widthDots: width, heightDots: height });
-    }
+    const { width, height, rows, previewUrl } = logo;
+    this.fullWidthRaster(height, placeRows(rows, width, this.centreStart(width)));
+    this.block({ type: "image", src: previewUrl, widthDots: width, heightDots: height });
   }
 
   /** Centred, bold, double-height title such as a project or employee name. */

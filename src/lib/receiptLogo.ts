@@ -6,14 +6,6 @@ const MARK_SIZE = 84;
 const WORDMARK = "BugRicer";
 const INK = "#04213f";
 
-export const RECEIPT_LOGO_SIZE = { width: PRINT_DOTS, height: LOGO_HEIGHT };
-
-/**
- * Bump when the artwork changes so printers holding the old NV logo re-store it.
- * v2: v1 flags were set by uploads that stalled mid-transfer, so they are void.
- */
-export const RECEIPT_LOGO_VERSION = "bugricer-logo-v2";
-
 /** Ordered 4×4 Bayer thresholds (0–15) for halftoning mid-tones. */
 const BAYER = [0, 8, 2, 10, 12, 4, 14, 6, 3, 11, 1, 9, 15, 7, 13, 5];
 
@@ -142,44 +134,4 @@ export function loadReceiptLogo(): Promise<MonoBitmap> {
     });
   }
   return logoPromise;
-}
-
-/**
- * Time to wait after FS q before sending anything else. Why: the printer is
- * busy writing flash (and many models reset afterwards); bytes sent meanwhile
- * are refused and halt the USB endpoint.
- */
-export const LOGO_FLASH_WRITE_MS = 3000;
-
-/**
- * FS q 1 — stores the logo as NV image #1 in printer flash. Send it on its
- * own, wait LOGO_FLASH_WRITE_MS, then send `buildLogoTestSlip()`.
- *
- * Why column-major: FS q takes vertical bytes (8 dots tall, MSB on top),
- * column by column, unlike the row-major raster used by GS v 0.
- */
-export function buildStoreLogoJob(bitmap: MonoBitmap): Uint8Array {
-  const xBytes = bitmap.width / 8;
-  const yBytes = bitmap.height / 8;
-  const bytesPerRow = bitmap.width / 8;
-  const out: number[] = [0x1b, 0x40, 0x1c, 0x71, 1, xBytes & 0xff, xBytes >> 8, yBytes & 0xff, yBytes >> 8];
-  for (let x = 0; x < bitmap.width; x++) {
-    for (let by = 0; by < yBytes; by++) {
-      let byte = 0;
-      for (let bit = 0; bit < 8; bit++) {
-        const y = by * 8 + bit;
-        if (bitmap.rows[y * bytesPerRow + (x >> 3)] & (0x80 >> (x & 7))) byte |= 0x80 >> bit;
-      }
-      out.push(byte);
-    }
-  }
-  return Uint8Array.from(out);
-}
-
-/** Prints the stored logo (FS p 1 0) with a confirmation line, then cuts. */
-export function buildLogoTestSlip(): Uint8Array {
-  const out: number[] = [0x1b, 0x40, 0x1b, 0x61, 1, 0x1c, 0x70, 1, 0, 0x0a];
-  for (const ch of "Logo stored in printer\n") out.push(ch.charCodeAt(0));
-  out.push(0x1b, 0x61, 0, 0x1b, 0x64, 5, 0x1d, 0x56, 0);
-  return Uint8Array.from(out);
 }

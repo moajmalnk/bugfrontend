@@ -27,34 +27,24 @@ import {
   getPairedThermalPrinter,
   getThermalPrinter,
   isDirectPrintSupported,
-  printerKey,
   sendToThermalPrinter,
   ThermalPrinterError,
 } from "@/lib/escposPrinter";
 import {
   clampOffset,
+  clearLegacyLogoPrefs,
   getCutMode,
   getPrintFont,
   getPrintOffset,
-  hasStoredLogo,
-  markLogoStored,
   OFFSET_STEP_DOTS,
   setCutMode,
   setPrintFont,
   setPrintOffset,
 } from "@/lib/printerPrefs";
-import {
-  buildLogoTestSlip,
-  buildStoreLogoJob,
-  loadReceiptLogo,
-  LOGO_FLASH_WRITE_MS,
-  RECEIPT_LOGO_SIZE,
-} from "@/lib/receiptLogo";
+import { loadReceiptLogo } from "@/lib/receiptLogo";
 import { cn } from "@/lib/utils";
 import {
   AlertTriangle,
-  CheckCircle2,
-  ImageIcon,
   Loader2,
   Minus,
   Plus,
@@ -175,17 +165,14 @@ export function ThermalPrintDialog({
   const [printing, setPrinting] = useState(false);
   const [progress, setProgress] = useState<{ sent: number; total: number } | null>(null);
   const [printerName, setPrinterName] = useState<string | null>(null);
-  const [printerId, setPrinterId] = useState<string | null>(null);
   const [font, setFont] = useState<ReceiptFont>(getPrintFont);
   const [cut, setCut] = useState<CutMode>(getCutMode);
   const [offsetDots, setOffsetDots] = useState<number>(getPrintOffset);
   const [logo, setLogo] = useState<MonoBitmap | null>(null);
   const [logoState, setLogoState] = useState<"loading" | "ready" | "error">("loading");
-  const [logoStored, setLogoStored] = useState(false);
-  const [storingLogo, setStoringLogo] = useState(false);
-  /** One lock for every printer write so a print and a logo upload never interleave. */
+  /** Synchronous lock so a double click never starts two USB sessions. */
   const busyRef = useRef(false);
-  const busy = printing || storingLogo;
+  const busy = printing;
 
   const copies = Number(copiesInput);
   const copiesValid =
@@ -196,10 +183,7 @@ export function ThermalPrintDialog({
 
   const refreshPrinter = useCallback(async () => {
     const device = await getPairedThermalPrinter().catch(() => null);
-    const id = device ? printerKey(device) : null;
     setPrinterName(device ? device.productName || "USB thermal printer" : null);
-    setPrinterId(id);
-    setLogoStored(hasStoredLogo(id));
   }, []);
 
   useEffect(() => {
@@ -208,6 +192,7 @@ export function ThermalPrintDialog({
       setProgress(null);
       return;
     }
+    clearLegacyLogoPrefs();
     void refreshPrinter();
   }, [open, refreshPrinter]);
 
@@ -227,17 +212,8 @@ export function ThermalPrintDialog({
     };
   }, [open]);
 
-  const styleFor = useCallback(
-    (nvStored: boolean): ReceiptStyle => ({
-      font,
-      cut,
-      logo: nvStored
-        ? { kind: "nv", previewUrl: logo?.previewUrl ?? "", ...RECEIPT_LOGO_SIZE }
-        : logo
-          ? { kind: "raster", bitmap: logo }
-          : null,
-      offsetDots,
-    }),
+  const style = useMemo<ReceiptStyle>(
+    () => ({ font, cut, logo, offsetDots }),
     [font, cut, logo, offsetDots]
   );
 
@@ -251,9 +227,9 @@ export function ThermalPrintDialog({
     return buildReceipt({
       printedAt: new Date(),
       copy: { index: 1, total: copiesValid ? copies : 1 },
-      style: styleFor(logoStored),
+      style,
     });
-  }, [ready, logoState, buildReceipt, copies, copiesValid, styleFor, logoStored]);
+  }, [ready, logoState, buildReceipt, copies, copiesValid, style]);
 
   const setCopies = (next: number) =>
     setCopiesInput(String(Math.min(MAX_COPIES, Math.max(MIN_COPIES, next))));
@@ -285,14 +261,8 @@ export function ThermalPrintDialog({
       // Must run before any other await so Chrome still sees the click gesture.
       const device = await getThermalPrinter();
       const deviceName = device.productName || "USB thermal printer";
-      const id = printerKey(device);
-      // The chosen printer may differ from the paired one shown in the preview.
-      const nvStored = hasStoredLogo(id);
       setPrinterName(deviceName);
-      setPrinterId(id);
-      setLogoStored(nvStored);
       const printedAt = new Date();
-      const style = styleFor(nvStored);
       const jobs = Array.from(
         { length: copies },
         (_, i) => buildReceipt({ printedAt, copy: { index: i + 1, total: copies }, style }).bytes
@@ -308,13 +278,10 @@ export function ThermalPrintDialog({
       if (!(error instanceof ThermalPrinterError) && import.meta.env.DEV) {
         console.error("Thermal print failed:", error);
       }
-      const stalledOnStoredLogo =
-        error instanceof ThermalPrinterError && error.code === "stall" && logoStored;
       toast({
         title: "Print failed",
-        description: stalledOnStoredLogo
-          ? `${error.message} If it happens again, choose “Send with each slip” under Logo.`
-          : error instanceof ThermalPrinterError
+        description:
+          error instanceof ThermalPrinterError
             ? error.message
             : "Could not reach the thermal printer. Please try again.",
         variant: "destructive",
@@ -326,58 +293,9 @@ export function ThermalPrintDialog({
     }
   };
 
-  /**
-   * Uploads the logo to printer flash once (FS q); afterwards every slip prints
-   * it with the 4-byte FS p command instead of re-sending ~4.6KB of bitmap.
-   */
-  const handleStoreLogo = async () => {
-    if (busyRef.current || !logo || !supported) return;
-    busyRef.current = true;
-    setStoringLogo(true);
-    try {
-      const device = await getThermalPrinter();
-      const id = printerKey(device);
-      setPrinterName(device.productName || "USB thermal printer");
-      setPrinterId(id);
-      await sendToThermalPrinter(device, [buildStoreLogoJob(logo)]);
-      await new Promise((resolve) => setTimeout(resolve, LOGO_FLASH_WRITE_MS));
-      await sendToThermalPrinter(device, [buildLogoTestSlip()]);
-      markLogoStored(id, true);
-      setLogoStored(true);
-      toast({
-        title: "Logo stored in printer",
-        description:
-          "Check the test slip. If it has no logo, choose “Send with each slip” — this printer can't print stored logos.",
-      });
-    } catch (error) {
-      if (!(error instanceof ThermalPrinterError) && import.meta.env.DEV) {
-        console.error("Logo upload failed:", error);
-      }
-      toast({
-        title: "Logo not stored",
-        description:
-          error instanceof ThermalPrinterError
-            ? error.message
-            : "Could not reach the thermal printer. Please try again.",
-        variant: "destructive",
-      });
-    } finally {
-      busyRef.current = false;
-      setStoringLogo(false);
-    }
-  };
-
-  const handleUseRasterLogo = () => {
-    if (!printerId) return;
-    markLogoStored(printerId, false);
-    setLogoStored(false);
-  };
-
   const handleChangePrinter = async () => {
     await forgetThermalPrinter().catch(() => undefined);
     setPrinterName(null);
-    setPrinterId(null);
-    setLogoStored(false);
     toast({
       title: "Printer unpaired",
       description: "Chrome will ask you to choose a printer on the next print.",
@@ -654,72 +572,11 @@ export function ThermalPrintDialog({
                   </p>
                 )}
 
-                {supported ? (
-                  <div className="flex flex-col gap-2 border-t pt-2">
-                    <div className="flex items-center gap-2 text-xs font-semibold">
-                      <ImageIcon className="h-3.5 w-3.5 text-muted-foreground" />
-                      Logo
-                    </div>
-                    {logoState === "loading" ? (
-                      <Skeleton className="h-4 w-3/4" />
-                    ) : logoState === "error" ? (
-                      <p className="text-xs text-amber-700 dark:text-amber-400">
-                        Logo could not load; slips use the text heading.
-                      </p>
-                    ) : logoStored ? (
-                      <div className="flex flex-col gap-1.5">
-                        <p className="flex items-start gap-1.5 text-xs text-foreground">
-                          <CheckCircle2 className="mt-0.5 h-3.5 w-3.5 shrink-0 text-emerald-500" />
-                          Stored in this printer. Each slip prints it with a 4-byte command.
-                        </p>
-                        <div className="flex flex-wrap gap-2">
-                          <Button
-                            type="button"
-                            variant="outline"
-                            size="sm"
-                            className="h-7 rounded-xl px-2 text-xs"
-                            disabled={busy || !logo}
-                            onClick={() => void handleStoreLogo()}
-                          >
-                            {storingLogo ? <Loader2 className="mr-1 h-3 w-3 animate-spin" /> : null}
-                            Store again
-                          </Button>
-                          <Button
-                            type="button"
-                            variant="ghost"
-                            size="sm"
-                            className="h-7 rounded-xl px-2 text-xs"
-                            disabled={busy}
-                            onClick={handleUseRasterLogo}
-                          >
-                            Send with each slip
-                          </Button>
-                        </div>
-                      </div>
-                    ) : (
-                      <div className="flex flex-col gap-1.5">
-                        <p className="text-xs text-muted-foreground">
-                          Printed as an image on every slip (works on all printers). Optional:
-                          store it in the printer if its test slip shows the logo.
-                        </p>
-                        <Button
-                          type="button"
-                          variant="outline"
-                          size="sm"
-                          className="h-8 w-fit rounded-xl px-3 text-xs"
-                          disabled={busy || !logo}
-                          onClick={() => void handleStoreLogo()}
-                        >
-                          {storingLogo ? (
-                            <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
-                          ) : (
-                            <ImageIcon className="mr-1.5 h-3.5 w-3.5" />
-                          )}
-                          {storingLogo ? "Storing logo…" : "Store logo in printer"}
-                        </Button>
-                      </div>
-                    )}
-                  </div>
+                {supported && logoState === "error" ? (
+                  <p className="flex items-start gap-1.5 border-t pt-2 text-xs text-amber-700 dark:text-amber-400">
+                    <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+                    Logo could not load; slips use the text heading.
+                  </p>
                 ) : null}
               </div>
             </div>

@@ -1,5 +1,4 @@
 import { MAX_OFFSET_DOTS, type CutMode, type ReceiptFont } from "@/lib/escposReceipt";
-import { RECEIPT_LOGO_VERSION } from "@/lib/receiptLogo";
 
 /**
  * Device-level print preferences for this browser. Not business data: they
@@ -7,7 +6,7 @@ import { RECEIPT_LOGO_VERSION } from "@/lib/receiptLogo";
  */
 const FONT_KEY = "bugricer.thermal.font";
 const CUT_KEY = "bugricer.thermal.cutMode";
-const NV_LOGO_KEY = "bugricer.thermal.nvLogo";
+const LEGACY_NV_LOGO_KEY = "bugricer.thermal.nvLogo";
 const OFFSET_KEY = "bugricer.thermal.offsetDots";
 
 /** 8 dots = 1mm on a 203dpi head; the stepper moves in whole millimetres. */
@@ -51,21 +50,11 @@ export const getPrintOffset = (): number => {
 };
 export const setPrintOffset = (dots: number) => write(OFFSET_KEY, String(clampOffset(dots)));
 
-function nvLogoMap(): Record<string, string> {
+/** Drops the old "logo stored in printer" flags; slips always send the logo now. */
+export function clearLegacyLogoPrefs() {
   try {
-    return JSON.parse(read(NV_LOGO_KEY) || "{}") as Record<string, string>;
+    localStorage.removeItem(LEGACY_NV_LOGO_KEY);
   } catch {
-    return {};
+    /* storage blocked — nothing to clear */
   }
-}
-
-/** True when this printer holds the current logo version in flash (FS p usable). */
-export const hasStoredLogo = (printer: string | null) =>
-  !!printer && nvLogoMap()[printer] === RECEIPT_LOGO_VERSION;
-
-export function markLogoStored(printer: string, stored: boolean) {
-  const map = nvLogoMap();
-  if (stored) map[printer] = RECEIPT_LOGO_VERSION;
-  else delete map[printer];
-  write(NV_LOGO_KEY, JSON.stringify(map));
 }
