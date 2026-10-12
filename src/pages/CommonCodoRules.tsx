@@ -17,6 +17,10 @@ import {
   writeStoredCodoContentLang,
   type CodoContentLang,
 } from '@/lib/codo/codoContentLang';
+import {
+  developerTrack,
+  ruleOnDeveloperTrack,
+} from '@/lib/codo/codoDeveloperTrack';
 import { CodoRuleDialog } from '@/components/codo/CodoRuleDialog';
 import { Button } from '@/components/ui/button';
 import {
@@ -78,6 +82,8 @@ import {
   Code2,
   Download,
   FolderKanban,
+  Globe,
+  Smartphone,
   Loader2,
   Lock,
   MinusCircle,
@@ -94,9 +100,25 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { format, parseISO, isValid } from 'date-fns';
 
-type TabKey = 'all' | CodoRulePhase | 'analytics' | 'export';
+type TabKey = 'all' | 'web' | 'app' | 'tester' | 'project' | 'analytics' | 'export';
 
-const VALID_TABS: TabKey[] = ['all', 'developer', 'tester', 'project', 'analytics', 'export'];
+const VALID_TABS: TabKey[] = ['all', 'web', 'app', 'tester', 'project', 'analytics', 'export'];
+
+const DEVELOPER_TRACK_COPY: Record<
+  'web' | 'app',
+  { title: string; detail: string }
+> = {
+  web: {
+    title: 'Web Developer',
+    detail:
+      'Browser, layout, SEO, and SPA rules, plus the shared production standards every developer follows.',
+  },
+  app: {
+    title: 'App Developer',
+    detail:
+      'Native and in-app WebView rules, plus the shared production standards every developer follows.',
+  },
+};
 
 const PHASE_META: Record<
   CodoRulePhase,
@@ -246,7 +268,8 @@ export default function CommonCodoRules() {
     'all' | 'pending' | CodoAckStatus
   >('all');
   const [searchParams, setSearchParams] = useSearchParams();
-  const tabParam = (searchParams.get('tab') || 'all') as TabKey;
+  const tabParamRaw = searchParams.get('tab') || 'all';
+  const tabParam = (tabParamRaw === 'developer' ? 'web' : tabParamRaw) as TabKey;
   const initialTab: TabKey =
     VALID_TABS.includes(tabParam) &&
     (tabParam !== 'analytics' || canViewAnalytics)
@@ -400,7 +423,14 @@ export default function CommonCodoRules() {
   }, [load]);
 
   useEffect(() => {
-    const t = (searchParams.get('tab') || 'all') as TabKey;
+    const raw = searchParams.get('tab') || 'all';
+    if (raw === 'developer') {
+      const next = new URLSearchParams(searchParams);
+      next.set('tab', 'web');
+      setSearchParams(next, { replace: true });
+      return;
+    }
+    const t = raw as TabKey;
     if (t === 'analytics' && !canViewAnalytics) {
       setActiveTab('all');
       const next = new URLSearchParams(searchParams);
@@ -465,7 +495,13 @@ export default function CommonCodoRules() {
     const q = search.trim().toLowerCase();
     return rules.filter((r) => {
       if (activeTab === 'analytics' || activeTab === 'export') return true;
-      if (activeTab !== 'all' && r.phase !== activeTab) return false;
+      if (activeTab === 'web' || activeTab === 'app') {
+        if (r.phase !== 'developer' || !ruleOnDeveloperTrack(r.rule_key, activeTab)) {
+          return false;
+        }
+      } else if (activeTab !== 'all' && r.phase !== activeTab) {
+        return false;
+      }
       if (canViewAnalytics) {
         if (!ruleMatchesAdminHealth(r)) return false;
         if (!ruleMatchesMyStatus(r)) return false;
@@ -487,6 +523,14 @@ export default function CommonCodoRules() {
     healthFilter,
     myStatusFilter,
   ]);
+
+  const trackCounts = useMemo(() => {
+    const developers = rules.filter((rule) => rule.phase === 'developer');
+    return {
+      web: developers.filter((rule) => ruleOnDeveloperTrack(rule.rule_key, 'web')).length,
+      app: developers.filter((rule) => ruleOnDeveloperTrack(rule.rule_key, 'app')).length,
+    };
+  }, [rules]);
 
   const listFiltered = useMemo(() => {
     if (activeTab === 'analytics' || activeTab === 'export') return [];
@@ -728,13 +772,22 @@ export default function CommonCodoRules() {
         'bg-cyan-100 dark:bg-cyan-900/30 text-cyan-700 dark:text-cyan-300',
     },
     {
-      value: 'developer' as TabKey,
-      label: 'Developer',
-      shortLabel: 'Dev',
-      icon: Code2,
-      count: String(counts.developer),
+      value: 'web' as TabKey,
+      label: 'Web Developer',
+      shortLabel: 'Web',
+      icon: Globe,
+      count: String(trackCounts.web),
       countClass:
-        'bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300',
+        'bg-sky-100 dark:bg-sky-900/30 text-sky-700 dark:text-sky-300',
+    },
+    {
+      value: 'app' as TabKey,
+      label: 'App Developer',
+      shortLabel: 'App',
+      icon: Smartphone,
+      count: String(trackCounts.app),
+      countClass:
+        'bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-300',
     },
     {
       value: 'tester' as TabKey,
@@ -818,8 +871,33 @@ export default function CommonCodoRules() {
                   <span
                     className={`inline-flex items-center rounded-md border px-2 py-0.5 text-[11px] font-semibold ${meta.badge}`}
                   >
-                    {meta.label}
+                    {rule.phase === 'developer'
+                      ? activeTab === 'web'
+                        ? 'Web Developer'
+                        : activeTab === 'app'
+                          ? 'App Developer'
+                          : meta.label
+                      : meta.label}
                   </span>
+                  {rule.phase === 'developer' ? (
+                    <span
+                      className={cn(
+                        'inline-flex items-center rounded-md border px-2 py-0.5 text-[11px] font-semibold',
+                        developerTrack(rule.rule_key) === 'web' &&
+                          'border-sky-200 bg-sky-50 text-sky-800 dark:border-sky-800 dark:bg-sky-950/40 dark:text-sky-200',
+                        developerTrack(rule.rule_key) === 'app' &&
+                          'border-emerald-200 bg-emerald-50 text-emerald-800 dark:border-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-200',
+                        developerTrack(rule.rule_key) === 'shared' &&
+                          'border-border bg-muted text-muted-foreground'
+                      )}
+                    >
+                      {developerTrack(rule.rule_key) === 'shared'
+                        ? 'Shared'
+                        : developerTrack(rule.rule_key) === 'web'
+                          ? 'Web only'
+                          : 'App only'}
+                    </span>
+                  ) : null}
                 </div>
 
                 <CodoRuleBody
@@ -1194,16 +1272,13 @@ export default function CommonCodoRules() {
               </div>
 
               <TabsList
-                className={cn(
-                  'hidden lg:grid w-full h-14 bg-transparent p-1 gap-1 min-w-0',
-                  canViewAnalytics ? 'grid-cols-12' : 'grid-cols-10'
-                )}
+                className="hidden lg:flex h-auto min-h-14 w-full flex-wrap gap-1 bg-transparent p-1"
               >
                 {codoTabs.map((tab) => (
                   <TabsTrigger
                     key={tab.value}
                     value={tab.value}
-                    className="col-span-2 min-w-0 px-1.5 sm:px-2 text-xs sm:text-sm font-semibold data-[state=active]:bg-white data-[state=active]:shadow-lg data-[state=active]:border data-[state=active]:border-gray-200 dark:data-[state=active]:bg-gray-800 dark:data-[state=active]:border-gray-700 rounded-xl transition-all duration-300 flex items-center justify-center gap-1 overflow-hidden"
+                    className="h-12 min-w-[8.75rem] flex-1 rounded-xl px-2 text-xs font-semibold transition-all duration-300 data-[state=active]:border data-[state=active]:border-gray-200 data-[state=active]:bg-white data-[state=active]:shadow-lg dark:data-[state=active]:border-gray-700 dark:data-[state=active]:bg-gray-800 sm:text-sm flex items-center justify-center gap-1 overflow-hidden"
                   >
                     <tab.icon className="h-4 w-4 shrink-0" />
                     <span className="hidden xl:inline truncate">{tab.label}</span>
@@ -1287,6 +1362,30 @@ export default function CommonCodoRules() {
           </Drawer>
 
           <TabsContent value={activeTab} className="space-y-4 sm:space-y-6 md:space-y-8 mt-4 sm:mt-6 min-w-0 w-full overflow-x-hidden">
+            {(activeTab === 'web' || activeTab === 'app') && (
+              <div className="flex items-start gap-3 rounded-2xl border border-border bg-card px-4 py-3.5 shadow-sm sm:px-5">
+                <span
+                  className={cn(
+                    'mt-0.5 flex h-10 w-10 shrink-0 items-center justify-center rounded-xl text-white',
+                    activeTab === 'web' ? 'bg-sky-600' : 'bg-emerald-600'
+                  )}
+                >
+                  {activeTab === 'web' ? (
+                    <Globe className="h-5 w-5" />
+                  ) : (
+                    <Smartphone className="h-5 w-5" />
+                  )}
+                </span>
+                <div className="min-w-0">
+                  <p className="text-sm font-semibold text-foreground">
+                    {DEVELOPER_TRACK_COPY[activeTab].title}
+                  </p>
+                  <p className="mt-0.5 text-sm text-muted-foreground">
+                    {DEVELOPER_TRACK_COPY[activeTab].detail}
+                  </p>
+                </div>
+              </div>
+            )}
             {!loading && !isAnalytics && !isExport && (
               <>
                 <CodoStandardCard />

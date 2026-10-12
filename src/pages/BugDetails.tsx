@@ -246,7 +246,10 @@ const BugDetails = () => {
   const navigationFallbackRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const lastTargetUrlRef = useRef<string | null>(null);
   const [isNavigating, setIsNavigating] = useState(false);
+  const [jumpValue, setJumpValue] = useState("");
   const navigatingToBugIdRef = useRef<string | null>(null);
+  const jumpBusyRef = useRef(false);
+  const ignoreJumpBlurRef = useRef(false);
   const previousLocationRef = useRef<string>(location.pathname);
   const exitReloadRef = useRef(false);
   const chunkLoadErrorRef = useRef(false);
@@ -438,6 +441,7 @@ const BugDetails = () => {
       }
 
       navigatingToBugIdRef.current = null;
+      jumpBusyRef.current = false;
       setIsNavigating(false);
 
       if (options?.reason === "timeout") {
@@ -882,6 +886,13 @@ const BugDetails = () => {
   
   const { currentIndex, prevBugId, nextBugId, totalBugs } = navigationValues;
 
+  useEffect(() => {
+    jumpBusyRef.current = false;
+    if (totalBugs > 0 && currentIndex >= 0) {
+      setJumpValue(String(currentIndex + 1));
+    }
+  }, [bugId, currentIndex, totalBugs]);
+
   const buildSiblingUrl = (targetId: string) => {
     const role = currentUser?.role || "tester";
     const params = new URLSearchParams();
@@ -896,6 +907,60 @@ const BugDetails = () => {
     }
     const qs = params.toString();
     return `/${role}/bugs/${targetId}${qs ? `?${qs}` : ""}`;
+  };
+
+  const openSibling = (targetId: string | null) => {
+    if (
+      !targetId ||
+      isNavigating ||
+      bugListLoading ||
+      isLoading ||
+      idsEqual(targetId, bugId)
+    ) {
+      return false;
+    }
+    const url = buildSiblingUrl(targetId);
+    lastTargetUrlRef.current = url;
+    setIsNavigating(true);
+    navigatingToBugIdRef.current = String(targetId);
+    chunkLoadErrorRef.current = false;
+
+    navigationTimeoutRef.current = setTimeout(() => {
+      if (idsEqual(navigatingToBugIdRef.current, targetId)) {
+        window.location.assign(url);
+        clearNavigationState({
+          reason: "timeout",
+          targetId,
+          targetUrl: url,
+        });
+      }
+    }, 2500);
+
+    try {
+      navigate(url, { replace: false });
+    } catch {
+      clearNavigationState({ reason: "cancelled" });
+      window.location.href = url;
+    }
+    return true;
+  };
+
+  const commitJump = () => {
+    if (jumpBusyRef.current || isNavigating) return;
+    const typed = Number.parseInt(jumpValue, 10);
+    const shown = currentIndex >= 0 ? currentIndex + 1 : 1;
+    if (!Number.isFinite(typed) || totalBugs < 1) {
+      setJumpValue(String(shown));
+      return;
+    }
+    const position = Math.min(Math.max(1, typed), totalBugs);
+    setJumpValue(String(position));
+    if (position === shown) return;
+    const targetId = filteredBugList[position - 1]?.id;
+    if (!targetId) return;
+    const opened = openSibling(String(targetId));
+    if (!opened) return;
+    jumpBusyRef.current = true;
   };
 
   // Check if this is an access error
@@ -1139,40 +1204,10 @@ const BugDetails = () => {
               className={`inline-flex items-center gap-1.5 rounded-xl border border-border/70 bg-background px-3 sm:px-4 py-2 text-sm font-medium text-foreground shadow-sm transition-all hover:bg-muted disabled:opacity-40 disabled:pointer-events-none ${
                 isNavigating ? "cursor-wait" : ""
               }`}
-              onClick={() => {
-                if (
-                  isNavigating ||
-                  !prevBugId ||
-                  bugListLoading ||
-                  isLoading ||
-                  idsEqual(prevBugId, bugId)
-                ) {
-                  return;
-                }
-                const url = buildSiblingUrl(prevBugId);
-                lastTargetUrlRef.current = url;
-                setIsNavigating(true);
-                navigatingToBugIdRef.current = String(prevBugId);
-                chunkLoadErrorRef.current = false;
-
-                navigationTimeoutRef.current = setTimeout(() => {
-                  if (idsEqual(navigatingToBugIdRef.current, prevBugId)) {
-                    window.location.assign(url);
-                    clearNavigationState({
-                      reason: "timeout",
-                      targetId: prevBugId,
-                      targetUrl: url,
-                    });
-                  }
-                }, 2500);
-
-                try {
-                  navigate(url, { replace: false });
-                } catch {
-                  clearNavigationState({ reason: "cancelled" });
-                  window.location.href = url;
-                }
+              onMouseDown={() => {
+                ignoreJumpBlurRef.current = true;
               }}
+              onClick={() => openSibling(prevBugId)}
               disabled={!prevBugId || bugListLoading || isLoading || isNavigating}
               aria-label="Previous bug"
             >
@@ -1189,14 +1224,45 @@ const BugDetails = () => {
               )}
             </button>
 
-            <div className="min-w-[7.5rem] sm:min-w-[10rem] text-center px-2">
+            <div className="flex min-w-[7.5rem] items-center justify-center gap-1.5 px-1 sm:min-w-[10rem]">
               {bugListLoading || isLoading ? (
                 <span className="text-sm text-muted-foreground tabular-nums">Loading…</span>
               ) : totalBugs > 0 && currentIndex >= 0 ? (
-                <span className="text-sm font-semibold text-foreground tabular-nums">
-                  {currentIndex + 1}
-                  <span className="text-muted-foreground font-medium"> / {totalBugs}</span>
-                </span>
+                <form
+                  className="flex items-center gap-1.5"
+                  onSubmit={(event) => {
+                    event.preventDefault();
+                    commitJump();
+                  }}
+                >
+                  <input
+                    type="text"
+                    inputMode="numeric"
+                    aria-label={`Bug position, 1 to ${totalBugs}. Type a number and press Enter.`}
+                    value={jumpValue}
+                    disabled={isNavigating}
+                    maxLength={4}
+                    onFocus={(event) => event.currentTarget.select()}
+                    onChange={(event) => {
+                      const digits = event.target.value.replace(/\D/g, "").slice(0, 4);
+                      setJumpValue(digits);
+                    }}
+                    onBlur={() => {
+                      window.setTimeout(() => {
+                        if (ignoreJumpBlurRef.current) {
+                          ignoreJumpBlurRef.current = false;
+                          if (currentIndex >= 0) setJumpValue(String(currentIndex + 1));
+                          return;
+                        }
+                        commitJump();
+                      }, 0);
+                    }}
+                    className="h-9 w-14 rounded-xl border border-border/70 bg-background text-center text-sm font-semibold tabular-nums text-foreground shadow-sm outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-40"
+                  />
+                  <span className="text-sm font-medium text-muted-foreground tabular-nums">
+                    / {totalBugs}
+                  </span>
+                </form>
               ) : (
                 <span className="text-sm text-muted-foreground">1 / 1</span>
               )}
@@ -1207,40 +1273,10 @@ const BugDetails = () => {
               className={`inline-flex items-center gap-1.5 rounded-xl border border-border/70 bg-background px-3 sm:px-4 py-2 text-sm font-medium text-foreground shadow-sm transition-all hover:bg-muted disabled:opacity-40 disabled:pointer-events-none ${
                 isNavigating ? "cursor-wait" : ""
               }`}
-              onClick={() => {
-                if (
-                  isNavigating ||
-                  !nextBugId ||
-                  bugListLoading ||
-                  isLoading ||
-                  idsEqual(nextBugId, bugId)
-                ) {
-                  return;
-                }
-                const url = buildSiblingUrl(nextBugId);
-                lastTargetUrlRef.current = url;
-                setIsNavigating(true);
-                navigatingToBugIdRef.current = String(nextBugId);
-                chunkLoadErrorRef.current = false;
-
-                navigationTimeoutRef.current = setTimeout(() => {
-                  if (idsEqual(navigatingToBugIdRef.current, nextBugId)) {
-                    window.location.assign(url);
-                    clearNavigationState({
-                      reason: "timeout",
-                      targetId: nextBugId,
-                      targetUrl: url,
-                    });
-                  }
-                }, 2500);
-
-                try {
-                  navigate(url, { replace: false });
-                } catch {
-                  clearNavigationState({ reason: "cancelled" });
-                  window.location.href = url;
-                }
+              onMouseDown={() => {
+                ignoreJumpBlurRef.current = true;
               }}
+              onClick={() => openSibling(nextBugId)}
               disabled={!nextBugId || bugListLoading || isLoading || isNavigating}
               aria-label="Next bug"
             >
