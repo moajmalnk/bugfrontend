@@ -382,6 +382,30 @@ function SummarySection({ title, children }: { title: string; children: ReactNod
  * Why: The server names the field it rejected (e.g. "Missing required fields: city");
  * map it to the wizard step so the employee can jump straight to the fix.
  */
+/**
+ * Why: submit_onboarding.php drops a DOB outside age 14–100 and then reports it as
+ * "missing", which looks like a blank field. Match that rule here so Save never posts it.
+ */
+function dobAgeError(value: string): string | null {
+  const v = value.trim().slice(0, 10);
+  if (!v) return "Enter a date of birth";
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(v)) return "Enter a valid date of birth";
+  const [year, month, day] = v.split("-").map(Number);
+  const dob = new Date(year, month - 1, day, 12, 0, 0, 0);
+  if (
+    dob.getFullYear() !== year ||
+    dob.getMonth() !== month - 1 ||
+    dob.getDate() !== day
+  ) {
+    return "Enter a valid date of birth";
+  }
+  const age = Math.floor((Date.now() - dob.getTime()) / (365.25 * 24 * 60 * 60 * 1000));
+  if (age < 14 || age > 100) {
+    return "Date of birth must be a real past date (age 14–100)";
+  }
+  return null;
+}
+
 function stepForSubmitError(message: string): number | null {
   const m = message.toLowerCase();
   if (/aadhaar|pan_|pan |statutory/.test(m)) return 1;
@@ -972,6 +996,8 @@ export function OnboardingWizard({
   /** Signature of the server-loaded form; edit/admin drafts are only kept while the form differs. */
   const baselineSigRef = useRef<string | null>(null);
   const hasDraftRef = useRef(false);
+  /** Why: setState(loading) is too late for a second click in the same frame. */
+  const submitLockRef = useRef(false);
   /** Blocks a pending autosave from re-writing a draft the user just discarded or submitted. */
   const draftDiscardRef = useRef(false);
   const restoreNoticeRef = useRef<string | null>(null);
@@ -1789,7 +1815,7 @@ export function OnboardingWizard({
       contactsOk &&
       isValidContactEmail(form.contact_email) &&
       !mailConflictMsg &&
-      !!form.date_of_birth &&
+      !dobAgeError(form.date_of_birth) &&
       !!form.gender &&
       !!form.marital_status &&
       isValidGithubUrl(form.github_url) &&
@@ -1883,7 +1909,9 @@ export function OnboardingWizard({
     if (!skipEmployeeOtp && !form.contact_email_verified) {
       return "Verify contact email with OTP";
     }
-    if (!form.date_of_birth) return "Enter your date of birth";
+    if (dobAgeError(form.date_of_birth)) {
+      return dobAgeError(form.date_of_birth);
+    }
     if (!form.gender) return "Select your gender";
     if (!form.marital_status) return "Select your marital status";
     if (!isValidGithubUrl(form.github_url)) return "Enter a valid GitHub profile URL";
@@ -2199,7 +2227,17 @@ export function OnboardingWizard({
   const handleFinalize = async () => {
     const hasAadhaar =
       !!form.aadhaar_file || ((editMode || adminMode) && hasExistingAadhaar);
-    if (loading) return;
+    if (loading || submitLockRef.current) return;
+    const dobProblem = dobAgeError(form.date_of_birth);
+    if (dobProblem) {
+      toast({
+        title: "Date of birth is not valid",
+        description: `${dobProblem}. Open Address and pick a real birth date, then save again.`,
+        variant: "destructive",
+      });
+      void goToStep(0);
+      return;
+    }
     // Why: Deep links / OAuth returns can land on Review with earlier steps incomplete —
     // never let Save silently no-op or submit blanks; send the user to the gap.
     const firstInvalid = [!!step1Valid, step2Valid, !!step3Valid].findIndex((ok) => !ok);
@@ -2291,6 +2329,7 @@ export function OnboardingWizard({
       profile_photo: form.profile_photo || null,
     };
 
+    submitLockRef.current = true;
     setLoading(true);
 
     // Why: Edit/admin mode closes immediately so Save feels instant; request continues in background.
@@ -2355,6 +2394,7 @@ export function OnboardingWizard({
           { replace: false }
         );
       } finally {
+        submitLockRef.current = false;
         setLoading(false);
       }
       return;
@@ -2399,6 +2439,7 @@ export function OnboardingWizard({
         variant: "destructive",
       });
     } finally {
+      submitLockRef.current = false;
       setLoading(false);
     }
   };
@@ -3044,15 +3085,20 @@ export function OnboardingWizard({
                     disableFuture
                     showToday={false}
                     fromYear={new Date().getFullYear() - 100}
-                    toYear={new Date().getFullYear()}
+                    toYear={new Date().getFullYear() - 14}
                   />
+                  {form.date_of_birth && dobAgeError(form.date_of_birth) ? (
+                    <p className="text-xs text-destructive" role="alert">
+                      {dobAgeError(form.date_of_birth)}
+                    </p>
+                  ) : null}
                 </FieldShell>
 
                 <FieldShell label="Gender" required className="col-span-12 md:col-span-4">
                   {/* Why: Remount after hydrate so Radix never flips uncontrolled → controlled. */}
                   <Select
                     key={hydrated ? "gender-ready" : "gender-boot"}
-                    value={form.gender || undefined}
+                    value={form.gender || ""}
                     onValueChange={(v) => setForm((p) => ({ ...p, gender: v }))}
                   >
                     <SelectTrigger className={cn(fieldClass, "w-full")}>
@@ -3070,7 +3116,7 @@ export function OnboardingWizard({
                 <FieldShell label="Marital status" required className="col-span-12 md:col-span-4">
                   <Select
                     key={hydrated ? "marital-ready" : "marital-boot"}
-                    value={form.marital_status || undefined}
+                    value={form.marital_status || ""}
                     onValueChange={(v) => setForm((p) => ({ ...p, marital_status: v }))}
                   >
                     <SelectTrigger className={cn(fieldClass, "w-full")}>
@@ -3180,9 +3226,7 @@ export function OnboardingWizard({
                     <Select
                       key={`po-${form.pin_code}-${pinPostOffices.join("|")}`}
                       value={
-                        pinPostOffices.includes(form.post_office)
-                          ? form.post_office
-                          : undefined
+                        pinPostOffices.includes(form.post_office) ? form.post_office : ""
                       }
                       onValueChange={(v) => {
                         const block = pinOfficeBlocks[v];
@@ -3233,7 +3277,11 @@ export function OnboardingWizard({
                 </FieldShell>
 
                 <FieldShell label="State" required className="md:col-span-4">
-                  <Select value={form.state || undefined} onValueChange={handleStateChange}>
+                  <Select
+                    key={hydrated ? "state-ready" : "state-boot"}
+                    value={form.state || ""}
+                    onValueChange={handleStateChange}
+                  >
                     <SelectTrigger className={cn(fieldClass, "w-full")}>
                       <SelectValue placeholder="Select state" />
                     </SelectTrigger>
@@ -3253,7 +3301,8 @@ export function OnboardingWizard({
                 </FieldShell>
                 <FieldShell label="District" required className="md:col-span-4">
                   <Select
-                    value={form.district || undefined}
+                    key={hydrated ? `district-ready-${form.state}` : "district-boot"}
+                    value={form.district || ""}
                     onValueChange={(v) => setField("district", v)}
                     disabled={!form.state || districtOptions.length === 0}
                   >
