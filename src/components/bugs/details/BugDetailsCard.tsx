@@ -27,9 +27,11 @@ import { Badge } from "@/components/ui/badge";
 import { formatRetestSummary } from "@/lib/verificationUtils";
 import { BugTypeMultiSelect } from "@/components/bugs/BugTypeMultiSelect";
 import { cn } from "@/lib/utils";
+import { retestBugPath } from "@/lib/bugStatusNavigation";
+import { notifyAdminNavCountsChanged } from "@/services/adminNavCountsService";
 import { useQueryClient } from "@tanstack/react-query";
 import { useEffect, useRef, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { DuplicateOfDialog, DuplicateOriginal } from "@/components/bugs/DuplicateOfDialog";
 import { GoogleDocsButton } from "./GoogleDocsButton";
 
@@ -49,6 +51,7 @@ export const BugDetailsCard = ({
   formattedUpdatedDate,
 }: BugDetailsCardProps) => {
   const { currentUser } = useAuth();
+  const navigate = useNavigate();
   const queryClient = useQueryClient();
   const [updating, setUpdating] = useState(false);
   const updatingRef = useRef(false);
@@ -235,10 +238,24 @@ export const BugDetailsCard = ({
       });
       void queryClient.invalidateQueries({ queryKey: ["userProfilePortfolio"] });
 
-      toast({
-        title: "Success",
-        description: `Bug ${fieldLabel} updated successfully.`,
-      });
+      const movedToRetest = markingFixed && previous.status !== "fixed";
+      if (movedToRetest) {
+        notifyAdminNavCountsChanged();
+        toast({
+          title: "Marked fixed",
+          description:
+            "Opened in Retests. A tester or admin can mark the issue fixed or still broken.",
+        });
+        navigate(retestBugPath(currentUser?.role, bug.id), {
+          replace: true,
+          state: { from: "retests" },
+        });
+      } else {
+        toast({
+          title: "Success",
+          description: `Bug ${fieldLabel} updated successfully.`,
+        });
+      }
 
       const savedStatus = String(serverBug.status || "");
       if (

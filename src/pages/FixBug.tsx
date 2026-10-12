@@ -14,6 +14,7 @@ import { toast } from "@/components/ui/use-toast";
 import { DuplicateOfDialog } from "@/components/bugs/DuplicateOfDialog";
 import { useAuth } from "@/context/AuthContext";
 import { broadcastNotificationService } from "@/services/broadcastNotificationService";
+import { retestBugPath } from "@/lib/bugStatusNavigation";
 import { bugService } from "@/services/bugService";
 import { Bug } from "@/types";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
@@ -167,8 +168,11 @@ const FixBug = () => {
       });
 
       toast({
-        title: "Success",
-        description: "Bug status updated successfully",
+        title: status === "fixed" ? "Marked fixed" : "Success",
+        description:
+          status === "fixed"
+            ? "Opened in Retests. A tester or admin can mark the issue fixed or still broken."
+            : "Bug status updated successfully",
       });
 
       if (status && bug) {
@@ -186,7 +190,14 @@ const FixBug = () => {
         });
       }
 
-      navigate(getBugDetailsUrl());
+      if (status === "fixed" && bugId) {
+        navigate(retestBugPath(currentUser.role, bugId), {
+          replace: true,
+          state: { from: "retests" },
+        });
+      } else {
+        navigate(getBugDetailsUrl());
+      }
     } catch (error) {
       if (previousBug) {
         queryClient.setQueryData(["bug", bugId], previousBug);

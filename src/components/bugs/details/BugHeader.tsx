@@ -114,19 +114,23 @@ export const BugHeader = ({
 
   const referrerIsProject =
     typeof document !== "undefined" && document.referrer.includes("/projects/");
-  const isFromProject =
-    Boolean(pathFromState?.includes("/projects/")) ||
-    fromState === "project" ||
-    fromParam === "project" ||
-    referrerIsProject;
-  const isFromFixes =
-    Boolean(pathFromState?.includes("/fixes")) ||
-    fromState === "fixes" ||
-    fromParam === "fixes";
+  // The query param is the current entry point. It wins over a leftover
+  // project referrer, so marking a bug fixed can send Back to Retests.
   const isFromRetests =
-    Boolean(pathFromState?.includes("/retests")) ||
-    fromState === "retests" ||
-    fromParam === "retests";
+    fromParam === "retests" ||
+    (!fromParam &&
+      (fromState === "retests" || Boolean(pathFromState?.includes("/retests"))));
+  const isFromFixes =
+    fromParam === "fixes" ||
+    (!fromParam &&
+      (fromState === "fixes" || Boolean(pathFromState?.includes("/fixes"))));
+  const isFromProject =
+    !isFromRetests &&
+    !isFromFixes &&
+    (fromParam === "project" ||
+      fromState === "project" ||
+      Boolean(pathFromState?.includes("/projects/")) ||
+      referrerIsProject);
   const isFromCommonBugs =
     Boolean(pathFromState?.includes("/common-bugs")) ||
     fromState === "common-bugs" ||
@@ -135,24 +139,24 @@ export const BugHeader = ({
     Boolean(bug.common_bug_read_only);
 
   const role = getEffectiveRole(authUser || {});
-  const backLink =
-    pathFromState ||
-    (isFromProject
-      ? `/${role}/projects/${bug.project_id}?tab=bugs`
-      : isFromRetests
-        ? `/${role}/retests`
-        : isFromFixes
-          ? `/${role}/fixes`
+  const backLink = isFromRetests
+    ? `/${role}/retests`
+    : isFromFixes
+      ? `/${role}/fixes`
+      : pathFromState && !fromParam
+        ? pathFromState
+        : isFromProject
+          ? `/${role}/projects/${bug.project_id}?tab=bugs`
           : isFromCommonBugs
             ? `/${role}/common-bugs`
-            : `/${role}/bugs`);
+            : `/${role}/bugs`;
 
-  const backText = isFromProject
-    ? "Back to Project Bugs"
-    : isFromRetests
-      ? "Back to Retests"
-      : isFromFixes
-        ? "Back to Fixes"
+  const backText = isFromRetests
+    ? "Back to Retests"
+    : isFromFixes
+      ? "Back to Fixes"
+      : isFromProject
+        ? "Back to Project Bugs"
         : isFromCommonBugs
           ? "Back to Common Bugs"
           : "Back to Bugs";

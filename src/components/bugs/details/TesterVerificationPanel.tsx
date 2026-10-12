@@ -434,8 +434,18 @@ export function TesterVerificationPanel({ bug, onUpdated }: TesterVerificationPa
     </div>
   );
 
+  const panelRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (window.location.hash !== "#tester-verification") return;
+    panelRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }, [bug.id, bug.status]);
+
   return (
-    <div className="mt-5 rounded-2xl border border-sky-200/50 dark:border-sky-800/40 bg-gradient-to-br from-sky-50/80 via-background/40 to-indigo-50/50 dark:from-sky-950/20 dark:via-background/20 dark:to-indigo-950/20 p-4 sm:p-5">
+    <div
+      ref={panelRef}
+      id="tester-verification"
+      className="mt-5 scroll-mt-24 rounded-2xl border border-sky-200/50 dark:border-sky-800/40 bg-gradient-to-br from-sky-50/80 via-background/40 to-indigo-50/50 dark:from-sky-950/20 dark:via-background/20 dark:to-indigo-950/20 p-4 sm:p-5"
+    >
       <div className="flex flex-wrap items-start justify-between gap-3 mb-4">
         <div className="flex items-start gap-2.5 min-w-0">
           <div className="mt-0.5 rounded-lg bg-sky-600 p-1.5 shrink-0">

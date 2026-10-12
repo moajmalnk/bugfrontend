@@ -844,19 +844,19 @@ const BugDetails = () => {
   const filteredBugList = useMemo(() => {
     const currentId = bugId ? String(bugId) : null;
     const list = bugList.filter((b) => {
-      if (fromFixes) {
-        return (
-          b.status === "fixed" ||
-          b.status === "rejected" ||
-          (currentId != null && String(b.id) === currentId)
-        );
+      if (currentId != null && String(b.id) === currentId) return true;
+      if (fromRetests) {
+        const awaiting =
+          b.tester_retested === null ||
+          b.tester_retested === undefined ||
+          String(b.tester_retested) === "";
+        return b.status === "fixed" && awaiting;
       }
-      // Bugs list / project: active Bugs-tab statuses + always include current bug
-      return (
-        b.status === "pending" ||
-        b.status === "in_progress" ||
-        (currentId != null && String(b.id) === currentId)
-      );
+      if (fromFixes) {
+        return b.status === "fixed" || b.status === "rejected";
+      }
+      // Bugs list / project: active Bugs-tab statuses
+      return b.status === "pending" || b.status === "in_progress";
     });
 
     // Ensure current bug is present even if list fetch lagged
@@ -864,7 +864,7 @@ const BugDetails = () => {
       return [bug, ...list];
     }
     return list;
-  }, [bugList, fromFixes, bugId, bug]);
+  }, [bugList, fromFixes, fromRetests, bugId, bug]);
   
   // Memoize navigation values to prevent recalculation
   // MUST be before any early returns to follow Rules of Hooks
