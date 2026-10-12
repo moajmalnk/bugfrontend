@@ -993,7 +993,7 @@ export function BugContentCards({ bug, onBugUpdated }: BugContentCardsProps) {
                   const label = String(step.event_label || "").toLowerCase();
                   const from = String(step.from_status || "").toLowerCase();
                   const to = String(step.status || "").toLowerCase();
-                  const closed = new Set(["fixed", "declined", "rejected"]);
+                  const closed = new Set(["fixed", "declined", "rejected", "duplicate"]);
                   const eventLabel =
                     kind === "conversion"
                       ? "Converted"

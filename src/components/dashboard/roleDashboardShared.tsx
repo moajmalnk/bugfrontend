@@ -178,6 +178,7 @@ type PipelineCounts = {
   fixed: number;
   declined: number;
   rejected: number;
+  duplicate: number;
   total: number;
 };
 
@@ -191,6 +192,7 @@ const PIPELINE_ROWS: {
   { key: "fixed", label: "Fixed", bar: "bg-emerald-500" },
   { key: "declined", label: "Declined", bar: "bg-pink-500" },
   { key: "rejected", label: "Rejected", bar: "bg-red-500" },
+  { key: "duplicate", label: "Duplicate", bar: "bg-violet-500" },
 ];
 
 export function BugPipelineCard({

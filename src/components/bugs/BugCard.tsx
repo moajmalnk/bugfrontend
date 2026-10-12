@@ -22,7 +22,7 @@ interface Bug {
   title: string;
   description: string;
   priority: "high" | "medium" | "low";
-  status: "pending" | "in_progress" | "fixed" | "declined" | "rejected";
+  status: "pending" | "in_progress" | "fixed" | "declined" | "rejected" | "duplicate";
   project_id: string;
   project_name?: string;
   reported_by: string;
@@ -63,7 +63,16 @@ const statusColors = {
   fixed: "bg-green-100 text-green-800 dark:bg-green-900/20 dark:text-green-300",
   declined: "bg-red-100 text-red-800 dark:bg-red-900/20 dark:text-red-300",
   rejected: "bg-red-100 text-red-800 dark:bg-red-900/20 dark:text-red-300",
+  duplicate:
+    "bg-violet-100 text-violet-800 dark:bg-violet-900/20 dark:text-violet-300",
 };
+
+function formatBugStatusLabel(status: string) {
+  if (status === "in_progress") return "In progress";
+  if (status === "duplicate") return "Duplicate";
+  const label = status || "pending";
+  return label.charAt(0).toUpperCase() + label.slice(1);
+}
 
 function formatDateTime(dateStr: string) {
   return formatLocalDate(dateStr, "datetime");
@@ -131,7 +140,7 @@ export function BugCard({
               statusColors[bug.status] || statusColors.pending
             }`}
           >
-            {(bug.status || "pending").replace("_", " ")}
+            {formatBugStatusLabel(bug.status || "pending")}
           </Badge>
           {bug.source === "whatsapp" && (
             <Badge
@@ -248,7 +257,7 @@ export function CommonBugCard({ bug }: CommonBugCardProps) {
                 statusColors[bug.status] || statusColors.pending
               }`}
             >
-              {(bug.status || "pending").replace("_", " ")}
+              {formatBugStatusLabel(bug.status || "pending")}
             </Badge>
             <Badge
               variant="outline"

@@ -34,6 +34,7 @@ import {
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "@/components/ui/use-toast";
+import { DuplicateOfDialog } from "@/components/bugs/DuplicateOfDialog";
 import { apiClient } from "@/lib/axios";
 import { sendBugStatusUpdateNotification } from "@/services/emailService";
 import { Bug, BugLevel, BugPriority, BugStatus, Project } from "@/types";
@@ -137,6 +138,7 @@ const formSchema = z.object({
     "fixed",
     "declined",
     "rejected",
+    "duplicate",
   ] as const),
 });
 
@@ -178,6 +180,16 @@ const EditBugForm = ({ bug, onCancel, onSuccess }: EditBugFormProps) => {
   );
   const [projectId, setProjectId] = useState(bug.project_id);
   const [projectPickerOpen, setProjectPickerOpen] = useState(false);
+  const [duplicateOpen, setDuplicateOpen] = useState(false);
+  const [duplicateOf, setDuplicateOf] = useState<{ id: string; title: string } | null>(
+    () =>
+      bug.status === "duplicate" && bug.duplicate_of
+        ? {
+            id: bug.duplicate_of,
+            title: bug.duplicate_of_title || "Original bug",
+          }
+        : null
+  );
 
   // Refs for file inputs
   const screenshotInputRef = useRef<HTMLInputElement>(null);
@@ -234,6 +246,14 @@ const EditBugForm = ({ bug, onCancel, onSuccess }: EditBugFormProps) => {
     setBugLevel(bug.bug_level || "normal");
     setSelectedBugTypeIds((bug.bug_types || []).map((t) => t.id));
     setProjectId(bug.project_id);
+    setDuplicateOf(
+      bug.status === "duplicate" && bug.duplicate_of
+        ? {
+            id: bug.duplicate_of,
+            title: bug.duplicate_of_title || "Original bug",
+          }
+        : null
+    );
 
       // Load existing attachments
       const loadAttachments = async () => {
@@ -479,6 +499,15 @@ const EditBugForm = ({ bug, onCancel, onSuccess }: EditBugFormProps) => {
       return;
     }
 
+    if (values.status === "duplicate" && !duplicateOf) {
+      toast({
+        title: "Original bug required",
+        description: "Choose the bug this one duplicates.",
+        variant: "destructive",
+      });
+      return;
+    }
+
     setIsSubmitting(true);
     try {
       // Create FormData for file uploads
@@ -490,6 +519,9 @@ const EditBugForm = ({ bug, onCancel, onSuccess }: EditBugFormProps) => {
       formData.append("actual_result", values.actual_result || "");
       formData.append("priority", values.priority);
       formData.append("status", values.status);
+      if (values.status === "duplicate" && duplicateOf) {
+        formData.append("duplicate_of", duplicateOf.id);
+      }
       formData.append("already_raised", alreadyRaised ? "1" : "0");
       formData.append("bug_level", bugLevel);
       // Send both array fields and JSON so PHP always receives the selection
@@ -926,7 +958,14 @@ const EditBugForm = ({ bug, onCancel, onSuccess }: EditBugFormProps) => {
                     Status
                   </FormLabel>
                   <Select
-                    onValueChange={field.onChange}
+                    onValueChange={(value) => {
+                      if (value === "duplicate") {
+                        setDuplicateOpen(true);
+                        return;
+                      }
+                      field.onChange(value);
+                      setDuplicateOf(null);
+                    }}
                     value={field.value}
                   >
                     <FormControl>
@@ -940,11 +979,37 @@ const EditBugForm = ({ bug, onCancel, onSuccess }: EditBugFormProps) => {
                       <SelectItem value="fixed">Fixed</SelectItem>
                       <SelectItem value="declined">Declined</SelectItem>
                       <SelectItem value="rejected">Rejected</SelectItem>
+                      <SelectItem value="duplicate">Duplicate</SelectItem>
                     </SelectContent>
                   </Select>
+                  {field.value === "duplicate" && duplicateOf ? (
+                    <p className="text-sm text-muted-foreground">
+                      Duplicate of {duplicateOf.title}
+                    </p>
+                  ) : null}
+                  {field.value === "duplicate" && duplicateOf ? (
+                    <Button
+                      type="button"
+                      variant="outline"
+                      className="rounded-xl"
+                      onClick={() => setDuplicateOpen(true)}
+                    >
+                      Change original bug
+                    </Button>
+                  ) : null}
                   <FormMessage />
                 </FormItem>
               )}
+            />
+            <DuplicateOfDialog
+              open={duplicateOpen}
+              onOpenChange={setDuplicateOpen}
+              projectId={projectId}
+              excludeBugId={bug.id}
+              onConfirm={async (original) => {
+                form.setValue("status", "duplicate", { shouldDirty: true });
+                setDuplicateOf(original);
+              }}
             />
             </div>
 

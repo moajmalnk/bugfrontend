@@ -671,6 +671,7 @@ const CommonBugs = () => {
                               <SelectItem value="fixed">Fixed</SelectItem>
                               <SelectItem value="declined">Declined</SelectItem>
                               <SelectItem value="rejected">Rejected</SelectItem>
+                              <SelectItem value="duplicate">Duplicate</SelectItem>
                             </SelectContent>
                           </Select>
                         </div>

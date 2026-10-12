@@ -211,6 +211,7 @@ export default function DeveloperDashboard() {
         fixed: stats.fixed,
         declined: stats.declined,
         rejected: stats.rejected,
+        duplicate: stats.duplicate ?? 0,
         total: stats.total,
       },
     };

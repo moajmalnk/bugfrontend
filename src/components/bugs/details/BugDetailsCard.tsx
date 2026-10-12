@@ -29,6 +29,8 @@ import { BugTypeMultiSelect } from "@/components/bugs/BugTypeMultiSelect";
 import { cn } from "@/lib/utils";
 import { useQueryClient } from "@tanstack/react-query";
 import { useEffect, useRef, useState } from "react";
+import { Link } from "react-router-dom";
+import { DuplicateOfDialog, DuplicateOriginal } from "@/components/bugs/DuplicateOfDialog";
 import { GoogleDocsButton } from "./GoogleDocsButton";
 
 interface BugDetailsCardProps {
@@ -51,6 +53,7 @@ export const BugDetailsCard = ({
   const [updating, setUpdating] = useState(false);
   const updatingRef = useRef(false);
   const [bugState, setBugState] = useState(bug);
+  const [duplicateOpen, setDuplicateOpen] = useState(false);
 
   useEffect(() => {
     setBugState(bug);
@@ -76,6 +79,11 @@ export const BugDetailsCard = ({
           : "0"
         : String(bugState[field] ?? "");
     if (currentValue === value) return;
+
+    if (field === "status" && value === "duplicate") {
+      setDuplicateOpen(true);
+      return;
+    }
 
     const previous = bugState;
     const markingFixed = field === "status" && value === "fixed";
@@ -160,14 +168,43 @@ export const BugDetailsCard = ({
     );
   };
 
+  const confirmDuplicate = async (original: DuplicateOriginal) => {
+    if (!currentUser) {
+      throw new Error("You must be logged in to update bugs.");
+    }
+    const previous = bugState;
+    const optimistic: Bug = {
+      ...bugState,
+      status: "duplicate",
+      duplicate_of: original.id,
+      duplicate_of_title: original.title,
+      updated_by: currentUser.id,
+      updated_by_name: currentUser.name || currentUser.username,
+    };
+    const saved = await persistBugUpdate(
+      {
+        id: bug.id,
+        status: "duplicate",
+        duplicate_of: original.id,
+        updated_by: currentUser.id,
+      },
+      previous,
+      optimistic,
+      "status"
+    );
+    if (!saved) {
+      throw new Error("Duplicate was not saved");
+    }
+  };
+
   const persistBugUpdate = async (
     payload: Record<string, unknown>,
     previous: Bug,
     optimistic: Bug,
     fieldLabel: string,
     markingFixed = false
-  ) => {
-    if (updatingRef.current) return;
+  ): Promise<boolean> => {
+    if (updatingRef.current) return false;
     updatingRef.current = true;
 
     setBugState(optimistic);
@@ -203,12 +240,16 @@ export const BugDetailsCard = ({
         description: `Bug ${fieldLabel} updated successfully.`,
       });
 
-      if (markingFixed && currentUser) {
+      const savedStatus = String(serverBug.status || "");
+      if (
+        currentUser &&
+        (markingFixed || savedStatus === "duplicate")
+      ) {
         void broadcastNotificationService
           .broadcastStatusChange(
             serverBug.title,
             serverBug.id,
-            "fixed",
+            savedStatus,
             currentUser.name || currentUser.username || "BugRicer User"
           )
           .catch(() => undefined);
@@ -222,7 +263,7 @@ export const BugDetailsCard = ({
             whatsappService.shareStatusUpdate({
               bugTitle: serverBug.title,
               bugId: serverBug.id,
-              status: "fixed",
+              status: savedStatus,
               priority: serverBug.priority,
               updatedBy:
                 currentUser.name || currentUser.username || "BugRicer User",
@@ -235,6 +276,7 @@ export const BugDetailsCard = ({
           }
         }
       }
+      return true;
     } catch (error) {
       setBugState(previous);
       queryClient.setQueryData(["bug", bug.id], previous);
@@ -246,6 +288,7 @@ export const BugDetailsCard = ({
             : `Failed to update bug ${fieldLabel}.`,
         variant: "destructive",
       });
+      return false;
     } finally {
       updatingRef.current = false;
       setUpdating(false);
@@ -279,6 +322,7 @@ export const BugDetailsCard = ({
                   <SelectItem value="fixed">Fixed</SelectItem>
                   <SelectItem value="declined">Declined</SelectItem>
                   <SelectItem value="rejected">Rejected</SelectItem>
+                  <SelectItem value="duplicate">Duplicate</SelectItem>
                 </SelectContent>
               </Select>
             ) : (
@@ -288,6 +332,17 @@ export const BugDetailsCard = ({
                 </span>
               </div>
             )}
+            {bugState.status === "duplicate" && bugState.duplicate_of ? (
+              <p className="text-xs text-muted-foreground">
+                Duplicate of{" "}
+                <Link
+                  to={`/${currentUser?.role || "admin"}/bugs/${bugState.duplicate_of}`}
+                  className="font-medium text-foreground underline underline-offset-2"
+                >
+                  {bugState.duplicate_of_title || "original bug"}
+                </Link>
+              </p>
+            ) : null}
           </div>
 
           <div className="space-y-1.5">
@@ -447,6 +502,13 @@ export const BugDetailsCard = ({
           <GoogleDocsButton bugId={String(bugState.id)} />
         </CardContent>
       </Card>
+      <DuplicateOfDialog
+        open={duplicateOpen}
+        onOpenChange={setDuplicateOpen}
+        projectId={String(bugState.project_id || "")}
+        excludeBugId={String(bug.id)}
+        onConfirm={confirmDuplicate}
+      />
     </div>
   );
 };

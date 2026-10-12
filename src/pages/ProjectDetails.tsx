@@ -1941,9 +1941,11 @@ const FixesWithInitialParams = ({ projectId, initialTab, initialStatus }: { proj
       const matchesVerification =
         verificationFilter === "all" ||
         getVerificationFilterKey(bug) === verificationFilter;
-      // Fixes: fixed + rejected (rejected counts as closed on our side)
+      // Fixes: closed work (fixed, rejected, duplicate)
       const isResolved =
-        bug.status === "fixed" || bug.status === "rejected";
+        bug.status === "fixed" ||
+        bug.status === "rejected" ||
+        bug.status === "duplicate";
       return (
         matchesSearch &&
         matchesPriority &&
@@ -2172,6 +2174,7 @@ const FixesWithInitialParams = ({ projectId, initialTab, initialStatus }: { proj
                             <SelectItem value="all">All Status</SelectItem>
                             <SelectItem value="fixed">Fixed</SelectItem>
                             <SelectItem value="rejected">Rejected</SelectItem>
+                            <SelectItem value="duplicate">Duplicate</SelectItem>
                           </SelectContent>
                         </Select>
                       </div>
@@ -2552,6 +2555,7 @@ const FixesWithInitialParams = ({ projectId, initialTab, initialStatus }: { proj
                             <SelectItem value="all">All Status</SelectItem>
                             <SelectItem value="fixed">Fixed</SelectItem>
                             <SelectItem value="rejected">Rejected</SelectItem>
+                            <SelectItem value="duplicate">Duplicate</SelectItem>
                           </SelectContent>
                         </Select>
                       </div>
@@ -4543,7 +4547,10 @@ const ProjectDetails = () => {
       bugs: uniqueBugs.filter((bug) => openBugStatuses.includes(bug.status)).length,
       retests: uniqueBugs.filter(isRetestPending).length,
       fixes: uniqueBugs.filter(
-        (bug) => bug.status === "fixed" || bug.status === "rejected"
+        (bug) =>
+          bug.status === "fixed" ||
+          bug.status === "rejected" ||
+          bug.status === "duplicate"
       ).length,
       updates: updates.length,
       tasks: sharedTasks.length,

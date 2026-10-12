@@ -76,6 +76,7 @@ export type MonthlyOpsMonth = {
   bugs_fixed: number;
   bugs_declined: number;
   bugs_rejected: number;
+  bugs_duplicate?: number;
   bugs_closed: number;
   bugs_high_created: number;
   updates_created: number;
@@ -102,6 +103,7 @@ export type MonthlyOpsTimeline = {
     bugs_fixed: number;
     bugs_declined: number;
     bugs_rejected: number;
+    bugs_duplicate?: number;
     updates_created: number;
     updates_completed: number;
     bugs_high_created: number;
@@ -230,6 +232,7 @@ export const bugService = {
     fixed: number;
     declined: number;
     rejected: number;
+    duplicate: number;
     open: number;
     resolved: number;
     total: number;
@@ -257,6 +260,7 @@ export const bugService = {
         fixed: number;
         declined: number;
         rejected: number;
+        duplicate: number;
         open: number;
         resolved: number;
         total: number;

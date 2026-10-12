@@ -35,6 +35,8 @@ const getStatusColor = (status: string) => {
       return "bg-yellow-100 text-yellow-800 hover:bg-yellow-100";
     case "declined":
       return "bg-red-100 text-red-800 hover:bg-red-100";
+    case "duplicate":
+      return "bg-violet-100 text-violet-800 hover:bg-violet-100";
     default:
       return "bg-gray-100 text-gray-800 hover:bg-gray-100";
   }

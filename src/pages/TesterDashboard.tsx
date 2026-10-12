@@ -59,6 +59,7 @@ function countByStatus(bugs: Bug[]) {
     fixed: 0,
     declined: 0,
     rejected: 0,
+    duplicate: 0,
     total: bugs.length,
     open: 0,
     highOpen: 0,
@@ -230,6 +231,7 @@ export default function TesterDashboard() {
         fixed: data.myCounts.fixed,
         declined: data.myCounts.declined,
         rejected: data.myCounts.rejected,
+        duplicate: data.myCounts.duplicate,
         total: data.myCounts.total,
       }
     : null;

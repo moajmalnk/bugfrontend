@@ -18,7 +18,10 @@ export type Bug = {
   updated_by?: string;
   updated_by_name?: string;  // Add this field
   priority: 'high' | 'medium' | 'low';
-  status: 'pending' | 'in_progress' | 'fixed' | 'declined' | 'rejected';
+  status: 'pending' | 'in_progress' | 'fixed' | 'declined' | 'rejected' | 'duplicate';
+  /** Original bug when status is duplicate */
+  duplicate_of?: string | null;
+  duplicate_of_title?: string | null;
   created_at: string;
   updated_at: string;
   fix_description?: string | null;
@@ -72,7 +75,7 @@ export type Bug = {
 
 export type BugPriority = 'low' | 'medium' | 'high';
 export type BugLevel = 'normal' | 'floap' | 'utter_floap';
-export type BugStatus = 'pending' | 'in_progress' | 'fixed' | 'rejected' | 'declined';
+export type BugStatus = 'pending' | 'in_progress' | 'fixed' | 'rejected' | 'declined' | 'duplicate';
 
 /** Lightweight type attached to a bug */
 export type BugTypeRef = {

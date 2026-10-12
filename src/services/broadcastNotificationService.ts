@@ -321,7 +321,8 @@ class BroadcastNotificationService {
       'fixed': `Bug has been fixed: ${bugTitle}`,
       'in_progress': `Bug is now in progress: ${bugTitle}`,
       'declined': `Bug has been declined: ${bugTitle}`,
-      'rejected': `Bug has been rejected: ${bugTitle}`
+      'rejected': `Bug has been rejected: ${bugTitle}`,
+      'duplicate': `Bug marked as duplicate: ${bugTitle}`,
     };
 
     const message = statusMessages[status] || `Bug status updated to ${status}: ${bugTitle}`;

@@ -411,7 +411,17 @@ class WhatsAppService {
     
     let message = `${statusEmoji} *Bug Status Updated*\n\n`;
     message += `📋 *Title:* ${data.bugTitle}\n`;
-    message += `🔄 *New Status:* ${(data.status || '').replace('_', ' ').toUpperCase()}\n`;
+    const statusLabels: Record<string, string> = {
+      pending: 'Pending',
+      in_progress: 'In Progress',
+      fixed: 'Fixed',
+      declined: 'Declined',
+      rejected: 'Rejected',
+      duplicate: 'Duplicate',
+    };
+    const statusKey = (data.status || '').toLowerCase();
+    const statusLabel = statusLabels[statusKey] || statusKey.replace(/_/g, ' ');
+    message += `🔄 *New Status:* ${statusLabel}\n`;
     
     if (data.priority) {
       const priorityEmoji = this.getPriorityEmoji(data.priority);
@@ -530,6 +540,8 @@ class WhatsAppService {
         return '❌';
       case 'rejected':
         return '🚫';
+      case 'duplicate':
+        return '🔁';
       default:
         return '📝';
     }

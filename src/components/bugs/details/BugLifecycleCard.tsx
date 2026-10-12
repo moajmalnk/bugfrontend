@@ -17,6 +17,7 @@ import {
   CheckCircle2,
   ClipboardCheck,
   Clock3,
+  Copy,
   Flag,
   Hourglass,
   Percent,
@@ -35,7 +36,7 @@ type BugLifecycleCardProps = {
 
 type RatioTone = "success" | "warning" | "urgent" | "default";
 
-const CLOSED = new Set(["fixed", "declined", "rejected"]);
+const CLOSED = new Set(["fixed", "declined", "rejected", "duplicate"]);
 
 type StepVisual = {
   key: string;
@@ -98,6 +99,16 @@ const STEP_VISUALS: Record<string, StepVisual> = {
     ring: "ring-rose-400/50",
     glow: "shadow-rose-500/30",
     path: "bg-rose-500",
+  },
+  duplicate: {
+    key: "duplicate",
+    label: "Duplicate",
+    Icon: Copy,
+    accent: "text-violet-600 dark:text-violet-300",
+    soft: "bg-violet-500/15 text-violet-800 dark:text-violet-200",
+    ring: "ring-violet-400/50",
+    glow: "shadow-violet-500/30",
+    path: "bg-violet-500",
   },
   rejected: {
     key: "rejected",
@@ -196,6 +207,9 @@ function statusTone(status?: string | null) {
   if (["in_progress", "pending"].includes(value)) {
     return "bg-amber-500/15 text-amber-800 dark:text-amber-300 border-amber-500/25";
   }
+  if (value === "duplicate") {
+    return "bg-violet-500/15 text-violet-700 dark:text-violet-300 border-violet-500/25";
+  }
   if (["declined", "rejected"].includes(value)) {
     return "bg-rose-500/15 text-rose-700 dark:text-rose-300 border-rose-500/25";
   }
@@ -207,6 +221,7 @@ function statusBarColor(status?: string | null) {
   if (value === "fixed") return "bg-emerald-500";
   if (value === "in_progress") return "bg-sky-500";
   if (value === "pending") return "bg-amber-500";
+  if (value === "duplicate") return "bg-violet-500";
   if (["declined", "rejected"].includes(value)) return "bg-rose-500";
   return "bg-muted-foreground/50";
 }

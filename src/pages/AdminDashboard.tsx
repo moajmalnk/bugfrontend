@@ -163,6 +163,7 @@ type BugStatusCounts = {
   fixed: number;
   declined: number;
   rejected: number;
+  duplicate: number;
   total: number;
   open: number;
 };
@@ -281,7 +282,7 @@ async function mapWithConcurrency<T, R>(
   return results;
 }
 
-type BugStatusKey = "pending" | "in_progress" | "fixed" | "declined" | "rejected";
+type BugStatusKey = "pending" | "in_progress" | "fixed" | "declined" | "rejected" | "duplicate";
 
 function sortByPriorityThenDate(bugs: Bug[]): Bug[] {
   const priorityRank = { high: 0, medium: 1, low: 2 };
@@ -303,6 +304,7 @@ async function loadDashboardData() {
     "fixed",
     "declined",
     "rejected",
+    "duplicate",
   ];
 
   const [projects, users, lifetimeStats, allUpdates] = await Promise.all([
@@ -316,8 +318,14 @@ async function loadDashboardData() {
   const bugResults = await mapWithConcurrency(bugStatuses, bugFetchConcurrency, (status) =>
     bugService.getBugs({ page: 1, limit: listLimit, status })
   );
-  const [pendingResult, progressResult, fixedResult, declinedResult, rejectedResult] =
-    bugResults;
+  const [
+    pendingResult,
+    progressResult,
+    fixedResult,
+    declinedResult,
+    rejectedResult,
+    duplicateResult,
+  ] = bugResults;
 
   const updatesByProject = new Map<string, number>();
   const updateStatusCounts = {
@@ -359,6 +367,7 @@ async function loadDashboardData() {
     fixed: lifetimeStats.fixed,
     declined: lifetimeStats.declined,
     rejected: lifetimeStats.rejected,
+    duplicate: lifetimeStats.duplicate ?? 0,
     open: lifetimeStats.open,
     total: lifetimeStats.total,
   };
@@ -371,6 +380,7 @@ async function loadDashboardData() {
       .sort((a, b) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime()),
     declined: sortByPriorityThenDate(declinedResult.bugs || []),
     rejected: sortByPriorityThenDate(rejectedResult.bugs || []),
+    duplicate: sortByPriorityThenDate(duplicateResult.bugs || []),
   };
 
   const openBugs = sortByPriorityThenDate([
@@ -496,6 +506,7 @@ const statusChartConfig = {
   fixed: { label: "Fixed", color: "#10b981" },
   declined: { label: "Declined", color: "#94a3b8" },
   rejected: { label: "Rejected", color: "#f43f5e" },
+  duplicate: { label: "Duplicate", color: "#8b5cf6" },
 } satisfies ChartConfig;
 
 const priorityChartConfig = {
@@ -625,31 +636,37 @@ function BugPipelineCard({
       value: bugCounts.pending,
       className: "bg-amber-500",
       // 12-grid: 3+2+3+2+2 = 12 on lg; md 4+4+4 / 6+6
-      span: "col-span-12 sm:col-span-6 md:col-span-4 lg:col-span-3",
+      span: "col-span-12 sm:col-span-6 lg:col-span-2",
     },
     {
       label: "In progress",
       value: bugCounts.in_progress,
       className: "bg-blue-500",
-      span: "col-span-12 sm:col-span-6 md:col-span-4 lg:col-span-2",
+      span: "col-span-12 sm:col-span-6 lg:col-span-2",
     },
     {
       label: "Fixed",
       value: bugCounts.fixed,
       className: "bg-emerald-500",
-      span: "col-span-12 sm:col-span-6 md:col-span-4 lg:col-span-3",
+      span: "col-span-12 sm:col-span-6 lg:col-span-2",
     },
     {
       label: "Declined",
       value: bugCounts.declined,
       className: "bg-slate-400",
-      span: "col-span-12 sm:col-span-6 md:col-span-6 lg:col-span-2",
+      span: "col-span-12 sm:col-span-6 lg:col-span-2",
     },
     {
       label: "Rejected",
       value: bugCounts.rejected,
       className: "bg-rose-400",
-      span: "col-span-12 sm:col-span-6 md:col-span-6 lg:col-span-2",
+      span: "col-span-12 sm:col-span-6 lg:col-span-2",
+    },
+    {
+      label: "Duplicate",
+      value: bugCounts.duplicate,
+      className: "bg-violet-500",
+      span: "col-span-12 sm:col-span-6 lg:col-span-2",
     },
   ];
 
@@ -743,6 +760,7 @@ function BugsFixesStatusPanel({
     { key: "fixed", label: "Fixed", count: data.bugCounts.fixed },
     { key: "declined", label: "Declined", count: data.bugCounts.declined },
     { key: "rejected", label: "Rejected", count: data.bugCounts.rejected },
+    { key: "duplicate", label: "Duplicate", count: data.bugCounts.duplicate },
   ];
 
   const activeTab = statusTabs.find((t) => t.key === statusFilter) ?? statusTabs[0];
@@ -1838,6 +1856,7 @@ export default function AdminDashboard() {
       fixed: data.bugsByStatus.fixed.filter((b) => bugTouchesPeriod(b, from, to)),
       declined: data.bugsByStatus.declined.filter((b) => bugTouchesPeriod(b, from, to)),
       rejected: data.bugsByStatus.rejected.filter((b) => bugTouchesPeriod(b, from, to)),
+      duplicate: data.bugsByStatus.duplicate.filter((b) => bugTouchesPeriod(b, from, to)),
     };
     const openBugs = sortByPriorityThenDate([
       ...bugsByStatus.pending,
@@ -1852,6 +1871,7 @@ export default function AdminDashboard() {
           fixed: stats.fixed,
           declined: stats.declined,
           rejected: stats.rejected,
+          duplicate: stats.duplicate ?? 0,
           open: stats.open,
           total: stats.total,
         }
@@ -1914,6 +1934,7 @@ export default function AdminDashboard() {
       { key: "fixed", name: "Fixed", value: view.bugCounts.fixed, fill: "var(--color-fixed)" },
       { key: "declined", name: "Declined", value: view.bugCounts.declined, fill: "var(--color-declined)" },
       { key: "rejected", name: "Rejected", value: view.bugCounts.rejected, fill: "var(--color-rejected)" },
+      { key: "duplicate", name: "Duplicate", value: view.bugCounts.duplicate, fill: "var(--color-duplicate)" },
     ].filter((d) => d.value > 0);
   }, [view]);
 
@@ -3430,6 +3451,7 @@ export default function AdminDashboard() {
                           { label: "Fixed", value: view.bugCounts.fixed, key: "fixed" },
                           { label: "Declined", value: view.bugCounts.declined, key: "declined" },
                           { label: "Rejected", value: view.bugCounts.rejected, key: "rejected" },
+                          { label: "Duplicate", value: view.bugCounts.duplicate, key: "duplicate" },
                         ]}
                         margin={{ left: 8, right: 8, top: 8 }}
                       >
@@ -3438,7 +3460,7 @@ export default function AdminDashboard() {
                         <YAxis tickLine={false} axisLine={false} width={40} />
                         <ChartTooltip content={<ChartTooltipContent hideLabel />} />
                         <Bar dataKey="value" radius={[8, 8, 0, 0]}>
-                          {["pending", "in_progress", "fixed", "declined", "rejected"].map((key) => (
+                          {["pending", "in_progress", "fixed", "declined", "rejected", "duplicate"].map((key) => (
                             <Cell key={key} fill={`var(--color-${key})`} />
                           ))}
                         </Bar>

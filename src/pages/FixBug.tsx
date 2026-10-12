@@ -11,6 +11,7 @@ import {
 import { Skeleton } from "@/components/ui/skeleton";
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "@/components/ui/use-toast";
+import { DuplicateOfDialog } from "@/components/bugs/DuplicateOfDialog";
 import { useAuth } from "@/context/AuthContext";
 import { broadcastNotificationService } from "@/services/broadcastNotificationService";
 import { bugService } from "@/services/bugService";
@@ -23,6 +24,7 @@ import {
   Bug as BugIcon,
   CheckCircle,
   Clock,
+  Copy,
   FolderOpen,
   Save,
   X,
@@ -50,6 +52,8 @@ const FixBug = () => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [fixDescription, setFixDescription] = useState("");
   const [status, setStatus] = useState<Bug["status"]>("fixed");
+  const [duplicateOpen, setDuplicateOpen] = useState(false);
+  const [duplicateOf, setDuplicateOf] = useState<{ id: string; title: string } | null>(null);
   const [hasInitializedNotes, setHasInitializedNotes] = useState(false);
 
   const fromProject = searchParams.get("from") === "project";
@@ -113,6 +117,15 @@ const FixBug = () => {
       return;
     }
 
+    if (status === "duplicate" && !duplicateOf) {
+      toast({
+        title: "Original bug required",
+        description: "Choose the bug this one duplicates.",
+        variant: "destructive",
+      });
+      return;
+    }
+
     setIsSubmitting(true);
 
     const previousBug = queryClient.getQueryData<Bug>(["bug", bugId]);
@@ -121,6 +134,8 @@ const FixBug = () => {
       status,
       fix_description: fixDescription,
       fixed_by: currentUser.id,
+      duplicate_of: status === "duplicate" ? duplicateOf?.id ?? null : null,
+      duplicate_of_title: status === "duplicate" ? duplicateOf?.title ?? null : null,
     };
 
     // Paint success state immediately while the request runs
@@ -130,6 +145,9 @@ const FixBug = () => {
       const formData = new FormData();
       formData.append("id", bugId);
       formData.append("status", status);
+      if (status === "duplicate" && duplicateOf) {
+        formData.append("duplicate_of", duplicateOf.id);
+      }
       formData.append("fix_description", fixDescription);
       formData.append("fixed_by", currentUser.id);
 
@@ -488,7 +506,14 @@ const FixBug = () => {
                     </Label>
                     <Select
                       value={status}
-                      onValueChange={(value: Bug["status"]) => setStatus(value)}
+                      onValueChange={(value: Bug["status"]) => {
+                        if (value === "duplicate") {
+                          setDuplicateOpen(true);
+                          return;
+                        }
+                        setStatus(value);
+                        setDuplicateOf(null);
+                      }}
                       disabled={isSubmitting}
                     >
                       <SelectTrigger
@@ -530,8 +555,20 @@ const FixBug = () => {
                           <Clock className="h-4 w-4 text-gray-500" />
                           Pending
                         </SelectItem>
+                        <SelectItem
+                          value="duplicate"
+                          className="flex items-center gap-2"
+                        >
+                          <Copy className="h-4 w-4 text-violet-500" />
+                          Duplicate
+                        </SelectItem>
                       </SelectContent>
                     </Select>
+                    {status === "duplicate" && duplicateOf ? (
+                      <p className="text-sm text-muted-foreground">
+                        Duplicate of {duplicateOf.title}
+                      </p>
+                    ) : null}
                   </div>
 
                   <div className="space-y-2">
@@ -579,7 +616,7 @@ const FixBug = () => {
 
                     <Button
                       type="submit"
-                      disabled={isSubmitting || !bugId}
+                      disabled={isSubmitting || !bugId || (status === "duplicate" && !duplicateOf)}
                       className="h-12 px-8 bg-gradient-to-r from-blue-600 to-green-600 hover:from-blue-700 hover:to-green-700 text-white font-semibold shadow-lg hover:shadow-xl transition-all duration-300 transform hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100"
                     >
                       {isSubmitting ? (
@@ -600,6 +637,16 @@ const FixBug = () => {
             </div>
           </div>
         </div>
+      <DuplicateOfDialog
+        open={duplicateOpen}
+        onOpenChange={setDuplicateOpen}
+        projectId={String(bug?.project_id || "")}
+        excludeBugId={String(bugId || "")}
+        onConfirm={async (original) => {
+          setDuplicateOf(original);
+          setStatus("duplicate");
+        }}
+      />
     </div>
   );
 };
