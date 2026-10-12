@@ -1,8 +1,9 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useSearchParams, Navigate } from "react-router-dom";
-import { ENV } from "@/lib/env";
-import { User } from "@/types";
 import { apiClient } from "@/lib/axios";
+import { useAuth } from "@/context/AuthContext";
+import { getEffectiveRole } from "@/lib/utils";
+import { User } from "@/types";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -22,15 +23,6 @@ import {
 } from "lucide-react";
 import { format, formatDistanceToNow } from "date-fns";
 
-interface DashboardToken {
-  user_id: string;
-  username: string;
-  role: string;
-  admin_id: string;
-  purpose: string;
-  exp: number;
-}
-
 interface UserStats {
   total_projects: number;
   total_bugs: number;
@@ -47,8 +39,19 @@ interface ApiResponse<T> {
   [key: string]: any;
 }
 
+/** Admin "view as user" links carry purpose dashboard_access. A normal login JWT does not. */
+function isDashboardAccessToken(token: string): boolean {
+  try {
+    const payload = JSON.parse(atob(token.split(".")[1]));
+    return payload?.purpose === "dashboard_access";
+  } catch {
+    return false;
+  }
+}
+
 export default function Dashboard() {
   const [searchParams] = useSearchParams();
+  const { isAuthenticated, currentUser, isLoading: authLoading, storeIntendedDestination } = useAuth();
   const [token, setToken] = useState<string | null>(null);
   const [user, setUser] = useState<User | null>(null);
   const [stats, setStats] = useState<UserStats | null>(null);
@@ -56,22 +59,27 @@ export default function Dashboard() {
   const [error, setError] = useState<string | null>(null);
   const [tokenExpired, setTokenExpired] = useState(false);
 
-  useEffect(() => {
-    const tokenParam = searchParams.get('token');
-    if (!tokenParam) {
-      // If no token in URL, maybe we are already logged in via session
-      const sessionToken = sessionStorage.getItem('token');
-      if (!sessionToken) {
-          setError('No access token provided');
-          setIsLoading(false);
-          return;
-      }
-      validateAndDecodeToken(sessionToken);
-    } else {
-        setToken(tokenParam);
-        validateAndDecodeToken(tokenParam);
-    }
+  const impersonationToken = useMemo(() => {
+    const fromUrl = searchParams.get("token");
+    const fromSession = sessionStorage.getItem("token");
+    return [fromUrl, fromSession].find(
+      (value): value is string => Boolean(value && isDashboardAccessToken(value))
+    ) ?? null;
   }, [searchParams]);
+
+  useEffect(() => {
+    if (!impersonationToken) {
+      setIsLoading(false);
+      return;
+    }
+    setToken(impersonationToken);
+    void validateAndDecodeToken(impersonationToken);
+  }, [impersonationToken]);
+
+  useEffect(() => {
+    if (impersonationToken || authLoading || isAuthenticated) return;
+    storeIntendedDestination(`/dashboard${window.location.search}`);
+  }, [impersonationToken, authLoading, isAuthenticated, storeIntendedDestination]);
 
   const validateAndDecodeToken = async (tokenString: string) => {
     try {
@@ -136,6 +144,27 @@ export default function Dashboard() {
       //console.error('Error fetching user stats:', error);
     }
   };
+
+  if (!impersonationToken) {
+    if (authLoading) {
+      return (
+        <div className="container mx-auto px-4 py-8 max-w-4xl">
+          <div className="space-y-6">
+            <div className="text-center">
+              <Skeleton className="h-8 w-64 mx-auto mb-2" />
+              <Skeleton className="h-4 w-32 mx-auto" />
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    if (isAuthenticated && currentUser) {
+      return <Navigate to={`/${getEffectiveRole(currentUser)}/dashboard`} replace />;
+    }
+
+    return <Navigate to="/login" replace />;
+  }
 
   if (isLoading) {
     return (

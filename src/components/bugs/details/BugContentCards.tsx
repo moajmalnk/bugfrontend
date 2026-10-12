@@ -1,4 +1,5 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
@@ -32,6 +33,9 @@ import { WhatsAppVoiceMessage } from "@/components/voice/WhatsAppVoiceMessage";
 import { cn } from "@/lib/utils";
 import { formatLocalDate } from "@/lib/utils/dateUtils";
 import { bugService } from "@/services/bugService";
+
+/** Keeps the open attachment preview in the address bar without dropping from/projectId. */
+const ATTACHMENT_QUERY = "attachment";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   ArrowRightLeft,
@@ -59,6 +63,9 @@ type BugAttachmentItem = NonNullable<Bug["attachments"]>[number];
 
 export function BugContentCards({ bug, onBugUpdated }: BugContentCardsProps) {
   const queryClient = useQueryClient();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const previewPushedRef = useRef(false);
+  const previewClosingRef = useRef(false);
   const [activeVoiceId, setActiveVoiceId] = useState<string | null>(null);
   const [voiceNoteDurations, setVoiceNoteDurations] = useState<{
     [key: string]: number;
@@ -223,12 +230,43 @@ export function BugContentCards({ bug, onBugUpdated }: BugContentCardsProps) {
     file_path: string;
     file_type?: string;
   }) => {
-    setAttachmentPreview({
-      url: buildDownloadUrl(attachment.file_path, attachment.file_name),
-      file_name: attachment.file_name,
-      file_path: attachment.file_path,
-      id: attachment.id,
-    });
+    if (!attachment.id) {
+      setAttachmentPreview({
+        url: buildDownloadUrl(attachment.file_path, attachment.file_name),
+        file_name: attachment.file_name,
+        file_path: attachment.file_path,
+      });
+      return;
+    }
+    if (searchParams.get(ATTACHMENT_QUERY) === attachment.id) return;
+    const next = new URLSearchParams(searchParams);
+    next.set(ATTACHMENT_QUERY, attachment.id);
+    previewPushedRef.current = true;
+    setSearchParams(next);
+  };
+
+  const closeAttachmentPreview = () => {
+    if (previewClosingRef.current) return;
+    previewClosingRef.current = true;
+    if (previewPushedRef.current) {
+      previewPushedRef.current = false;
+      window.history.back();
+      return;
+    }
+    if (!searchParams.get(ATTACHMENT_QUERY)) {
+      previewClosingRef.current = false;
+      setAttachmentPreview(null);
+      return;
+    }
+    const next = new URLSearchParams(searchParams);
+    next.delete(ATTACHMENT_QUERY);
+    setSearchParams(next, { replace: true });
+  };
+
+  const attachmentPreviewPageUrl = (attachmentId?: string) => {
+    const url = new URL(window.location.href);
+    if (attachmentId) url.searchParams.set(ATTACHMENT_QUERY, attachmentId);
+    return url.toString();
   };
 
   const isVideoAttachment = (attachment: {
@@ -268,6 +306,55 @@ export function BugContentCards({ bug, onBugUpdated }: BugContentCardsProps) {
 
   const finalAttachments =
     allAttachments.length > 0 ? allAttachments : fallbackAttachments;
+
+  const attachmentQueryId = searchParams.get(ATTACHMENT_QUERY);
+  const attachmentLookupKey = finalAttachments
+    .map((item) => `${item.id}:${item.file_path}`)
+    .join("|");
+  useEffect(() => {
+    if (!attachmentQueryId) {
+      previewPushedRef.current = false;
+      previewClosingRef.current = false;
+      setAttachmentPreview((current) => (current ? null : current));
+      return;
+    }
+    const found = finalAttachments.find((item) => item.id === attachmentQueryId);
+    if (!found) {
+      if (Array.isArray(bug.attachments)) {
+        setSearchParams(
+          (prev) => {
+            if (!prev.get(ATTACHMENT_QUERY)) return prev;
+            const next = new URLSearchParams(prev);
+            next.delete(ATTACHMENT_QUERY);
+            return next;
+          },
+          { replace: true }
+        );
+      }
+      return;
+    }
+    setAttachmentPreview((current) => {
+      if (
+        current?.id === found.id &&
+        current.file_path === found.file_path &&
+        current.file_name === found.file_name
+      ) {
+        return current;
+      }
+      return {
+        url: buildDownloadUrl(found.file_path, found.file_name),
+        file_name: found.file_name,
+        file_path: found.file_path,
+        id: found.id,
+      };
+    });
+  }, [
+    attachmentQueryId,
+    attachmentLookupKey,
+    bug.attachments,
+    buildDownloadUrl,
+    setSearchParams,
+  ]);
 
   // Separate by type from final attachments list
   const screenshots = finalAttachments.filter(
@@ -691,7 +778,7 @@ export function BugContentCards({ bug, onBugUpdated }: BugContentCardsProps) {
       <Dialog
         open={!!attachmentPreview}
         onOpenChange={(open) => {
-          if (!open) setAttachmentPreview(null);
+          if (!open) closeAttachmentPreview();
         }}
       >
         <DialogContent
@@ -709,7 +796,7 @@ export function BugContentCards({ bug, onBugUpdated }: BugContentCardsProps) {
                   variant="ghost"
                   size="sm"
                   className="absolute right-2 top-2 h-8 w-8 p-0 rounded-full hover:bg-muted"
-                  onClick={() => setAttachmentPreview(null)}
+                  onClick={closeAttachmentPreview}
                   aria-label="Close preview"
                 >
                   <X className="h-4 w-4" />
@@ -737,7 +824,7 @@ export function BugContentCards({ bug, onBugUpdated }: BugContentCardsProps) {
                     className="rounded-xl"
                     onClick={() =>
                       window.open(
-                        attachmentPreview.url,
+                        attachmentPreviewPageUrl(attachmentPreview.id),
                         "_blank",
                         "noopener,noreferrer"
                       )

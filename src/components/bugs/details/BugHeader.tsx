@@ -4,6 +4,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { MalayalamDateToggle, MalayalamTextToggle } from "@/components/ui/DateDisplay";
 import { CopyTextButton } from "@/components/ui/CopyTextButton";
+import { CopyBugForCursorButton } from "@/components/bugs/details/CopyBugForCursorButton";
 import { Skeleton } from "@/components/ui/skeleton";
 import { toast } from "@/components/ui/use-toast";
 import { useAuth } from "@/context/AuthContext";
@@ -426,6 +427,7 @@ export const BugHeader = ({
               size="md"
               className="h-9 w-9 shrink-0"
             />
+            <CopyBugForCursorButton bug={bug} currentUser={currentUser} />
 
             {canEditActions && (
               <Button

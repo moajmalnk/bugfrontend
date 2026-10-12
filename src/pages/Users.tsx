@@ -170,9 +170,92 @@ const UserCardSkeleton = () => (
     </div>
 
     {/* Action Button Skeleton */}
-    <Skeleton className="h-10 w-full rounded-lg" />
+    <Skeleton className="h-10 w-full rounded-xl" />
   </div>
 );
+
+/**
+ * Why: Permission checks on a slow network used to replace the whole main
+ * region with "Loading..." and pull the footer up. This matches the Users
+ * header, tabs, search, and list so the page keeps its shape.
+ */
+function UsersPageSkeleton() {
+  return (
+    <div
+      className="min-h-[calc(100dvh-10rem)] w-full min-w-0 space-y-6 sm:space-y-8"
+      aria-busy="true"
+      aria-live="polite"
+    >
+      <div className="rounded-2xl border border-gray-200/50 bg-white/80 p-6 dark:border-gray-700/50 dark:bg-gray-900/80 sm:p-8">
+        <div className="flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between">
+          <div className="flex items-center gap-3">
+            <Skeleton className="h-10 w-10 rounded-xl" />
+            <div className="space-y-2">
+              <Skeleton className="h-8 w-36 sm:h-10 sm:w-48" />
+              <Skeleton className="h-4 w-56 max-w-full" />
+            </div>
+          </div>
+          <div className="flex items-center gap-4">
+            <Skeleton className="h-11 w-28 rounded-xl" />
+            <Skeleton className="h-14 w-24 rounded-xl" />
+          </div>
+        </div>
+      </div>
+
+      <div className="flex gap-2 overflow-hidden">
+        {Array.from({ length: 6 }, (_, index) => (
+          <Skeleton key={index} className="h-10 w-24 shrink-0 rounded-xl" />
+        ))}
+      </div>
+
+      <div className="rounded-xl border border-gray-200/40 bg-white/80 p-4 dark:border-gray-700/40 dark:bg-gray-900/80 sm:p-6">
+        <Skeleton className="mb-4 h-5 w-32" />
+        <Skeleton className="h-11 w-full rounded-xl" />
+      </div>
+
+      <div className="overflow-hidden rounded-2xl border border-gray-200/50 bg-white/80 dark:border-gray-700/50 dark:bg-gray-900/80">
+        <div className="hidden 2xl:block">
+          <div className="grid grid-cols-5 gap-4 border-b border-gray-200/60 px-6 py-5 dark:border-gray-700/60">
+            {Array.from({ length: 5 }, (_, index) => (
+              <Skeleton key={index} className="h-4 w-20" />
+            ))}
+          </div>
+          <div className="flex flex-col">
+            {Array.from({ length: 6 }, (_, index) => (
+              <div
+                key={index}
+                className="grid grid-cols-5 items-center gap-4 border-b border-gray-100/50 px-6 py-5 last:border-b-0 dark:border-gray-800/50"
+              >
+                <div className="flex items-center gap-3">
+                  <Skeleton className="h-10 w-10 rounded-full" />
+                  <div className="space-y-2">
+                    <Skeleton className="h-4 w-24" />
+                    <Skeleton className="h-3 w-16" />
+                  </div>
+                </div>
+                <div className="space-y-2">
+                  <Skeleton className="h-4 w-40" />
+                  <Skeleton className="h-3 w-28" />
+                </div>
+                <Skeleton className="h-6 w-16 rounded-full" />
+                <div className="flex gap-2">
+                  <Skeleton className="h-6 w-12 rounded-md" />
+                  <Skeleton className="h-6 w-12 rounded-md" />
+                </div>
+                <Skeleton className="ml-auto h-9 w-20 rounded-xl" />
+              </div>
+            ))}
+          </div>
+        </div>
+        <div className="grid grid-cols-1 gap-4 p-4 sm:grid-cols-2 sm:gap-6 sm:p-6 xl:grid-cols-3 2xl:hidden">
+          {Array.from({ length: 6 }, (_, index) => (
+            <UserCardSkeleton key={index} />
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
 
 interface NewUser {
   name: string;
@@ -785,14 +868,7 @@ const Users = () => {
 
   // USERS_VIEW permission (admin ENUM still has SUPER_ADMIN / all perms)
   if (isLoadingPermissions) {
-    return (
-      <div className="flex flex-col items-center justify-center h-full">
-        <h1 className="text-2xl font-bold mb-4">Loading...</h1>
-        <p className="text-muted-foreground">
-          Verifying your access permissions...
-        </p>
-      </div>
-    );
+    return <UsersPageSkeleton />;
   }
 
   if (!hasPermission("USERS_VIEW") && effectiveRole !== "admin") {
