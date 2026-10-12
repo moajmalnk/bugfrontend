@@ -13,7 +13,7 @@
       "destination": "/privacy-policy.html"
     },
     {
-      "source": "/((?!assets/|service-worker\\.js|firebase-messaging-sw\\.js|manifest\\.json|version\\.json|robots\\.txt|sitemap\\.xml|llms\\.txt|favicon\\.ico|browserconfig\\.xml|apple-touch-icon\\.png|icon-.*\\.png|share-target|api/|br-api/).*)",
+      "source": "/((?!assets/|service-worker\\.js|firebase-messaging-sw\\.js|manifest\\.json|version\\.json|robots\\.txt|sitemap\\.xml|llms\\.txt|favicon\\.ico|browserconfig\\.xml|apple-touch-icon\\.png|icon-.*\\.png|og-image\\.png|share-target|api/|br-api/).*)",
       "destination": "/index.html"
     }
   ],

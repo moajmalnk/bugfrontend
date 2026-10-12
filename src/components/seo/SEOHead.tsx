@@ -23,7 +23,7 @@ const defaultSEO = {
   title: 'BugRicer - Advanced Bug Tracking & Project Management Platform',
   description: 'Professional bug tracking and project management platform for development teams. Streamline bug reporting, project collaboration, and team communication with advanced features and real-time notifications.',
   keywords: 'bug tracking, project management, software development, team collaboration, bug reporting, issue tracking, development tools, CODO AI, BugRicer',
-  image: 'https://bugbackend.bugricer.com/uploads/dashboard.png',
+  image: 'https://bugs.bugricer.com/og-image.png',
   url: 'https://bugs.bugricer.com',
   type: 'website' as const,
   author: 'CODO AI Innovations',
