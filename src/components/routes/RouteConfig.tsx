@@ -60,6 +60,7 @@ const Login = lazy(() => import("@/pages/Login"));
 const ResetPassword = lazy(() => import("@/pages/ResetPassword"));
 const NotFound = lazy(() => import("@/pages/NotFound"));
 const PrivacyPolicy = lazy(() => import("@/pages/PrivacyPolicy"));
+const PublicAttachmentPage = lazy(() => import("@/pages/PublicAttachmentPage"));
 const TermsOfUse = lazy(() => import("@/pages/TermsOfUse"));
 
 // New layout for role-based routes
@@ -326,6 +327,14 @@ const RouteConfig = () => {
         element={
           <Suspense fallback={<SkeletonFallback />}>
             <ResetPassword />
+          </Suspense>
+        }
+      />
+      <Route
+        path="/share/:token"
+        element={
+          <Suspense fallback={<SkeletonFallback />}>
+            <PublicAttachmentPage />
           </Suspense>
         }
       />

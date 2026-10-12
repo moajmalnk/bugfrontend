@@ -27,6 +27,7 @@ import { useMalayalamToggle } from "@/hooks/useMalayalamToggle";
 import { Bug } from "@/types";
 import { ENV } from "@/lib/env";
 import { downloadAttachmentFile } from "@/lib/attachmentUtils";
+import { AttachmentShareButton } from "@/components/bugs/details/AttachmentShareButton";
 import { WhatsAppVoiceMessage } from "@/components/voice/WhatsAppVoiceMessage";
 import { cn } from "@/lib/utils";
 import { formatLocalDate } from "@/lib/utils/dateUtils";
@@ -94,6 +95,7 @@ export function BugContentCards({ bug, onBugUpdated }: BugContentCardsProps) {
     url: string;
     file_name: string;
     file_path: string;
+    id?: string;
   } | null>(null);
 
   const {
@@ -216,6 +218,7 @@ export function BugContentCards({ bug, onBugUpdated }: BugContentCardsProps) {
   };
 
   const openAttachmentPreview = (attachment: {
+    id?: string;
     file_name: string;
     file_path: string;
     file_type?: string;
@@ -224,6 +227,7 @@ export function BugContentCards({ bug, onBugUpdated }: BugContentCardsProps) {
       url: buildDownloadUrl(attachment.file_path, attachment.file_name),
       file_name: attachment.file_name,
       file_path: attachment.file_path,
+      id: attachment.id,
     });
   };
 
@@ -447,6 +451,9 @@ export function BugContentCards({ bug, onBugUpdated }: BugContentCardsProps) {
               <FileImage className="w-5 h-5" />
               Screenshots ({screenshots.length})
             </CardTitle>
+            <p className="text-xs text-muted-foreground">
+              Share a public link, then paste it in Cursor to refer to the image.
+            </p>
           </CardHeader>
           <CardContent className="relative">
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -456,7 +463,16 @@ export function BugContentCards({ bug, onBugUpdated }: BugContentCardsProps) {
                   className="relative group cursor-pointer"
                   onClick={() => openScreenshotViewer(index)}
                 >
-                  <div className="aspect-[9/16] bg-muted rounded-lg overflow-hidden border hover:border-primary/50 transition-colors">
+                  <div className="absolute top-2 right-2 z-10">
+                    <AttachmentShareButton
+                      attachmentId={attachment.id}
+                      fileName={attachment.file_name}
+                      bugTitle={bug.title}
+                      stopParentClick
+                      className="h-8 w-8 bg-background/90 p-0 shadow-sm hover:bg-background"
+                    />
+                  </div>
+                  <div className="aspect-[9/16] bg-muted rounded-xl overflow-hidden border hover:border-primary/50 transition-colors">
                     <img
                       src={buildImageUrl(attachment.file_path)}
                       alt={`Screenshot ${index + 1}`}
@@ -518,6 +534,9 @@ export function BugContentCards({ bug, onBugUpdated }: BugContentCardsProps) {
               <Volume2 className="w-5 h-5" />
               Voice Notes ({voiceNotes.length})
             </CardTitle>
+            <p className="text-xs text-muted-foreground">
+              Share a public link, then paste it in Cursor to refer to the recording.
+            </p>
           </CardHeader>
           <CardContent className="relative min-w-0 p-4 sm:p-6">
             <div className="flex min-w-0 flex-col gap-3">
@@ -539,6 +558,14 @@ export function BugContentCards({ bug, onBugUpdated }: BugContentCardsProps) {
                     key={attachment.id}
                     className="min-w-0 overflow-hidden rounded-xl border border-purple-100 dark:border-purple-900/50 bg-purple-50/40 dark:bg-purple-900/20 p-2 sm:p-3"
                   >
+                    <div className="mb-1 flex justify-end">
+                      <AttachmentShareButton
+                        attachmentId={attachment.id}
+                        fileName={attachment.file_name || "voice-note.webm"}
+                        bugTitle={bug.title}
+                        label="Share"
+                      />
+                    </div>
                     <WhatsAppVoiceMessage
                       id={voiceId}
                       audioSource={audioUrl}
@@ -598,6 +625,9 @@ export function BugContentCards({ bug, onBugUpdated }: BugContentCardsProps) {
               <File className="w-5 h-5" />
               Attachments ({otherFiles.length})
             </CardTitle>
+            <p className="text-xs text-muted-foreground">
+              Share a public link anyone can preview. Paste the Cursor note in chat instead of downloading the video into the project.
+            </p>
           </CardHeader>
           <CardContent className="relative">
             <div className="space-y-2">
@@ -606,7 +636,7 @@ export function BugContentCards({ bug, onBugUpdated }: BugContentCardsProps) {
                 return (
                 <div
                   key={attachment.id}
-                  className="flex items-center justify-between p-3 border rounded-lg hover:bg-muted/50 transition-colors"
+                  className="flex items-center justify-between p-3 border rounded-xl hover:bg-muted/50 transition-colors"
                 >
                   <div className="flex items-center gap-3 min-w-0">
                     {isVideo ? (
@@ -622,12 +652,18 @@ export function BugContentCards({ bug, onBugUpdated }: BugContentCardsProps) {
                     </div>
                   </div>
                   <div className="flex items-center gap-1 flex-shrink-0">
+                    <AttachmentShareButton
+                      attachmentId={attachment.id}
+                      fileName={attachment.file_name}
+                      bugTitle={bug.title}
+                      label="Share"
+                    />
                     <Button
                       variant="ghost"
                       size="sm"
                       onClick={() => openAttachmentPreview(attachment)}
                       title="View attachment"
-                      className="hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-950/30"
+                      className="rounded-xl hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-950/30"
                     >
                       <Eye className="w-4 h-4" />
                       <span className="sr-only">View</span>
@@ -637,6 +673,7 @@ export function BugContentCards({ bug, onBugUpdated }: BugContentCardsProps) {
                       size="sm"
                       onClick={() => downloadAttachment(attachment)}
                       title="Download attachment"
+                      className="rounded-xl"
                     >
                       <Download className="w-4 h-4" />
                       <span className="sr-only">Download</span>
@@ -685,24 +722,35 @@ export function BugContentCards({ bug, onBugUpdated }: BugContentCardsProps) {
                 />
               </div>
               <div className="px-4 py-3 border-t shrink-0 flex flex-wrap items-center justify-between gap-2">
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  onClick={() =>
-                    window.open(
-                      attachmentPreview.url,
-                      "_blank",
-                      "noopener,noreferrer"
-                    )
-                  }
-                >
-                  Open in new tab
-                </Button>
+                <div className="flex flex-wrap items-center gap-2">
+                  <AttachmentShareButton
+                    attachmentId={attachmentPreview.id}
+                    fileName={attachmentPreview.file_name}
+                    bugTitle={bug.title}
+                    label="Share"
+                    className="border border-border"
+                  />
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="rounded-xl"
+                    onClick={() =>
+                      window.open(
+                        attachmentPreview.url,
+                        "_blank",
+                        "noopener,noreferrer"
+                      )
+                    }
+                  >
+                    Open in new tab
+                  </Button>
+                </div>
                 <Button
                   type="button"
                   variant="secondary"
                   size="sm"
+                  className="rounded-xl"
                   onClick={() =>
                     downloadAttachment({
                       file_path: attachmentPreview.file_path,

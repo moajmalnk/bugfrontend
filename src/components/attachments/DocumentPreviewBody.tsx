@@ -3,6 +3,60 @@ import { ExternalLink, FileText, Loader2 } from 'lucide-react';
 import { documentPreviewKind, fetchAttachmentBlob } from '@/lib/attachmentUtils';
 import { Button } from '@/components/ui/button';
 
+function videoMime(fileName: string): string {
+  const ext = fileName.split('.').pop()?.toLowerCase() ?? '';
+  if (ext === 'webm') return 'video/webm';
+  if (ext === 'mov') return 'video/quicktime';
+  if (ext === 'mkv') return 'video/x-matroska';
+  if (ext === 'avi') return 'video/x-msvideo';
+  return 'video/mp4';
+}
+
+/**
+ * Why: The preview used to sit on a black 0:00 frame until the whole file
+ * arrived. Metadata preload plus one native play button lets anyone start
+ * the clip as soon as the first piece is ready.
+ */
+function FastVideoPreview({ url, fileName }: { url: string; fileName: string }) {
+  const [ready, setReady] = useState(false);
+  const [failed, setFailed] = useState(false);
+
+  useEffect(() => {
+    setReady(false);
+    setFailed(false);
+    const timer = window.setTimeout(() => setReady(true), 8000);
+    return () => window.clearTimeout(timer);
+  }, [url]);
+
+  if (failed) {
+    return (
+      <p className="px-4 py-10 text-center text-sm text-muted-foreground">
+        This video could not play here. Use Open in new tab or Download.
+      </p>
+    );
+  }
+
+  return (
+    <div className="flex flex-col gap-3 p-4">
+      {!ready && (
+        <p className="text-center text-sm text-muted-foreground">Loading video…</p>
+      )}
+      <video
+        key={url}
+        controls
+        playsInline
+        preload="metadata"
+        aria-label={fileName}
+        className="aspect-video w-full rounded-2xl bg-black object-contain"
+        onLoadedMetadata={() => setReady(true)}
+        onError={() => setFailed(true)}
+      >
+        <source src={url} type={videoMime(fileName)} />
+      </video>
+    </div>
+  );
+}
+
 function DocumentTextPreview({ url }: { url: string }) {
   const [text, setText] = useState<string | null>(null);
   const [failed, setFailed] = useState(false);
@@ -155,15 +209,7 @@ export function DocumentPreviewBody({ url, fileName }: { url: string; fileName: 
   }
 
   if (kind === 'video') {
-    return (
-      <div className="flex justify-center p-3 sm:p-6">
-        <video
-          src={url}
-          controls
-          className="max-h-[calc(100vh-12rem)] max-w-full rounded-md bg-black"
-        />
-      </div>
-    );
+    return <FastVideoPreview url={url} fileName={fileName} />;
   }
 
   if (kind === 'audio') {
