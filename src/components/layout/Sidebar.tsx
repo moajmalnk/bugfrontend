@@ -24,7 +24,6 @@ import {
   ListTodo,
   BarChart3,
   Activity,
-  Mic,
   Calendar,
   CalendarDays,
   Database,
@@ -34,18 +33,22 @@ import {
   ShieldCheck,
   Search,
   LifeBuoy,
+  Newspaper,
   Signal,
   PlaneTakeoff,
   LayoutDashboard,
   Clapperboard,
   Trash2,
   CalendarClock,
+  CalendarRange,
+  ChevronDown,
   ClipboardList,
   Banknote,
   UserRoundSearch,
   Palette,
   Server,
 } from "lucide-react";
+import { useEffect, useState, type ReactNode } from "react";
 import { Link, useLocation } from "react-router-dom";
 import { NotificationPopover } from "@/components/notifications/NotificationPopover";
 import { ImpersonateIndicator } from "@/components/ui/ImpersonateBanner";
@@ -71,6 +74,134 @@ function formatNavCount(count: number | undefined): string | undefined {
 interface SidebarProps {
   className?: string;
   closeSidebar?: () => void;
+}
+
+type SidebarAdminItem = {
+  id: string;
+  to: string;
+  icon: JSX.Element;
+  label: string;
+  badge?: string;
+  badgeTone?: "default" | "alert";
+  badgeTitle?: string;
+};
+
+type SidebarAdminGroup = {
+  id: string;
+  label: string;
+  items: SidebarAdminItem[];
+};
+
+/** UI preference only — which admin groups are expanded. Not business data. */
+const ADMIN_GROUPS_KEY = "bugricer.sidebar.admin-groups";
+
+function readAdminGroupState(): Record<string, boolean> {
+  try {
+    const raw = localStorage.getItem(ADMIN_GROUPS_KEY);
+    if (!raw) return {};
+    const parsed: unknown = JSON.parse(raw);
+    if (!parsed || typeof parsed !== "object") return {};
+    return parsed as Record<string, boolean>;
+  } catch {
+    return {};
+  }
+}
+
+function persistAdminGroupState(state: Record<string, boolean>) {
+  try {
+    localStorage.setItem(ADMIN_GROUPS_KEY, JSON.stringify(state));
+  } catch {
+    /* preference only */
+  }
+}
+
+/**
+ * Why: After Help & Support the old list was one long Administration dump.
+ * Grouping by job (people, workforce, insights, system) lets each role scan
+ * only the pages they can open, and collapsing a group keeps the sidebar short.
+ */
+function SidebarAdminNav({
+  groups,
+  activeGroupId,
+  renderItem,
+}: {
+  groups: SidebarAdminGroup[];
+  activeGroupId: string;
+  renderItem: (item: SidebarAdminItem) => ReactNode;
+}) {
+  const [open, setOpen] = useState<Record<string, boolean>>(readAdminGroupState);
+
+  useEffect(() => {
+    if (!activeGroupId) return;
+    setOpen((prev) => {
+      if (prev[activeGroupId] !== false) return prev;
+      const next = { ...prev, [activeGroupId]: true };
+      persistAdminGroupState(next);
+      return next;
+    });
+  }, [activeGroupId]);
+
+  const toggleGroup = (id: string) => {
+    setOpen((prev) => {
+      const next = { ...prev, [id]: prev[id] === false };
+      persistAdminGroupState(next);
+      return next;
+    });
+  };
+
+  if (groups.length === 0) return null;
+
+  return (
+    <div>
+      <Separator className="mb-3" />
+      <div className="flex flex-col gap-4">
+        {groups.map((group) => {
+          const expanded = open[group.id] !== false;
+          const needsAttention = group.items.some(
+            (item) => item.badgeTone === "alert" && item.badge
+          );
+
+          return (
+            <div key={group.id} className="flex flex-col gap-1">
+              <button
+                type="button"
+                onClick={() => toggleGroup(group.id)}
+                aria-expanded={expanded}
+                className="flex h-10 min-h-10 w-full items-center justify-between gap-2 rounded-xl px-3 text-left transition-colors hover:bg-accent/60"
+              >
+                <span className="flex min-w-0 items-center gap-2">
+                  <span className="truncate text-[11px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
+                    {group.label}
+                  </span>
+                  {needsAttention ? (
+                    <span
+                      className="h-1.5 w-1.5 shrink-0 rounded-full bg-amber-500"
+                      aria-hidden
+                    />
+                  ) : null}
+                </span>
+                <ChevronDown
+                  className={cn(
+                    "h-3.5 w-3.5 shrink-0 text-muted-foreground transition-transform duration-200",
+                    expanded && "rotate-180"
+                  )}
+                />
+              </button>
+              {expanded ? (
+                <div className="flex flex-col gap-1">
+                  {group.items.map((item) => (
+                    <div key={item.id} className="min-w-0">
+                      {renderItem(item)}
+                    </div>
+                  ))}
+                </div>
+              ) : null}
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
 }
 
 const defaultAvatar = "/logo.png";
@@ -193,6 +324,182 @@ export const Sidebar = ({ className, closeSidebar }: SidebarProps) => {
       </Link>
     );
   };
+
+  const visible = (show: boolean, item: SidebarAdminItem): SidebarAdminItem[] =>
+    show ? [item] : [];
+
+  const messagesInMain = showBugMessageInMainNav(role) || can("MESSAGING_VIEW");
+  // Why: WhatsApp bulk tools are admin-only — hide from the developer portal.
+  const showWhatsApp = can("MESSAGING_CREATE") && role === "admin";
+  const hasBackupManage = can("BACKUP_MANAGE") || can("SETTINGS_EDIT");
+
+  const adminGroups: SidebarAdminGroup[] = [
+    {
+      id: "people",
+      label: "People",
+      items: [
+        ...visible(can("USERS_VIEW"), {
+          id: "users",
+          to: "/users",
+          icon: <Users className="h-5 w-5" />,
+          label: "Users",
+          badge: formatNavCount(navCounts.users),
+          badgeTitle: `${navCounts.users} user${navCounts.users === 1 ? "" : "s"}`,
+        }),
+        ...visible(can("CLIENTS_VIEW"), {
+          id: "clients",
+          to: "/clients",
+          icon: <Building2 className="h-5 w-5" />,
+          label: "Clients",
+          badge: formatNavCount(navCounts.clients),
+          badgeTitle: `${navCounts.clients} client${navCounts.clients === 1 ? "" : "s"}`,
+        }),
+        ...visible(can("RECRUITMENT_VIEW"), {
+          id: "recruitment",
+          to: "/bug-recruitment",
+          icon: <UserRoundSearch className="h-5 w-5" />,
+          label: "BugRecruitment",
+        }),
+        ...visible(can("PERFORMANCE_REVIEWS_MANAGE"), {
+          id: "reviews",
+          to: "/performance-reviews",
+          icon: <ClipboardList className="h-5 w-5" />,
+          label: "Performance Reviews",
+          badge: formatNavCount(navCounts.reviews),
+          badgeTitle: `${navCounts.reviews} review${navCounts.reviews === 1 ? "" : "s"}`,
+        }),
+      ],
+    },
+    {
+      id: "workforce",
+      label: "Workforce",
+      items: [
+        ...visible(can("OVERTIME_MANAGE"), {
+          id: "ot",
+          to: "/overtime-requests",
+          icon: <Timer className="h-5 w-5" />,
+          label: "OT requests",
+          badge: formatNavCount(navCounts.ot),
+          badgeTitle: `${navCounts.ot} pending OT request${navCounts.ot === 1 ? "" : "s"}`,
+        }),
+        ...visible(can("LEAVE_MANAGE"), {
+          id: "leave",
+          to: "/leave-requests",
+          icon: <PlaneTakeoff className="h-5 w-5" />,
+          label: "Leave requests",
+          badge: formatNavCount(navCounts.leave),
+          badgeTitle: `${navCounts.leave} pending leave request${navCounts.leave === 1 ? "" : "s"}`,
+        }),
+        ...visible(can("LEAVE_MANAGE"), {
+          id: "official-leave",
+          to: "/official-leave",
+          icon: <CalendarRange className="h-5 w-5" />,
+          label: "Official Leave",
+        }),
+        ...visible(can("ATTENDANCE_MANAGE"), {
+          id: "attendance",
+          to: "/attendance-exceptions",
+          icon: <CalendarClock className="h-5 w-5" />,
+          label: "Attendance exceptions",
+          badge: formatNavCount(navCounts.attendance),
+          badgeTitle: `${navCounts.attendance} pending WFH request${navCounts.attendance === 1 ? "" : "s"}`,
+        }),
+      ],
+    },
+    {
+      id: "insights",
+      label: "Insights",
+      items: [
+        ...visible(can("FEEDBACK_VIEW"), {
+          id: "feedbacks",
+          to: "/feedback-stats",
+          icon: <BarChart3 className="h-5 w-5" />,
+          label: "Feedbacks",
+          badge: formatNavCount(navCounts.feedbacks),
+          badgeTitle: `${navCounts.feedbacks} feedback${navCounts.feedbacks === 1 ? "" : "s"}`,
+        }),
+        ...visible(can("ACTIVITY_VIEW"), {
+          id: "activities",
+          to: "/activity",
+          icon: <Activity className="h-5 w-5" />,
+          label: "Activities",
+          badge: formatNavCount(navCounts.activities),
+          badgeTitle: `${navCounts.activities} activit${navCounts.activities === 1 ? "y" : "ies"}`,
+        }),
+        ...visible(can("PUSH_COVERAGE_VIEW"), {
+          id: "push",
+          to: "/push-coverage",
+          icon: <Signal className="h-5 w-5" />,
+          label: "Push Coverage",
+          badge: formatNavCount(navCounts.push),
+          badgeTitle: `${navCounts.push} user${navCounts.push === 1 ? "" : "s"}`,
+        }),
+        ...visible(can("SHORTS_MANAGE"), {
+          id: "shorts",
+          to: "/shorts",
+          icon: <Clapperboard className="h-5 w-5" />,
+          label: "Shorts",
+          badge: formatNavCount(navCounts.shorts),
+          badgeTitle: `${navCounts.shorts} short${navCounts.shorts === 1 ? "" : "s"}`,
+        }),
+        ...visible(can("MESSAGING_VIEW") && !messagesInMain, {
+          id: "messages",
+          to: "/messages",
+          icon: <MessageSquare className="h-5 w-5" />,
+          label: "BugMessage",
+          badge: formatNavCount(navCounts.messages),
+          badgeTitle: `${navCounts.messages} chat${navCounts.messages === 1 ? "" : "s"}`,
+        }),
+        ...visible(showWhatsApp, {
+          id: "whatsapp",
+          to: "/whatsapp-messages",
+          icon: <MessageCircle className="h-5 w-5" />,
+          label: "WhatsApp",
+          badge: formatNavCount(navCounts.whatsapp),
+          badgeTitle: `${navCounts.whatsapp} user${navCounts.whatsapp === 1 ? "" : "s"} with a phone number`,
+        }),
+      ],
+    },
+    {
+      id: "system",
+      label: "System",
+      items: [
+        ...visible(can("ASSETS_VIEW"), {
+          id: "assets",
+          to: "/bugassets",
+          icon: <Server className="h-5 w-5" />,
+          label: "BugAssets",
+          badge: formatNavCount(navCounts.assets),
+          badgeTone: navCounts.assets > 0 ? "alert" : "default",
+          badgeTitle: `${navCounts.assets} renewal${navCounts.assets === 1 ? "" : "s"} within 30 days`,
+        }),
+        ...visible(can("SETTINGS_EDIT"), {
+          id: "settings",
+          to: "/settings",
+          icon: <Settings className="h-5 w-5" />,
+          label: "Settings",
+          badge: formatNavCount(navCounts.settings),
+          badgeTitle: `${navCounts.settings} setting${navCounts.settings === 1 ? "" : "s"}`,
+        }),
+        ...visible(hasBackupManage, {
+          id: "backup",
+          to: "/bugbackup",
+          icon: <Database className="h-5 w-5" />,
+          label: "BugBackup",
+          badge: formatNavCount(navCounts.backup),
+          badgeTitle: `${navCounts.backup} backup${navCounts.backup === 1 ? "" : "s"}`,
+        }),
+        ...visible(can("RECYCLE_BIN_VIEW"), {
+          id: "recycle",
+          to: "/recycle-bin",
+          icon: <Trash2 className="h-5 w-5" />,
+          label: "Recycle Bin",
+          badge: formatNavCount(navCounts.recycleBin),
+          badgeTitle: `${navCounts.recycleBin} deleted item${navCounts.recycleBin === 1 ? "" : "s"}`,
+        }),
+      ],
+    },
+  ].filter((group) => group.items.length > 0);
 
   return (
     <nav
@@ -496,247 +803,35 @@ export const Sidebar = ({ className, closeSidebar }: SidebarProps) => {
               badge={formatNavCount(helpCount)}
               badgeTitle={`${helpCount} article${helpCount === 1 ? "" : "s"}`}
             />
+            <NavLink
+              to="/whats-new"
+              icon={<Newspaper className="h-5 w-5" />}
+              label="What's New"
+            />
 
           </div>
 
-          {/* Administration Section — any admin-level permission */}
-          {(() => {
-            const hasUsersView = can("USERS_VIEW");
-            const hasClientsView = can("CLIENTS_VIEW");
-            const hasAssetsView = can("ASSETS_VIEW");
-            const hasOvertimeManage = can("OVERTIME_MANAGE");
-            const hasLeaveManage = can("LEAVE_MANAGE");
-            const hasAttendanceManage = can("ATTENDANCE_MANAGE");
-            const hasMessagingView = can("MESSAGING_VIEW");
-            const hasMessagingCreate = can("MESSAGING_CREATE");
-            // Why: WhatsApp bulk tools are admin-only — hide from developer portal.
-            const showWhatsApp = hasMessagingCreate && role === "admin";
-            const hasFeedbackView = can("FEEDBACK_VIEW");
-            const hasPerformanceReviews = can("PERFORMANCE_REVIEWS_MANAGE");
-            const hasActivityView = can("ACTIVITY_VIEW");
-            const hasSettingsEdit = can("SETTINGS_EDIT");
-            const hasBackupManage = can("BACKUP_MANAGE") || hasSettingsEdit;
-            const hasPushCoverage = can("PUSH_COVERAGE_VIEW");
-            const hasShortsManage = can("SHORTS_MANAGE");
-            const hasRecycleBinView = can("RECYCLE_BIN_VIEW");
-            const hasRecruitmentView = can("RECRUITMENT_VIEW");
-            const messagesInMain =
-              showBugMessageInMainNav(role) || can("MESSAGING_VIEW");
-
-            const hasAnyAdminLinks =
-              hasUsersView ||
-              hasClientsView ||
-              hasAssetsView ||
-              hasOvertimeManage ||
-              hasLeaveManage ||
-              hasAttendanceManage ||
-              (hasMessagingView && !messagesInMain) ||
-              showWhatsApp ||
-              hasFeedbackView ||
-              hasPerformanceReviews ||
-              hasActivityView ||
-              hasSettingsEdit ||
-              hasBackupManage ||
-              hasPushCoverage ||
-              hasShortsManage ||
-              hasRecycleBinView ||
-              hasRecruitmentView;
-
-            if (!hasAnyAdminLinks || isCreator) {
-              return null;
-            }
-
-            return (
-              <>
-                <Separator className="my-4" />
-                <div className="space-y-1">
-                  <div className="flex items-center gap-3 px-3 py-2 min-h-10">
-                    <span className="h-5 w-5 shrink-0" aria-hidden />
-                    <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider leading-none">
-                      Administration
-                    </h3>
-                  </div>
-
-                  {hasUsersView && (
-                    <NavLink
-                      to="/users"
-                      icon={<Users className="h-5 w-5" />}
-                      label="Users"
-                      badge={formatNavCount(navCounts.users)}
-                      badgeTitle={`${navCounts.users} user${navCounts.users === 1 ? "" : "s"}`}
-                    />
-                  )}
-
-                  {hasClientsView && (
-                    <NavLink
-                      to="/clients"
-                      icon={<Building2 className="h-5 w-5" />}
-                      label="Clients"
-                      badge={formatNavCount(navCounts.clients)}
-                      badgeTitle={`${navCounts.clients} client${navCounts.clients === 1 ? "" : "s"}`}
-                    />
-                  )}
-
-                  {hasAssetsView && (
-                    <NavLink
-                      to="/bugassets"
-                      icon={<Server className="h-5 w-5" />}
-                      label="BugAssets"
-                      badge={formatNavCount(navCounts.assets)}
-                      badgeTone={navCounts.assets > 0 ? "alert" : "default"}
-                      badgeTitle={`${navCounts.assets} renewal${navCounts.assets === 1 ? "" : "s"} within 30 days`}
-                    />
-                  )}
-
-                  {hasOvertimeManage && (
-                    <NavLink
-                      to="/overtime-requests"
-                      icon={<Timer className="h-5 w-5" />}
-                      label="OT requests"
-                      badge={formatNavCount(navCounts.ot)}
-                      badgeTitle={`${navCounts.ot} pending OT request${navCounts.ot === 1 ? "" : "s"}`}
-                    />
-                  )}
-
-                  {hasLeaveManage && (
-                    <NavLink
-                      to="/leave-requests"
-                      icon={<PlaneTakeoff className="h-5 w-5" />}
-                      label="Leave requests"
-                      badge={formatNavCount(navCounts.leave)}
-                      badgeTitle={`${navCounts.leave} pending leave request${navCounts.leave === 1 ? "" : "s"}`}
-                    />
-                  )}
-
-                  {hasLeaveManage && (
-                    <NavLink
-                      to="/official-leave"
-                      icon={<Building2 className="h-5 w-5" />}
-                      label="Official Leave"
-                    />
-                  )}
-
-                  {hasRecruitmentView && (
-                    <NavLink
-                      to="/bug-recruitment"
-                      icon={<UserRoundSearch className="h-5 w-5" />}
-                      label="BugRecruitment"
-                    />
-                  )}
-
-                  {hasAttendanceManage && (
-                    <NavLink
-                      to="/attendance-exceptions"
-                      icon={<CalendarClock className="h-5 w-5" />}
-                      label="Attendance exceptions"
-                      badge={formatNavCount(navCounts.attendance)}
-                      badgeTitle={`${navCounts.attendance} pending WFH request${navCounts.attendance === 1 ? "" : "s"}`}
-                    />
-                  )}
-
-                  {hasMessagingView && !messagesInMain && (
-                    <NavLink
-                      to="/messages"
-                      icon={<MessageSquare className="h-5 w-5" />}
-                      label="BugMessage"
-                      badge={formatNavCount(navCounts.messages)}
-                      badgeTitle={`${navCounts.messages} chat${navCounts.messages === 1 ? "" : "s"}`}
-                    />
-                  )}
-
-                  {showWhatsApp && (
-                    <NavLink
-                      to="/whatsapp-messages"
-                      icon={<MessageCircle className="h-5 w-5" />}
-                      label="WhatsApp"
-                      badge={formatNavCount(navCounts.whatsapp)}
-                      badgeTitle={`${navCounts.whatsapp} user${navCounts.whatsapp === 1 ? "" : "s"} with a phone number`}
-                    />
-                  )}
-
-                  {hasFeedbackView && (
-                    <NavLink
-                      to="/feedback-stats"
-                      icon={<BarChart3 className="h-5 w-5" />}
-                      label="Feedbacks"
-                      badge={formatNavCount(navCounts.feedbacks)}
-                      badgeTitle={`${navCounts.feedbacks} feedback${navCounts.feedbacks === 1 ? "" : "s"}`}
-                    />
-                  )}
-
-                  {hasPerformanceReviews && (
-                    <NavLink
-                      to="/performance-reviews"
-                      icon={<ClipboardList className="h-5 w-5" />}
-                      label="Performance Reviews"
-                      badge={formatNavCount(navCounts.reviews)}
-                      badgeTitle={`${navCounts.reviews} review${navCounts.reviews === 1 ? "" : "s"}`}
-                    />
-                  )}
-
-                  {hasActivityView && (
-                    <NavLink
-                      to="/activity"
-                      icon={<Activity className="h-5 w-5" />}
-                      label="Activities"
-                      badge={formatNavCount(navCounts.activities)}
-                      badgeTitle={`${navCounts.activities} activit${navCounts.activities === 1 ? "y" : "ies"}`}
-                    />
-                  )}
-
-                  {hasPushCoverage && (
-                    <NavLink
-                      to="/push-coverage"
-                      icon={<Signal className="h-5 w-5" />}
-                      label="Push Coverage"
-                      badge={formatNavCount(navCounts.push)}
-                      badgeTitle={`${navCounts.push} user${navCounts.push === 1 ? "" : "s"}`}
-                    />
-                  )}
-
-                  {hasShortsManage && (
-                    <NavLink
-                      to="/shorts"
-                      icon={<Clapperboard className="h-5 w-5" />}
-                      label="Shorts"
-                      badge={formatNavCount(navCounts.shorts)}
-                      badgeTitle={`${navCounts.shorts} short${navCounts.shorts === 1 ? "" : "s"}`}
-                    />
-                  )}
-
-                  {hasSettingsEdit && (
-                    <NavLink
-                      to="/settings"
-                      icon={<Settings className="h-5 w-5" />}
-                      label="Settings"
-                      badge={formatNavCount(navCounts.settings)}
-                      badgeTitle={`${navCounts.settings} setting${navCounts.settings === 1 ? "" : "s"}`}
-                    />
-                  )}
-
-                  {hasBackupManage && (
-                    <NavLink
-                      to="/bugbackup"
-                      icon={<Database className="h-5 w-5" />}
-                      label="BugBackup"
-                      badge={formatNavCount(navCounts.backup)}
-                      badgeTitle={`${navCounts.backup} backup${navCounts.backup === 1 ? "" : "s"}`}
-                    />
-                  )}
-
-                  {hasRecycleBinView && (
-                    <NavLink
-                      to="/recycle-bin"
-                      icon={<Trash2 className="h-5 w-5" />}
-                      label="Recycle Bin"
-                      badge={formatNavCount(navCounts.recycleBin)}
-                      badgeTitle={`${navCounts.recycleBin} deleted item${navCounts.recycleBin === 1 ? "" : "s"}`}
-                    />
-                  )}
-                </div>
-              </>
-            );
-          })()}
+          {/* After Help & Support: permission groups, not one long Administration list. */}
+          {!isCreator && adminGroups.length > 0 && (
+            <SidebarAdminNav
+              groups={adminGroups}
+              activeGroupId={
+                adminGroups.find((group) =>
+                  group.items.some((item) => isActive(item.to))
+                )?.id ?? ""
+              }
+              renderItem={(item) => (
+                <NavLink
+                  to={item.to}
+                  icon={item.icon}
+                  label={item.label}
+                  badge={item.badge}
+                  badgeTone={item.badgeTone}
+                  badgeTitle={item.badgeTitle}
+                />
+              )}
+            />
+          )}
         </div>
       </ScrollArea>
 

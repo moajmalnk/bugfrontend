@@ -254,6 +254,8 @@ export interface ProjectBugStatsLite {
   total: number;
   open: number;
   fixed: number;
+  /** Fixed bugs still waiting for a tester retest. */
+  retests?: number;
 }
 
 export interface ProjectUpdateStatsLite {

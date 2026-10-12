@@ -95,6 +95,7 @@ export function buildProjectReceipt(
     ],
     { boldRows: [1], centered: true }
   );
+  if (data.retestsPending != null) w.kv("Retests", `${data.retestsPending} pending`);
   if (data.updatesCount != null) w.kv("Updates", data.updatesCount);
   w.kv("Avg raise", data.avgRiseDurationLabel);
   w.kv("Avg fix", data.avgFixDurationLabel);

@@ -72,6 +72,10 @@ export interface ProjectWhatsAppShareData {
   updatesCount?: number | null;
   avgRiseDurationLabel?: string | null;
   avgFixDurationLabel?: string | null;
+  /** Fixed bugs still waiting for a tester retest. */
+  retestsPending?: number | null;
+  /** When this briefing was copied. The printed slip uses its own print time. */
+  copiedAtLabel?: string | null;
   /** Team */
   developers?: string[];
   testers?: string[];
@@ -187,6 +191,9 @@ class WhatsAppService {
     message += `• Open / in progress: *${open}*\n`;
     message += `• Fixed: *${fixed}*\n`;
     message += `• Fix rate: *${fixRate}*\n`;
+    if (data.retestsPending != null) {
+      message += `• Retests pending: *${data.retestsPending}*\n`;
+    }
     if (data.updatesCount != null) {
       message += `• Updates published: *${data.updatesCount}*\n`;
     }
@@ -259,6 +266,9 @@ class WhatsAppService {
     if (data.sharedBy) {
       message += `\n\n👤 Shared by: ${data.sharedBy}`;
       if (data.sharedByRole) message += ` (${data.sharedByRole})`;
+    }
+    if (data.copiedAtLabel) {
+      message += `\n🕒 Copied: ${data.copiedAtLabel}`;
     }
 
     message += `\n\n🔗 *Open project:* ${projectUrl}`;

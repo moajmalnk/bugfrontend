@@ -306,6 +306,22 @@ const PAGE_ENTRIES: PageSearchEntry[] = [
     subtitle: "Help center",
   },
   {
+    id: "page-whats-new",
+    label: "What's New",
+    path: "/whats-new",
+    keywords: [
+      "what's new",
+      "whats new",
+      "flowchart",
+      "steps",
+      "step by step",
+      "getting started",
+      "malayalam",
+      "path",
+    ],
+    subtitle: "Your role's step-by-step path",
+  },
+  {
     id: "page-common-bugs",
     label: "Common Bugs",
     path: "/common-bugs",

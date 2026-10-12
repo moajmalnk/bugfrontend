@@ -48,6 +48,8 @@ export type ProjectBugStats = {
   total: number;
   open: number;
   fixed: number;
+  /** Fixed bugs still waiting for a tester retest. */
+  retests?: number;
 };
 
 export type ProjectMemberStats = {
@@ -119,6 +121,8 @@ export type ProjectAnalyticsSummary = {
   avg_rise_duration_label?: string | null;
   avg_fix_duration_seconds?: number | null;
   avg_fix_duration_label?: string | null;
+  /** Fixed bugs with no tester retest yet. Null when the column is unavailable. */
+  retests?: number | null;
 };
 
 export type ProjectAnalyticsData = {

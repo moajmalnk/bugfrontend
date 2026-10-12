@@ -365,6 +365,8 @@ const Projects = () => {
         let fixedBugs =
           projectFixedBugsCount[project.id] ?? project.bug_stats?.fixed ?? 0;
         let updatesCount: number | null = project.update_stats?.total ?? null;
+        let retestsPending: number | null =
+          typeof project.bug_stats?.retests === "number" ? project.bug_stats.retests : null;
         let avgRise: string | null = null;
         let avgFix: string | null = null;
 
@@ -378,6 +380,9 @@ const Projects = () => {
             analytics.summary?.updates ?? analytics.project.counts.updates ?? updatesCount;
           avgRise = analytics.summary?.avg_rise_duration_label || null;
           avgFix = analytics.summary?.avg_fix_duration_label || null;
+          if (typeof analytics.summary?.retests === "number") {
+            retestsPending = analytics.summary.retests;
+          }
         } catch {
           // Card stats are enough if analytics endpoint is unavailable
         }
@@ -448,6 +453,8 @@ const Projects = () => {
           updatesCount,
           avgRiseDurationLabel: avgRise,
           avgFixDurationLabel: avgFix,
+          retestsPending,
+          copiedAtLabel: formatLocalDate(new Date(), "datetime"),
           developers,
           testers,
           developerCount: memberStats?.developers ?? developers.length,

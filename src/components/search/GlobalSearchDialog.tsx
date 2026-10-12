@@ -370,47 +370,25 @@ export function GlobalSearchDialog() {
             )}
           </CommandList>
 
-          <div className="flex items-center justify-between border-t border-border/60 px-4 py-2 text-[11px] text-muted-foreground">
-            <span className="inline-flex items-center gap-1.5">
+          <div className="flex items-center justify-between gap-3 border-t border-border/60 px-4 py-2 text-[11px] text-muted-foreground">
+            <span className="inline-flex min-w-0 items-center gap-1.5">
               <kbd className="rounded-xl border border-border/70 bg-muted/40 px-1.5 py-0.5 font-medium">
                 ↵
               </kbd>
               Open
-              <span className="mx-1 text-border">·</span>
+              <span className="text-border" aria-hidden>
+                ·
+              </span>
               <kbd className="rounded-xl border border-border/70 bg-muted/40 px-1.5 py-0.5 font-medium">
                 esc
               </kbd>
               Close
             </span>
-            <span className="hidden items-center gap-3 sm:inline-flex">
-              {role === "admin" ? (
-                <>
-                  <span className="inline-flex items-center gap-1">
-                    <Users className="h-3 w-3" />
-                    Employee ID
-                  </span>
-                  <span className="inline-flex items-center gap-1">
-                    <Mail className="h-3 w-3" />
-                    Email
-                  </span>
-                  <span className="inline-flex items-center gap-1">
-                    <Phone className="h-3 w-3" />
-                    Phone
-                  </span>
-                </>
-              ) : (
-                <>
-                  <span className="inline-flex items-center gap-1">
-                    <Mail className="h-3 w-3" />
-                    Email
-                  </span>
-                  <span className="inline-flex items-center gap-1">
-                    <CalendarClock className="h-3 w-3" />
-                    Attendance
-                  </span>
-                </>
-              )}
-            </span>
+            {hasQuery && !loading ? (
+              <span className="shrink-0 tabular-nums">
+                {results.length === 1 ? "1 result" : `${results.length} results`}
+              </span>
+            ) : null}
           </div>
         </Command>
       </DialogContent>

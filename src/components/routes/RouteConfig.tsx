@@ -8,6 +8,7 @@ import Home from "@/pages/Home";
 import { lazy, Suspense } from "react";
 import { Navigate, Outlet, Route, Routes, useParams, useLocation } from "react-router-dom";
 import { HelpSupportRoute, HelpArticleRoute } from "@/pages/help/HelpRoutes";
+import { WhatsNewRoute } from "@/pages/whats-new/WhatsNewRoute";
 import { getEffectiveRole } from "@/lib/utils";
 import { WorkforceRoute } from "@/components/routes/WorkforceRoute";
 
@@ -440,6 +441,7 @@ const RouteConfig = () => {
       <Route path="/document" element={<RolePathRedirect suffix="document" />} />
       <Route path="/help/:articleId" element={<RolePathRedirect suffix="help/:articleId" />} />
       <Route path="/help" element={<RolePathRedirect suffix="help" />} />
+      <Route path="/whats-new" element={<RolePathRedirect suffix="whats-new" />} />
 
       {/* Protected Routes with role prefix — always registered so logout deep links redirect to login */}
       <Route path="/:role" element={<ProtectedRoleLayout />}>
@@ -530,6 +532,7 @@ const RouteConfig = () => {
           <Route path="shorts" element={<Shorts />} />
           <Route path="help" element={<HelpSupportRoute />} />
           <Route path="help/:articleId" element={<HelpArticleRoute />} />
+          <Route path="whats-new" element={<WhatsNewRoute />} />
           {/* Admin → ops dashboard; others → projects */}
           <Route index element={<RoleHomeRedirect />} />
       </Route>
