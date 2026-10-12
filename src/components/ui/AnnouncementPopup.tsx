@@ -10,7 +10,8 @@ import {
   Announcement,
   announcementService,
 } from "@/services/announcementService";
-import { Bug, X } from "lucide-react";
+import { X } from "lucide-react";
+import { BrandLogo } from "@/components/brand/BrandLogo";
 import React, { useEffect, useState } from "react";
 import ReactMarkdown from "react-markdown";
 
@@ -82,11 +83,8 @@ const AnnouncementPopup: React.FC = () => {
           <X className="h-5 w-5" />
         </button>
         <CardHeader className="text-center pb-2 pt-10">
-          <div className="flex items-center justify-center mb-3">
-            <span className="inline-block animate-bounce-slow">
-              <Bug className="h-8 w-8 text-primary drop-shadow-glow" />
-            </span>
-            <h2 className="text-2xl font-bold tracking-tight ml-2">BugRicer</h2>
+          <div className="mb-3 flex justify-center">
+            <BrandLogo className="h-9" />
           </div>
           <CardTitle className="text-xl sm:text-2xl">
             {announcement.title}

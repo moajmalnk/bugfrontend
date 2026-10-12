@@ -1,3 +1,4 @@
+import { BrandLogo } from "@/components/brand/BrandLogo";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
@@ -204,14 +205,9 @@ export const Sidebar = ({ className, closeSidebar }: SidebarProps) => {
       {/* Header */}
       <div className="flex-shrink-0 p-6 pb-4">
         <div className="flex items-center justify-between gap-3">
-          <div className="flex items-center gap-3 flex-1 min-w-0">
-          <div className="flex items-center justify-center w-10 h-10 rounded-xl bg-primary/10">
-            <Bug className="h-6 w-6 text-primary" />
-          </div>
-          <div className="min-w-0 flex-1">
-            <h2 className="text-lg font-bold text-foreground truncate">BugRicer</h2>
+          <div className="flex min-w-0 flex-1 flex-col gap-1">
+            <BrandLogo className="h-8 w-[9.5rem]" />
             <p className="text-xs text-muted-foreground">Bug Tracking</p>
-            </div>
           </div>
           <div className="flex shrink-0 items-center gap-0.5">
             <ImpersonateIndicator />

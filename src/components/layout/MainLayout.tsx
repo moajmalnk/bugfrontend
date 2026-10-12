@@ -1,6 +1,6 @@
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/context/AuthContext";
-import { Menu, Bug, Search, RefreshCw } from "lucide-react";
+import { Menu, Search, RefreshCw } from "lucide-react";
 import { lazy, memo, ReactNode, Suspense, useEffect, useRef, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { cn, getEffectiveRole, userHasPendingOnboarding } from "@/lib/utils";
@@ -12,6 +12,7 @@ import { GlobalSearchProvider, useGlobalSearchModal } from "@/context/GlobalSear
 import { GlobalSearchDialog } from "@/components/search/GlobalSearchDialog";
 import { AdminActiveUsersStrip } from "@/components/users/AdminActiveUsersStrip";
 import StandardsGates from "@/components/standards/StandardsGates";
+import { BrandLogo } from "@/components/brand/BrandLogo";
 import { WorkspaceLaunchSkeleton } from "@/components/onboarding/WorkspaceLaunchSkeleton";
 
 // Non-critical widgets: loaded in separate chunks so they never block first paint.
@@ -60,14 +61,7 @@ const MobileTopBar = memo(function MobileTopBar({
         >
           <Menu className="h-5 w-5" />
         </Button>
-        <div className="flex items-center gap-2 min-w-0">
-          <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
-            <Bug className="h-5 w-5 text-primary" />
-          </div>
-          <span className="font-bold text-base sm:text-lg text-foreground truncate">
-            BugRicer
-          </span>
-        </div>
+        <BrandLogo className="h-7 w-[8.5rem]" />
       </div>
 
       <div className="flex items-center gap-0.5 shrink-0">

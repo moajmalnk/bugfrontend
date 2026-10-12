@@ -1,5 +1,6 @@
 import React, { useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
+import { BrandLogo } from '@/components/brand/BrandLogo';
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/context/AuthContext';
 import { 
@@ -162,16 +163,8 @@ const Home = () => {
         <div className="relative container mx-auto px-4 py-16 sm:py-24 md:py-32 max-w-6xl">
           <div className="text-center">
             {/* Logo */}
-            <div className="flex justify-center mb-8">
-              <div className="relative inline-flex items-center justify-center w-20 h-20 sm:w-24 sm:h-24 bg-gradient-to-br from-blue-600 to-indigo-600 rounded-2xl shadow-2xl group transform hover:scale-105 transition-all duration-300">
-                <BugIcon className="h-10 w-10 sm:h-12 sm:w-12 text-white group-hover:rotate-12 transition-transform duration-300" />
-                <div className="absolute inset-0 bg-gradient-to-br from-blue-400 to-indigo-400 rounded-2xl blur-xl opacity-0 group-hover:opacity-50 transition-opacity duration-300"></div>
-              </div>
-            </div>
-
-            {/* Title */}
-            <h1 className="text-4xl sm:text-5xl md:text-6xl font-bold text-slate-900 dark:text-white mb-4 tracking-tight">
-              BugRicer
+            <h1 className="mb-8 flex justify-center">
+              <BrandLogo className="h-14 sm:h-16" />
             </h1>
             <p className="text-lg sm:text-xl md:text-2xl text-slate-600 dark:text-slate-400 mb-8 max-w-3xl mx-auto">
               Advanced Bug Tracking & Project Management Platform

@@ -18,13 +18,13 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { toast } from "@/components/ui/use-toast";
+import { BrandLogo } from "@/components/brand/BrandLogo";
 import { useAuth } from "@/context/AuthContext";
 import { API_BASE_URL } from "@/lib/env";
 import { extractApiErrorMessage, getNetworkErrorMessage } from "@/lib/apiError";
 import axios from "axios";
 import { 
   AlertCircle, 
-  BugIcon, 
   Key, 
   Mail, 
   Eye, 
@@ -336,9 +336,7 @@ const Login = () => {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-100 dark:from-slate-900 dark:via-slate-800 dark:to-slate-900 px-4">
         <div className="text-center">
-          <div className="inline-flex items-center justify-center w-16 h-16 bg-gradient-to-br from-blue-600 to-indigo-600 rounded-2xl shadow-lg mb-4 animate-pulse">
-            <BugIcon className="h-8 w-8 text-white" />
-          </div>
+          <BrandLogo className="mx-auto mb-4 h-10" />
           <p className="text-slate-600 dark:text-slate-400 font-medium">
             Loading...
           </p>
@@ -1149,10 +1147,7 @@ const Login = () => {
           }`}>
           {/* Header Section */}
           <div className="text-center px-4 sm:px-6 md:px-8 pt-6 sm:pt-8 pb-4 sm:pb-6">
-            <div className="relative inline-flex items-center justify-center w-14 h-14 sm:w-16 sm:h-16 bg-gradient-to-br from-blue-600 to-indigo-600 rounded-xl sm:rounded-2xl shadow-lg mb-4 sm:mb-6 transform hover:scale-105 transition-all duration-300 group">
-              <BugIcon className="h-7 w-7 sm:h-8 sm:w-8 text-white group-hover:rotate-12 transition-transform duration-300" />
-              <div className="absolute inset-0 bg-gradient-to-br from-blue-400 to-indigo-400 rounded-xl sm:rounded-2xl blur-lg opacity-0 group-hover:opacity-50 transition-opacity duration-300"></div>
-            </div>
+            <BrandLogo className="mx-auto mb-4 h-11 sm:mb-6 sm:h-12" />
             <h1 className="text-2xl sm:text-3xl font-bold text-slate-900 dark:text-white mb-2 sm:mb-3 tracking-tight">
               Welcome back
             </h1>

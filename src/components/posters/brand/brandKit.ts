@@ -546,21 +546,14 @@ export const CODO_LOGO_ASSETS = {
 export type CodoLogoAssetKey = keyof typeof CODO_LOGO_ASSETS;
 
 /**
- * Our own brand symbol, cut out of `public/logo.png` (opaque lavender master) into
- * transparent WebPs so it sits cleanly on any palette.
- *
- * | Key   | Inks               | Use on                               |
- * |-------|--------------------|--------------------------------------|
- * | color | navy + green       | Light / cream / pastel backgrounds   |
- * | light | white + green      | Dark / saturated backgrounds         |
- * | black | solid #111         | Transparent "Black" cut-out exports  |
- * | white | solid #FFF         | Transparent "White" cut-out exports  |
+ * BugRicer bug mark from the current wordmark. Black ink on light surfaces,
+ * white ink on dark surfaces.
  */
 export const BRAND_MARK_ASSETS = {
-  color: { src: '/posters/brand-mark-color.webp', width: 1015, height: 1024 },
-  light: { src: '/posters/brand-mark-light.webp', width: 1015, height: 1024 },
-  black: { src: '/posters/brand-mark-black.webp', width: 1015, height: 1024 },
-  white: { src: '/posters/brand-mark-white.webp', width: 1015, height: 1024 },
+  color: { src: '/brand/bugricer-mark-black.png', width: 600, height: 680 },
+  light: { src: '/brand/bugricer-mark-white.png', width: 600, height: 680 },
+  black: { src: '/brand/bugricer-mark-black.png', width: 600, height: 680 },
+  white: { src: '/brand/bugricer-mark-white.png', width: 600, height: 680 },
 } as const;
 
 export type BrandMarkAssetKey = keyof typeof BRAND_MARK_ASSETS;

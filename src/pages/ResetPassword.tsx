@@ -1,3 +1,4 @@
+import { BrandLogo } from "@/components/brand/BrandLogo";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -7,7 +8,6 @@ import { cn } from "@/lib/utils";
 import {
   AlertCircle,
   ArrowLeft,
-  BugIcon,
   Check,
   CheckCircle2,
   Eye,
@@ -385,10 +385,7 @@ const ResetPassword = () => {
     <AuthShell>
       <div className="rounded-2xl border border-border/60 bg-card/80 p-6 shadow-xl backdrop-blur-xl sm:p-8">
         <div className="text-center">
-          <div className="group relative mx-auto mb-5 inline-flex h-16 w-16 items-center justify-center rounded-2xl bg-gradient-to-br from-blue-600 to-indigo-600 text-white shadow-lg shadow-blue-500/30">
-            <div className="absolute inset-0 rounded-2xl bg-gradient-to-br from-blue-400 to-indigo-400 opacity-0 blur-lg transition-opacity duration-300 group-hover:opacity-50" />
-            <BugIcon className="relative h-8 w-8" />
-          </div>
+          <BrandLogo className="mx-auto mb-5 h-10" />
           <h1 className="text-2xl font-bold tracking-tight text-foreground">Set a new password</h1>
           <p className="mt-2 text-sm text-muted-foreground">
             Choose a strong password you haven't used before on BugRicer.

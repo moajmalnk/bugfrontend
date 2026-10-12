@@ -294,14 +294,12 @@ function containerBox(kind: ContainerKind, style: LogoStyleKey, p: PosterPalette
 }
 
 /**
- * Responsive brand-symbol artwork (from `public/logo.png`) for app icons, profile
- * pictures, banners and website logos.
+ * Responsive BugRicer mark for app icons, profile pictures, banners and website logos.
  *
  * - 34 design styles (canvas, frames, badges, patterns, accents) × every palette
  * - The symbol is near-square, so it is sized from the shorter side; wide banners
  *   turn badges into pills instead of stretching them
- * - Dark palettes get the white + green variant; transparent palettes export a
- *   mono cut-out and ignore the style
+ * - Dark palettes get the white mark; transparent palettes export a mono cut-out and ignore the style
  */
 export function BrandLogoTemplate({ data, palette, size }: PosterTemplateProps) {
   const { width: w, height: h } = size;
