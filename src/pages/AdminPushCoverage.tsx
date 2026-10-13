@@ -38,6 +38,8 @@ type PushSummary = {
   mail_failed_7d?: number;
   whatsapp_sent_7d?: number;
   whatsapp_failed_7d?: number;
+  google_connected?: number;
+  google_not_connected?: number;
 };
 
 type MissingUser = {
@@ -61,6 +63,11 @@ type ChannelUser = {
   username: string;
   email?: string;
   phone?: string;
+};
+
+type GoogleAccountUser = ChannelUser & {
+  google_email?: string | null;
+  google_connected_at?: string | null;
 };
 
 type DeliveryLogRow = {
@@ -107,6 +114,8 @@ const defaultSummary: PushSummary = {
   mail_failed_7d: 0,
   whatsapp_sent_7d: 0,
   whatsapp_failed_7d: 0,
+  google_connected: 0,
+  google_not_connected: 0,
 };
 
 function isPushEnabled(value: boolean | number | undefined | null): boolean {
@@ -134,6 +143,8 @@ export default function AdminPushCoverage() {
   const [mailRecentErrors, setMailRecentErrors] = useState<DeliveryLogRow[]>([]);
   const [whatsappRecentSent, setWhatsappRecentSent] = useState<DeliveryLogRow[]>([]);
   const [whatsappRecentErrors, setWhatsappRecentErrors] = useState<DeliveryLogRow[]>([]);
+  const [googleConnectedUsers, setGoogleConnectedUsers] = useState<GoogleAccountUser[]>([]);
+  const [googleMissingUsers, setGoogleMissingUsers] = useState<ChannelUser[]>([]);
   const [fcmTokenEpoch, setFcmTokenEpoch] = useState<string>("1");
   const [error, setError] = useState<string | null>(null);
   const [togglingUserId, setTogglingUserId] = useState<string | null>(null);
@@ -181,6 +192,8 @@ export default function AdminPushCoverage() {
       setMailRecentErrors(json.data?.mail_recent_errors || []);
       setWhatsappRecentSent(json.data?.whatsapp_recent_sent || []);
       setWhatsappRecentErrors(json.data?.whatsapp_recent_errors || []);
+      setGoogleConnectedUsers(json.data?.google_connected_users || []);
+      setGoogleMissingUsers(json.data?.google_missing_users || []);
       if (json.data?.fcm_token_epoch) {
         setFcmTokenEpoch(String(json.data.fcm_token_epoch));
       }
@@ -289,6 +302,8 @@ export default function AdminPushCoverage() {
     { label: "WA Missing", value: summary.whatsapp_missing ?? 0, tone: "text-rose-600 dark:text-rose-400" },
     { label: "WA Sent (7d)", value: summary.whatsapp_sent_7d ?? 0, tone: "text-emerald-600 dark:text-emerald-400" },
     { label: "WA Errors (7d)", value: summary.whatsapp_failed_7d ?? 0, tone: "text-rose-600 dark:text-rose-400" },
+    { label: "Google Connected", value: summary.google_connected ?? 0, tone: "text-emerald-600 dark:text-emerald-400" },
+    { label: "Google Not Connected", value: summary.google_not_connected ?? 0, tone: "text-rose-600 dark:text-rose-400" },
   ];
 
   const PushToggle = ({
@@ -349,7 +364,7 @@ export default function AdminPushCoverage() {
                   </div>
                 </div>
                 <p className="text-gray-600 dark:text-gray-400 text-base lg:text-lg font-medium max-w-2xl">
-                  Monitor FCM adoption, email/WhatsApp recipients, and delivery errors.
+                  Monitor FCM adoption, Google accounts, email/WhatsApp recipients, and delivery errors.
                 </p>
                 <p className="text-xs text-muted-foreground">
                   Server token epoch: <span className="font-mono font-semibold">{fcmTokenEpoch}</span>
@@ -635,6 +650,86 @@ export default function AdminPushCoverage() {
               )}
             </CardContent>
           </Card>
+        </section>
+
+        <section className="space-y-3">
+          <h2 className="text-lg font-semibold">Google accounts</h2>
+          <div className="grid grid-cols-1 gap-4 xl:grid-cols-2 xl:gap-6">
+            <Card className="overflow-hidden rounded-2xl border border-gray-200/50 bg-white/80 shadow-xl backdrop-blur-sm dark:border-gray-700/50 dark:bg-gray-900/80">
+              <CardHeader className="pb-3">
+                <CardTitle className="flex items-center gap-2 text-lg font-semibold">
+                  <CheckCircle2 className="h-4 w-4 text-emerald-500" />
+                  Google Connected ({loading ? "..." : summary.google_connected ?? googleConnectedUsers.length})
+                </CardTitle>
+                <p className="text-xs font-normal text-muted-foreground">
+                  Active users who have linked a Google account for Docs, Sheets, and Meet.
+                </p>
+              </CardHeader>
+              <CardContent className="max-h-[24rem] space-y-2 overflow-auto">
+                {loading ? (
+                  <div className="h-14 animate-pulse rounded-xl bg-muted" />
+                ) : googleConnectedUsers.length === 0 ? (
+                  <p className="text-sm text-muted-foreground">No Google accounts connected yet.</p>
+                ) : (
+                  googleConnectedUsers.map((u) => (
+                    <div
+                      key={u.id}
+                      className="flex items-center justify-between gap-3 rounded-xl border border-gray-200/60 bg-background/70 p-3 dark:border-gray-700/60"
+                    >
+                      <div className="min-w-0 flex-1">
+                        <p className="truncate font-semibold">{u.username}</p>
+                        <p className="truncate text-xs text-muted-foreground">
+                          {u.google_email?.trim() || u.email?.trim() || "Connected"}
+                        </p>
+                      </div>
+                      <Badge className="shrink-0 rounded-full bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300">
+                        Connected
+                      </Badge>
+                    </div>
+                  ))
+                )}
+              </CardContent>
+            </Card>
+
+            <Card className="overflow-hidden rounded-2xl border border-gray-200/50 bg-white/80 shadow-xl backdrop-blur-sm dark:border-gray-700/50 dark:bg-gray-900/80">
+              <CardHeader className="pb-3">
+                <CardTitle className="flex items-center gap-2 text-lg font-semibold">
+                  <UserX className="h-4 w-4 text-rose-500" />
+                  Google Not Connected ({loading ? "..." : summary.google_not_connected ?? googleMissingUsers.length})
+                </CardTitle>
+                <p className="text-xs font-normal text-muted-foreground">
+                  Active users with no Google account linked.
+                </p>
+              </CardHeader>
+              <CardContent className="max-h-[24rem] space-y-2 overflow-auto">
+                {loading ? (
+                  <div className="h-14 animate-pulse rounded-xl bg-muted" />
+                ) : googleMissingUsers.length === 0 ? (
+                  <div className="flex items-center gap-2 rounded-xl border border-emerald-200/60 bg-emerald-50/60 p-4 text-sm text-emerald-700 dark:border-emerald-800/60 dark:bg-emerald-950/20 dark:text-emerald-300">
+                    <CheckCircle2 className="h-4 w-4 shrink-0" />
+                    Every active user has a Google account connected.
+                  </div>
+                ) : (
+                  googleMissingUsers.map((u) => (
+                    <div
+                      key={u.id}
+                      className="flex items-center justify-between gap-3 rounded-xl border border-gray-200/60 bg-background/70 p-3 dark:border-gray-700/60"
+                    >
+                      <div className="min-w-0 flex-1">
+                        <p className="truncate font-semibold">{u.username}</p>
+                        <p className="truncate text-xs text-muted-foreground">
+                          {u.email?.trim() || "No email"}
+                        </p>
+                      </div>
+                      <Badge variant="destructive" className="shrink-0 rounded-full">
+                        Not connected
+                      </Badge>
+                    </div>
+                  ))
+                )}
+              </CardContent>
+            </Card>
+          </div>
         </section>
 
         <section className="space-y-3">
