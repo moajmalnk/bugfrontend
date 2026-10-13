@@ -208,7 +208,7 @@ export const adminOperationsArticles: HelpArticle[] = [
               ["Notif Enabled / Disabled", "Users who switched notifications on or off"],
               ["PWA Installed", "Users running BugRicer as an installed app"],
               ["Mail / WA Ready, Missing", "Users with or without an email address or WhatsApp number"],
-              ["Google Connected / Not Connected", "Active users who have or have not linked a Google account"],
+              ["Google Connected / Not Connected", "Active users who have or have not linked a Google account, split into Admins, Developers, CODO Testers, Client Testers, and Creators. Disconnect removes a link. Notify locks that person out of the dashboard until they connect Google."],
               ["Mail / WA Sent and Errors (7d)", "Delivery results over the last week"],
             ],
           },
