@@ -995,24 +995,28 @@ export default function AdminPushCoverage() {
         )}
 
         <section className="space-y-4">
-          <div className="grid grid-cols-12 gap-2">
-            {COVERAGE_TOPICS.map((topic) => {
-              const active = coverageTopic === topic.id;
-              return (
-                <button
-                  key={topic.id}
-                  type="button"
-                  onClick={() => openCoverageTopic(topic.id)}
-                  className={`col-span-6 md:col-span-4 xl:col-span-2 rounded-xl border px-3 py-2 text-sm font-semibold transition-colors ${
-                    active
-                      ? "border-cyan-500 bg-cyan-500 text-white"
-                      : "border-gray-200/70 dark:border-gray-700/70 bg-white/80 dark:bg-gray-900/80 text-foreground"
-                  }`}
-                >
-                  {topic.label}
-                </button>
-              );
-            })}
+          <div className="grid grid-cols-12 gap-4">
+            <div className="col-span-12 grid grid-cols-2 gap-4 sm:grid-cols-5">
+              {COVERAGE_TOPICS.map((topic, index) => {
+                const active = coverageTopic === topic.id;
+                return (
+                  <button
+                    key={topic.id}
+                    type="button"
+                    onClick={() => openCoverageTopic(topic.id)}
+                    className={`min-w-0 truncate rounded-xl border px-3 py-2 text-sm font-semibold transition-colors ${
+                      index === COVERAGE_TOPICS.length - 1 ? "col-span-2 sm:col-span-1" : ""
+                    } ${
+                      active
+                        ? "border-cyan-500 bg-cyan-500 text-white"
+                        : "border-gray-200/70 dark:border-gray-700/70 bg-white/80 dark:bg-gray-900/80 text-foreground"
+                    }`}
+                  >
+                    {topic.label}
+                  </button>
+                );
+              })}
+            </div>
           </div>
 
           {loading ? (

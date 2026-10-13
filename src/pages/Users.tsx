@@ -295,6 +295,9 @@ const Users = () => {
   const testerTypeParam = searchParams.get("tester_type");
   const testerTypeFilter: TesterType | "all" =
     testerTypeParam === "codo" || testerTypeParam === "client" ? testerTypeParam : "all";
+  const accountParam = searchParams.get("account");
+  const accountStatusFilter: "all" | "active" | "inactive" =
+    accountParam === "active" || accountParam === "inactive" ? accountParam : "all";
   const todayYmd = istTodayYmd();
   const dateParam = searchParams.get("date") || "";
   const workDate =
@@ -451,10 +454,21 @@ const Users = () => {
   // Apply filtering whenever search term or tab changes
   useEffect(() => {
     applyFilters();
-  }, [searchTerm, users, tabFromUrl, testerTypeFilter]);
+  }, [searchTerm, users, tabFromUrl, testerTypeFilter, accountStatusFilter]);
 
   // Reset current page when filters change
-  useResetUrlPageOnChange(setCurrentPage, [searchTerm, tabFromUrl, testerTypeFilter]);
+  useResetUrlPageOnChange(setCurrentPage, [searchTerm, tabFromUrl, testerTypeFilter, accountStatusFilter]);
+
+  const handleAccountStatusFilterChange = (next: "all" | "active" | "inactive") => {
+    const params = new URLSearchParams(searchParams);
+    if (next === "all") {
+      params.delete("account");
+    } else {
+      params.set("account", next);
+    }
+    params.delete("page");
+    setSearchParams(params, { replace: true });
+  };
 
   const handleTesterTypeFilterChange = (next: TesterType | "all") => {
     const params = new URLSearchParams(searchParams);
@@ -537,6 +551,16 @@ const Users = () => {
           return !["admin", "developer", "tester", "creator"].includes(user.role);
         });
       }
+      if (
+        (tabFromUrl === "developers" || tabFromUrl === "testers" || tabFromUrl === "creators") &&
+        accountStatusFilter !== "all"
+      ) {
+        filtered = filtered.filter((user) =>
+          accountStatusFilter === "inactive"
+            ? user.account_active === 0
+            : user.account_active !== 0
+        );
+      }
     }
 
     // Requirement: show earliest check-in users first.
@@ -549,6 +573,9 @@ const Users = () => {
       return;
     }
     params.set("tab", tab);
+    if (tab !== "developers" && tab !== "testers" && tab !== "creators") {
+      params.delete("account");
+    }
     params.delete("page");
     setSearchParams(params, { replace: true });
   };
@@ -1044,9 +1071,67 @@ const Users = () => {
     return <UserWorkStats userId={user.id} compact={true} />;
   }
 
+  function renderAccountStatusFilter() {
+    if (
+      isLoading ||
+      searchTerm.trim() ||
+      (activeTab !== "developers" && activeTab !== "testers" && activeTab !== "creators")
+    ) {
+      return null;
+    }
+
+    const role =
+      activeTab === "developers" ? "developer" : activeTab === "testers" ? "tester" : "creator";
+    let pool = users.filter((user) => user.role === role);
+    if (role === "tester" && testerTypeFilter !== "all") {
+      pool = pool.filter(
+        (user) => (user.tester_type === "codo" ? "codo" : "client") === testerTypeFilter
+      );
+    }
+    const activeCount = pool.filter((user) => user.account_active !== 0).length;
+    const inactiveCount = pool.filter((user) => user.account_active === 0).length;
+    const options = [
+      { value: "all" as const, label: "All", count: pool.length },
+      { value: "active" as const, label: "Active", count: activeCount },
+      { value: "inactive" as const, label: "Inactive", count: inactiveCount },
+    ];
+
+    return (
+      <div
+        role="radiogroup"
+        aria-label={`Filter ${role}s by account status`}
+        className="flex flex-wrap items-center gap-2"
+      >
+        {options.map((opt) => {
+          const selected = accountStatusFilter === opt.value;
+          return (
+            <button
+              key={opt.value}
+              type="button"
+              role="radio"
+              aria-checked={selected}
+              onClick={() => handleAccountStatusFilterChange(opt.value)}
+              className={cn(
+                "inline-flex items-center gap-2 rounded-xl border px-3 py-1.5 text-sm font-medium transition-colors",
+                "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+                selected
+                  ? "border-primary bg-primary/10 text-foreground"
+                  : "border-border bg-background text-muted-foreground hover:bg-muted/50"
+              )}
+            >
+              {opt.label}
+              <span className="rounded-full bg-muted px-2 text-xs text-foreground">{opt.count}</span>
+            </button>
+          );
+        })}
+      </div>
+    );
+  }
+
   function renderUsersContent() {
     return (
       <>
+        {renderAccountStatusFilter()}
         {/* Professional Search and Filter Controls */}
         {!isLoading && (
         <div className="relative">
@@ -1327,7 +1412,15 @@ const Users = () => {
                 ? "No team members have checked in for work today yet."
                 : activeTab === "pending" && !searchTerm.trim()
                   ? "No pending or rejected onboarding submissions."
-                : "No users match your current filters."}
+                  : accountStatusFilter === "inactive" &&
+                      !searchTerm.trim() &&
+                      (activeTab === "developers" || activeTab === "testers" || activeTab === "creators")
+                    ? "No inactive accounts in this role."
+                    : accountStatusFilter === "active" &&
+                        !searchTerm.trim() &&
+                        (activeTab === "developers" || activeTab === "testers" || activeTab === "creators")
+                      ? "No active accounts in this role."
+                      : "No users match your current filters."}
             </p>
           </div>
         )}
