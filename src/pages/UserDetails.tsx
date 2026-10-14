@@ -59,13 +59,16 @@ import {
   AtSign,
   BarChart3,
   Briefcase,
+  Cake,
   Calendar,
   CalendarCheck,
   ClipboardList,
   CalendarOff,
   ExternalLink,
+  FileText,
   FolderKanban,
   Key,
+  Network,
   Loader2,
   Lock,
   Mail,
@@ -100,6 +103,99 @@ import { defaultPayVerifyYearMonth } from "@/services/payVerifyService";
 import { buildAdminAddHoursPath } from "@/pages/adminOvertimeShared";
 
 type UserStatus = "active" | "idle" | "offline";
+
+/** Why: HR needs calendar age from onboarding DOB — not an approximate year fraction. */
+function ageFromDateOfBirth(value?: string | null): number | null {
+  const raw = String(value || "").trim().slice(0, 10);
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(raw)) return null;
+  const [year, month, day] = raw.split("-").map(Number);
+  const dob = new Date(year, month - 1, day);
+  if (
+    Number.isNaN(dob.getTime()) ||
+    dob.getFullYear() !== year ||
+    dob.getMonth() !== month - 1 ||
+    dob.getDate() !== day
+  ) {
+    return null;
+  }
+  const today = new Date();
+  let age = today.getFullYear() - year;
+  const beforeBirthday =
+    today.getMonth() < month - 1 ||
+    (today.getMonth() === month - 1 && today.getDate() < day);
+  if (beforeBirthday) age -= 1;
+  if (age < 0 || age > 120) return null;
+  return age;
+}
+
+function formatDateOfBirth(value?: string | null): string | null {
+  const raw = String(value || "").trim().slice(0, 10);
+  if (!raw) return null;
+  const d = new Date(`${raw}T00:00:00`);
+  if (Number.isNaN(d.getTime())) return null;
+  return d.toLocaleDateString(undefined, {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+  });
+}
+
+const CONTRACT_LABELS: Record<string, string> = {
+  full_time: "Full time",
+  remote: "Remote",
+  part_time: "Part time",
+  contract: "Contract",
+  intern: "Intern",
+  probation: "Probation",
+  other: "Other",
+};
+
+function formatContractType(value?: string | null): string | null {
+  const raw = (value || "").trim();
+  if (!raw) return null;
+  return CONTRACT_LABELS[raw] || raw.replace(/_/g, " ");
+}
+
+/** Why: Founders / admins sit at the top of the org — no manager or employment contract tile. */
+function isOrgLeaderUser(
+  user: Pick<User, "role" | "job_level"> | null | undefined
+): boolean {
+  if (!user) return false;
+  if (String(user.role || "").toLowerCase() === "admin") return true;
+  return String(user.job_level || "").trim().toLowerCase() === "founder";
+}
+
+function formatMemberSince(value?: string | null): string | null {
+  if (!value) return null;
+  const d = new Date(value);
+  if (Number.isNaN(d.getTime())) return null;
+  return d.toLocaleDateString(undefined, {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+  });
+}
+
+/** Why: Compact tenure for founder/admin header tiles (e.g. 2y 4m). */
+function formatTenureSince(value?: string | null): string | null {
+  const raw = String(value || "").trim().slice(0, 10);
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(raw)) return null;
+  const start = new Date(`${raw}T00:00:00`);
+  if (Number.isNaN(start.getTime())) return null;
+  const now = new Date();
+  if (start > now) return null;
+  let months =
+    (now.getFullYear() - start.getFullYear()) * 12 +
+    (now.getMonth() - start.getMonth());
+  if (now.getDate() < start.getDate()) months -= 1;
+  if (months < 0) return null;
+  if (months < 1) return "Under 1 month";
+  const years = Math.floor(months / 12);
+  const rem = months % 12;
+  if (years === 0) return `${rem} ${rem === 1 ? "month" : "months"}`;
+  if (rem === 0) return `${years} ${years === 1 ? "year" : "years"}`;
+  return `${years}y ${rem}m`;
+}
 
 type UserDetailsTab =
   | "personal"
@@ -351,6 +447,47 @@ export default function UserDetails() {
     [onboardingData]
   );
 
+  const dateOfBirthLabel = useMemo(
+    () => formatDateOfBirth(onboardingData?.details?.date_of_birth),
+    [onboardingData?.details?.date_of_birth]
+  );
+  const ageYears = useMemo(
+    () => ageFromDateOfBirth(onboardingData?.details?.date_of_birth),
+    [onboardingData?.details?.date_of_birth]
+  );
+
+  /** Why: Header tiles need the same HR fallbacks as the print report. */
+  const reportsToDisplay = useMemo(() => {
+    const name = (
+      user?.reports_to_username ||
+      onboardingData?.user?.reports_to_username ||
+      ""
+    ).trim();
+    return name || null;
+  }, [user?.reports_to_username, onboardingData?.user?.reports_to_username]);
+
+  const contractTypeDisplay = useMemo(
+    () =>
+      formatContractType(
+        user?.contract_type || onboardingData?.user?.contract_type
+      ),
+    [user?.contract_type, onboardingData?.user?.contract_type]
+  );
+
+  const showOrgLeaderTiles = isOrgLeaderUser(user);
+  const memberSinceDisplay = useMemo(
+    () => formatMemberSince(user?.created_at),
+    [user?.created_at]
+  );
+  const tenureDisplay = useMemo(
+    () =>
+      formatTenureSince(user?.joining_date) ||
+      formatTenureSince(
+        user?.created_at ? String(user.created_at).slice(0, 10) : null
+      ),
+    [user?.joining_date, user?.created_at]
+  );
+
   const status = useMemo(() => {
     if (!user) return "offline" as const;
     return user.status || computeStatus(user);
@@ -428,6 +565,11 @@ export default function UserDetails() {
     toast({ title: "Updated", description: "User updated successfully" });
     // best-effort refresh (keeps page source-of-truth in sync)
     void refetch();
+    // Why: DOB lives in onboarding details — refresh Age / Date of birth tiles after Edit User.
+    void queryClient.invalidateQueries({ queryKey: ["onboarding-details", userId] });
+    queryClient.setQueryData<User | null>(["userDetails", userId], (prev) =>
+      prev ? { ...prev, ...updated } : updated
+    );
   };
 
   const handleUserDelete = async (id: string, force?: boolean) => {
@@ -1059,6 +1201,41 @@ export default function UserDetails() {
                           </div>
                         </div>
                       ) : null}
+                      {effectiveRole === "admin" ? (
+                        <div className="flex items-center gap-3 p-3 rounded-xl bg-muted/30 border border-border/40 min-w-0">
+                          <div className="h-10 w-10 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
+                            <Cake className="h-5 w-5 text-primary" />
+                          </div>
+                          <div className="min-w-0 flex-1">
+                            <div className="text-xs text-muted-foreground">
+                              Date of birth
+                            </div>
+                            <div
+                              className="font-semibold truncate"
+                              title={dateOfBirthLabel || undefined}
+                            >
+                              {dateOfBirthLabel || "—"}
+                            </div>
+                          </div>
+                        </div>
+                      ) : null}
+                      {effectiveRole === "admin" ? (
+                        <div className="flex items-center gap-3 p-3 rounded-xl bg-muted/30 border border-border/40 min-w-0">
+                          <div className="h-10 w-10 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
+                            <UserRound className="h-5 w-5 text-primary" />
+                          </div>
+                          <div className="min-w-0 flex-1">
+                            <div className="text-xs text-muted-foreground">
+                              Age
+                            </div>
+                            <div className="font-semibold truncate tabular-nums">
+                              {ageYears != null
+                                ? `${ageYears} ${ageYears === 1 ? "year" : "years"}`
+                                : "—"}
+                            </div>
+                          </div>
+                        </div>
+                      ) : null}
                       <div className="flex items-center gap-3 p-3 rounded-xl bg-muted/30 border border-border/40 min-w-0">
                         <div className="h-10 w-10 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
                           <Briefcase className="h-5 w-5 text-primary" />
@@ -1114,11 +1291,112 @@ export default function UserDetails() {
                           <div className="text-xs text-muted-foreground">
                             Department
                           </div>
-                          <div className="font-semibold truncate">
+                          <div
+                            className="font-semibold truncate"
+                            title={user.department || undefined}
+                          >
                             {user.department || "—"}
                           </div>
                         </div>
                       </div>
+                      {effectiveRole === "admin" && showOrgLeaderTiles ? (
+                        <div className="flex items-center gap-3 p-3 rounded-xl bg-muted/30 border border-border/40 min-w-0">
+                          <div className="h-10 w-10 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
+                            <Calendar className="h-5 w-5 text-primary" />
+                          </div>
+                          <div className="min-w-0 flex-1">
+                            <div className="text-xs text-muted-foreground">
+                              Member since
+                            </div>
+                            <div
+                              className={cn(
+                                "font-semibold truncate",
+                                memberSinceDisplay
+                                  ? "text-foreground"
+                                  : "text-muted-foreground"
+                              )}
+                              title={memberSinceDisplay || undefined}
+                            >
+                              {memberSinceDisplay || "—"}
+                            </div>
+                          </div>
+                        </div>
+                      ) : null}
+                      {effectiveRole === "admin" && showOrgLeaderTiles ? (
+                        <div className="flex items-center gap-3 p-3 rounded-xl bg-muted/30 border border-border/40 min-w-0">
+                          <div className="h-10 w-10 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
+                            <Timer className="h-5 w-5 text-primary" />
+                          </div>
+                          <div className="min-w-0 flex-1">
+                            <div className="text-xs text-muted-foreground">
+                              Tenure
+                            </div>
+                            <div
+                              className={cn(
+                                "font-semibold truncate tabular-nums",
+                                tenureDisplay
+                                  ? "text-foreground"
+                                  : "text-muted-foreground"
+                              )}
+                              title={tenureDisplay || undefined}
+                            >
+                              {tenureDisplay || "—"}
+                            </div>
+                          </div>
+                        </div>
+                      ) : null}
+                      {effectiveRole === "admin" && !showOrgLeaderTiles ? (
+                        <div className="flex items-center gap-3 p-3 rounded-xl bg-muted/30 border border-border/40 min-w-0">
+                          <div className="h-10 w-10 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
+                            <Network className="h-5 w-5 text-primary" />
+                          </div>
+                          <div className="min-w-0 flex-1">
+                            <div className="text-xs text-muted-foreground">
+                              Reports to
+                            </div>
+                            <div
+                              className={cn(
+                                "font-semibold truncate",
+                                reportsToDisplay
+                                  ? "text-foreground"
+                                  : "text-muted-foreground"
+                              )}
+                              title={
+                                reportsToDisplay
+                                  ? `@${reportsToDisplay}`
+                                  : "Not assigned"
+                              }
+                            >
+                              {reportsToDisplay
+                                ? `@${reportsToDisplay}`
+                                : "—"}
+                            </div>
+                          </div>
+                        </div>
+                      ) : null}
+                      {effectiveRole === "admin" && !showOrgLeaderTiles ? (
+                        <div className="flex items-center gap-3 p-3 rounded-xl bg-muted/30 border border-border/40 min-w-0">
+                          <div className="h-10 w-10 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
+                            <FileText className="h-5 w-5 text-primary" />
+                          </div>
+                          <div className="min-w-0 flex-1">
+                            <div className="text-xs text-muted-foreground">
+                              Contract type
+                            </div>
+                            <div
+                              className={cn(
+                                "font-semibold truncate capitalize",
+                                contractTypeDisplay
+                                  ? "text-foreground"
+                                  : "text-muted-foreground"
+                              )}
+                              title={contractTypeDisplay || "Not set"}
+                            >
+                              {contractTypeDisplay || "—"}
+                            </div>
+                          </div>
+                        </div>
+                      ) : null}
                     </div>
                   </div>
 
@@ -1126,6 +1404,7 @@ export default function UserDetails() {
                   <div className="mt-5 lg:hidden space-y-3">
                     <EditUserDialog
                       user={user}
+                      dateOfBirth={onboardingData?.details?.date_of_birth}
                       onUserUpdate={handleUserUpdate}
                       loggedInUserRole={effectiveRole}
                       trigger={<UserActionCard icon={Pencil} label="Edit User" />}
@@ -1189,6 +1468,7 @@ export default function UserDetails() {
                     <div>
                       <EditUserDialog
                         user={user}
+                        dateOfBirth={onboardingData?.details?.date_of_birth}
                         onUserUpdate={handleUserUpdate}
                         loggedInUserRole={effectiveRole}
                         trigger={

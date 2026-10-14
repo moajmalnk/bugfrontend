@@ -167,6 +167,7 @@ interface UpdateUserData {
   onboarding_mode?: OnboardingMode;
   account_active?: boolean | number;
   joining_date?: string | null;
+  date_of_birth?: string | null;
   employee_code?: string | null;
   job_title?: string | null;
   job_level?: string | null;
@@ -562,6 +563,9 @@ class UserService {
           ? Number(user.account_active)
           : undefined,
       joining_date: user.joining_date ?? null,
+      date_of_birth: user.date_of_birth
+        ? String(user.date_of_birth).slice(0, 10)
+        : user.date_of_birth ?? null,
       employee_code: user.employee_code ?? null,
       job_title: user.job_title ?? null,
       job_level: user.job_level ?? null,
@@ -704,6 +708,9 @@ class UserService {
             ? Number(updatedUser.account_active)
             : undefined,
         joining_date: updatedUser.joining_date ?? null,
+        date_of_birth: updatedUser.date_of_birth
+          ? String(updatedUser.date_of_birth).slice(0, 10)
+          : updatedUser.date_of_birth ?? null,
         employee_code: updatedUser.employee_code ?? null,
         job_title: updatedUser.job_title ?? null,
         job_level: updatedUser.job_level ?? null,

@@ -56,6 +56,27 @@ const optionalDate = z
     message: "Date must be YYYY-MM-DD",
   });
 
+/** Why: Same age band as onboarding (14–100) so admin Edit User matches Employee ID rules. */
+function dobAgeError(value: string): string | null {
+  const v = value.trim().slice(0, 10);
+  if (!v) return null;
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(v)) return "Enter a valid date of birth";
+  const [year, month, day] = v.split("-").map(Number);
+  const dob = new Date(year, month - 1, day, 12, 0, 0, 0);
+  if (
+    dob.getFullYear() !== year ||
+    dob.getMonth() !== month - 1 ||
+    dob.getDate() !== day
+  ) {
+    return "Enter a valid date of birth";
+  }
+  const age = Math.floor((Date.now() - dob.getTime()) / (365.25 * 24 * 60 * 60 * 1000));
+  if (age < 14 || age > 100) {
+    return "Date of birth must be a real past date (age 14–100)";
+  }
+  return null;
+}
+
 const userFormSchema = z
   .object({
   username: z
@@ -72,6 +93,7 @@ const userFormSchema = z
   onboarding_mode: z.enum(["required", "optional", "off"]).optional(),
   phone: z.string().optional(),
   joining_date: optionalDate,
+  date_of_birth: optionalDate,
   employee_code: z.string().optional(),
   job_title: z.string().max(200).optional(),
   job_level: z.string().max(80).optional(),
@@ -89,6 +111,14 @@ const userFormSchema = z
       message: "Choose CODO Tester or Client Tester",
     });
   }
+  const dobErr = dobAgeError(values.date_of_birth || "");
+  if (dobErr) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ["date_of_birth"],
+      message: dobErr,
+    });
+  }
 });
 
 type UserFormValues = z.infer<typeof userFormSchema>;
@@ -98,6 +128,8 @@ type EditUserDialogProps = {
   onUserUpdate: (user: User) => void;
   trigger?: React.ReactNode;
   loggedInUserRole: string;
+  /** Prefill when DOB is loaded from onboarding details (User Details page). */
+  dateOfBirth?: string | null;
 };
 
 const fieldInputClass =
@@ -167,7 +199,8 @@ function PhoneInput({
   );
 }
 
-function toFormValues(user: User): UserFormValues {
+function toFormValues(user: User, dateOfBirth?: string | null): UserFormValues {
+  const dob = (dateOfBirth || user.date_of_birth || "").toString().slice(0, 10);
   return {
     username: user.username || "",
     email: user.email,
@@ -179,6 +212,7 @@ function toFormValues(user: User): UserFormValues {
     onboarding_mode: getOnboardingMode(user),
     phone: user.phone ? user.phone.replace(/^\+91/, "") : "",
     joining_date: user.joining_date || "",
+    date_of_birth: dob,
     employee_code: user.employee_code || "",
     job_title: user.job_title || "",
     job_level: user.job_level || "",
@@ -196,6 +230,7 @@ export function EditUserDialog({
   onUserUpdate,
   trigger,
   loggedInUserRole,
+  dateOfBirth,
 }: EditUserDialogProps) {
   const [open, setOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -234,19 +269,46 @@ export function EditUserDialog({
 
   const form = useForm<UserFormValues>({
     resolver: zodResolver(userFormSchema),
-    defaultValues: toFormValues(user),
+    defaultValues: toFormValues(user, dateOfBirth),
   });
 
   const roleKeyRef = useRef("");
   useEffect(() => {
-    const initial = toFormValues(user);
+    const initial = toFormValues(user, dateOfBirth);
     roleKeyRef.current = `${initial.role}:${initial.tester_type}`;
     form.reset(initial);
-  }, [user, form]);
+  }, [user, dateOfBirth, form]);
+
+  // Why: Users list may omit DOB — hydrate from getUser when admin opens Edit User.
+  useEffect(() => {
+    if (!open || String(loggedInUserRole || "").toLowerCase() !== "admin") return;
+    const existing = (dateOfBirth || user.date_of_birth || "").toString().slice(0, 10);
+    if (existing) return;
+    let cancelled = false;
+    void (async () => {
+      try {
+        const fresh = await userService.getUser(user.id);
+        const dob = (fresh.date_of_birth || "").toString().slice(0, 10);
+        if (!cancelled && dob && !form.getValues("date_of_birth")) {
+          form.setValue("date_of_birth", dob, { shouldDirty: false });
+        }
+      } catch {
+        // Optional hydrate — leave field empty if fetch fails.
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [open, loggedInUserRole, user.id, user.date_of_birth, dateOfBirth, form]);
 
   const isAdminEditor = String(loggedInUserRole || "").toLowerCase() === "admin";
   const selectedRoleName = form.watch("role");
   const selectedTesterType = form.watch("tester_type");
+  const selectedJobLevel = form.watch("job_level");
+  // Why: Founders / admins have no manager or employment contract — hide those HR fields.
+  const isOrgLeaderProfile =
+    String(selectedRoleName || "").toLowerCase() === "admin" ||
+    String(selectedJobLevel || "").trim().toLowerCase() === "founder";
   const isTesterRole = selectedRoleName === "tester";
   const testerTypeMissing =
     isTesterRole && selectedTesterType !== "codo" && selectedTesterType !== "client";
@@ -296,7 +358,7 @@ export function EditUserDialog({
     if (!next) {
       if (isSubmitting) return;
       if (form.formState.isDirty && !window.confirm("You have unsaved changes. Discard them?")) return;
-      const initial = toFormValues(user);
+      const initial = toFormValues(user, dateOfBirth);
       roleKeyRef.current = `${initial.role}:${initial.tester_type}`;
       form.reset(initial);
     }
@@ -331,12 +393,15 @@ export function EditUserDialog({
             data.onboarding_mode ?? onboardingModeDefault(data.role, data.tester_type);
         }
         payload.joining_date = data.joining_date?.trim() || null;
+        payload.date_of_birth = data.date_of_birth?.trim() || null;
         payload.employee_code = data.employee_code?.trim() || null;
         payload.job_title = data.job_title?.trim() || null;
         payload.job_level = data.job_level?.trim() || null;
         payload.department = data.department?.trim() || null;
-        payload.reports_to_user_id = data.reports_to_user_id?.trim() || null;
-        payload.contract_type = data.contract_type?.trim() || null;
+        if (!isOrgLeaderProfile) {
+          payload.reports_to_user_id = data.reports_to_user_id?.trim() || null;
+          payload.contract_type = data.contract_type?.trim() || null;
+        }
         payload.offer_letter_issued = !!data.offer_letter_issued;
         payload.offer_letter_shared_date =
           data.offer_letter_shared_date?.trim() || null;
@@ -355,6 +420,10 @@ export function EditUserDialog({
         phone: updatedUser.phone || (data.phone ? "+91" + data.phone : ""),
         name: updatedUser.name || updatedUser.username || data.username,
         avatar: updatedUser.avatar || user.avatar,
+        date_of_birth:
+          updatedUser.date_of_birth !== undefined
+            ? updatedUser.date_of_birth
+            : data.date_of_birth?.trim() || null,
       };
 
       onUserUpdate(finalUpdatedUser);
@@ -383,10 +452,23 @@ export function EditUserDialog({
   const handleRegenerateCode = async () => {
     if (!isAdminEditor || regenerating || isSubmitting) return;
     const join = (form.getValues("joining_date") || "").trim();
-    if (!join) {
+    const dob = (form.getValues("date_of_birth") || "").trim();
+    const missing: string[] = [];
+    if (!join) missing.push("Join date");
+    if (!dob) missing.push("Date of birth");
+    if (missing.length) {
       toast({
         title: "Cannot create Employee ID",
-        description: "Missing: Join date. Set Join date first, then regenerate. Date of birth must also exist from onboarding.",
+        description: `Missing: ${missing.join(" and ")}. Set them below, then regenerate.`,
+        variant: "destructive",
+      });
+      return;
+    }
+    const dobErr = dobAgeError(dob);
+    if (dobErr) {
+      toast({
+        title: "Cannot create Employee ID",
+        description: dobErr,
         variant: "destructive",
       });
       return;
@@ -395,9 +477,13 @@ export function EditUserDialog({
     try {
       const updatedUser = await userService.updateUser(user.id, {
         joining_date: join,
+        date_of_birth: dob,
         regenerate_employee_code: true,
       });
       form.setValue("employee_code", updatedUser.employee_code || "");
+      if (updatedUser.date_of_birth) {
+        form.setValue("date_of_birth", String(updatedUser.date_of_birth).slice(0, 10));
+      }
       onUserUpdate({ ...user, ...updatedUser });
       toast({
         title: "Employee ID regenerated",
@@ -620,9 +706,36 @@ export function EditUserDialog({
 
                   <FormField
                     control={form.control}
-                    name="employee_code"
+                    name="date_of_birth"
                     render={({ field }) => (
                       <FormItem className="col-span-12 md:col-span-6 space-y-2">
+                        <FormLabelDot color="bg-pink-500">Date of birth</FormLabelDot>
+                        <FormControl>
+                          <DatePicker
+                            value={field.value || ""}
+                            onChange={field.onChange}
+                            placeholder="Pick date of birth"
+                            className={fieldInputClass}
+                            disableFuture
+                            showToday={false}
+                            // Why: Default DatePicker is ±15 years (2011–2041 in 2026) — too narrow for DOB.
+                            fromYear={new Date().getFullYear() - 100}
+                            toYear={new Date().getFullYear() - 14}
+                          />
+                        </FormControl>
+                        <p className="text-[11px] text-muted-foreground leading-snug">
+                          Used for Employee ID and BugDates birthdays. Age must be 14–100.
+                        </p>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={form.control}
+                    name="employee_code"
+                    render={({ field }) => (
+                      <FormItem className="col-span-12 space-y-2">
                         <FormLabelDot color="bg-sky-500">Employee ID</FormLabelDot>
                         <div className="flex gap-2 min-w-0">
                           <FormControl>
@@ -649,8 +762,7 @@ export function EditUserDialog({
                           </Button>
                         </div>
                         <p className="text-[11px] text-muted-foreground leading-snug">
-                          Needs Join date + Date of birth (from onboarding). Refresh regenerates the
-                          cipher ID.
+                          Needs Join date + Date of birth above. Refresh regenerates the cipher ID.
                         </p>
                         <FormMessage />
                       </FormItem>
@@ -723,84 +835,88 @@ export function EditUserDialog({
                     )}
                   />
 
-                  <FormField
-                    control={form.control}
-                    name="reports_to_user_id"
-                    render={({ field }) => (
-                      <FormItem className="col-span-12 md:col-span-6 space-y-2">
-                        <FormLabelDot>Reports to</FormLabelDot>
-                        <Select
-                          onValueChange={(v) =>
-                            field.onChange(v === "__none__" ? "" : v)
-                          }
-                          value={field.value ? field.value : "__none__"}
-                        >
-                          <FormControl>
-                            <SelectTrigger className={fieldInputClass}>
-                              <SelectValue placeholder="Select manager" />
-                            </SelectTrigger>
-                          </FormControl>
-                          <SelectContent
-                            position="popper"
-                            className="z-[70] max-h-64"
-                            searchPlaceholder="Search manager..."
+                  {!isOrgLeaderProfile ? (
+                    <FormField
+                      control={form.control}
+                      name="reports_to_user_id"
+                      render={({ field }) => (
+                        <FormItem className="col-span-12 md:col-span-6 space-y-2">
+                          <FormLabelDot>Reports to</FormLabelDot>
+                          <Select
+                            onValueChange={(v) =>
+                              field.onChange(v === "__none__" ? "" : v)
+                            }
+                            value={field.value ? field.value : "__none__"}
                           >
-                            <SelectItem value="__none__">N/A</SelectItem>
-                            {managerOptions.map((m) => {
-                              const name = m.username || m.name || m.email || "User";
-                              const position = (m.role || m.job_title || "")
-                                .replace(/_/g, " ")
-                                .trim();
-                              return (
-                                <SelectItem key={m.id} value={m.id}>
-                                  <span className="flex items-center gap-2 min-w-0">
-                                    <span className="truncate">{name}</span>
-                                    {position ? (
-                                      <span className="text-muted-foreground capitalize shrink-0">
-                                        · {position}
-                                      </span>
-                                    ) : null}
-                                  </span>
-                                </SelectItem>
-                              );
-                            })}
-                          </SelectContent>
-                        </Select>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
+                            <FormControl>
+                              <SelectTrigger className={fieldInputClass}>
+                                <SelectValue placeholder="Select manager" />
+                              </SelectTrigger>
+                            </FormControl>
+                            <SelectContent
+                              position="popper"
+                              className="z-[70] max-h-64"
+                              searchPlaceholder="Search manager..."
+                            >
+                              <SelectItem value="__none__">N/A</SelectItem>
+                              {managerOptions.map((m) => {
+                                const name = m.username || m.name || m.email || "User";
+                                const position = (m.role || m.job_title || "")
+                                  .replace(/_/g, " ")
+                                  .trim();
+                                return (
+                                  <SelectItem key={m.id} value={m.id}>
+                                    <span className="flex items-center gap-2 min-w-0">
+                                      <span className="truncate">{name}</span>
+                                      {position ? (
+                                        <span className="text-muted-foreground capitalize shrink-0">
+                                          · {position}
+                                        </span>
+                                      ) : null}
+                                    </span>
+                                  </SelectItem>
+                                );
+                              })}
+                            </SelectContent>
+                          </Select>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  ) : null}
 
-                  <FormField
-                    control={form.control}
-                    name="contract_type"
-                    render={({ field }) => (
-                      <FormItem className="col-span-12 md:col-span-6 space-y-2">
-                        <FormLabelDot>Contract type</FormLabelDot>
-                        <Select
-                          onValueChange={(v) =>
-                            field.onChange(v === "__none__" ? "" : v)
-                          }
-                          value={field.value ? field.value : "__none__"}
-                        >
-                          <FormControl>
-                            <SelectTrigger className={fieldInputClass}>
-                              <SelectValue placeholder="Select type" />
-                            </SelectTrigger>
-                          </FormControl>
-                          <SelectContent position="popper" className="z-[70]">
-                            <SelectItem value="__none__">Not set</SelectItem>
-                            {CONTRACT_OPTIONS.map((opt) => (
-                              <SelectItem key={opt.value} value={opt.value}>
-                                {opt.label}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
+                  {!isOrgLeaderProfile ? (
+                    <FormField
+                      control={form.control}
+                      name="contract_type"
+                      render={({ field }) => (
+                        <FormItem className="col-span-12 md:col-span-6 space-y-2">
+                          <FormLabelDot>Contract type</FormLabelDot>
+                          <Select
+                            onValueChange={(v) =>
+                              field.onChange(v === "__none__" ? "" : v)
+                            }
+                            value={field.value ? field.value : "__none__"}
+                          >
+                            <FormControl>
+                              <SelectTrigger className={fieldInputClass}>
+                                <SelectValue placeholder="Select type" />
+                              </SelectTrigger>
+                            </FormControl>
+                            <SelectContent position="popper" className="z-[70]">
+                              <SelectItem value="__none__">Not set</SelectItem>
+                              {CONTRACT_OPTIONS.map((opt) => (
+                                <SelectItem key={opt.value} value={opt.value}>
+                                  {opt.label}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  ) : null}
 
                   <FormField
                     control={form.control}

@@ -189,6 +189,32 @@ function formatDateOnly(value?: string | null): string | null {
   return d.toLocaleDateString(undefined, { day: "2-digit", month: "short", year: "numeric" });
 }
 
+/** Why: Personal tab should show the same calendar age admins see in the header grid. */
+function ageFromDateOfBirth(value?: string | null): string | null {
+  const raw = String(value || "").trim().slice(0, 10);
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(raw)) return null;
+  const [year, month, day] = raw.split("-").map(Number);
+  const dob = new Date(year, month - 1, day);
+  if (
+    Number.isNaN(dob.getTime()) ||
+    dob.getFullYear() !== year ||
+    dob.getMonth() !== month - 1 ||
+    dob.getDate() !== day
+  ) {
+    return null;
+  }
+  const today = new Date();
+  let age = today.getFullYear() - year;
+  if (
+    today.getMonth() < month - 1 ||
+    (today.getMonth() === month - 1 && today.getDate() < day)
+  ) {
+    age -= 1;
+  }
+  if (age < 0 || age > 120) return null;
+  return `${age} ${age === 1 ? "year" : "years"}`;
+}
+
 type DetailGroup = {
   title?: string;
   cells: DetailCell[];
@@ -1322,6 +1348,7 @@ export function OnboardingProfileSection({
                 title: "Personal",
                 cells: [
                   { label: "Date of birth", value: formatDateOnly(details.date_of_birth) },
+                  { label: "Age", value: ageFromDateOfBirth(details.date_of_birth) },
                   {
                     label: "Gender",
                     value: details.gender

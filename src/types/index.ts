@@ -169,6 +169,11 @@ export interface User {
   privacy_accepted_at?: string | null;
   /** Employment start date (YYYY-MM-DD); attendance blocked before this day */
   joining_date?: string | null;
+  /**
+   * Date of birth (YYYY-MM-DD) from onboarding details.
+   * Returned on get/update for admins (and self); used by Edit User + Employee ID.
+   */
+  date_of_birth?: string | null;
   /** CODO cipher employee ID e.g. CODO-TPLN-KLTK */
   employee_code?: string | null;
   job_title?: string | null;
