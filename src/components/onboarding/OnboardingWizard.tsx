@@ -1684,8 +1684,7 @@ export function OnboardingWizard({
     setEmgOtpError(null);
     try {
       const res = await onboardingService.verifyEmergencyOtp(digits.slice(-10), otp);
-      const verifiedAt =
-        (res?.data?.verified_at as string | undefined) || new Date().toISOString();
+      const verifiedAt = res.data?.verified_at || new Date().toISOString();
       setForm((p) => ({
         ...p,
         emergency_contact_verified: true,
@@ -1766,8 +1765,7 @@ export function OnboardingWizard({
     setMailOtpError(null);
     try {
       const res = await onboardingService.verifyContactEmailOtp(email, otp);
-      const verifiedAt =
-        (res?.data?.verified_at as string | undefined) || new Date().toISOString();
+      const verifiedAt = res.data?.verified_at || new Date().toISOString();
       setForm((p) => ({
         ...p,
         contact_email_verified: true,
@@ -2372,9 +2370,7 @@ export function OnboardingWizard({
         setHasExistingPan(false);
         setExistingAvatarUrl(null);
         const avatar =
-          (result?.data?.avatar as string | undefined) ||
-          (result?.data?.user?.avatar as string | undefined) ||
-          null;
+          result.data?.avatar || result.data?.user?.avatar || null;
         onCompleted({ avatar, updated: true });
       } catch (err) {
         dropUnreadableFile(err);
@@ -2423,9 +2419,7 @@ export function OnboardingWizard({
       setHasExistingPan(false);
       setExistingAvatarUrl(null);
       const avatar =
-        (result?.data?.avatar as string | undefined) ||
-        (result?.data?.user?.avatar as string | undefined) ||
-        null;
+        result.data?.avatar || result.data?.user?.avatar || null;
       onCompleted({ avatar, updated: false });
       onOpenChange?.(false);
     } catch (err) {

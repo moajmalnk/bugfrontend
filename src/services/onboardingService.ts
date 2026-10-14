@@ -261,6 +261,35 @@ function isConnectionDrop(err: unknown): boolean {
   return !e?.response && e?.code === "ERR_NETWORK";
 }
 
+/** Why: Axios response bodies are unknown until we declare the API envelope. */
+type ApiEnvelope<T> = {
+  success?: boolean;
+  message?: string;
+  data?: T;
+};
+
+type OtpSendData = {
+  expires_in?: number;
+  phone?: string;
+  email?: string;
+  masked?: string;
+};
+
+type OtpVerifyData = {
+  verified?: boolean;
+  verified_at?: string;
+  phone?: string;
+  email?: string;
+};
+
+type SubmitOnboardingData = {
+  avatar?: string | null;
+  user?: { avatar?: string | null } | null;
+  updated?: boolean;
+  onboarding_completed?: number;
+  details?: UserOnboardingDetails | null;
+};
+
 export const onboardingService = {
   async submit(
     payload: OnboardingPayload,
@@ -270,7 +299,7 @@ export const onboardingService = {
       /** 0–100 while the request body uploads. */
       onUploadProgress?: (percent: number) => void;
     }
-  ) {
+  ): Promise<ApiEnvelope<SubmitOnboardingData>> {
     const hasFiles = !!(payload.aadhaar_file || payload.pan_file || payload.profile_photo);
     // Why: Text-only edits should not wait for the 120s file-upload budget.
     const timeout = options?.timeoutMs ?? (hasFiles ? 120_000 : 25_000);
@@ -304,14 +333,14 @@ export const onboardingService = {
 
     const first = send();
     try {
-      return (await first.request).data;
+      return (await first.request).data as ApiEnvelope<SubmitOnboardingData>;
     } catch (err) {
       // Why: Mobile radios drop long uploads mid-body. PHP only runs once the full
       // body arrives, so retrying an incomplete upload cannot double-submit.
       if (!isConnectionDrop(err) || first.wasBodySent()) throw err;
       options?.onUploadProgress?.(0);
       await new Promise((resolve) => setTimeout(resolve, 1500));
-      return (await send().request).data;
+      return (await send().request).data as ApiEnvelope<SubmitOnboardingData>;
     }
   },
 
@@ -330,34 +359,36 @@ export const onboardingService = {
       // Stale @types/axios lacks `signal`; axios 1.x supports it at runtime.
       { signal: options?.signal, timeout: 10_000 } as Parameters<typeof apiClient.post>[2]
     );
-    const data = response.data?.data as { available?: boolean; message?: string | null } | undefined;
+    const envelope = response.data as ApiEnvelope<{ available?: boolean; message?: string | null }>;
+    const data = envelope?.data;
     return { available: data?.available !== false, message: data?.message ?? null };
   },
 
-  async sendEmergencyOtp(phone: string) {
+  async sendEmergencyOtp(phone: string): Promise<ApiEnvelope<OtpSendData>> {
     const response = await apiClient.post("/users/send_emergency_otp.php", { phone });
-    return response.data;
+    return response.data as ApiEnvelope<OtpSendData>;
   },
 
-  async verifyEmergencyOtp(phone: string, otp: string) {
+  async verifyEmergencyOtp(phone: string, otp: string): Promise<ApiEnvelope<OtpVerifyData>> {
     const response = await apiClient.post("/users/verify_emergency_otp.php", { phone, otp });
-    return response.data;
+    return response.data as ApiEnvelope<OtpVerifyData>;
   },
 
-  async sendContactEmailOtp(email: string) {
+  async sendContactEmailOtp(email: string): Promise<ApiEnvelope<OtpSendData>> {
     const response = await apiClient.post("/users/send_contact_email_otp.php", { email });
-    return response.data;
+    return response.data as ApiEnvelope<OtpSendData>;
   },
 
-  async verifyContactEmailOtp(email: string, otp: string) {
+  async verifyContactEmailOtp(email: string, otp: string): Promise<ApiEnvelope<OtpVerifyData>> {
     const response = await apiClient.post("/users/verify_contact_email_otp.php", { email, otp });
-    return response.data;
+    return response.data as ApiEnvelope<OtpVerifyData>;
   },
 
   async get(userId?: string): Promise<GetOnboardingResponse> {
     const params = userId ? { user_id: userId } : undefined;
     const response = await apiClient.get("/users/get_onboarding.php", { params });
-    return response.data?.data as GetOnboardingResponse;
+    const envelope = response.data as ApiEnvelope<GetOnboardingResponse>;
+    return envelope?.data as GetOnboardingResponse;
   },
 
   async verify(
