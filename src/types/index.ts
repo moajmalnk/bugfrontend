@@ -186,7 +186,7 @@ export interface User {
   department?: string | null;
   reports_to_user_id?: string | null;
   reports_to_username?: string | null;
-  contract_type?: 'full_time' | 'remote' | 'part_time' | 'contract' | 'intern' | 'probation' | 'other' | string | null;
+  contract_type?: 'full_time' | 'remote' | 'part_time' | 'contract' | 'intern' | 'probation' | 'freelancer' | 'other' | string | null;
   offer_letter_issued?: number | boolean | null;
   offer_letter_shared_date?: string | null;
   probation_end_date?: string | null;
@@ -208,6 +208,11 @@ export interface User {
   is_late?: boolean;
   /** Day the work fields describe when fetched with ?date=; null/absent = today */
   work_date?: string | null;
+  /** True when approved leave covers the work date (IST today unless ?date=) */
+  on_leave_today?: boolean;
+  today_leave_type_name?: string | null;
+  today_leave_type_code?: string | null;
+  today_leave_reason?: string | null;
   permissions?: string[]; // Effective permissions for the user
 }
 

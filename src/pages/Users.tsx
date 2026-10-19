@@ -411,6 +411,10 @@ const Users = () => {
             checkout_time: user.checkout_time || null,
             work_mode: user.work_mode === 'office' || user.work_mode === 'wfh' ? user.work_mode : null,
             is_late: Boolean(user.is_late),
+            on_leave_today: Boolean(user.on_leave_today),
+            today_leave_type_name: user.today_leave_type_name || null,
+            today_leave_type_code: user.today_leave_type_code || null,
+            today_leave_reason: user.today_leave_reason || null,
             // Keep raw/resolved upload path — do not force ui-avatars over real photos.
             avatar: user.avatar
               ? resolveAvatarUrl(user.avatar, name)

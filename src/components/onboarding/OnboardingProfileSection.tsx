@@ -90,6 +90,7 @@ const HR_CONTRACT_TYPES = [
   { value: "contract", label: "Contract" },
   { value: "intern", label: "Intern" },
   { value: "probation", label: "Probation" },
+  { value: "freelancer", label: "Freelancer" },
   { value: "other", label: "Other" },
 ] as const;
 

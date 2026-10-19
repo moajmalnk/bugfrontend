@@ -79,6 +79,7 @@ import {
   Calendar,
   CalendarClock,
   CalendarDays,
+  CalendarOff,
   Check,
   CheckCircle2,
   ChevronDown,
@@ -470,9 +471,13 @@ async function loadDashboardData() {
   };
   // Why: Hours / check-in pool = developers, creators, CODO testers (not admins/clients).
   const trackableUsers = activeUsers.filter((u) => isAttendanceRosterUser(u));
-  const checkedIn = trackableUsers.filter((u) => u.checked_in_today);
+  const checkedIn = trackableUsers.filter((u) => u.checked_in_today && !u.on_leave_today);
   const onlineNow = activeUsers.filter((u) => u.status === "active" || u.status === "idle");
-  const notCheckedIn = trackableUsers.filter((u) => !u.checked_in_today);
+  const onLeave = trackableUsers.filter((u) => Boolean(u.on_leave_today));
+  // Why: Approved leave is not "still offline" — keep leave out of not-checked-in.
+  const notCheckedIn = trackableUsers.filter(
+    (u) => !u.checked_in_today && !u.on_leave_today
+  );
 
   return {
     projects,
@@ -490,6 +495,7 @@ async function loadDashboardData() {
     trackableUsers,
     checkedIn,
     onlineNow,
+    onLeave,
     notCheckedIn,
     userTotals,
     trackableCount: trackableProjects.length,
@@ -532,6 +538,7 @@ const projectStatusChartConfig = {
 
 const attendanceChartConfig = {
   checkedIn: { label: "Checked in", color: "#10b981" },
+  onLeave: { label: "On leave", color: "#14b8a6" },
   notCheckedIn: { label: "Not checked in", color: "#f59e0b" },
 } satisfies ChartConfig;
 
@@ -902,6 +909,7 @@ function BugsFixesStatusPanel({
 
 const workStatusChartConfig = {
   checkedIn: { label: "Checked in", color: "#10b981" },
+  onLeave: { label: "On leave", color: "#14b8a6" },
   notCheckedIn: { label: "Not checked in", color: "#f59e0b" },
   noHours: { label: "No hours yet", color: "#94a3b8" },
 } satisfies ChartConfig;
@@ -916,17 +924,40 @@ type WorkRetentionRow = {
   hours: number;
   overtime: number;
   leaveDays: number;
-  status: "checked_in" | "not_checked_in" | "no_hours";
+  status: "checked_in" | "on_leave" | "not_checked_in" | "no_hours";
   statusLabel: string;
+  /** Leave type for today when status is on_leave (e.g. Casual Leave). */
+  leaveTypeName?: string | null;
+  leaveReason?: string | null;
 };
+
+function istTodayYmdLocal(): string {
+  return new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Kolkata" });
+}
+
+function formatLeaveStatusLabel(leaveTypeName?: string | null): string {
+  const name = String(leaveTypeName || "").trim();
+  if (!name) return "On leave";
+  // Avoid "On On Leave" / duplicate prefix when API already says "Unpaid Leave"
+  if (/^on\s+/i.test(name)) return name;
+  return name;
+}
 
 function buildWorkRetentionRows(
   trackableUsers: User[],
   submissions: Array<Record<string, unknown>> | undefined
 ): WorkRetentionRow[] {
+  const today = istTodayYmdLocal();
   const byUser = new Map<
     string,
-    { days: Set<string>; hours: number; overtime: number; leaveDays: number }
+    {
+      days: Set<string>;
+      hours: number;
+      overtime: number;
+      leaveDays: number;
+      todayLeaveName: string | null;
+      todayLeaveReason: string | null;
+    }
   >();
 
   for (const sub of submissions || []) {
@@ -941,12 +972,21 @@ function buildWorkRetentionRows(
       hours: 0,
       overtime: 0,
       leaveDays: 0,
+      todayLeaveName: null as string | null,
+      todayLeaveReason: null as string | null,
     };
     if (date) entry.days.add(date);
     entry.hours += hours;
     entry.overtime += overtime;
     if (dayStatus.includes("leave") || dayStatus === "half_day") {
       entry.leaveDays += 1;
+      if (date === today) {
+        entry.todayLeaveName =
+          String(sub.leave_type_name || sub.leave_type_code || "").trim() || "Leave";
+        entry.todayLeaveReason = sub.leave_reason
+          ? String(sub.leave_reason)
+          : entry.todayLeaveReason;
+      }
     }
     byUser.set(uid, entry);
   }
@@ -958,9 +998,17 @@ function buildWorkRetentionRows(
       const days = stats?.days.size ?? 0;
       const overtime = stats?.overtime ?? 0;
       const leaveDays = stats?.leaveDays ?? 0;
+      const leaveTypeName =
+        user.today_leave_type_name || stats?.todayLeaveName || null;
+      const leaveReason = user.today_leave_reason || stats?.todayLeaveReason || null;
+      const onLeaveToday = Boolean(user.on_leave_today) || Boolean(stats?.todayLeaveName);
+
       let status: WorkRetentionRow["status"] = "no_hours";
       let statusLabel = "No hours yet";
-      if (user.checked_in_today) {
+      if (onLeaveToday) {
+        status = "on_leave";
+        statusLabel = formatLeaveStatusLabel(leaveTypeName);
+      } else if (user.checked_in_today) {
         status = "checked_in";
         statusLabel = "Checked in";
       } else if (hours > 0 || days > 0) {
@@ -975,6 +1023,8 @@ function buildWorkRetentionRows(
         leaveDays,
         status,
         statusLabel,
+        leaveTypeName,
+        leaveReason,
       };
     })
     .sort((a, b) => b.hours - a.hours || a.user.username.localeCompare(b.user.username));
@@ -1040,6 +1090,9 @@ function sumWorkforcePeriodHours(
 function workStatusBadgeClass(status: WorkRetentionRow["status"]): string {
   if (status === "checked_in") {
     return "bg-emerald-100 text-emerald-800 dark:bg-emerald-950/50 dark:text-emerald-300";
+  }
+  if (status === "on_leave") {
+    return "bg-teal-100 text-teal-900 border border-teal-200/80 dark:bg-teal-950/50 dark:text-teal-200 dark:border-teal-800/60";
   }
   if (status === "not_checked_in") {
     return "bg-amber-100 text-amber-800 dark:bg-amber-950/50 dark:text-amber-300";
@@ -1316,9 +1369,10 @@ function WorkRetentionTab({
     const overtime = rows.reduce((sum, r) => sum + r.overtime, 0);
     const withHours = rows.filter((r) => r.hours > 0 || r.days > 0).length;
     const checkedIn = rows.filter((r) => r.status === "checked_in").length;
+    const onLeave = rows.filter((r) => r.status === "on_leave").length;
     const notCheckedIn = rows.filter((r) => r.status === "not_checked_in").length;
     const noHours = rows.filter((r) => r.status === "no_hours").length;
-    return { hours, overtime, withHours, checkedIn, notCheckedIn, noHours };
+    return { hours, overtime, withHours, checkedIn, onLeave, notCheckedIn, noHours };
   }, [rows]);
 
   const statusPieData = useMemo(
@@ -1329,6 +1383,12 @@ function WorkRetentionTab({
           name: "Checked in",
           value: totals.checkedIn,
           fill: "var(--color-checkedIn)",
+        },
+        {
+          key: "onLeave",
+          name: "On leave",
+          value: totals.onLeave,
+          fill: "var(--color-onLeave)",
         },
         {
           key: "notCheckedIn",
@@ -1432,16 +1492,27 @@ function WorkRetentionTab({
             valueClass: "text-emerald-700 dark:text-emerald-300",
             span: "col-span-6 lg:col-span-3",
           },
-          {
-            title: "No hours yet",
-            value: totals.noHours,
-            hint: period.rangeLabel,
-            icon: Clock,
-            gradient: "from-slate-500 to-gray-600",
-            chip: "from-slate-50 to-gray-50 dark:from-slate-950/30 dark:to-gray-950/30 border-slate-200 dark:border-slate-700",
-            valueClass: "text-slate-700 dark:text-slate-300",
-            span: "col-span-6 lg:col-span-3",
-          },
+          totals.onLeave > 0
+            ? {
+                title: "On leave today",
+                value: totals.onLeave,
+                hint: `${totals.notCheckedIn} not checked in · ${totals.noHours} no hours`,
+                icon: CalendarOff,
+                gradient: "from-teal-500 to-cyan-600",
+                chip: "from-teal-50 to-cyan-50 dark:from-teal-950/30 dark:to-cyan-950/30 border-teal-200 dark:border-teal-800",
+                valueClass: "text-teal-700 dark:text-teal-300",
+                span: "col-span-6 lg:col-span-3",
+              }
+            : {
+                title: "No hours yet",
+                value: totals.noHours,
+                hint: period.rangeLabel,
+                icon: Clock,
+                gradient: "from-slate-500 to-gray-600",
+                chip: "from-slate-50 to-gray-50 dark:from-slate-950/30 dark:to-gray-950/30 border-slate-200 dark:border-slate-700",
+                valueClass: "text-slate-700 dark:text-slate-300",
+                span: "col-span-6 lg:col-span-3",
+              },
         ].map((card) => (
           <div
             key={card.title}
@@ -1475,7 +1546,7 @@ function WorkRetentionTab({
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
         <ChartCard
           title="Work status"
-          description="Entire team — check-in and period activity"
+          description="Entire team — check-in, leave, and period activity"
           icon={Users}
           gradient="from-cyan-500 to-blue-600"
         >
@@ -1575,7 +1646,11 @@ function WorkRetentionTab({
                     <TableRow key={row.user.id}>
                       <TableCell>
                         <Link
-                          to={`/${role}/users/${row.user.id}/work-stats/${encodeURIComponent(periodStartForLink)}`}
+                          to={
+                            row.status === "on_leave"
+                              ? `/${role}/leave-requests/${row.user.id}`
+                              : `/${role}/users/${row.user.id}/work-stats/${encodeURIComponent(periodStartForLink)}`
+                          }
                           className="flex items-center gap-2.5 min-w-0 hover:text-indigo-600 dark:hover:text-indigo-400"
                         >
                           <UserAvatar name={name} avatar={row.user.avatar} size="sm" />
@@ -1594,9 +1669,44 @@ function WorkRetentionTab({
                         {todayH != null ? `${todayH.toFixed(1)}h` : "—"}
                       </TableCell>
                       <TableCell>
-                        <Badge className={cn("border-0 font-semibold", workStatusBadgeClass(row.status))}>
-                          {row.statusLabel}
-                        </Badge>
+                        {row.status === "on_leave" ? (
+                          <div
+                            className="inline-flex flex-col items-start gap-1 min-w-0 max-w-[220px]"
+                            title={
+                              row.leaveReason
+                                ? `${row.statusLabel} · ${row.leaveReason}`
+                                : row.statusLabel
+                            }
+                          >
+                            <Badge
+                              className={cn(
+                                "inline-flex items-center gap-1.5 font-semibold rounded-xl px-2.5 py-1",
+                                workStatusBadgeClass(row.status)
+                              )}
+                            >
+                              <CalendarOff className="h-3.5 w-3.5 shrink-0" aria-hidden />
+                              <span className="truncate">{row.statusLabel}</span>
+                            </Badge>
+                            <span className="inline-flex items-center gap-1 text-[10px] font-semibold uppercase tracking-wide text-emerald-700 dark:text-emerald-300">
+                              <CheckCircle2 className="h-3 w-3" aria-hidden />
+                              Approved
+                            </span>
+                            {row.leaveReason ? (
+                              <span className="text-[11px] text-muted-foreground line-clamp-1 leading-snug">
+                                {row.leaveReason}
+                              </span>
+                            ) : null}
+                          </div>
+                        ) : (
+                          <Badge
+                            className={cn(
+                              "border-0 font-semibold rounded-xl",
+                              workStatusBadgeClass(row.status)
+                            )}
+                          >
+                            {row.statusLabel}
+                          </Badge>
+                        )}
                       </TableCell>
                     </TableRow>
                   );
@@ -1614,30 +1724,44 @@ function TrackingUserRow({
   user,
   role,
   showHours,
+  showLeave,
   accent = "emerald",
 }: {
   user: User;
   role: string;
   showHours?: boolean;
-  accent?: "emerald" | "amber";
+  showLeave?: boolean;
+  accent?: "emerald" | "amber" | "teal";
 }) {
   const name = user.username || user.name || "User";
   const hours =
     typeof user.today_hours_worked === "number" ? user.today_hours_worked.toFixed(1) : null;
+  const leaveLabel = formatLeaveStatusLabel(user.today_leave_type_name);
   const presence =
-    user.status === "active"
-      ? { label: "Active", dot: "bg-emerald-500", ring: "ring-emerald-400/50" }
-      : user.status === "idle"
-        ? { label: "Idle", dot: "bg-amber-400", ring: "ring-amber-400/40" }
-        : { label: "Offline", dot: "bg-slate-400", ring: "ring-slate-400/30" };
+    showLeave || user.on_leave_today
+      ? { label: leaveLabel, dot: "bg-teal-500", ring: "ring-teal-400/50" }
+      : user.status === "active"
+        ? { label: "Active", dot: "bg-emerald-500", ring: "ring-emerald-400/50" }
+        : user.status === "idle"
+          ? { label: "Idle", dot: "bg-amber-400", ring: "ring-amber-400/40" }
+          : { label: "Offline", dot: "bg-slate-400", ring: "ring-slate-400/30" };
   const avatarStatus =
-    user.status === "active" || user.status === "idle" ? user.status : null;
+    showLeave || user.on_leave_today
+      ? null
+      : user.status === "active" || user.status === "idle"
+        ? user.status
+        : null;
 
   return (
     <li>
       <Link
-        to={`/${role}/users/${user.id}`}
+        to={
+          showLeave || user.on_leave_today
+            ? `/${role}/leave-requests/${user.id}`
+            : `/${role}/users/${user.id}`
+        }
         className="group flex items-center gap-3 rounded-2xl px-2.5 py-2.5 -mx-0.5 transition-all duration-200 hover:bg-white/70 dark:hover:bg-white/[0.04]"
+        title={user.today_leave_reason || undefined}
       >
         <div className="relative shrink-0">
           <UserAvatar
@@ -1664,16 +1788,30 @@ function TrackingUserRow({
           <p className="text-[11px] text-muted-foreground capitalize truncate mt-0.5">
             <span className="font-medium">{user.role}</span>
             <span className="mx-1 opacity-40">·</span>
-            <span>{presence.label}</span>
+            <span className={showLeave ? "normal-case text-teal-700 dark:text-teal-300 font-medium" : undefined}>
+              {presence.label}
+            </span>
           </p>
+          {showLeave && user.today_leave_reason ? (
+            <p className="text-[11px] text-muted-foreground line-clamp-1 mt-0.5">
+              {user.today_leave_reason}
+            </p>
+          ) : null}
         </div>
-        {showHours ? (
+        {showLeave ? (
+          <span className="shrink-0 inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wide bg-emerald-500/10 text-emerald-700 dark:text-emerald-300">
+            <CheckCircle2 className="h-3 w-3" aria-hidden />
+            Approved
+          </span>
+        ) : showHours ? (
           <span
             className={cn(
               "shrink-0 inline-flex items-center rounded-full px-2.5 py-1 text-xs font-semibold tabular-nums",
               accent === "emerald"
                 ? "bg-emerald-500/10 text-emerald-700 dark:text-emerald-300"
-                : "bg-amber-500/10 text-amber-700 dark:text-amber-300"
+                : accent === "teal"
+                  ? "bg-teal-500/10 text-teal-700 dark:text-teal-300"
+                  : "bg-amber-500/10 text-amber-700 dark:text-amber-300"
             )}
           >
             {hours ?? "0.0"}h
@@ -1700,7 +1838,7 @@ function AttendancePeoplePanel({
   count: number;
   icon: LucideIcon;
   gradient: string;
-  accent: "emerald" | "amber";
+  accent: "emerald" | "amber" | "teal";
   emptyLabel: string;
   children: ReactNode;
   footer?: ReactNode;
@@ -1708,15 +1846,21 @@ function AttendancePeoplePanel({
   const accentBar =
     accent === "emerald"
       ? "from-emerald-500 via-teal-500 to-cyan-500"
-      : "from-amber-500 via-orange-500 to-rose-400";
+      : accent === "teal"
+        ? "from-teal-500 via-cyan-500 to-sky-500"
+        : "from-amber-500 via-orange-500 to-rose-400";
   const countTone =
     accent === "emerald"
       ? "text-emerald-600 dark:text-emerald-300"
-      : "text-amber-600 dark:text-amber-300";
+      : accent === "teal"
+        ? "text-teal-600 dark:text-teal-300"
+        : "text-amber-600 dark:text-amber-300";
   const wash =
     accent === "emerald"
       ? "from-emerald-50/50 via-transparent to-teal-50/20 dark:from-emerald-950/20 dark:via-transparent dark:to-teal-950/10"
-      : "from-amber-50/50 via-transparent to-orange-50/20 dark:from-amber-950/20 dark:via-transparent dark:to-orange-950/10";
+      : accent === "teal"
+        ? "from-teal-50/50 via-transparent to-cyan-50/20 dark:from-teal-950/20 dark:via-transparent dark:to-cyan-950/10"
+        : "from-amber-50/50 via-transparent to-orange-50/20 dark:from-amber-950/20 dark:via-transparent dark:to-orange-950/10";
 
   return (
     <div className={cn(PANEL, "flex flex-col h-full min-h-0 w-full")}>
@@ -1994,6 +2138,12 @@ export default function AdminDashboard() {
         fill: "var(--color-checkedIn)",
       },
       {
+        key: "onLeave",
+        name: "On leave",
+        value: data.onLeave.length,
+        fill: "var(--color-onLeave)",
+      },
+      {
         key: "notCheckedIn",
         name: "Not checked in",
         value: data.notCheckedIn.length,
@@ -2196,7 +2346,10 @@ export default function AdminDashboard() {
         {
           title: "Checked in",
           value: data.checkedIn.length,
-          hint: `${data.notCheckedIn.length} not in`,
+          hint:
+            data.onLeave.length > 0
+              ? `${data.onLeave.length} on leave · ${data.notCheckedIn.length} not in`
+              : `${data.notCheckedIn.length} not in`,
           icon: Users,
           gradient: "from-cyan-500 to-blue-600",
           chip: "from-cyan-50 to-blue-50 dark:from-cyan-950/30 dark:to-blue-950/30 border-cyan-200 dark:border-cyan-800",
@@ -3417,7 +3570,7 @@ export default function AdminDashboard() {
                     </ChartContainer>
                   </ChartCard>
 
-                  <ChartCard title="Team attendance" description="Check-in status today" icon={Users} gradient="from-cyan-500 to-blue-600">
+                  <ChartCard title="Team attendance" description="Check-in, leave, and still out today" icon={Users} gradient="from-cyan-500 to-blue-600">
                     <ChartContainer config={attendanceChartConfig} className="aspect-[4/3] w-full">
                       <PieChart>
                         <ChartTooltip content={<ChartTooltipContent nameKey="name" hideLabel />} />
@@ -3569,7 +3722,7 @@ export default function AdminDashboard() {
               <TabsContent value="team" className="space-y-6 mt-0">
                 <div className="grid grid-cols-12 gap-4 sm:gap-5">
                   <div className="col-span-12 lg:col-span-5">
-                    <ChartCard title="Attendance today" description="Checked in vs still out" icon={Users} gradient="from-cyan-500 to-blue-600">
+                    <ChartCard title="Attendance today" description="Checked in · on leave · still out" icon={Users} gradient="from-cyan-500 to-blue-600">
                       <ChartContainer config={attendanceChartConfig} className="aspect-[4/3] w-full">
                         <PieChart>
                           <ChartTooltip content={<ChartTooltipContent nameKey="name" hideLabel />} />
@@ -3592,7 +3745,7 @@ export default function AdminDashboard() {
                   </div>
 
                   <div className="col-span-12 lg:col-span-7 grid grid-cols-12 gap-3 sm:gap-4">
-                    <div className="col-span-12 sm:col-span-6 relative overflow-hidden rounded-2xl border border-emerald-200/70 dark:border-emerald-800/50 bg-gradient-to-br from-emerald-50/90 via-white to-teal-50/60 dark:from-emerald-950/40 dark:via-gray-900/80 dark:to-teal-950/20 p-5 sm:p-6 flex flex-col justify-center shadow-sm">
+                    <div className="col-span-12 sm:col-span-4 relative overflow-hidden rounded-2xl border border-emerald-200/70 dark:border-emerald-800/50 bg-gradient-to-br from-emerald-50/90 via-white to-teal-50/60 dark:from-emerald-950/40 dark:via-gray-900/80 dark:to-teal-950/20 p-5 sm:p-6 flex flex-col justify-center shadow-sm">
                       <div className="flex items-center justify-between gap-3 mb-3">
                         <span className="text-[11px] font-semibold uppercase tracking-[0.14em] text-emerald-700/80 dark:text-emerald-300/80">
                           Checked in
@@ -3601,14 +3754,30 @@ export default function AdminDashboard() {
                           <CheckCircle2 className="h-4 w-4" />
                         </div>
                       </div>
-                      <p className="text-4xl sm:text-5xl font-bold tabular-nums tracking-tight text-emerald-700 dark:text-emerald-300">
+                      <p className="text-3xl sm:text-4xl font-bold tabular-nums tracking-tight text-emerald-700 dark:text-emerald-300">
                         {data.checkedIn.length}
                       </p>
                       <p className="text-xs text-muted-foreground mt-2 font-medium">
-                        {data.onlineNow.length} online or idle right now
+                        {data.onlineNow.length} online or idle
                       </p>
                     </div>
-                    <div className="col-span-12 sm:col-span-6 relative overflow-hidden rounded-2xl border border-amber-200/70 dark:border-amber-800/50 bg-gradient-to-br from-amber-50/90 via-white to-orange-50/60 dark:from-amber-950/40 dark:via-gray-900/80 dark:to-orange-950/20 p-5 sm:p-6 flex flex-col justify-center shadow-sm">
+                    <div className="col-span-12 sm:col-span-4 relative overflow-hidden rounded-2xl border border-teal-200/70 dark:border-teal-800/50 bg-gradient-to-br from-teal-50/90 via-white to-cyan-50/60 dark:from-teal-950/40 dark:via-gray-900/80 dark:to-cyan-950/20 p-5 sm:p-6 flex flex-col justify-center shadow-sm">
+                      <div className="flex items-center justify-between gap-3 mb-3">
+                        <span className="text-[11px] font-semibold uppercase tracking-[0.14em] text-teal-700/80 dark:text-teal-300/80">
+                          On leave
+                        </span>
+                        <div className="p-2 rounded-xl bg-gradient-to-br from-teal-500 to-cyan-600 text-white shadow-md">
+                          <CalendarOff className="h-4 w-4" />
+                        </div>
+                      </div>
+                      <p className="text-3xl sm:text-4xl font-bold tabular-nums tracking-tight text-teal-700 dark:text-teal-300">
+                        {data.onLeave.length}
+                      </p>
+                      <p className="text-xs text-muted-foreground mt-2 font-medium">
+                        Approved leave today
+                      </p>
+                    </div>
+                    <div className="col-span-12 sm:col-span-4 relative overflow-hidden rounded-2xl border border-amber-200/70 dark:border-amber-800/50 bg-gradient-to-br from-amber-50/90 via-white to-orange-50/60 dark:from-amber-950/40 dark:via-gray-900/80 dark:to-orange-950/20 p-5 sm:p-6 flex flex-col justify-center shadow-sm">
                       <div className="flex items-center justify-between gap-3 mb-3">
                         <span className="text-[11px] font-semibold uppercase tracking-[0.14em] text-amber-700/80 dark:text-amber-300/80">
                           Not checked in
@@ -3617,18 +3786,18 @@ export default function AdminDashboard() {
                           <Timer className="h-4 w-4" />
                         </div>
                       </div>
-                      <p className="text-4xl sm:text-5xl font-bold tabular-nums tracking-tight text-amber-700 dark:text-amber-300">
+                      <p className="text-3xl sm:text-4xl font-bold tabular-nums tracking-tight text-amber-700 dark:text-amber-300">
                         {data.notCheckedIn.length}
                       </p>
                       <p className="text-xs text-muted-foreground mt-2 font-medium">
-                        Devs & testers still out
+                        Still expected in
                       </p>
                     </div>
                   </div>
                 </div>
 
                 <div className="grid grid-cols-12 gap-5 sm:gap-6 items-stretch">
-                  <div className="col-span-12 lg:col-span-6 flex">
+                  <div className="col-span-12 lg:col-span-4 flex">
                     <AttendancePeoplePanel
                       title="Checked in today"
                       description="Team members who started work"
@@ -3653,10 +3822,42 @@ export default function AdminDashboard() {
                     </AttendancePeoplePanel>
                   </div>
 
-                  <div className="col-span-12 lg:col-span-6 flex">
+                  <div className="col-span-12 lg:col-span-4 flex">
+                    <AttendancePeoplePanel
+                      title="On leave today"
+                      description="Approved leave — not expected to check in"
+                      count={data.onLeave.length}
+                      icon={CalendarOff}
+                      gradient="from-teal-500 to-cyan-600"
+                      accent="teal"
+                      emptyLabel="Nobody is on approved leave today."
+                      footer={
+                        <Button
+                          asChild
+                          variant="outline"
+                          size="sm"
+                          className="h-10 rounded-xl font-semibold w-full"
+                        >
+                          <Link to={`/${role}/leave-requests`}>Leave requests</Link>
+                        </Button>
+                      }
+                    >
+                      {data.onLeave.map((user) => (
+                        <TrackingUserRow
+                          key={user.id}
+                          user={user}
+                          role={role}
+                          accent="teal"
+                          showLeave
+                        />
+                      ))}
+                    </AttendancePeoplePanel>
+                  </div>
+
+                  <div className="col-span-12 lg:col-span-4 flex">
                     <AttendancePeoplePanel
                       title="Not checked in"
-                      description="Developers and testers still offline"
+                      description="Developers and testers still expected"
                       count={data.notCheckedIn.length}
                       icon={Clock}
                       gradient="from-amber-500 to-orange-600"
@@ -3668,7 +3869,7 @@ export default function AdminDashboard() {
                             asChild
                             variant="outline"
                             size="sm"
-                            className="col-span-12 sm:col-span-4 h-10 rounded-xl font-semibold"
+                            className="col-span-12 sm:col-span-6 h-10 rounded-xl font-semibold"
                           >
                             <Link to={`/${role}/users`}>Users & work stats</Link>
                           </Button>
@@ -3676,17 +3877,9 @@ export default function AdminDashboard() {
                             asChild
                             variant="outline"
                             size="sm"
-                            className="col-span-12 sm:col-span-4 h-10 rounded-xl font-semibold"
+                            className="col-span-12 sm:col-span-6 h-10 rounded-xl font-semibold"
                           >
                             <Link to={`/${role}/activity`}>Activity feed</Link>
-                          </Button>
-                          <Button
-                            asChild
-                            variant="outline"
-                            size="sm"
-                            className="col-span-12 sm:col-span-4 h-10 rounded-xl font-semibold"
-                          >
-                            <Link to={`/${role}/leave-requests`}>Leave requests</Link>
                           </Button>
                         </div>
                       }

@@ -118,6 +118,17 @@ export const isAttendanceRosterUser = (user: {
 };
 
 /**
+ * Why: Freelancer contract type — User Details hides Attend / Leaves / Hours
+ * and Add/Fix Hours. Check-in elsewhere is unchanged (UI-only gate).
+ */
+export const isFreelancerContract = (user: {
+  contract_type?: string | null;
+} | null | undefined): boolean =>
+  String(user?.contract_type || "")
+    .trim()
+    .toLowerCase() === "freelancer";
+
+/**
  * Why: HR keeps personal, employment and banking records for staff, plus anyone
  * an admin has opted into onboarding (e.g. a client tester set to Optional).
  */

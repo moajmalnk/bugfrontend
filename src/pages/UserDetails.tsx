@@ -41,7 +41,7 @@ import {
 } from "@/lib/utils";
 import { usePermissions } from "@/hooks/usePermissions";
 import { useToast } from "@/hooks/use-toast";
-import { cn, getEffectiveRole } from "@/lib/utils";
+import { cn, getEffectiveRole, isFreelancerContract } from "@/lib/utils";
 import {
   getRoleIcon as roleIcon,
   isSuperAdminUser,
@@ -149,6 +149,7 @@ const CONTRACT_LABELS: Record<string, string> = {
   contract: "Contract",
   intern: "Intern",
   probation: "Probation",
+  freelancer: "Freelancer",
   other: "Other",
 };
 
@@ -226,15 +227,26 @@ const USER_DETAILS_TABS: {
   { value: "active-hours", label: "Active Hours", shortLabel: "Hours", icon: Activity },
 ];
 
+/** Tabs hidden on User Details when contract_type is freelancer (UI-only). */
+const FREELANCER_HIDDEN_TABS = new Set<UserDetailsTab>([
+  "attendance",
+  "leaves",
+  "active-hours",
+]);
+
 function parseUserDetailsTab(
   raw: string | null,
-  isAdmin: boolean
+  isAdmin: boolean,
+  hideWorkforceTabs = false
 ): UserDetailsTab {
   // Why: Pay / Hours was folded into Payments; keep old ?tab=pay-hours links working.
   if (raw === "pay-hours") return "payments";
   const match = USER_DETAILS_TABS.find((t) => t.value === raw);
   if (!match) return "personal";
   if (match.adminOnly && !isAdmin) return "personal";
+  if (hideWorkforceTabs && FREELANCER_HIDDEN_TABS.has(match.value)) {
+    return "personal";
+  }
   return match.value;
 }
 
@@ -329,42 +341,6 @@ export default function UserDetails() {
     `/${effectiveRole}/users`
   );
 
-  const activeTab = parseUserDetailsTab(searchParams.get("tab"), isAdmin);
-  const visibleTabs = USER_DETAILS_TABS.filter((t) => !t.adminOnly || isAdmin);
-
-  const setActiveTab = (tab: string) => {
-    const next = parseUserDetailsTab(tab, isAdmin);
-    setSearchParams(
-      (prev) => {
-        const params = new URLSearchParams(prev);
-        if (next === "personal") {
-          params.delete("tab");
-        } else {
-          params.set("tab", next);
-        }
-        return params;
-      },
-      { replace: true }
-    );
-  };
-
-  // Why: Review / admin fill wizard live on Professional — deep-links must land there.
-  useEffect(() => {
-    if (!isAdmin) return;
-    const needsProfessional =
-      searchParams.get("review") === "onboarding" ||
-      Boolean(searchParams.get(ADMIN_ONBOARDING_URL_PARAM));
-    if (!needsProfessional || activeTab === "professional") return;
-    setSearchParams(
-      (prev) => {
-        const params = new URLSearchParams(prev);
-        params.set("tab", "professional");
-        return params;
-      },
-      { replace: true }
-    );
-  }, [activeTab, isAdmin, searchParams, setSearchParams]);
-
   const [isGeneratingLink, setIsGeneratingLink] = useState(false);
   const [isResendingWelcome, setIsResendingWelcome] = useState(false);
   const [resendConfirmOpen, setResendConfirmOpen] = useState(false);
@@ -400,6 +376,71 @@ export default function UserDetails() {
     queryFn: () => onboardingService.get(String(userId)),
     enabled: Boolean(userId),
   });
+
+  // Why: Freelancer contract — Attend / Leaves / Hours stay off this profile UI only.
+  const isFreelancer = isFreelancerContract({
+    contract_type:
+      user?.contract_type || onboardingData?.user?.contract_type || null,
+  });
+
+  const activeTab = parseUserDetailsTab(
+    searchParams.get("tab"),
+    isAdmin,
+    isFreelancer
+  );
+  const visibleTabs = USER_DETAILS_TABS.filter((t) => {
+    if (t.adminOnly && !isAdmin) return false;
+    if (isFreelancer && FREELANCER_HIDDEN_TABS.has(t.value)) return false;
+    return true;
+  });
+
+  const setActiveTab = (tab: string) => {
+    const next = parseUserDetailsTab(tab, isAdmin, isFreelancer);
+    setSearchParams(
+      (prev) => {
+        const params = new URLSearchParams(prev);
+        if (next === "personal") {
+          params.delete("tab");
+        } else {
+          params.set("tab", next);
+        }
+        return params;
+      },
+      { replace: true }
+    );
+  };
+
+  // Why: Review / admin fill wizard live on Professional — deep-links must land there.
+  useEffect(() => {
+    if (!isAdmin) return;
+    const needsProfessional =
+      searchParams.get("review") === "onboarding" ||
+      Boolean(searchParams.get(ADMIN_ONBOARDING_URL_PARAM));
+    if (!needsProfessional || activeTab === "professional") return;
+    setSearchParams(
+      (prev) => {
+        const params = new URLSearchParams(prev);
+        params.set("tab", "professional");
+        return params;
+      },
+      { replace: true }
+    );
+  }, [activeTab, isAdmin, searchParams, setSearchParams]);
+
+  // Why: Drop Attend/Leaves/Hours from the URL once we know the user is a freelancer.
+  useEffect(() => {
+    if (!isFreelancer) return;
+    const raw = searchParams.get("tab");
+    if (!raw || !FREELANCER_HIDDEN_TABS.has(raw as UserDetailsTab)) return;
+    setSearchParams(
+      (prev) => {
+        const params = new URLSearchParams(prev);
+        params.delete("tab");
+        return params;
+      },
+      { replace: true }
+    );
+  }, [isFreelancer, searchParams, setSearchParams]);
 
   const employeeCodeDisplay =
     (user?.employee_code || onboardingData?.user?.employee_code || "").trim() ||
@@ -721,7 +762,7 @@ export default function UserDetails() {
               </div>
 
               <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
-                {effectiveRole === "admin" && userId ? (
+                {effectiveRole === "admin" && userId && !isFreelancer ? (
                   <Button
                     type="button"
                     variant="outline"
@@ -856,6 +897,12 @@ export default function UserDetails() {
                             </span>
                           )}
                         </div>
+                        {isFreelancer ? (
+                          <p className="text-xs sm:text-sm text-muted-foreground max-w-xl leading-relaxed">
+                            Freelancer — check-in, leave, and hours are not managed on
+                            this profile.
+                          </p>
+                        ) : null}
                         <div className="flex flex-wrap items-center gap-2">
                           <span
                             className={cn(
