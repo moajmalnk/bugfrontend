@@ -27,11 +27,10 @@ import { Badge } from "@/components/ui/badge";
 import { formatRetestSummary } from "@/lib/verificationUtils";
 import { BugTypeMultiSelect } from "@/components/bugs/BugTypeMultiSelect";
 import { cn } from "@/lib/utils";
-import { retestBugPath } from "@/lib/bugStatusNavigation";
 import { notifyAdminNavCountsChanged } from "@/services/adminNavCountsService";
 import { useQueryClient } from "@tanstack/react-query";
 import { useEffect, useRef, useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import { DuplicateOfDialog, DuplicateOriginal } from "@/components/bugs/DuplicateOfDialog";
 import { GoogleDocsButton } from "./GoogleDocsButton";
 
@@ -52,6 +51,7 @@ export const BugDetailsCard = ({
 }: BugDetailsCardProps) => {
   const { currentUser } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
   const queryClient = useQueryClient();
   const [updating, setUpdating] = useState(false);
   const updatingRef = useRef(false);
@@ -244,12 +244,17 @@ export const BugDetailsCard = ({
         toast({
           title: "Marked fixed",
           description:
-            "Opened in Retests. A tester or admin can mark the issue fixed or still broken.",
+            "Queued for retest. A tester or admin can mark the issue fixed or still broken.",
         });
-        navigate(retestBugPath(currentUser?.role, bug.id), {
-          replace: true,
-          state: { from: "retests" },
-        });
+        // Focus verification only — keep from=project / Bugs entry so Back is unchanged.
+        navigate(
+          {
+            pathname: location.pathname,
+            search: location.search,
+            hash: "#tester-verification",
+          },
+          { replace: true, state: location.state }
+        );
       } else {
         toast({
           title: "Success",

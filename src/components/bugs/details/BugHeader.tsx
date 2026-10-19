@@ -114,8 +114,8 @@ export const BugHeader = ({
 
   const referrerIsProject =
     typeof document !== "undefined" && document.referrer.includes("/projects/");
-  // The query param is the current entry point. It wins over a leftover
-  // project referrer, so marking a bug fixed can send Back to Retests.
+  // Query param is the entry point (Bugs / Project / Retests). Marking fixed
+  // must not rewrite it — only true Retests entry uses from=retests.
   const isFromRetests =
     fromParam === "retests" ||
     (!fromParam &&

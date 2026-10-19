@@ -167,8 +167,11 @@ export function usePermissions(projectId: string | null = null) {
   );
 
   const isSuper = useCallback((): boolean => {
+    if (Number(currentUser?.is_super_admin) === 1 || currentUser?.is_super_admin === true) {
+      return true;
+    }
     return permissions.includes("SUPER_ADMIN");
-  }, [permissions]);
+  }, [permissions, currentUser?.is_super_admin]);
 
   const clearCache = useCallback(() => {
     if (currentUser) {

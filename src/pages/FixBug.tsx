@@ -171,7 +171,7 @@ const FixBug = () => {
         title: status === "fixed" ? "Marked fixed" : "Success",
         description:
           status === "fixed"
-            ? "Opened in Retests. A tester or admin can mark the issue fixed or still broken."
+            ? "Queued for retest. A tester or admin can mark the issue fixed or still broken."
             : "Bug status updated successfully",
       });
 
@@ -191,10 +191,13 @@ const FixBug = () => {
       }
 
       if (status === "fixed" && bugId) {
-        navigate(retestBugPath(currentUser.role, bugId), {
-          replace: true,
-          state: { from: "retests" },
-        });
+        // Preserve from=project (and other entry query) so Back stays correct.
+        navigate(
+          retestBugPath(currentUser.role, bugId, {
+            search: searchParams.toString(),
+          }),
+          { replace: true }
+        );
       } else {
         navigate(getBugDetailsUrl());
       }

@@ -154,6 +154,11 @@ export interface User {
   role_id?: number | null;
   /** 1 = active, 0 = deactivated by admin (when column exists) */
   account_active?: number;
+  /**
+   * 1 = Super Admin (can create Admins). JWT role stays `admin` for routing.
+   * Regular Admins have role admin with is_super_admin = 0.
+   */
+  is_super_admin?: number | boolean;
   /** 1 = mandatory onboarding wizard finished */
   onboarding_completed?: number;
   /** 1 = must choose password during onboarding (new hires) */

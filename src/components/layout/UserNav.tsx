@@ -9,16 +9,19 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { UserIcon, LogOut, Settings, User as UserAvatar, Shield, Mail } from "lucide-react";
+import { UserIcon, LogOut, Settings, User as UserAvatar, Crown, Shield, Mail } from "lucide-react";
 import { Link } from "react-router-dom";
 import { resolveAvatarUrl } from "@/lib/avatarUrl";
 import { cn } from "@/lib/utils";
+import { getRoleDisplayLabel, isSuperAdminUser } from "@/lib/roleBadge";
 import { VerifiedBlueTick, isFullFledgedUser } from "@/components/ui/VerifiedBlueTick";
 import { useState } from "react";
 
 export function UserNav() {
   const { currentUser } = useAuth();
   const role = currentUser?.role;
+  const superAdmin = isSuperAdminUser(currentUser);
+  const roleLabel = getRoleDisplayLabel(currentUser, role);
   const [logoutOpen, setLogoutOpen] = useState(false);
 
   const defaultAvatar = "/logo.png";
@@ -95,9 +98,20 @@ export function UserNav() {
                 {currentUser?.email || "No email"}
               </p>
               <div className="flex items-center gap-1 mt-1">
-                <Shield className="h-3 w-3 text-muted-foreground" />
-                <span className="text-xs text-muted-foreground capitalize">
-                  {role || "User"}
+                {superAdmin ? (
+                  <Crown className="h-3 w-3 text-amber-500" />
+                ) : (
+                  <Shield className="h-3 w-3 text-muted-foreground" />
+                )}
+                <span
+                  className={cn(
+                    "text-xs",
+                    superAdmin
+                      ? "text-amber-700 dark:text-amber-300 font-medium"
+                      : "text-muted-foreground capitalize"
+                  )}
+                >
+                  {roleLabel}
                 </span>
               </div>
             </div>

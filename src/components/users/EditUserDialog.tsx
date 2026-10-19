@@ -29,13 +29,16 @@ import { toast } from "@/components/ui/use-toast";
 import { DatePicker } from "@/components/ui/DatePicker";
 import { userService } from "@/services/userService";
 import { permissionService } from "@/services/permissionService";
+import { usePermissions } from "@/hooks/usePermissions";
+import { useAuth } from "@/context/AuthContext";
+import { isSuperAdminUser } from "@/lib/roleBadge";
 import { OnboardingMode, StandardsMode, TesterType, User, UserRole } from "@/types";
 import { TesterTypeField } from "@/components/users/TesterTypeField";
 import { StandardsAccessField } from "@/components/users/StandardsAccessField";
 import { OnboardingModeField } from "@/components/users/OnboardingModeField";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Loader2, Pencil, RefreshCw } from "lucide-react";
-import React, { useEffect, useRef, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 import {
@@ -232,6 +235,10 @@ export function EditUserDialog({
   loggedInUserRole,
   dateOfBirth,
 }: EditUserDialogProps) {
+  const { currentUser } = useAuth();
+  const { isSuper } = usePermissions();
+  const actorIsSuper = isSuperAdminUser(currentUser) || isSuper();
+  const targetIsSuper = isSuperAdminUser(user);
   const [open, setOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [regenerating, setRegenerating] = useState(false);
@@ -240,19 +247,36 @@ export function EditUserDialog({
 
   useEffect(() => {
     const loadRoles = async () => {
+      const filterRoles = (list: { id: number; role_name: string }[]) =>
+        list.filter(
+          (r) => actorIsSuper || r.role_name.toLowerCase() !== "admin"
+        );
       try {
-        const data = await permissionService.getRoles();
-        setRoles(data);
+        setRoles(filterRoles(await permissionService.getRoles()));
       } catch {
-        setRoles([
-          { id: 1, role_name: "Admin" },
-          { id: 2, role_name: "Developer" },
-          { id: 3, role_name: "Tester" },
-        ]);
+        setRoles(
+          filterRoles([
+            { id: 1, role_name: "Admin" },
+            { id: 2, role_name: "Developer" },
+            { id: 3, role_name: "Tester" },
+            { id: 4, role_name: "Creator" },
+          ])
+        );
       }
     };
     void loadRoles();
-  }, []);
+  }, [actorIsSuper]);
+
+  const selectableRoles = useMemo(() => {
+    // Keep current Admin role visible when editing an Admin even if actor cannot assign Admin.
+    if (
+      String(user.role || "").toLowerCase() === "admin" &&
+      !roles.some((r) => r.role_name.toLowerCase() === "admin")
+    ) {
+      return [{ id: 1, role_name: "Admin" }, ...roles];
+    }
+    return roles;
+  }, [roles, user.role]);
 
   useEffect(() => {
     if (!open) return;
@@ -368,7 +392,20 @@ export function EditUserDialog({
   const onSubmit = async (data: UserFormValues) => {
     setIsSubmitting(true);
     try {
-      const selectedRole = roles.find(
+      if (
+        data.role === "admin" &&
+        !actorIsSuper &&
+        String(user.role || "").toLowerCase() !== "admin"
+      ) {
+        toast({
+          title: "Not allowed",
+          description: "Only a Super Admin can assign the Admin role.",
+          variant: "destructive",
+        });
+        setIsSubmitting(false);
+        return;
+      }
+      const selectedRole = selectableRoles.find(
         (r) => r.role_name.toLowerCase() === data.role.toLowerCase()
       );
 
@@ -575,7 +612,10 @@ export function EditUserDialog({
                     <Select
                       onValueChange={field.onChange}
                       value={field.value}
-                      disabled={loggedInUserRole !== "admin"}
+                      disabled={
+                        loggedInUserRole !== "admin" ||
+                        (targetIsSuper && !actorIsSuper)
+                      }
                     >
                       <FormControl>
                         <SelectTrigger className={fieldInputClass}>
@@ -583,13 +623,26 @@ export function EditUserDialog({
                         </SelectTrigger>
                       </FormControl>
                       <SelectContent position="popper" className="z-[70]">
-                        {roles.map((role) => (
-                          <SelectItem key={role.id} value={role.role_name.toLowerCase()}>
+                        {selectableRoles.map((role) => (
+                          <SelectItem
+                            key={role.id}
+                            value={role.role_name.toLowerCase()}
+                            disabled={
+                              role.role_name.toLowerCase() === "admin" &&
+                              !actorIsSuper &&
+                              String(user.role || "").toLowerCase() !== "admin"
+                            }
+                          >
                             {role.role_name}
                           </SelectItem>
                         ))}
                       </SelectContent>
                     </Select>
+                    {targetIsSuper ? (
+                      <p className="text-[11px] text-amber-700 dark:text-amber-300">
+                        Super Admin — role changes require another Super Admin.
+                      </p>
+                    ) : null}
                     <FormMessage />
                   </FormItem>
                 )}

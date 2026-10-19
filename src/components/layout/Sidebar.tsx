@@ -5,6 +5,7 @@ import { Separator } from "@/components/ui/separator";
 import { useAuth } from "@/context/AuthContext";
 import { resolveAvatarUrl } from "@/lib/avatarUrl";
 import { canAccessCodoStandards, canViewStandards, cn, getEffectiveRole, isWorkforceUser, showBugMessageInMainNav } from "@/lib/utils";
+import { getRoleDisplayLabel, isSuperAdminUser } from "@/lib/roleBadge";
 import { VerifiedBlueTick, isFullFledgedUser } from "@/components/ui/VerifiedBlueTick";
 import { usePermissions } from "@/hooks/usePermissions";
 import {
@@ -874,8 +875,15 @@ export const Sidebar = ({ className, closeSidebar }: SidebarProps) => {
               <p className="text-sm font-semibold text-foreground truncate leading-tight">
                 {currentUser?.username || "BugRicer"}
               </p>
-              <p className="text-xs text-muted-foreground capitalize truncate leading-tight">
-                {role || "BugRicer"}
+              <p
+                className={cn(
+                  "text-xs truncate leading-tight",
+                  isSuperAdminUser(currentUser)
+                    ? "text-amber-700 dark:text-amber-300 font-medium"
+                    : "text-muted-foreground capitalize"
+                )}
+              >
+                {getRoleDisplayLabel(currentUser, role) || "BugRicer"}
               </p>
             </div>
           </Link>

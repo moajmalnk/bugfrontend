@@ -439,6 +439,10 @@ class UserService {
           user.account_active !== undefined && user.account_active !== null
             ? Number(user.account_active)
             : undefined,
+        is_super_admin:
+          user.is_super_admin !== undefined && user.is_super_admin !== null
+            ? Number(user.is_super_admin)
+            : undefined,
         joining_date: user.joining_date ?? null,
         employee_code: user.employee_code ?? null,
         job_title: user.job_title ?? null,
@@ -561,6 +565,10 @@ class UserService {
       account_active:
         user.account_active !== undefined && user.account_active !== null
           ? Number(user.account_active)
+          : undefined,
+      is_super_admin:
+        user.is_super_admin !== undefined && user.is_super_admin !== null
+          ? Number(user.is_super_admin)
           : undefined,
       joining_date: user.joining_date ?? null,
       date_of_birth: user.date_of_birth
@@ -706,6 +714,10 @@ class UserService {
         account_active:
           updatedUser.account_active !== undefined && updatedUser.account_active !== null
             ? Number(updatedUser.account_active)
+            : undefined,
+        is_super_admin:
+          updatedUser.is_super_admin !== undefined && updatedUser.is_super_admin !== null
+            ? Number(updatedUser.is_super_admin)
             : undefined,
         joining_date: updatedUser.joining_date ?? null,
         date_of_birth: updatedUser.date_of_birth

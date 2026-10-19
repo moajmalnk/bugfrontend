@@ -44,7 +44,9 @@ import { useToast } from "@/hooks/use-toast";
 import { cn, getEffectiveRole } from "@/lib/utils";
 import {
   getRoleIcon as roleIcon,
+  isSuperAdminUser,
   OnboardingModeBadge,
+  RoleLabelBadge,
   StandardsModeBadge,
   TesterTypeBadge,
 } from "@/lib/roleBadge";
@@ -494,13 +496,27 @@ export default function UserDetails() {
   }, [user]);
   const statusConfig = statusChip(status);
 
+  const actorIsSuperAdmin = isSuperAdminUser(currentUser);
+  const targetIsSuperAdmin = isSuperAdminUser(user);
+  const targetIsAdminAccount =
+    String(user?.role || "").toLowerCase() === "admin" || targetIsSuperAdmin;
   const canAdminManageAccount =
     effectiveRole === "admin" && currentUser?.id && user?.id && currentUser.id !== user.id;
+  const isAccountDeactivated = user?.account_active === 0;
+  // Why: Only Super Admin may delete / deactivate Admin accounts; Super Admins are never deleted from UI.
+  const canDeleteTargetUser =
+    canAdminManageAccount &&
+    !targetIsSuperAdmin &&
+    (!targetIsAdminAccount || actorIsSuperAdmin);
+  const canDeactivateTargetUser =
+    canAdminManageAccount &&
+    !isAccountDeactivated &&
+    !targetIsSuperAdmin &&
+    (!targetIsAdminAccount || actorIsSuperAdmin);
   const canManageUserProjects =
     effectiveRole === "admin" &&
     Boolean(user?.id) &&
     (user?.role === "developer" || user?.role === "tester");
-  const isAccountDeactivated = user?.account_active === 0;
   const canResendWelcome =
     Boolean(user?.id && (user?.email || user?.phone)) &&
     currentUser?.id !== user?.id &&
@@ -829,13 +845,8 @@ export default function UserDetails() {
                           </span>
                         </div>
                         <div className="flex flex-wrap items-center gap-2">
-                          <span className="inline-flex h-8 items-center gap-2 px-3 rounded-xl bg-muted/50 border border-border/40 shrink-0">
-                            {roleIcon(user.role, "h-4 w-4")}
-                            <span className="capitalize text-sm font-semibold">
-                              {user.role}
-                            </span>
-                            <TesterTypeBadge role={user.role} testerType={user.tester_type} />
-                          </span>
+                          <RoleLabelBadge user={user} />
+                          <TesterTypeBadge role={user.role} testerType={user.tester_type} />
                           {user.last_active_at && (
                             <span className="text-xs text-muted-foreground">
                               Active{" "}
@@ -1435,7 +1446,7 @@ export default function UserDetails() {
                       />
                     )}
 
-                    {canAdminManageAccount && !isAccountDeactivated && user.role !== "admin" && (
+                    {canDeactivateTargetUser && (
                       <UserActionCard
                         icon={UserX}
                         label="Deactivate"
@@ -1445,7 +1456,7 @@ export default function UserDetails() {
                       />
                     )}
 
-                    {canAdminManageAccount && isAccountDeactivated && (
+                    {canAdminManageAccount && isAccountDeactivated && !targetIsSuperAdmin && (
                       <UserActionCard
                         icon={UserCheck}
                         label="Activate"
@@ -1455,7 +1466,7 @@ export default function UserDetails() {
                       />
                     )}
 
-                    {effectiveRole === "admin" && currentUser?.id !== user.id && (
+                    {canDeleteTargetUser && (
                       <DeleteUserDialog
                         user={user}
                         onUserDelete={handleUserDelete}
@@ -1531,7 +1542,7 @@ export default function UserDetails() {
                       </div>
                     )}
 
-                    {canAdminManageAccount && !isAccountDeactivated && user.role !== "admin" && (
+                    {canDeactivateTargetUser && (
                       <div>
                         <Button
                           variant="secondary"
@@ -1545,7 +1556,7 @@ export default function UserDetails() {
                       </div>
                     )}
 
-                    {canAdminManageAccount && isAccountDeactivated && (
+                    {canAdminManageAccount && isAccountDeactivated && !targetIsSuperAdmin && (
                       <div>
                         <Button
                           variant="secondary"
@@ -1559,7 +1570,7 @@ export default function UserDetails() {
                       </div>
                     )}
 
-                    {effectiveRole === "admin" && currentUser?.id !== user.id && (
+                    {canDeleteTargetUser && (
                       <div>
                         <DeleteUserDialog
                           user={user}

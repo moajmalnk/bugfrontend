@@ -33,7 +33,12 @@ import { UndoDeleteNotificationPortal } from "@/components/ui/UndoDeleteNotifica
 import { ENV } from "@/lib/env";
 import { resolveAvatarUrl } from "@/lib/avatarUrl";
 import { cn, getEffectiveRole } from "@/lib/utils";
-import { getRoleIcon as getRoleIconFn, TesterTypeBadge } from "@/lib/roleBadge";
+import {
+  getRoleDisplayLabel,
+  getRoleIcon as getRoleIconFn,
+  isSuperAdminUser,
+  TesterTypeBadge,
+} from "@/lib/roleBadge";
 import { userService } from "@/services/userService";
 import { notifyAdminNavCountsChanged } from "@/services/adminNavCountsService";
 import { OnboardingMode, StandardsMode, TesterType, User, UserRole } from "@/types";
@@ -580,8 +585,8 @@ const Users = () => {
     setSearchParams(params, { replace: true });
   };
 
-  const getRoleIcon = (role: string) => {
-    return getRoleIconFn(role, "h-5 w-5 sm:h-6 sm:w-6");
+  const getRoleIcon = (role: string, isSuperAdmin = false) => {
+    return getRoleIconFn(role, "h-5 w-5 sm:h-6 sm:w-6", { isSuperAdmin });
   };
 
   const handleAddUser = async (userData: NewUser): Promise<boolean> => {
@@ -1685,9 +1690,16 @@ const Users = () => {
                         </p>
                         <div className="flex flex-wrap items-center gap-2 mt-1">
                           <div className="flex items-center gap-1">
-                            {getRoleIcon(user.role)}
-                            <span className="text-xs font-medium text-gray-600 dark:text-gray-400 capitalize">
-                              {user.role}
+                            {getRoleIcon(user.role, isSuperAdminUser(user))}
+                            <span
+                              className={cn(
+                                "text-xs font-medium",
+                                isSuperAdminUser(user)
+                                  ? "text-amber-700 dark:text-amber-300"
+                                  : "text-gray-600 dark:text-gray-400 capitalize"
+                              )}
+                            >
+                              {getRoleDisplayLabel(user)}
                             </span>
                             <TesterTypeBadge role={user.role} testerType={user.tester_type} />
                           </div>

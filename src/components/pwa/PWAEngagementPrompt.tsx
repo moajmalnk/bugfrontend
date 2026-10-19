@@ -703,7 +703,7 @@ export function PWAEngagementPrompt() {
               <div className="flex gap-2 pt-1">
                 <Button
                   variant="ghost"
-                  className="flex-1 text-slate-300 hover:text-white"
+                  className="flex-1 border border-slate-600 bg-slate-800 text-slate-100 hover:bg-slate-700 hover:text-white"
                   onClick={() => closePrompt(true)}
                 >
                   Not now

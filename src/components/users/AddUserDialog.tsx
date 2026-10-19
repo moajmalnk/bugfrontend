@@ -35,6 +35,9 @@ import { useEffect, useRef, useState } from "react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { permissionService } from "@/services/permissionService";
+import { usePermissions } from "@/hooks/usePermissions";
+import { useAuth } from "@/context/AuthContext";
+import { isSuperAdminUser } from "@/lib/roleBadge";
 import {
   cn,
   isOnboardingConfigurable,
@@ -137,6 +140,10 @@ function PhoneInput({
 }
 
 export function AddUserDialog({ onUserAdd }: AddUserDialogProps) {
+  const { currentUser } = useAuth();
+  const { isSuper } = usePermissions();
+  // Why: Only Super Admin may assign the Admin role at create time.
+  const canAssignAdmin = isSuperAdminUser(currentUser) || isSuper();
   const [open, setOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [roles, setRoles] = useState<{ id: number; role_name: string }[]>([]);
@@ -189,27 +196,43 @@ export function AddUserDialog({ onUserAdd }: AddUserDialogProps) {
 
   useEffect(() => {
     const loadRoles = async () => {
+      const filterRoles = (list: { id: number; role_name: string }[]) =>
+        list.filter(
+          (r) =>
+            canAssignAdmin || r.role_name.toLowerCase() !== "admin"
+        );
       try {
-        const data = await permissionService.getRoles();
+        const data = filterRoles(await permissionService.getRoles());
         setRoles(data);
         if (data.length > 0 && !form.getValues("role")) {
           form.setValue("role", data[data.length - 1].role_name.toLowerCase());
         }
       } catch {
-        const fallbackRoles = [
+        const fallbackRoles = filterRoles([
           { id: 1, role_name: "Admin" },
           { id: 2, role_name: "Developer" },
           { id: 3, role_name: "Tester" },
-        ];
+          { id: 4, role_name: "Creator" },
+        ]);
         setRoles(fallbackRoles);
         if (!form.getValues("role")) {
           form.setValue("role", fallbackRoles[fallbackRoles.length - 1].role_name.toLowerCase());
         }
       }
     };
-    loadRoles();
+    void loadRoles();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [canAssignAdmin]);
+
+  useEffect(() => {
+    if (canAssignAdmin) return;
+    if (form.getValues("role") === "admin") {
+      const fallback =
+        roles.find((r) => r.role_name.toLowerCase() !== "admin")?.role_name.toLowerCase() ||
+        "tester";
+      form.setValue("role", fallback);
+    }
+  }, [canAssignAdmin, roles, form]);
 
   const handleAddUser = async (userData: UserFormValues): Promise<boolean> => {
     try {

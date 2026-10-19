@@ -1,4 +1,4 @@
-import { Bug, Code2, Palette, Shield } from "lucide-react";
+import { Bug, Code2, Crown, Palette, Shield } from "lucide-react";
 import {
   cn,
   getOnboardingModeLabel,
@@ -6,12 +6,41 @@ import {
   isOnboardingConfigurable,
   isStandardsConfigurable,
 } from "@/lib/utils";
+import type { User } from "@/types";
+
+/** Why: Super Admin keeps JWT role `admin` — the flag distinguishes hierarchy. */
+export function isSuperAdminUser(
+  user?: Pick<User, "is_super_admin" | "role"> | null
+): boolean {
+  if (!user) return false;
+  return (
+    Number(user.is_super_admin) === 1 ||
+    user.is_super_admin === true
+  );
+}
+
+export function getRoleDisplayLabel(
+  user?: Pick<User, "role" | "is_super_admin"> | null,
+  roleFallback?: string | null
+): string {
+  if (isSuperAdminUser(user)) return "Super Admin";
+  const role = (user?.role || roleFallback || "").toString().trim();
+  if (!role) return "User";
+  return role.charAt(0).toUpperCase() + role.slice(1);
+}
 
 /**
  * Why: One badge token set so Users, details, and dashboards stay consistent
  * when a new first-class role (Creator) is added.
  */
-export function getRoleIcon(role: string, className = "h-5 w-5") {
+export function getRoleIcon(
+  role: string,
+  className = "h-5 w-5",
+  opts?: { isSuperAdmin?: boolean }
+) {
+  if (opts?.isSuperAdmin) {
+    return <Crown className={cn(className, "text-amber-500")} />;
+  }
   switch (role) {
     case "admin":
       return <Shield className={cn(className, "text-blue-500")} />;
@@ -26,7 +55,10 @@ export function getRoleIcon(role: string, className = "h-5 w-5") {
   }
 }
 
-export function getRoleBadgeClass(role: string): string {
+export function getRoleBadgeClass(role: string, opts?: { isSuperAdmin?: boolean }): string {
+  if (opts?.isSuperAdmin) {
+    return "bg-amber-100 text-amber-900 dark:bg-amber-900/30 dark:text-amber-200 border-amber-500/30";
+  }
   switch (role) {
     case "admin":
       return "bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300";
@@ -39,6 +71,34 @@ export function getRoleBadgeClass(role: string): string {
     default:
       return "bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-300";
   }
+}
+
+/** Premium pill for Super Admin; falls back to standard role styling. */
+export function RoleLabelBadge({
+  user,
+  className,
+}: {
+  user?: Pick<User, "role" | "is_super_admin" | "tester_type"> | null;
+  className?: string;
+}) {
+  if (!user) return null;
+  const superAdmin = isSuperAdminUser(user);
+  return (
+    <span
+      className={cn(
+        "inline-flex h-8 items-center gap-2 px-3 rounded-xl border shrink-0 text-sm font-semibold",
+        superAdmin
+          ? "bg-gradient-to-r from-amber-500/15 via-amber-400/10 to-yellow-500/15 border-amber-500/35 text-amber-900 dark:text-amber-100"
+          : "bg-muted/50 border-border/40",
+        className
+      )}
+    >
+      {getRoleIcon(user.role || "", "h-4 w-4", { isSuperAdmin: superAdmin })}
+      <span className={superAdmin ? "tracking-wide" : "capitalize"}>
+        {getRoleDisplayLabel(user)}
+      </span>
+    </span>
+  );
 }
 
 export const SYSTEM_USER_ROLES = ["admin", "developer", "tester", "creator"] as const;

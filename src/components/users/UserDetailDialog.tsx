@@ -57,7 +57,7 @@ import { EditUserDialog } from "./EditUserDialog";
 import { UserWorkStats } from "./UserWorkStats";
 import { ActiveHours } from "./ActiveHours";
 import { usePermissions } from "@/hooks/usePermissions";
-import { getRoleIcon as roleIcon, TesterTypeBadge } from "@/lib/roleBadge";
+import { RoleLabelBadge, TesterTypeBadge } from "@/lib/roleBadge";
 
 export interface DeleteUserDialogProps {
   user: User;
@@ -194,8 +194,6 @@ export function UserDetailDialog({
     },
     enabled: !!user.id,
   });
-
-  const getRoleIcon = (role: string) => roleIcon(role, "h-5 w-5");
 
   // Calculate user status based on last_active_at
   const getUserStatus = (): 'active' | 'idle' | 'offline' => {
@@ -372,13 +370,8 @@ export function UserDetailDialog({
                 
                 {/* Role Badge */}
                 <div className="flex flex-col sm:flex-row items-center sm:items-center justify-center sm:justify-start gap-1.5 sm:gap-2 flex-wrap">
-                  <div className="flex items-center gap-1.5 sm:gap-2 px-2 sm:px-3 py-1 sm:py-1.5 bg-muted/60 rounded-lg border border-border/50">
-                    {getRoleIcon(user.role)}
-                    <span className="capitalize font-semibold text-sm sm:text-base text-foreground">
-                      {user.role}
-                    </span>
-                    <TesterTypeBadge role={user.role} testerType={user.tester_type} />
-                  </div>
+                  <RoleLabelBadge user={user} />
+                  <TesterTypeBadge role={user.role} testerType={user.tester_type} />
                   <Badge
                     variant={isAccountDeactivated ? "destructive" : "secondary"}
                     className="text-xs font-medium"
