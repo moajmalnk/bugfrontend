@@ -1,5 +1,15 @@
 import { Button } from "@/components/ui/button";
 import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import {
   Dialog,
   DialogContent,
   DialogDescription,
@@ -246,6 +256,7 @@ export function EditUserDialog({
   const actorIsSuper = isSuperAdminUser(currentUser) || isSuper();
   const targetIsSuper = isSuperAdminUser(user);
   const [open, setOpen] = useState(false);
+  const [discardConfirmOpen, setDiscardConfirmOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [regenerating, setRegenerating] = useState(false);
   const [roles, setRoles] = useState<{ id: number; role_name: string }[]>([]);
@@ -414,17 +425,27 @@ export function EditUserDialog({
     if (photoInputRef.current) photoInputRef.current.value = "";
   };
 
+  const discardAndClose = () => {
+    const initial = toFormValues(user, dateOfBirth);
+    roleKeyRef.current = `${initial.role}:${initial.tester_type}`;
+    form.reset(initial);
+    resetPhotoState();
+    setDiscardConfirmOpen(false);
+    setOpen(false);
+  };
+
   const handleOpenChange = (next: boolean) => {
     if (!next) {
       if (isSubmitting) return;
       const dirty = form.formState.isDirty || !!profilePhoto;
-      if (dirty && !window.confirm("You have unsaved changes. Discard them?")) return;
-      const initial = toFormValues(user, dateOfBirth);
-      roleKeyRef.current = `${initial.role}:${initial.tester_type}`;
-      form.reset(initial);
-      resetPhotoState();
+      if (dirty) {
+        setDiscardConfirmOpen(true);
+        return;
+      }
+      discardAndClose();
+      return;
     }
-    setOpen(next);
+    setOpen(true);
   };
 
   const handlePhotoPick = (fileList: FileList | null) => {
@@ -1229,6 +1250,29 @@ export function EditUserDialog({
           setCropOpen(false);
         }}
       />
+
+      <AlertDialog open={discardConfirmOpen} onOpenChange={setDiscardConfirmOpen}>
+        <AlertDialogContent
+          className="z-[1100] max-w-[400px] rounded-2xl"
+          overlayClassName="z-[1100]"
+        >
+          <AlertDialogHeader>
+            <AlertDialogTitle>Discard unsaved changes?</AlertDialogTitle>
+            <AlertDialogDescription>
+              You have unsaved edits on this user. Close anyway and lose them?
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel className="rounded-xl">Keep editing</AlertDialogCancel>
+            <AlertDialogAction
+              className="rounded-xl bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              onClick={discardAndClose}
+            >
+              Discard
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </Dialog>
   );
 }
