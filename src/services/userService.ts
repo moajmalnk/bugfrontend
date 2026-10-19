@@ -179,6 +179,8 @@ interface UpdateUserData {
   probation_end_date?: string | null;
   employment_status?: "active" | "inactive" | string;
   regenerate_employee_code?: boolean;
+  /** Why: Admin Edit User can set another user's photo via multipart upload. */
+  profile_photo?: File | null;
 }
 
 // Define the structure for user statistics
@@ -382,26 +384,12 @@ export interface ActiveHoursData {
 class UserService {
   private baseUrl = `${ENV.API_URL}/users`;
 
-  private generateAvatar(username: string, role: UserRole): string {
-    const backgroundColors = {
-      admin: '3b82f6',
-      developer: '10b981',
-      tester: 'f59e0b',
-    };
-    const bgColor = backgroundColors[role] || '6b7280';
-    return `https://ui-avatars.com/api/?name=${encodeURIComponent(username)}&background=${bgColor}&color=fff`;
-  }
-
   private resolveUserAvatar(
     avatar: string | null | undefined,
     name: string,
-    role: UserRole
+    _role?: UserRole
   ): string {
-    const raw = (avatar || "").trim();
-    if (raw) {
-      return resolveAvatarUrl(raw, name);
-    }
-    return this.generateAvatar(name, role);
+    return resolveAvatarUrl(avatar, name);
   }
 
   private async fetchWithAuth(url: string, options: RequestInit = {}) {
@@ -678,14 +666,43 @@ class UserService {
   }
 
   async updateUser(userId: string, userData: UpdateUserData): Promise<User> {
-    const response = await fetch(`${ENV.API_URL}/users/update.php`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${localStorage.getItem("token")}`,
-      },
-      body: JSON.stringify({ id: userId, ...userData }),
-    });
+    const token = localStorage.getItem("token");
+    const { profile_photo, ...rest } = userData;
+
+    let response: Response;
+    if (profile_photo instanceof File) {
+      // Why: File uploads require multipart; keep JSON path for photo-less edits.
+      const fd = new FormData();
+      fd.append("id", userId);
+      for (const [key, value] of Object.entries(rest)) {
+        if (value === undefined) continue;
+        if (value === null) {
+          fd.append(key, "");
+          continue;
+        }
+        if (typeof value === "boolean") {
+          fd.append(key, value ? "1" : "0");
+          continue;
+        }
+        fd.append(key, String(value));
+      }
+      fd.append("profile_photo", profile_photo);
+      response = await fetch(`${ENV.API_URL}/users/update.php`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${token}` },
+        body: fd,
+      });
+    } else {
+      response = await fetch(`${ENV.API_URL}/users/update.php`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ id: userId, ...rest }),
+      });
+    }
+
     const result = await response.json();
     if (!result.success) {
       throw new Error(result.message || "Failed to update user");

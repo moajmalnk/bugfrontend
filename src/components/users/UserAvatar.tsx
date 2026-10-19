@@ -8,7 +8,11 @@ import {
   DialogDescription,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { resolveAvatarUrl } from "@/lib/avatarUrl";
+import {
+  DEFAULT_AVATAR_LOGO,
+  hasUploadedAvatar,
+  resolveAvatarUrl,
+} from "@/lib/avatarUrl";
 import { cn } from "@/lib/utils";
 import { X } from "lucide-react";
 
@@ -22,16 +26,6 @@ const SIZE_CLASS: Record<UserAvatarSize, string> = {
   "2xl": "h-28 w-28 text-2xl",
 };
 
-function initialsFromName(name: string): string {
-  const parts = name
-    .trim()
-    .split(/[\s._-]+/)
-    .filter(Boolean);
-  if (parts.length === 0) return "?";
-  if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
-  return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
-}
-
 type UserAvatarProps = {
   name: string;
   avatar?: string | null;
@@ -42,14 +36,14 @@ type UserAvatarProps = {
   alt?: string;
   /**
    * Why: Detail screens open a full-size photo dialog on click when a real
-   * upload exists (initials-only faces stay non-clickable).
+   * upload exists (logo-only faces stay non-clickable).
    */
   previewable?: boolean;
 };
 
 /**
  * Why: One professional face for Users / Project members / details —
- * real upload when present, polished initials otherwise.
+ * real upload when present, BugRicer logo otherwise.
  */
 export function UserAvatar({
   name,
@@ -62,15 +56,12 @@ export function UserAvatar({
 }: UserAvatarProps) {
   const [previewOpen, setPreviewOpen] = useState(false);
   const displayName = name.trim() || "User";
-  const raw = (avatar || "").trim();
-  const hasRealPhoto =
-    raw !== "" && !/^https?:\/\/ui-avatars\.com\//i.test(raw);
+  const hasRealPhoto = hasUploadedAvatar(avatar);
   const imageSrc = hasRealPhoto
-    ? resolveAvatarUrl(raw, displayName)
-    : undefined;
-  const initials = initialsFromName(displayName);
+    ? resolveAvatarUrl(avatar, displayName)
+    : DEFAULT_AVATAR_LOGO;
   const label = alt || `${displayName} profile photo`;
-  const canPreview = previewable && !!imageSrc;
+  const canPreview = previewable && hasRealPhoto;
 
   const avatarNode = (
     <Avatar
@@ -80,20 +71,23 @@ export function UserAvatar({
         canPreview && "transition-opacity group-hover/avatar:opacity-90"
       )}
     >
-      {imageSrc ? (
-        <AvatarImage
-          src={imageSrc}
-          alt={label}
-          className="object-cover"
-          loading="lazy"
-          decoding="async"
-        />
-      ) : null}
+      <AvatarImage
+        src={imageSrc}
+        alt={label}
+        className={cn("object-cover", !hasRealPhoto && "object-contain p-1.5")}
+        loading="lazy"
+        decoding="async"
+      />
       <AvatarFallback
-        className="bg-gradient-to-br from-slate-500 to-slate-700 text-white font-semibold tracking-wide"
-        delayMs={imageSrc ? 400 : 0}
+        className="bg-muted p-1.5"
+        delayMs={0}
       >
-        {initials}
+        <img
+          src={DEFAULT_AVATAR_LOGO}
+          alt=""
+          className="h-full w-full object-contain"
+          aria-hidden
+        />
       </AvatarFallback>
     </Avatar>
   );

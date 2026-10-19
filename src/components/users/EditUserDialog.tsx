@@ -36,8 +36,14 @@ import { OnboardingMode, StandardsMode, TesterType, User, UserRole } from "@/typ
 import { TesterTypeField } from "@/components/users/TesterTypeField";
 import { StandardsAccessField } from "@/components/users/StandardsAccessField";
 import { OnboardingModeField } from "@/components/users/OnboardingModeField";
+import { ProfilePhotoResizeModal } from "@/components/onboarding/ProfilePhotoResizeModal";
+import {
+  DEFAULT_AVATAR_LOGO,
+  hasUploadedAvatar,
+  resolveAvatarUrl,
+} from "@/lib/avatarUrl";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { Loader2, Pencil, RefreshCw } from "lucide-react";
+import { Camera, Loader2, Pencil, RefreshCw } from "lucide-react";
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
@@ -244,6 +250,18 @@ export function EditUserDialog({
   const [regenerating, setRegenerating] = useState(false);
   const [roles, setRoles] = useState<{ id: number; role_name: string }[]>([]);
   const [managerOptions, setManagerOptions] = useState<User[]>([]);
+  const [profilePhoto, setProfilePhoto] = useState<File | null>(null);
+  const [photoPreviewUrl, setPhotoPreviewUrl] = useState<string | null>(null);
+  const [cropOpen, setCropOpen] = useState(false);
+  const [cropSrc, setCropSrc] = useState<string | null>(null);
+  const photoInputRef = useRef<HTMLInputElement>(null);
+
+  const displayName = user.username || user.name || "User";
+  const existingAvatarSrc = hasUploadedAvatar(user.avatar)
+    ? resolveAvatarUrl(user.avatar, displayName)
+    : DEFAULT_AVATAR_LOGO;
+  const previewSrc = photoPreviewUrl || existingAvatarSrc;
+  const showingLogo = !photoPreviewUrl && !hasUploadedAvatar(user.avatar);
 
   useEffect(() => {
     const loadRoles = async () => {
@@ -378,15 +396,60 @@ export function EditUserDialog({
     });
   }, [selectedRoleName, selectedTesterType, form]);
 
+  useEffect(() => {
+    if (!profilePhoto) {
+      setPhotoPreviewUrl(null);
+      return;
+    }
+    const url = URL.createObjectURL(profilePhoto);
+    setPhotoPreviewUrl(url);
+    return () => URL.revokeObjectURL(url);
+  }, [profilePhoto]);
+
+  const resetPhotoState = () => {
+    setProfilePhoto(null);
+    setPhotoPreviewUrl(null);
+    setCropOpen(false);
+    setCropSrc(null);
+    if (photoInputRef.current) photoInputRef.current.value = "";
+  };
+
   const handleOpenChange = (next: boolean) => {
     if (!next) {
       if (isSubmitting) return;
-      if (form.formState.isDirty && !window.confirm("You have unsaved changes. Discard them?")) return;
+      const dirty = form.formState.isDirty || !!profilePhoto;
+      if (dirty && !window.confirm("You have unsaved changes. Discard them?")) return;
       const initial = toFormValues(user, dateOfBirth);
       roleKeyRef.current = `${initial.role}:${initial.tester_type}`;
       form.reset(initial);
+      resetPhotoState();
     }
     setOpen(next);
+  };
+
+  const handlePhotoPick = (fileList: FileList | null) => {
+    const file = fileList?.[0];
+    if (!file) return;
+    if (!/^image\/(jpeg|jpg|png|webp)$/i.test(file.type)) {
+      toast({
+        title: "Invalid image",
+        description: "Use JPG, PNG, or WebP.",
+        variant: "destructive",
+      });
+      return;
+    }
+    if (file.size > 8 * 1024 * 1024) {
+      toast({
+        title: "Image too large",
+        description: "Max size is 8MB before resize.",
+        variant: "destructive",
+      });
+      return;
+    }
+    const url = URL.createObjectURL(file);
+    setCropSrc(url);
+    setCropOpen(true);
+    if (photoInputRef.current) photoInputRef.current.value = "";
   };
 
   const onSubmit = async (data: UserFormValues) => {
@@ -444,6 +507,9 @@ export function EditUserDialog({
           data.offer_letter_shared_date?.trim() || null;
         payload.probation_end_date = data.probation_end_date?.trim() || null;
       }
+      if (profilePhoto) {
+        payload.profile_photo = profilePhoto;
+      }
 
       const updatedUser = await userService.updateUser(user.id, payload);
 
@@ -464,6 +530,7 @@ export function EditUserDialog({
       };
 
       onUserUpdate(finalUpdatedUser);
+      resetPhotoState();
 
       toast({
         title: "Success",
@@ -570,6 +637,67 @@ export function EditUserDialog({
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)}>
             <div className="max-h-[min(70vh,560px)] overflow-y-auto px-6 py-5 grid grid-cols-12 gap-4">
+              <div className="col-span-12 flex flex-wrap items-center gap-4 rounded-2xl border border-border/60 bg-muted/20 p-4">
+                <div
+                  className={cn(
+                    "relative h-20 w-20 shrink-0 overflow-hidden rounded-2xl ring-1 ring-border/60 bg-muted shadow-sm",
+                    showingLogo && "p-2"
+                  )}
+                >
+                  <img
+                    src={previewSrc}
+                    alt={`${displayName} profile`}
+                    className={cn(
+                      "h-full w-full",
+                      showingLogo ? "object-contain" : "object-cover"
+                    )}
+                    onError={(e) => {
+                      e.currentTarget.src = DEFAULT_AVATAR_LOGO;
+                    }}
+                  />
+                </div>
+                <div className="min-w-0 flex-1 space-y-2">
+                  <p className="text-sm font-semibold text-foreground">Profile photo</p>
+                  <p className="text-xs text-muted-foreground leading-snug">
+                    {showingLogo
+                      ? "No photo yet — BugRicer logo is shown by default. Upload a square photo to replace it."
+                      : "Update the profile picture shown across BugRicer."}
+                  </p>
+                  <div className="flex flex-wrap gap-2">
+                    <input
+                      ref={photoInputRef}
+                      type="file"
+                      accept="image/jpeg,image/jpg,image/png,image/webp"
+                      className="hidden"
+                      onChange={(e) => handlePhotoPick(e.target.files)}
+                    />
+                    <Button
+                      type="button"
+                      variant="outline"
+                      className="h-10 rounded-xl"
+                      disabled={isSubmitting}
+                      onClick={() => photoInputRef.current?.click()}
+                    >
+                      <Camera className="h-4 w-4 mr-2" />
+                      {hasUploadedAvatar(user.avatar) || profilePhoto
+                        ? "Change photo"
+                        : "Upload photo"}
+                    </Button>
+                    {profilePhoto ? (
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        className="h-10 rounded-xl text-muted-foreground"
+                        disabled={isSubmitting}
+                        onClick={() => setProfilePhoto(null)}
+                      >
+                        Clear new photo
+                      </Button>
+                    ) : null}
+                  </div>
+                </div>
+              </div>
+
               <FormField
                 control={form.control}
                 name="username"
@@ -1079,7 +1207,28 @@ export function EditUserDialog({
             </DialogFooter>
           </form>
         </Form>
+
       </DialogContent>
+
+      <ProfilePhotoResizeModal
+        open={cropOpen}
+        imageSrc={cropSrc}
+        onOpenChange={(next) => {
+          setCropOpen(next);
+          if (!next && cropSrc) {
+            URL.revokeObjectURL(cropSrc);
+            setCropSrc(null);
+          }
+        }}
+        onApply={(file) => {
+          setProfilePhoto(file);
+          if (cropSrc) {
+            URL.revokeObjectURL(cropSrc);
+            setCropSrc(null);
+          }
+          setCropOpen(false);
+        }}
+      />
     </Dialog>
   );
 }

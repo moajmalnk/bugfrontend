@@ -35,7 +35,7 @@ import {
   userRequiresOnboarding,
 } from "@/lib/utils";
 import { API_BASE_URL } from "@/lib/env";
-import { resolveAvatarUrl } from "@/lib/avatarUrl";
+import { hasUploadedAvatar, resolveAvatarUrl } from "@/lib/avatarUrl";
 import { onboardingService } from "@/services/onboardingService";
 import { userService } from "@/services/userService";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
@@ -636,10 +636,7 @@ export default function Profile() {
 
   const displayName = currentUser.name || currentUser.username || "Member";
   const avatarSrc = resolveAvatarUrl(currentUser.avatar, displayName);
-  const hasRealPhoto =
-    !!currentUser.avatar &&
-    String(currentUser.avatar).trim() !== "" &&
-    !/^https?:\/\/ui-avatars\.com\//i.test(String(currentUser.avatar).trim());
+  const hasRealPhoto = hasUploadedAvatar(currentUser.avatar);
   const roleLabel = (currentUser.role || "member").replace(/_/g, " ");
   const joiningLabel = currentUser.joining_date
     ? new Date(currentUser.joining_date).toLocaleDateString(undefined, {

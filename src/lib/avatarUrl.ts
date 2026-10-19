@@ -1,5 +1,8 @@
 import { ENV } from "@/lib/env";
 
+/** Why: When a user has no uploaded photo, show the BugRicer brand mark — not initials. */
+export const DEFAULT_AVATAR_LOGO = "/logo.png";
+
 /**
  * Why: Onboarding / messaging used to persist XAMPP-absolute paths
  * (`/BugRicer/backend/uploads/...`) which 404 on the Hostinger backend and
@@ -17,22 +20,29 @@ export function getBackendOrigin(): string {
   return "https://bugbackend.bugricer.com";
 }
 
-function uiAvatarFallback(displayName: string): string {
-  return `https://ui-avatars.com/api/?name=${encodeURIComponent(
-    displayName || "User"
-  )}&background=475569&color=fff&size=256&bold=true`;
+/**
+ * True when avatar is a real upload (not empty, not the brand logo, not ui-avatars).
+ */
+export function hasUploadedAvatar(avatar: string | null | undefined): boolean {
+  const raw = (avatar || "").trim();
+  if (!raw) return false;
+  if (raw === DEFAULT_AVATAR_LOGO || raw.endsWith("/logo.png")) return false;
+  if (/^https?:\/\/ui-avatars\.com\//i.test(raw)) return false;
+  return true;
 }
 
 /**
  * Normalize users.avatar (or legacy profile picture paths) for <img src>.
+ * Empty / missing photos resolve to the BugRicer logo.
  */
 export function resolveAvatarUrl(
   avatar: string | null | undefined,
-  displayName = "User"
+  _displayName = "User"
 ): string {
-  const fallback = uiAvatarFallback(displayName);
+  const fallback = DEFAULT_AVATAR_LOGO;
   const raw = (avatar || "").trim();
   if (!raw) return fallback;
+  if (/^https?:\/\/ui-avatars\.com\//i.test(raw)) return fallback;
 
   if (
     raw.startsWith("http://") ||
