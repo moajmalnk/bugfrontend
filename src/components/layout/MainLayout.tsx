@@ -204,7 +204,7 @@ export const MainLayout = ({ children }: MainLayoutProps) => {
     <GlobalSearchProvider onCloseSidebar={() => setSidebarOpen(false)}>
       <div className="flex h-screen supports-[height:100dvh]:h-[100dvh] min-w-0 overflow-hidden bg-background">
         {/* Sidebar for desktop */}
-        <aside className="hidden lg:block w-64 xl:w-72 shrink-0 min-w-0">
+        <aside className="hidden lg:block w-64 xl:w-72 shrink-0 min-w-0 h-full overflow-visible">
           <Sidebar />
         </aside>
 

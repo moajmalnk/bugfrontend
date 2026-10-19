@@ -15,17 +15,22 @@ export function BrandLogo({ className, mark = false }: BrandLogoProps) {
   const white = mark ? "/brand/bugricer-mark-white.png" : "/brand/bugricer-wordmark-white.png";
 
   return (
-    <span className={cn("inline-flex items-center", className)}>
+    <span
+      className={cn(
+        "inline-flex items-center justify-start overflow-visible",
+        className
+      )}
+    >
       <img
         src={black}
         alt="BugRicer"
-        className="h-full w-auto max-w-full object-contain dark:hidden"
+        className="h-full w-auto max-h-full max-w-full object-contain object-left dark:hidden"
         decoding="async"
       />
       <img
         src={white}
         alt=""
-        className="hidden h-full w-auto max-w-full object-contain dark:block"
+        className="hidden h-full w-auto max-h-full max-w-full object-contain object-left dark:block"
         decoding="async"
       />
     </span>

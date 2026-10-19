@@ -10,6 +10,7 @@ import {
 } from "@/components/ui/dialog";
 import {
   DEFAULT_AVATAR_LOGO,
+  DEFAULT_AVATAR_LOGO_DARK,
   hasUploadedAvatar,
   resolveAvatarUrl,
 } from "@/lib/avatarUrl";
@@ -24,6 +25,14 @@ const SIZE_CLASS: Record<UserAvatarSize, string> = {
   lg: "h-12 w-12 text-sm",
   xl: "h-20 w-20 text-xl",
   "2xl": "h-28 w-28 text-2xl",
+};
+
+const LOGO_PAD: Record<UserAvatarSize, string> = {
+  sm: "p-1",
+  md: "p-1.5",
+  lg: "p-2",
+  xl: "p-3",
+  "2xl": "p-4",
 };
 
 type UserAvatarProps = {
@@ -41,9 +50,33 @@ type UserAvatarProps = {
   previewable?: boolean;
 };
 
+function BrandMarkFallback({ size }: { size: UserAvatarSize }) {
+  return (
+    <span
+      className={cn(
+        "flex h-full w-full items-center justify-center bg-white dark:bg-slate-900",
+        LOGO_PAD[size]
+      )}
+    >
+      <img
+        src={DEFAULT_AVATAR_LOGO}
+        alt=""
+        className="h-full w-full object-contain dark:hidden"
+        aria-hidden
+      />
+      <img
+        src={DEFAULT_AVATAR_LOGO_DARK}
+        alt=""
+        className="hidden h-full w-full object-contain dark:block"
+        aria-hidden
+      />
+    </span>
+  );
+}
+
 /**
  * Why: One professional face for Users / Project members / details —
- * real upload when present, BugRicer logo otherwise.
+ * real upload when present, high-contrast BugRicer mark otherwise.
  */
 export function UserAvatar({
   name,
@@ -59,7 +92,7 @@ export function UserAvatar({
   const hasRealPhoto = hasUploadedAvatar(avatar);
   const imageSrc = hasRealPhoto
     ? resolveAvatarUrl(avatar, displayName)
-    : DEFAULT_AVATAR_LOGO;
+    : undefined;
   const label = alt || `${displayName} profile photo`;
   const canPreview = previewable && hasRealPhoto;
 
@@ -67,27 +100,22 @@ export function UserAvatar({
     <Avatar
       className={cn(
         SIZE_CLASS[size],
-        "ring-1 ring-border/60 shadow-sm bg-muted",
+        "ring-1 ring-border/60 shadow-sm overflow-hidden",
+        hasRealPhoto ? "bg-muted" : "bg-white dark:bg-slate-900",
         canPreview && "transition-opacity group-hover/avatar:opacity-90"
       )}
     >
-      <AvatarImage
-        src={imageSrc}
-        alt={label}
-        className={cn("object-cover", !hasRealPhoto && "object-contain p-1.5")}
-        loading="lazy"
-        decoding="async"
-      />
-      <AvatarFallback
-        className="bg-muted p-1.5"
-        delayMs={0}
-      >
-        <img
-          src={DEFAULT_AVATAR_LOGO}
-          alt=""
-          className="h-full w-full object-contain"
-          aria-hidden
+      {imageSrc ? (
+        <AvatarImage
+          src={imageSrc}
+          alt={label}
+          className="object-cover"
+          loading="lazy"
+          decoding="async"
         />
+      ) : null}
+      <AvatarFallback className="p-0 bg-transparent" delayMs={imageSrc ? 400 : 0}>
+        <BrandMarkFallback size={size} />
       </AvatarFallback>
     </Avatar>
   );

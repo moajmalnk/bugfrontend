@@ -30,7 +30,7 @@ export function NotificationPopover() {
     >
       <Bell className="h-5 w-5" />
       {unreadCount > 0 && (
-        <span className="absolute -top-1 -right-1 h-5 w-5 rounded-full bg-gradient-to-r from-red-500 to-pink-500 text-[10px] font-bold text-white flex items-center justify-center shadow-lg animate-pulse">
+        <span className="absolute top-0 right-0 h-4 min-w-4 px-0.5 rounded-full bg-gradient-to-r from-red-500 to-pink-500 text-[9px] font-bold text-white flex items-center justify-center shadow-lg animate-pulse leading-none">
           {unreadCount > 99 ? '99+' : unreadCount}
         </span>
       )}

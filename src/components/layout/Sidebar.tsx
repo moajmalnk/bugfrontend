@@ -205,7 +205,7 @@ function SidebarAdminNav({
   );
 }
 
-const defaultAvatar = "/logo.png";
+const defaultAvatar = "/brand/bugricer-mark-black.png";
 
 export const Sidebar = ({ className, closeSidebar }: SidebarProps) => {
   const { currentUser } = useAuth();
@@ -510,14 +510,14 @@ export const Sidebar = ({ className, closeSidebar }: SidebarProps) => {
         className
       )}
     >
-      {/* Header */}
-      <div className="flex-shrink-0 p-6 pb-4">
-        <div className="flex items-center justify-between gap-3">
-          <div className="flex min-w-0 flex-1 flex-col gap-1">
-            <BrandLogo className="h-8 w-[9.5rem]" />
-            <p className="text-xs text-muted-foreground">Bug Tracking</p>
+      {/* Header — extra top pad so wordmark antennae + notification badge are not
+          clipped by the root layout overflow-hidden / safe-area edge. */}
+      <div className="flex-shrink-0 px-5 pb-4 pt-[max(1.5rem,calc(0.75rem+env(safe-area-inset-top)))] overflow-visible">
+        <div className="flex items-start justify-between gap-3 overflow-visible">
+          <div className="flex min-w-0 flex-1 flex-col gap-1.5 overflow-visible">
+            <BrandLogo className="h-11 w-[13rem] max-w-full shrink-0 overflow-visible" />
           </div>
-          <div className="flex shrink-0 items-center gap-0.5">
+          <div className="flex shrink-0 items-center gap-0.5 pt-0.5">
             <ImpersonateIndicator />
             <NotificationPopover />
           </div>
@@ -847,21 +847,33 @@ export const Sidebar = ({ className, closeSidebar }: SidebarProps) => {
             }}
           >
             <div className="relative flex h-10 w-10 shrink-0 items-center justify-center">
-              <img
-                src={
-                  currentUser?.avatar
-                    ? resolveAvatarUrl(
-                        currentUser.avatar,
-                        currentUser.name || currentUser.username || "User"
-                      )
-                    : defaultAvatar
-                }
-                alt="User avatar"
-                className="h-10 w-10 rounded-xl object-cover ring-2 ring-border/50 group-hover:ring-accent/50 transition-all duration-200"
-                onError={(e) => {
-                  e.currentTarget.src = defaultAvatar;
-                }}
-              />
+              {currentUser?.avatar ? (
+                <img
+                  src={resolveAvatarUrl(
+                    currentUser.avatar,
+                    currentUser.name || currentUser.username || "User"
+                  )}
+                  alt="User avatar"
+                  className="h-10 w-10 rounded-xl object-cover ring-2 ring-border/50 group-hover:ring-accent/50 transition-all duration-200"
+                  onError={(e) => {
+                    e.currentTarget.src = defaultAvatar;
+                  }}
+                />
+              ) : (
+                <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-white p-1.5 ring-2 ring-border/50 group-hover:ring-accent/50 transition-all duration-200 dark:bg-slate-900">
+                  <img
+                    src={defaultAvatar}
+                    alt="User avatar"
+                    className="h-full w-full object-contain dark:hidden"
+                  />
+                  <img
+                    src="/brand/bugricer-mark-white.png"
+                    alt=""
+                    className="hidden h-full w-full object-contain dark:block"
+                    aria-hidden
+                  />
+                </span>
+              )}
               {isFullFledgedUser(currentUser) ? (
                 <VerifiedBlueTick
                   size="sm"

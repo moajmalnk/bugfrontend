@@ -49,6 +49,7 @@ import { OnboardingModeField } from "@/components/users/OnboardingModeField";
 import { ProfilePhotoResizeModal } from "@/components/onboarding/ProfilePhotoResizeModal";
 import {
   DEFAULT_AVATAR_LOGO,
+  DEFAULT_AVATAR_LOGO_DARK,
   hasUploadedAvatar,
   resolveAvatarUrl,
 } from "@/lib/avatarUrl";
@@ -270,7 +271,7 @@ export function EditUserDialog({
   const displayName = user.username || user.name || "User";
   const existingAvatarSrc = hasUploadedAvatar(user.avatar)
     ? resolveAvatarUrl(user.avatar, displayName)
-    : DEFAULT_AVATAR_LOGO;
+    : null;
   const previewSrc = photoPreviewUrl || existingAvatarSrc;
   const showingLogo = !photoPreviewUrl && !hasUploadedAvatar(user.avatar);
 
@@ -358,7 +359,8 @@ export function EditUserDialog({
   const selectedRoleName = form.watch("role");
   const selectedTesterType = form.watch("tester_type");
   const selectedJobLevel = form.watch("job_level");
-  // Why: Founders / admins have no manager or employment contract — hide those HR fields.
+  // Why: Founders / admins are not standard employees — hide manager, contract,
+  // department, probation, offer-letter (and similar HR / pay-onboarding fields).
   const isOrgLeaderProfile =
     String(selectedRoleName || "").toLowerCase() === "admin" ||
     String(selectedJobLevel || "").trim().toLowerCase() === "founder";
@@ -518,15 +520,15 @@ export function EditUserDialog({
         payload.employee_code = data.employee_code?.trim() || null;
         payload.job_title = data.job_title?.trim() || null;
         payload.job_level = data.job_level?.trim() || null;
-        payload.department = data.department?.trim() || null;
         if (!isOrgLeaderProfile) {
+          payload.department = data.department?.trim() || null;
           payload.reports_to_user_id = data.reports_to_user_id?.trim() || null;
           payload.contract_type = data.contract_type?.trim() || null;
+          payload.offer_letter_issued = !!data.offer_letter_issued;
+          payload.offer_letter_shared_date =
+            data.offer_letter_shared_date?.trim() || null;
+          payload.probation_end_date = data.probation_end_date?.trim() || null;
         }
-        payload.offer_letter_issued = !!data.offer_letter_issued;
-        payload.offer_letter_shared_date =
-          data.offer_letter_shared_date?.trim() || null;
-        payload.probation_end_date = data.probation_end_date?.trim() || null;
       }
       if (profilePhoto) {
         payload.profile_photo = profilePhoto;
@@ -661,21 +663,36 @@ export function EditUserDialog({
               <div className="col-span-12 flex flex-wrap items-center gap-4 rounded-2xl border border-border/60 bg-muted/20 p-4">
                 <div
                   className={cn(
-                    "relative h-20 w-20 shrink-0 overflow-hidden rounded-2xl ring-1 ring-border/60 bg-muted shadow-sm",
-                    showingLogo && "p-2"
+                    "relative h-20 w-20 shrink-0 overflow-hidden rounded-2xl ring-1 ring-border/60 shadow-sm",
+                    showingLogo
+                      ? "bg-white dark:bg-slate-900 p-3"
+                      : "bg-muted"
                   )}
                 >
-                  <img
-                    src={previewSrc}
-                    alt={`${displayName} profile`}
-                    className={cn(
-                      "h-full w-full",
-                      showingLogo ? "object-contain" : "object-cover"
-                    )}
-                    onError={(e) => {
-                      e.currentTarget.src = DEFAULT_AVATAR_LOGO;
-                    }}
-                  />
+                  {showingLogo ? (
+                    <>
+                      <img
+                        src={DEFAULT_AVATAR_LOGO}
+                        alt={`${displayName} profile`}
+                        className="h-full w-full object-contain dark:hidden"
+                      />
+                      <img
+                        src={DEFAULT_AVATAR_LOGO_DARK}
+                        alt=""
+                        className="hidden h-full w-full object-contain dark:block"
+                        aria-hidden
+                      />
+                    </>
+                  ) : (
+                    <img
+                      src={previewSrc || DEFAULT_AVATAR_LOGO}
+                      alt={`${displayName} profile`}
+                      className="h-full w-full object-cover"
+                      onError={(e) => {
+                        e.currentTarget.src = DEFAULT_AVATAR_LOGO;
+                      }}
+                    />
+                  )}
                 </div>
                 <div className="min-w-0 flex-1 space-y-2">
                   <p className="text-sm font-semibold text-foreground">Profile photo</p>
@@ -994,7 +1011,12 @@ export function EditUserDialog({
                     control={form.control}
                     name="job_level"
                     render={({ field }) => (
-                      <FormItem className="col-span-12 md:col-span-6 space-y-2">
+                      <FormItem
+                        className={cn(
+                          "col-span-12 space-y-2",
+                          !isOrgLeaderProfile && "md:col-span-6"
+                        )}
+                      >
                         <FormLabelDot>Job level</FormLabelDot>
                         <Select
                           onValueChange={field.onChange}
@@ -1018,183 +1040,183 @@ export function EditUserDialog({
                     )}
                   />
 
-                  <FormField
-                    control={form.control}
-                    name="department"
-                    render={({ field }) => (
-                      <FormItem className="col-span-12 md:col-span-6 space-y-2">
-                        <FormLabelDot>Department</FormLabelDot>
-                        <FormControl>
-                          <Input
-                            placeholder="e.g. CODO Agency - Development"
-                            {...field}
-                            className={fieldInputClass}
-                            maxLength={150}
-                          />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-
                   {!isOrgLeaderProfile ? (
-                    <FormField
-                      control={form.control}
-                      name="reports_to_user_id"
-                      render={({ field }) => (
-                        <FormItem className="col-span-12 md:col-span-6 space-y-2">
-                          <FormLabelDot>Reports to</FormLabelDot>
-                          <Select
-                            onValueChange={(v) =>
-                              field.onChange(v === "__none__" ? "" : v)
-                            }
-                            value={field.value ? field.value : "__none__"}
-                          >
+                    <>
+                      <FormField
+                        control={form.control}
+                        name="department"
+                        render={({ field }) => (
+                          <FormItem className="col-span-12 md:col-span-6 space-y-2">
+                            <FormLabelDot>Department</FormLabelDot>
                             <FormControl>
-                              <SelectTrigger className={fieldInputClass}>
-                                <SelectValue placeholder="Select manager" />
-                              </SelectTrigger>
+                              <Input
+                                placeholder="e.g. CODO Agency - Development"
+                                {...field}
+                                className={fieldInputClass}
+                                maxLength={150}
+                              />
                             </FormControl>
-                            <SelectContent
-                              position="popper"
-                              className="z-[70] max-h-64"
-                              searchPlaceholder="Search manager..."
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+
+                      <FormField
+                        control={form.control}
+                        name="reports_to_user_id"
+                        render={({ field }) => (
+                          <FormItem className="col-span-12 md:col-span-6 space-y-2">
+                            <FormLabelDot>Reports to</FormLabelDot>
+                            <Select
+                              onValueChange={(v) =>
+                                field.onChange(v === "__none__" ? "" : v)
+                              }
+                              value={field.value ? field.value : "__none__"}
                             >
-                              <SelectItem value="__none__">N/A</SelectItem>
-                              {managerOptions.map((m) => {
-                                const name = m.username || m.name || m.email || "User";
-                                const position = (m.role || m.job_title || "")
-                                  .replace(/_/g, " ")
-                                  .trim();
-                                return (
-                                  <SelectItem key={m.id} value={m.id}>
-                                    <span className="flex items-center gap-2 min-w-0">
-                                      <span className="truncate">{name}</span>
-                                      {position ? (
-                                        <span className="text-muted-foreground capitalize shrink-0">
-                                          · {position}
-                                        </span>
-                                      ) : null}
-                                    </span>
+                              <FormControl>
+                                <SelectTrigger className={fieldInputClass}>
+                                  <SelectValue placeholder="Select manager" />
+                                </SelectTrigger>
+                              </FormControl>
+                              <SelectContent
+                                position="popper"
+                                className="z-[70] max-h-64"
+                                searchPlaceholder="Search manager..."
+                              >
+                                <SelectItem value="__none__">N/A</SelectItem>
+                                {managerOptions.map((m) => {
+                                  const name = m.username || m.name || m.email || "User";
+                                  const position = (m.role || m.job_title || "")
+                                    .replace(/_/g, " ")
+                                    .trim();
+                                  return (
+                                    <SelectItem key={m.id} value={m.id}>
+                                      <span className="flex items-center gap-2 min-w-0">
+                                        <span className="truncate">{name}</span>
+                                        {position ? (
+                                          <span className="text-muted-foreground capitalize shrink-0">
+                                            · {position}
+                                          </span>
+                                        ) : null}
+                                      </span>
+                                    </SelectItem>
+                                  );
+                                })}
+                              </SelectContent>
+                            </Select>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+
+                      <FormField
+                        control={form.control}
+                        name="contract_type"
+                        render={({ field }) => (
+                          <FormItem className="col-span-12 md:col-span-6 space-y-2">
+                            <FormLabelDot>Contract type</FormLabelDot>
+                            <Select
+                              onValueChange={(v) =>
+                                field.onChange(v === "__none__" ? "" : v)
+                              }
+                              value={field.value ? field.value : "__none__"}
+                            >
+                              <FormControl>
+                                <SelectTrigger className={fieldInputClass}>
+                                  <SelectValue placeholder="Select type" />
+                                </SelectTrigger>
+                              </FormControl>
+                              <SelectContent position="popper" className="z-[70]">
+                                <SelectItem value="__none__">Not set</SelectItem>
+                                {CONTRACT_OPTIONS.map((opt) => (
+                                  <SelectItem key={opt.value} value={opt.value}>
+                                    {opt.label}
                                   </SelectItem>
-                                );
-                              })}
-                            </SelectContent>
-                          </Select>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                  ) : null}
+                                ))}
+                              </SelectContent>
+                            </Select>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
 
-                  {!isOrgLeaderProfile ? (
-                    <FormField
-                      control={form.control}
-                      name="contract_type"
-                      render={({ field }) => (
-                        <FormItem className="col-span-12 md:col-span-6 space-y-2">
-                          <FormLabelDot>Contract type</FormLabelDot>
-                          <Select
-                            onValueChange={(v) =>
-                              field.onChange(v === "__none__" ? "" : v)
-                            }
-                            value={field.value ? field.value : "__none__"}
-                          >
+                      <FormField
+                        control={form.control}
+                        name="probation_end_date"
+                        render={({ field }) => (
+                          <FormItem className="col-span-12 md:col-span-6 space-y-2">
+                            <FormLabelDot>Probation end date</FormLabelDot>
                             <FormControl>
-                              <SelectTrigger className={fieldInputClass}>
-                                <SelectValue placeholder="Select type" />
-                              </SelectTrigger>
+                              <DatePicker
+                                value={field.value || ""}
+                                onChange={field.onChange}
+                                placeholder="Optional / NILL"
+                                className={fieldInputClass}
+                              />
                             </FormControl>
-                            <SelectContent position="popper" className="z-[70]">
-                              <SelectItem value="__none__">Not set</SelectItem>
-                              {CONTRACT_OPTIONS.map((opt) => (
-                                <SelectItem key={opt.value} value={opt.value}>
-                                  {opt.label}
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+
+                      <FormField
+                        control={form.control}
+                        name="offer_letter_issued"
+                        render={({ field }) => (
+                          <FormItem className="col-span-12 md:col-span-6 flex items-center justify-between gap-4 rounded-xl border border-border/60 px-4 py-3">
+                            <div className="min-w-0">
+                              <FormLabelDot color="bg-violet-500">Offer letter</FormLabelDot>
+                              <p className="text-xs text-muted-foreground mt-1">
+                                Mark when the offer letter has been issued
+                              </p>
+                            </div>
+                            <FormControl>
+                              <Switch
+                                checked={!!field.value}
+                                onCheckedChange={(checked) => {
+                                  field.onChange(checked);
+                                  if (checked && !form.getValues("offer_letter_shared_date")) {
+                                    form.setValue(
+                                      "offer_letter_shared_date",
+                                      new Date().toISOString().slice(0, 10),
+                                      { shouldDirty: true }
+                                    );
+                                  }
+                                }}
+                              />
+                            </FormControl>
+                          </FormItem>
+                        )}
+                      />
+
+                      <FormField
+                        control={form.control}
+                        name="offer_letter_shared_date"
+                        render={({ field }) => (
+                          <FormItem className="col-span-12 md:col-span-6 space-y-2">
+                            <FormLabelDot color="bg-violet-500">Offer letter shared</FormLabelDot>
+                            <FormControl>
+                              <DatePicker
+                                value={field.value || ""}
+                                onChange={(v) => {
+                                  field.onChange(v);
+                                  if (v) {
+                                    form.setValue("offer_letter_issued", true, {
+                                      shouldDirty: true,
+                                    });
+                                  }
+                                }}
+                                placeholder="When shared"
+                                className={fieldInputClass}
+                                disableFuture
+                              />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                    </>
                   ) : null}
-
-                  <FormField
-                    control={form.control}
-                    name="probation_end_date"
-                    render={({ field }) => (
-                      <FormItem className="col-span-12 md:col-span-6 space-y-2">
-                        <FormLabelDot>Probation end date</FormLabelDot>
-                        <FormControl>
-                          <DatePicker
-                            value={field.value || ""}
-                            onChange={field.onChange}
-                            placeholder="Optional / NILL"
-                            className={fieldInputClass}
-                          />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-
-                  <FormField
-                    control={form.control}
-                    name="offer_letter_issued"
-                    render={({ field }) => (
-                      <FormItem className="col-span-12 md:col-span-6 flex items-center justify-between gap-4 rounded-xl border border-border/60 px-4 py-3">
-                        <div className="min-w-0">
-                          <FormLabelDot color="bg-violet-500">Offer letter</FormLabelDot>
-                          <p className="text-xs text-muted-foreground mt-1">
-                            Mark when the offer letter has been issued
-                          </p>
-                        </div>
-                        <FormControl>
-                          <Switch
-                            checked={!!field.value}
-                            onCheckedChange={(checked) => {
-                              field.onChange(checked);
-                              if (checked && !form.getValues("offer_letter_shared_date")) {
-                                form.setValue(
-                                  "offer_letter_shared_date",
-                                  new Date().toISOString().slice(0, 10),
-                                  { shouldDirty: true }
-                                );
-                              }
-                            }}
-                          />
-                        </FormControl>
-                      </FormItem>
-                    )}
-                  />
-
-                  <FormField
-                    control={form.control}
-                    name="offer_letter_shared_date"
-                    render={({ field }) => (
-                      <FormItem className="col-span-12 md:col-span-6 space-y-2">
-                        <FormLabelDot color="bg-violet-500">Offer letter shared</FormLabelDot>
-                        <FormControl>
-                          <DatePicker
-                            value={field.value || ""}
-                            onChange={(v) => {
-                              field.onChange(v);
-                              if (v) {
-                                form.setValue("offer_letter_issued", true, {
-                                  shouldDirty: true,
-                                });
-                              }
-                            }}
-                            placeholder="When shared"
-                            className={fieldInputClass}
-                            disableFuture
-                          />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
 
                   <div className="col-span-12 pt-1" />
                 </>

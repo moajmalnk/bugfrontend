@@ -85,14 +85,15 @@ function measureCropSize(el: HTMLElement): Size {
 
 /**
  * Why: Zoomed-out crops include pixels outside the bitmap. Sample corners so
- * the padded ring matches the photo instead of a hard black fill.
+ * the padded ring matches the photo. Transparent / near-black corners (logos)
+ * fall back to white — black fill hides dark brand marks.
  */
 function sampleEdgeFill(image: HTMLImageElement): string {
   const canvas = document.createElement("canvas");
   canvas.width = 1;
   canvas.height = 1;
-  const ctx = canvas.getContext("2d");
-  if (!ctx) return "rgb(28, 28, 28)";
+  const ctx = canvas.getContext("2d", { willReadFrequently: true });
+  if (!ctx) return "rgb(255, 255, 255)";
 
   const w = image.naturalWidth;
   const h = image.naturalHeight;
@@ -106,16 +107,24 @@ function sampleEdgeFill(image: HTMLImageElement): string {
   let r = 0;
   let g = 0;
   let b = 0;
+  let opaque = 0;
   for (const [px, py] of points) {
     ctx.clearRect(0, 0, 1, 1);
     ctx.drawImage(image, px, py, 1, 1, 0, 0, 1, 1);
     const d = ctx.getImageData(0, 0, 1, 1).data;
+    if (d[3] < 16) continue; // skip transparent corners
     r += d[0];
     g += d[1];
     b += d[2];
+    opaque += 1;
   }
-  const n = points.length;
-  return `rgb(${Math.round(r / n)}, ${Math.round(g / n)}, ${Math.round(b / n)})`;
+  if (opaque === 0) return "rgb(255, 255, 255)";
+  const avgR = Math.round(r / opaque);
+  const avgG = Math.round(g / opaque);
+  const avgB = Math.round(b / opaque);
+  // Near-black pads hide charcoal logos — use white instead.
+  if (avgR < 28 && avgG < 28 && avgB < 28) return "rgb(255, 255, 255)";
+  return `rgb(${avgR}, ${avgG}, ${avgB})`;
 }
 
 /**

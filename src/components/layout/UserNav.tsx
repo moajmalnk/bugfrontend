@@ -24,7 +24,7 @@ export function UserNav() {
   const roleLabel = getRoleDisplayLabel(currentUser, role);
   const [logoutOpen, setLogoutOpen] = useState(false);
 
-  const defaultAvatar = "/logo.png";
+  const defaultAvatar = "/brand/bugricer-mark-black.png";
   const displayName = currentUser?.name || currentUser?.username || "User";
   const avatarSrc = currentUser?.avatar
     ? resolveAvatarUrl(currentUser.avatar, displayName)

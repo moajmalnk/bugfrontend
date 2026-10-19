@@ -12,7 +12,7 @@ function SidebarSkeleton() {
   return (
     <div className="h-full flex flex-col bg-card/95 border-r border-border/50">
       {/* Header: logo + brand + notification bell */}
-      <div className="flex-shrink-0 p-6 pb-4">
+      <div className="flex-shrink-0 px-5 pb-4 pt-[max(1.5rem,calc(0.75rem+env(safe-area-inset-top)))]">
         <div className="flex items-center justify-between gap-3">
           <div className="flex min-w-0 flex-1 flex-col gap-1.5">
             <Skeleton className="h-8 w-[9.5rem] rounded-xl" />

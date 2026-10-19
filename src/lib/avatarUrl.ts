@@ -1,7 +1,11 @@
 import { ENV } from "@/lib/env";
 
-/** Why: When a user has no uploaded photo, show the BugRicer brand mark — not initials. */
-export const DEFAULT_AVATAR_LOGO = "/logo.png";
+/**
+ * Why: `/logo.png` is dark ink on a black tile — invisible in Edit User / avatars.
+ * Use the brand mark (black for light UI, white for dark UI).
+ */
+export const DEFAULT_AVATAR_LOGO = "/brand/bugricer-mark-black.png";
+export const DEFAULT_AVATAR_LOGO_DARK = "/brand/bugricer-mark-white.png";
 
 /**
  * Why: Onboarding / messaging used to persist XAMPP-absolute paths
@@ -26,7 +30,14 @@ export function getBackendOrigin(): string {
 export function hasUploadedAvatar(avatar: string | null | undefined): boolean {
   const raw = (avatar || "").trim();
   if (!raw) return false;
-  if (raw === DEFAULT_AVATAR_LOGO || raw.endsWith("/logo.png")) return false;
+  if (
+    raw === DEFAULT_AVATAR_LOGO ||
+    raw === DEFAULT_AVATAR_LOGO_DARK ||
+    raw.endsWith("/logo.png") ||
+    raw.includes("/brand/bugricer-mark-")
+  ) {
+    return false;
+  }
   if (/^https?:\/\/ui-avatars\.com\//i.test(raw)) return false;
   return true;
 }
