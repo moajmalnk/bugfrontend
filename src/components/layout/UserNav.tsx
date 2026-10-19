@@ -9,9 +9,9 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { UserIcon, LogOut, Settings, User as UserAvatar, Crown, Shield, Mail } from "lucide-react";
+import { LogOut, Settings, User as UserAvatar, Crown, Shield, Mail } from "lucide-react";
 import { Link } from "react-router-dom";
-import { resolveAvatarUrl } from "@/lib/avatarUrl";
+import { UserFace } from "@/components/brand/UserFace";
 import { cn } from "@/lib/utils";
 import { getRoleDisplayLabel, isSuperAdminUser } from "@/lib/roleBadge";
 import { VerifiedBlueTick, isFullFledgedUser } from "@/components/ui/VerifiedBlueTick";
@@ -24,11 +24,7 @@ export function UserNav() {
   const roleLabel = getRoleDisplayLabel(currentUser, role);
   const [logoutOpen, setLogoutOpen] = useState(false);
 
-  const defaultAvatar = "/brand/bugricer-mark-black.png";
   const displayName = currentUser?.name || currentUser?.username || "User";
-  const avatarSrc = currentUser?.avatar
-    ? resolveAvatarUrl(currentUser.avatar, displayName)
-    : null;
 
   return (
     <>
@@ -44,20 +40,12 @@ export function UserNav() {
           aria-label="User menu"
         >
           <div className="relative">
-            {avatarSrc ? (
-              <img
-                src={avatarSrc}
-                alt="User avatar"
-                className="h-10 w-10 rounded-xl object-cover ring-2 ring-border/50 hover:ring-accent/50 transition-all duration-200"
-                onError={(e) => {
-                  e.currentTarget.src = defaultAvatar;
-                }}
-              />
-            ) : (
-              <div className="h-10 w-10 rounded-xl bg-muted flex items-center justify-center ring-2 ring-border/50 hover:ring-accent/50 transition-all duration-200">
-                <UserIcon className="h-5 w-5 text-muted-foreground" />
-              </div>
-            )}
+            <UserFace
+              avatar={currentUser?.avatar}
+              name={displayName}
+              className="h-10 w-10 rounded-xl ring-2 ring-border/50 hover:ring-accent/50 transition-all duration-200"
+              alt="User avatar"
+            />
             {/* Online status indicator */}
             <div className="absolute -bottom-0.5 -right-0.5 w-3 h-3 bg-green-500 rounded-full border-2 border-background"></div>
           </div>
@@ -74,17 +62,12 @@ export function UserNav() {
         <DropdownMenuLabel className="p-3">
           <div className="flex items-center gap-3">
             <div className="relative">
-              {currentUser?.avatar ? (
-                <img
-                  src={currentUser.avatar}
-                  alt="User avatar"
-                  className="h-12 w-12 rounded-xl object-cover ring-2 ring-border/50"
-                />
-              ) : (
-                <div className="h-12 w-12 rounded-xl bg-muted flex items-center justify-center ring-2 ring-border/50">
-                  <UserIcon className="h-6 w-6 text-muted-foreground" />
-                </div>
-              )}
+              <UserFace
+                avatar={currentUser?.avatar}
+                name={displayName}
+                className="h-12 w-12 rounded-xl ring-2 ring-border/50"
+                alt="User avatar"
+              />
               <div className="absolute -bottom-0.5 -right-0.5 w-3 h-3 bg-green-500 rounded-full border-2 border-background"></div>
             </div>
             <div className="flex-1 min-w-0">

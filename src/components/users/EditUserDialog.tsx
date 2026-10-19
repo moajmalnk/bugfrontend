@@ -46,13 +46,9 @@ import { OnboardingMode, StandardsMode, TesterType, User, UserRole } from "@/typ
 import { TesterTypeField } from "@/components/users/TesterTypeField";
 import { StandardsAccessField } from "@/components/users/StandardsAccessField";
 import { OnboardingModeField } from "@/components/users/OnboardingModeField";
+import { BrandAvatar } from "@/components/brand/BrandAvatar";
 import { ProfilePhotoResizeModal } from "@/components/onboarding/ProfilePhotoResizeModal";
-import {
-  DEFAULT_AVATAR_LOGO,
-  DEFAULT_AVATAR_LOGO_DARK,
-  hasUploadedAvatar,
-  resolveAvatarUrl,
-} from "@/lib/avatarUrl";
+import { hasUploadedAvatar, resolveAvatarUrl } from "@/lib/avatarUrl";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Camera, Loader2, Pencil, RefreshCw } from "lucide-react";
 import React, { useEffect, useMemo, useRef, useState } from "react";
@@ -661,39 +657,20 @@ export function EditUserDialog({
           <form onSubmit={form.handleSubmit(onSubmit)}>
             <div className="max-h-[min(70vh,560px)] overflow-y-auto px-6 py-5 grid grid-cols-12 gap-4">
               <div className="col-span-12 flex flex-wrap items-center gap-4 rounded-2xl border border-border/60 bg-muted/20 p-4">
-                <div
-                  className={cn(
-                    "relative h-20 w-20 shrink-0 overflow-hidden rounded-2xl ring-1 ring-border/60 shadow-sm",
-                    showingLogo
-                      ? "bg-white dark:bg-slate-900 p-3"
-                      : "bg-muted"
-                  )}
-                >
-                  {showingLogo ? (
-                    <>
-                      <img
-                        src={DEFAULT_AVATAR_LOGO}
-                        alt={`${displayName} profile`}
-                        className="h-full w-full object-contain dark:hidden"
-                      />
-                      <img
-                        src={DEFAULT_AVATAR_LOGO_DARK}
-                        alt=""
-                        className="hidden h-full w-full object-contain dark:block"
-                        aria-hidden
-                      />
-                    </>
-                  ) : (
+                {showingLogo ? (
+                  <BrandAvatar
+                    className="h-20 w-20 shrink-0 rounded-2xl ring-1 ring-border/60 shadow-sm"
+                    alt={`${displayName} profile`}
+                  />
+                ) : (
+                  <div className="relative h-20 w-20 shrink-0 overflow-hidden rounded-2xl ring-1 ring-border/60 shadow-sm bg-white">
                     <img
-                      src={previewSrc || DEFAULT_AVATAR_LOGO}
+                      src={previewSrc || "/brand/bugricer-mark-black.png"}
                       alt={`${displayName} profile`}
-                      className="h-full w-full object-cover"
-                      onError={(e) => {
-                        e.currentTarget.src = DEFAULT_AVATAR_LOGO;
-                      }}
+                      className="h-full w-full object-contain p-[14%]"
                     />
-                  )}
-                </div>
+                  </div>
+                )}
                 <div className="min-w-0 flex-1 space-y-2">
                   <p className="text-sm font-semibold text-foreground">Profile photo</p>
                   <p className="text-xs text-muted-foreground leading-snug">

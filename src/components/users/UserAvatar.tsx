@@ -8,12 +8,8 @@ import {
   DialogDescription,
   DialogTitle,
 } from "@/components/ui/dialog";
-import {
-  DEFAULT_AVATAR_LOGO,
-  DEFAULT_AVATAR_LOGO_DARK,
-  hasUploadedAvatar,
-  resolveAvatarUrl,
-} from "@/lib/avatarUrl";
+import { BrandAvatar } from "@/components/brand/BrandAvatar";
+import { hasUploadedAvatar, resolveAvatarUrl } from "@/lib/avatarUrl";
 import { cn } from "@/lib/utils";
 import { X } from "lucide-react";
 
@@ -25,14 +21,6 @@ const SIZE_CLASS: Record<UserAvatarSize, string> = {
   lg: "h-12 w-12 text-sm",
   xl: "h-20 w-20 text-xl",
   "2xl": "h-28 w-28 text-2xl",
-};
-
-const LOGO_PAD: Record<UserAvatarSize, string> = {
-  sm: "p-1",
-  md: "p-1.5",
-  lg: "p-2",
-  xl: "p-3",
-  "2xl": "p-4",
 };
 
 type UserAvatarProps = {
@@ -49,30 +37,6 @@ type UserAvatarProps = {
    */
   previewable?: boolean;
 };
-
-function BrandMarkFallback({ size }: { size: UserAvatarSize }) {
-  return (
-    <span
-      className={cn(
-        "flex h-full w-full items-center justify-center bg-white dark:bg-slate-900",
-        LOGO_PAD[size]
-      )}
-    >
-      <img
-        src={DEFAULT_AVATAR_LOGO}
-        alt=""
-        className="h-full w-full object-contain dark:hidden"
-        aria-hidden
-      />
-      <img
-        src={DEFAULT_AVATAR_LOGO_DARK}
-        alt=""
-        className="hidden h-full w-full object-contain dark:block"
-        aria-hidden
-      />
-    </span>
-  );
-}
 
 /**
  * Why: One professional face for Users / Project members / details —
@@ -101,7 +65,7 @@ export function UserAvatar({
       className={cn(
         SIZE_CLASS[size],
         "ring-1 ring-border/60 shadow-sm overflow-hidden",
-        hasRealPhoto ? "bg-muted" : "bg-white dark:bg-slate-900",
+        "bg-white",
         canPreview && "transition-opacity group-hover/avatar:opacity-90"
       )}
     >
@@ -115,7 +79,7 @@ export function UserAvatar({
         />
       ) : null}
       <AvatarFallback className="p-0 bg-transparent" delayMs={imageSrc ? 400 : 0}>
-        <BrandMarkFallback size={size} />
+        <BrandAvatar className="h-full w-full rounded-none" alt="" />
       </AvatarFallback>
     </Avatar>
   );

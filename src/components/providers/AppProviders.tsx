@@ -3,7 +3,6 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import * as TooltipPrimitive from '@radix-ui/react-tooltip';
 import { AuthProvider } from '@/context/AuthContext';
 import { BugProvider } from '@/context/BugContext';
-import { ThemeProvider } from '@/context/ThemeContext';
 import { NotificationProvider } from '@/context/NotificationContext';
 import { Toaster } from '@/components/ui/toaster';
 import { Toaster as Sonner } from '@/components/ui/sonner';
@@ -14,7 +13,9 @@ interface AppProvidersProps {
   queryClient: QueryClient;
 }
 
-// Providers that don't need router context
+// Providers that don't need router context.
+// Why: ThemeProvider lives once in App.tsx — a nested copy made useTheme()
+// disagree with html.dark and rendered black brand marks on dark UI.
 export const CoreProviders = ({ children, queryClient }: AppProvidersProps) => {
   useEffect(() => {
     bindNotificationSoundUnlock();
@@ -22,13 +23,11 @@ export const CoreProviders = ({ children, queryClient }: AppProvidersProps) => {
 
   return (
     <QueryClientProvider client={queryClient}>
-      <ThemeProvider>
-        <TooltipPrimitive.Provider>
-          <Toaster />
-          <Sonner />
-          {children}
-        </TooltipPrimitive.Provider>
-      </ThemeProvider>
+      <TooltipPrimitive.Provider>
+        <Toaster />
+        <Sonner />
+        {children}
+      </TooltipPrimitive.Provider>
     </QueryClientProvider>
   );
 };

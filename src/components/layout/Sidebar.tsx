@@ -1,9 +1,9 @@
 import { BrandLogo } from "@/components/brand/BrandLogo";
+import { UserFace } from "@/components/brand/UserFace";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
 import { useAuth } from "@/context/AuthContext";
-import { resolveAvatarUrl } from "@/lib/avatarUrl";
 import { canAccessCodoStandards, canViewStandards, cn, getEffectiveRole, isWorkforceUser, showBugMessageInMainNav } from "@/lib/utils";
 import { getRoleDisplayLabel, isSuperAdminUser } from "@/lib/roleBadge";
 import { VerifiedBlueTick, isFullFledgedUser } from "@/components/ui/VerifiedBlueTick";
@@ -204,8 +204,6 @@ function SidebarAdminNav({
     </div>
   );
 }
-
-const defaultAvatar = "/brand/bugricer-mark-black.png";
 
 export const Sidebar = ({ className, closeSidebar }: SidebarProps) => {
   const { currentUser } = useAuth();
@@ -847,33 +845,12 @@ export const Sidebar = ({ className, closeSidebar }: SidebarProps) => {
             }}
           >
             <div className="relative flex h-10 w-10 shrink-0 items-center justify-center">
-              {currentUser?.avatar ? (
-                <img
-                  src={resolveAvatarUrl(
-                    currentUser.avatar,
-                    currentUser.name || currentUser.username || "User"
-                  )}
-                  alt="User avatar"
-                  className="h-10 w-10 rounded-xl object-cover ring-2 ring-border/50 group-hover:ring-accent/50 transition-all duration-200"
-                  onError={(e) => {
-                    e.currentTarget.src = defaultAvatar;
-                  }}
-                />
-              ) : (
-                <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-white p-1.5 ring-2 ring-border/50 group-hover:ring-accent/50 transition-all duration-200 dark:bg-slate-900">
-                  <img
-                    src={defaultAvatar}
-                    alt="User avatar"
-                    className="h-full w-full object-contain dark:hidden"
-                  />
-                  <img
-                    src="/brand/bugricer-mark-white.png"
-                    alt=""
-                    className="hidden h-full w-full object-contain dark:block"
-                    aria-hidden
-                  />
-                </span>
-              )}
+              <UserFace
+                avatar={currentUser?.avatar}
+                name={currentUser?.name || currentUser?.username || "User"}
+                className="h-10 w-10 rounded-xl ring-2 ring-border/50 group-hover:ring-accent/50 transition-all duration-200"
+                alt="User avatar"
+              />
               {isFullFledgedUser(currentUser) ? (
                 <VerifiedBlueTick
                   size="sm"

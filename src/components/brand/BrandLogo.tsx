@@ -1,3 +1,4 @@
+import { useHtmlDark } from "@/hooks/useHtmlDark";
 import { cn } from "@/lib/utils";
 
 type BrandLogoProps = {
@@ -7,12 +8,18 @@ type BrandLogoProps = {
 };
 
 /**
- * Why: Light and dark surfaces need opposite inks. One component keeps the
- * new wordmark in sync everywhere the old bug tile used to stand in for the logo.
+ * Why: Light and dark surfaces need opposite inks. Follow `html.dark` so the
+ * asset always matches the visible theme (avoids nested ThemeProvider drift).
  */
 export function BrandLogo({ className, mark = false }: BrandLogoProps) {
-  const black = mark ? "/brand/bugricer-mark-black.png" : "/brand/bugricer-wordmark-black.png";
-  const white = mark ? "/brand/bugricer-mark-white.png" : "/brand/bugricer-wordmark-white.png";
+  const isDark = useHtmlDark();
+  const src = mark
+    ? isDark
+      ? "/brand/bugricer-mark-white.png"
+      : "/brand/bugricer-mark-black.png"
+    : isDark
+      ? "/brand/bugricer-wordmark-white.png"
+      : "/brand/bugricer-wordmark-black.png";
 
   return (
     <span
@@ -22,15 +29,9 @@ export function BrandLogo({ className, mark = false }: BrandLogoProps) {
       )}
     >
       <img
-        src={black}
+        src={src}
         alt="BugRicer"
-        className="h-full w-auto max-h-full max-w-full object-contain object-left dark:hidden"
-        decoding="async"
-      />
-      <img
-        src={white}
-        alt=""
-        className="hidden h-full w-auto max-h-full max-w-full object-contain object-left dark:block"
+        className="h-full w-auto max-h-full max-w-full object-contain object-left"
         decoding="async"
       />
     </span>

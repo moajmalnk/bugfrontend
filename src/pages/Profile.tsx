@@ -35,6 +35,7 @@ import {
   userRequiresOnboarding,
 } from "@/lib/utils";
 import { API_BASE_URL } from "@/lib/env";
+import { UserFace } from "@/components/brand/UserFace";
 import { hasUploadedAvatar, resolveAvatarUrl } from "@/lib/avatarUrl";
 import { onboardingService } from "@/services/onboardingService";
 import { userService } from "@/services/userService";
@@ -880,38 +881,15 @@ export default function Profile() {
             <CardContent className="relative p-5 sm:p-6 lg:p-8 space-y-6">
               <div className="flex flex-col lg:flex-row lg:items-end gap-5 lg:gap-8">
                 <div className="relative shrink-0 self-center lg:self-end -mt-1 sm:mt-2">
-                  {hasRealPhoto ? (
-                    <button
-                      type="button"
-                      className="h-28 w-28 sm:h-32 sm:w-32 lg:h-36 lg:w-36 rounded-2xl overflow-hidden border-[3px] border-background shadow-xl bg-muted ring-1 ring-border/40 cursor-zoom-in focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/50 focus-visible:ring-offset-2"
-                      aria-label={`View ${displayName}'s profile photo`}
-                      onClick={() => setPhotoPreviewOpen(true)}
-                    >
-                      <img
-                        src={avatarSrc}
-                        alt={`${displayName}'s profile photo`}
-                        className="h-full w-full object-cover transition-opacity hover:opacity-90"
-                        loading="lazy"
-                        decoding="async"
-                        onError={(e) => {
-                          e.currentTarget.src = resolveAvatarUrl(null, displayName);
-                        }}
-                      />
-                    </button>
-                  ) : (
-                    <div className="h-28 w-28 sm:h-32 sm:w-32 lg:h-36 lg:w-36 rounded-2xl overflow-hidden border-[3px] border-background shadow-xl bg-muted ring-1 ring-border/40">
-                      <img
-                        src={avatarSrc}
-                        alt={`${displayName}'s profile photo`}
-                        className="h-full w-full object-cover"
-                        loading="lazy"
-                        decoding="async"
-                        onError={(e) => {
-                          e.currentTarget.src = resolveAvatarUrl(null, displayName);
-                        }}
-                      />
-                    </div>
-                  )}
+                  <UserFace
+                    avatar={currentUser.avatar}
+                    name={displayName}
+                    className="h-28 w-28 sm:h-32 sm:w-32 lg:h-36 lg:w-36 rounded-2xl border-[3px] border-background shadow-xl ring-1 ring-border/40"
+                    alt={`${displayName}'s profile photo`}
+                    onPreview={
+                      hasRealPhoto ? () => setPhotoPreviewOpen(true) : undefined
+                    }
+                  />
                   {isFullFledgedUser(currentUser) ? (
                     <VerifiedBlueTick
                       size="lg"

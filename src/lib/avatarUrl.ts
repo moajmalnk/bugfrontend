@@ -24,27 +24,32 @@ export function getBackendOrigin(): string {
   return "https://bugbackend.bugricer.com";
 }
 
+/** Local public brand assets — never rewrite these onto the API host. */
+function isBrandAssetPath(raw: string): boolean {
+  return (
+    raw === DEFAULT_AVATAR_LOGO ||
+    raw === DEFAULT_AVATAR_LOGO_DARK ||
+    /\/brand\/bugricer-mark-/i.test(raw) ||
+    /\/brand\/bugricer-wordmark-/i.test(raw) ||
+    /\/logo\.png(?:$|\?)/i.test(raw)
+  );
+}
+
 /**
  * True when avatar is a real upload (not empty, not the brand logo, not ui-avatars).
  */
 export function hasUploadedAvatar(avatar: string | null | undefined): boolean {
   const raw = (avatar || "").trim();
   if (!raw) return false;
-  if (
-    raw === DEFAULT_AVATAR_LOGO ||
-    raw === DEFAULT_AVATAR_LOGO_DARK ||
-    raw.endsWith("/logo.png") ||
-    raw.includes("/brand/bugricer-mark-")
-  ) {
-    return false;
-  }
+  if (isBrandAssetPath(raw)) return false;
   if (/^https?:\/\/ui-avatars\.com\//i.test(raw)) return false;
   return true;
 }
 
 /**
  * Normalize users.avatar (or legacy profile picture paths) for <img src>.
- * Empty / missing photos resolve to the BugRicer logo.
+ * Empty / missing photos resolve to the BugRicer logo (light-mode mark path;
+ * UI should prefer BrandAvatar so dark mode can swap to the white mark).
  */
 export function resolveAvatarUrl(
   avatar: string | null | undefined,
@@ -54,6 +59,16 @@ export function resolveAvatarUrl(
   const raw = (avatar || "").trim();
   if (!raw) return fallback;
   if (/^https?:\/\/ui-avatars\.com\//i.test(raw)) return fallback;
+
+  // Keep Vite public brand files on the app origin.
+  if (isBrandAssetPath(raw)) {
+    if (/bugricer-mark-white/i.test(raw)) return DEFAULT_AVATAR_LOGO_DARK;
+    if (/bugricer-mark-black/i.test(raw) || /\/logo\.png/i.test(raw)) {
+      return DEFAULT_AVATAR_LOGO;
+    }
+    const brandPath = raw.match(/\/brand\/[^?#]+/i)?.[0];
+    return brandPath || raw.replace(/^https?:\/\/[^/]+/i, "") || fallback;
+  }
 
   if (
     raw.startsWith("http://") ||
@@ -75,6 +90,8 @@ export function resolveAvatarUrl(
   }
 
   if (raw.startsWith("/")) {
+    // Public app assets stay on the frontend origin; only API uploads go to backend.
+    if (raw.startsWith("/brand/") || raw === "/logo.png") return raw;
     return `${getBackendOrigin()}${raw}`;
   }
 
