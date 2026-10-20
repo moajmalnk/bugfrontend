@@ -216,10 +216,12 @@ const USER_DETAILS_TABS: {
   shortLabel?: string;
   icon: LucideIcon;
   adminOnly?: boolean;
+  /** Full pay / banking for others — Super Admin only (regular Admins excluded). */
+  superAdminOnly?: boolean;
 }[] = [
   { value: "personal", label: "Personal", icon: UserRound },
   { value: "professional", label: "Professional", shortLabel: "Pro", icon: Briefcase },
-  { value: "payments", label: "Payments", icon: Wallet },
+  { value: "payments", label: "Payments", icon: Wallet, superAdminOnly: true },
   { value: "attendance", label: "Attendance", shortLabel: "Attend.", icon: CalendarCheck, adminOnly: true },
   { value: "leaves", label: "Leaves", icon: CalendarOff },
   { value: "projects", label: "Projects", icon: FolderKanban },
@@ -237,13 +239,15 @@ const FREELANCER_HIDDEN_TABS = new Set<UserDetailsTab>([
 function parseUserDetailsTab(
   raw: string | null,
   isAdmin: boolean,
-  hideWorkforceTabs = false
+  hideWorkforceTabs = false,
+  isSuperAdmin = false
 ): UserDetailsTab {
   // Why: Pay / Hours was folded into Payments; keep old ?tab=pay-hours links working.
-  if (raw === "pay-hours") return "payments";
+  if (raw === "pay-hours") return isSuperAdmin ? "payments" : "personal";
   const match = USER_DETAILS_TABS.find((t) => t.value === raw);
   if (!match) return "personal";
   if (match.adminOnly && !isAdmin) return "personal";
+  if (match.superAdminOnly && !isSuperAdmin) return "personal";
   if (hideWorkforceTabs && FREELANCER_HIDDEN_TABS.has(match.value)) {
     return "personal";
   }
@@ -335,6 +339,7 @@ export default function UserDetails() {
   const { currentUser } = useAuth();
   const effectiveRole = getEffectiveRole(currentUser || {});
   const isAdmin = effectiveRole === "admin";
+  const actorIsSuperAdmin = isSuperAdminUser(currentUser);
   const { hasPermission } = usePermissions(null);
   const usersBackPath = getReturnPathFromState(
     location.state,
@@ -386,16 +391,18 @@ export default function UserDetails() {
   const activeTab = parseUserDetailsTab(
     searchParams.get("tab"),
     isAdmin,
-    isFreelancer
+    isFreelancer,
+    actorIsSuperAdmin
   );
   const visibleTabs = USER_DETAILS_TABS.filter((t) => {
     if (t.adminOnly && !isAdmin) return false;
+    if (t.superAdminOnly && !actorIsSuperAdmin) return false;
     if (isFreelancer && FREELANCER_HIDDEN_TABS.has(t.value)) return false;
     return true;
   });
 
   const setActiveTab = (tab: string) => {
-    const next = parseUserDetailsTab(tab, isAdmin, isFreelancer);
+    const next = parseUserDetailsTab(tab, isAdmin, isFreelancer, actorIsSuperAdmin);
     setSearchParams(
       (prev) => {
         const params = new URLSearchParams(prev);
@@ -448,7 +455,9 @@ export default function UserDetails() {
 
   const reportDialog = useUrlDialogParam("print", ["month"]);
   const { value: printParam, close: closeReport, setRelated: setReportParam } = reportDialog;
-  const reportOpen = isAdmin && printParam === "report" && Boolean(user);
+  // Why: Print report embeds pay + bank — Super Admin only (not regular Admins).
+  const reportOpen =
+    actorIsSuperAdmin && printParam === "report" && Boolean(user);
   const reportMonth = reportDialog.searchParams.get("month") || defaultPayVerifyYearMonth();
   const openReport = () =>
     reportDialog.open("report", { month: defaultPayVerifyYearMonth() });
@@ -460,8 +469,8 @@ export default function UserDetails() {
   // Why: Print links are admin-only; strip unknown values or non-admin access instead of opening.
   useEffect(() => {
     if (!printParam || !currentUser) return;
-    if (!isAdmin || printParam !== "report") closeReport();
-  }, [printParam, currentUser, isAdmin, closeReport]);
+    if (!actorIsSuperAdmin || printParam !== "report") closeReport();
+  }, [printParam, currentUser, actorIsSuperAdmin, closeReport]);
 
   const reportProfile = useMemo<UserReportProfile | null>(() => {
     if (!user) return null;
@@ -537,7 +546,6 @@ export default function UserDetails() {
   }, [user]);
   const statusConfig = statusChip(status);
 
-  const actorIsSuperAdmin = isSuperAdminUser(currentUser);
   const targetIsSuperAdmin = isSuperAdminUser(user);
   const targetIsAdminAccount =
     String(user?.role || "").toLowerCase() === "admin" || targetIsSuperAdmin;
@@ -649,8 +657,26 @@ export default function UserDetails() {
     }
   };
 
+  const canOpenUserDashboard =
+    effectiveRole === "admin" &&
+    Boolean(currentUser?.id) &&
+    Boolean(user?.id) &&
+    currentUser!.id !== user!.id &&
+    !targetIsSuperAdmin &&
+    // Why: Regular Admins never open Admin / Super Admin sessions.
+    (actorIsSuperAdmin || String(user?.role || "").toLowerCase() !== "admin");
+
   const handleGenerateDashboardLink = async () => {
-    if (!user?.id) return;
+    if (!user?.id || !canOpenUserDashboard) {
+      toast({
+        title: "Not allowed",
+        description: targetIsSuperAdmin
+          ? "Super Admin accounts cannot be impersonated."
+          : "Only a Super Admin can open an Admin dashboard session.",
+        variant: "destructive",
+      });
+      return;
+    }
     setIsGeneratingLink(true);
     try {
       const link = await userService.generateUserDashboardLink(user.id);
@@ -779,7 +805,7 @@ export default function UserDetails() {
                     </Link>
                   </Button>
                 ) : null}
-                {isAdmin && userId ? (
+                {actorIsSuperAdmin && userId ? (
                   <Button
                     type="button"
                     variant="outline"
@@ -1484,7 +1510,7 @@ export default function UserDetails() {
                       />
                     )}
 
-                    {effectiveRole === "admin" && currentUser?.id !== user.id && (
+                    {canOpenUserDashboard && (
                       <UserActionCard
                         icon={ExternalLink}
                         label="Dashboard"
@@ -1570,7 +1596,7 @@ export default function UserDetails() {
                       </div>
                     )}
 
-                    {effectiveRole === "admin" && currentUser?.id !== user.id && (
+                    {canOpenUserDashboard && (
                       <div>
                         <Button
                           variant="outline"
@@ -1804,7 +1830,7 @@ export default function UserDetails() {
                       <OnboardingProfileSection
                         userId={user.id}
                         onboardingCompleted={user.onboarding_completed}
-                        canVerify={isAdmin}
+                        canVerify={actorIsSuperAdmin}
                         visibleSections={["banking"]}
                         employeeName={user.name || user.username}
                         employeeUsername={user.username}
@@ -1836,7 +1862,7 @@ export default function UserDetails() {
                       <CardContent className="p-5 sm:p-6 space-y-6">
                         <UserPayVerify
                           userId={user.id}
-                          isAdmin={isAdmin}
+                          isAdmin={actorIsSuperAdmin}
                           isSelf={currentUser?.id === user.id}
                         />
                       </CardContent>

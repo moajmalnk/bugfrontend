@@ -718,13 +718,14 @@ export const Sidebar = ({ className, closeSidebar }: SidebarProps) => {
             )}
 
 
-            {isWorkforce &&
-              (role === "admin" ||
-                role === "developer" ||
-                role === "creator" ||
-                isCodoTester ||
-                can("DAILY_UPDATE_VIEW") ||
-                can("USERS_VIEW")) && (
+            {/* Why: Team payroll is Super Admin only; workforce keeps personal hour verify. Regular Admins get no Pay Verify nav. */}
+            {(isSuperAdminUser(currentUser) ||
+              (isWorkforce &&
+                role !== "admin" &&
+                (role === "developer" ||
+                  role === "creator" ||
+                  isCodoTester ||
+                  can("DAILY_UPDATE_VIEW")))) && (
               <NavLink
                 to="/pay-verify"
                 icon={<Banknote className="h-5 w-5" />}
@@ -732,7 +733,7 @@ export const Sidebar = ({ className, closeSidebar }: SidebarProps) => {
                 badge={formatNavCount(payVerifyCount)}
                 badgeTone={payVerifyCount > 0 ? "alert" : "default"}
                 badgeTitle={
-                  role === "admin"
+                  isSuperAdminUser(currentUser)
                     ? "Pay Verify — hours and salary estimates"
                     : `${payVerifyCount} hour verification${payVerifyCount === 1 ? "" : "s"} pending`
                 }

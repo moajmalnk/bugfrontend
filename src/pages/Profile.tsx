@@ -1303,11 +1303,14 @@ export default function Profile() {
                   </CardContent>
                 </Card>
 
-                <Card className="border-border/60 bg-card/60 backdrop-blur shadow-sm rounded-2xl">
-                  <CardContent className="p-5 sm:p-6 space-y-5">
-                    <UserPayVerify userId={currentUser.id} isSelf />
-                  </CardContent>
-                </Card>
+                {/* Why: Personal hour verify for workforce only — Admins use team Pay Verify (Super Admin) or nothing. */}
+                {String(currentUser.role || "").toLowerCase() !== "admin" ? (
+                  <Card className="border-border/60 bg-card/60 backdrop-blur shadow-sm rounded-2xl">
+                    <CardContent className="p-5 sm:p-6 space-y-5">
+                      <UserPayVerify userId={currentUser.id} isSelf />
+                    </CardContent>
+                  </Card>
+                ) : null}
 
                 <UserProjectPortfolio userId={currentUser.id} />
 

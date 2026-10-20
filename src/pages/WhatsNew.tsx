@@ -39,6 +39,7 @@ import {
   type BiText,
   type WhatsNewIcon,
 } from "@/lib/whatsNew/whatsNewFlow";
+import { isSuperAdminUser } from "@/lib/roleBadge";
 import {
   canViewStandards,
   cn,
@@ -164,13 +165,13 @@ export default function WhatsNew() {
             can("UPDATES_VIEW") ||
             can("UPDATES_CREATE")),
         showPayVerify:
-          workforce &&
-          (role === "admin" ||
-            role === "developer" ||
-            role === "creator" ||
-            isCodoTester ||
-            can("DAILY_UPDATE_VIEW") ||
-            can("USERS_VIEW")),
+          isSuperAdminUser(currentUser) ||
+          (workforce &&
+            role !== "admin" &&
+            (role === "developer" ||
+              role === "creator" ||
+              isCodoTester ||
+              can("DAILY_UPDATE_VIEW"))),
         showMyLeave:
           workforce &&
           (isCodoTester ||

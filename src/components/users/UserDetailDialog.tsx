@@ -57,7 +57,7 @@ import { EditUserDialog } from "./EditUserDialog";
 import { UserWorkStats } from "./UserWorkStats";
 import { ActiveHours } from "./ActiveHours";
 import { usePermissions } from "@/hooks/usePermissions";
-import { RoleLabelBadge, TesterTypeBadge } from "@/lib/roleBadge";
+import { isSuperAdminUser, RoleLabelBadge, TesterTypeBadge } from "@/lib/roleBadge";
 
 export interface DeleteUserDialogProps {
   user: User;
@@ -143,6 +143,15 @@ export function UserDetailDialog({
   const isAccountDeactivated = user.account_active === 0;
   const canAdminManageAccount =
     loggedInUserRole === "admin" && currentUser?.id !== user.id;
+  const actorIsSuperAdmin = isSuperAdminUser(currentUser);
+  const targetIsSuperAdmin = isSuperAdminUser(user);
+  // Why: Super Admin accounts are never impersonated; regular Admins cannot open Admin sessions.
+  const canOpenUserDashboard =
+    loggedInUserRole === "admin" &&
+    Boolean(currentUser?.id) &&
+    currentUser!.id !== user.id &&
+    !targetIsSuperAdmin &&
+    (actorIsSuperAdmin || String(user.role || "").toLowerCase() !== "admin");
 
   useQuery({
     queryKey: ["userStats", user.id],
@@ -242,10 +251,12 @@ export function UserDetailDialog({
   const statusConfig = getStatusConfig(userStatus);
 
   const handleGenerateDashboardLink = async () => {
-    if (loggedInUserRole !== "admin") {
+    if (!canOpenUserDashboard) {
       toast({
-        title: "Access Denied",
-        description: "Only administrators can generate dashboard links.",
+        title: "Not allowed",
+        description: targetIsSuperAdmin
+          ? "Super Admin accounts cannot be impersonated."
+          : "Only a Super Admin can open an Admin dashboard session.",
         variant: "destructive",
       });
       return;
@@ -543,7 +554,7 @@ export function UserDetailDialog({
                 />
               )}
 
-              {loggedInUserRole === "admin" && currentUser?.id !== user.id && (
+              {canOpenUserDashboard && (
                 <UserActionCard
                   icon={ExternalLink}
                   label="Dashboard"
@@ -682,7 +693,7 @@ export function UserDetailDialog({
                 </Button>
               )}
 
-              {loggedInUserRole === "admin" && currentUser?.id !== user.id && (
+              {canOpenUserDashboard && (
                 <Button
                   variant="outline"
                   className="w-full flex items-center justify-center gap-2 h-10 transition-all hover:scale-[1.02] min-w-0"

@@ -1,5 +1,5 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Navigate, useSearchParams } from 'react-router-dom';
 import {
   AlertTriangle,
   Banknote,
@@ -58,6 +58,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { toast } from '@/components/ui/use-toast';
 import { useAuth } from '@/context/AuthContext';
 import { extractApiErrorMessage } from '@/lib/apiError';
+import { isSuperAdminUser } from '@/lib/roleBadge';
 import { cn } from '@/lib/utils';
 import { notifyAdminNavCountsChanged } from '@/services/adminNavCountsService';
 import {
@@ -255,6 +256,107 @@ function weekDotTone(week: PayVerifyWeek): string {
   return 'bg-gray-400 dark:bg-gray-500';
 }
 
+type AttendanceDayRow = {
+  date?: string;
+  hours?: number | string;
+  overtime_hours?: number | string;
+  day_status?: string;
+  check_in?: string | null;
+  check_out?: string | null;
+  work_mode?: string | null;
+};
+
+function asAttendanceDays(raw: PayVerifyWeek['attendance_days']): AttendanceDayRow[] {
+  if (!Array.isArray(raw)) return [];
+  return raw as AttendanceDayRow[];
+}
+
+function shortDayLabel(iso: string): string {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(iso)) return iso;
+  const d = new Date(`${iso}T12:00:00`);
+  return d.toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric' });
+}
+
+/** Why: Same hours block in verify popup and week detail cards so confirm matches what you attest. */
+function VerifyTimeSummary({
+  hours,
+  leaveDays,
+  otHours,
+  days,
+  title,
+}: {
+  hours: number | string | undefined;
+  leaveDays: number | string | undefined;
+  otHours: number | string | undefined;
+  days?: AttendanceDayRow[];
+  title?: string;
+}) {
+  const dayRows = (days || []).filter((d) => {
+    const status = String(d.day_status || '');
+    return status === 'worked' || status === 'leave' || Number(d.hours) > 0;
+  });
+
+  return (
+    <div className="rounded-xl border border-emerald-200/70 bg-emerald-50/50 p-3 dark:border-emerald-900/40 dark:bg-emerald-950/25">
+      {title ? (
+        <p className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-emerald-800/80 dark:text-emerald-200/80">
+          {title}
+        </p>
+      ) : null}
+      <div className="grid grid-cols-12 gap-2">
+        {[
+          { label: 'Hours', value: formatHours(hours) },
+          { label: 'Leave', value: `${leaveDays ?? 0}d` },
+          { label: 'OT', value: formatHours(otHours) },
+        ].map((cell) => (
+          <div
+            key={cell.label}
+            className="col-span-4 rounded-xl border border-emerald-100/80 bg-white/80 px-2.5 py-2 dark:border-emerald-900/40 dark:bg-gray-900/60"
+          >
+            <p className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+              {cell.label}
+            </p>
+            <p className="mt-0.5 text-sm font-semibold tabular-nums text-foreground">{cell.value}</p>
+          </div>
+        ))}
+      </div>
+      {dayRows.length > 0 ? (
+        <div className="mt-2 flex flex-col gap-1.5">
+          <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+            Day times
+          </p>
+          <div className="flex flex-col gap-1">
+            {dayRows.map((d) => {
+              const date = String(d.date || '');
+              const status = String(d.day_status || 'off');
+              const inAt = d.check_in ? String(d.check_in).slice(0, 5) : null;
+              const outAt = d.check_out ? String(d.check_out).slice(0, 5) : null;
+              return (
+                <div
+                  key={date || `${status}-${d.hours}`}
+                  className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-border/60 bg-background/80 px-2.5 py-1.5 text-[11px]"
+                >
+                  <span className="font-medium text-foreground">
+                    {date ? shortDayLabel(date) : '—'}
+                    {status === 'leave' ? (
+                      <span className="ml-1.5 text-amber-700 dark:text-amber-300">Leave</span>
+                    ) : null}
+                  </span>
+                  <span className="tabular-nums text-muted-foreground">
+                    {inAt && outAt ? `${inAt}–${outAt} · ` : null}
+                    {formatHours(d.hours)}
+                    {Number(d.overtime_hours) > 0 ? ` · OT ${formatHours(d.overtime_hours)}` : ''}
+                  </span>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
 type BankDetailsView = Pick<
   UserOnboardingDetails,
   | 'account_holder_name'
@@ -377,7 +479,10 @@ function RosterCardSkeleton() {
 
 export default function PayVerify() {
   const { currentUser: user } = useAuth();
-  const isAdmin = (user?.role || '').toLowerCase() === 'admin';
+  // Why: Team payroll UI is Super Admin only — regular Admins share JWT role `admin`.
+  const isAdmin = isSuperAdminUser(user);
+  const isRegularAdmin =
+    (user?.role || '').toLowerCase() === 'admin' && !isAdmin;
   const [searchParams, setSearchParams] = useSearchParams();
 
   const month = searchParams.get('month') || defaultPayVerifyYearMonth();
@@ -457,6 +562,11 @@ export default function PayVerify() {
   }, []);
 
   const load = useCallback(async () => {
+    if (isRegularAdmin) {
+      setLoading(false);
+      setData(null);
+      return;
+    }
     setLoading(true);
     setError(null);
     try {
@@ -468,11 +578,29 @@ export default function PayVerify() {
     } finally {
       setLoading(false);
     }
-  }, [month, role]);
+  }, [month, role, isRegularAdmin]);
 
   useEffect(() => {
     void load();
   }, [load]);
+
+  // Why: From "Open Pay Verify", open week details once per month load (do not fight Collapse).
+  const autoExpandKeyRef = useRef('');
+  useEffect(() => {
+    if (!data?.roster?.length) return;
+    const key = `${month}|${role}|${data.roster.map((e) => e.user.id).join(',')}`;
+    if (autoExpandKeyRef.current === key) return;
+    autoExpandKeyRef.current = key;
+    const pending = data.roster.find((e) =>
+      e.weeks.some(
+        (w) =>
+          w.employee_status !== 'verified' &&
+          w.admin_status !== 'approved' &&
+          canVerifyWeekPeriod(w)
+      )
+    );
+    setExpandedId((pending || data.roster[0]).user.id);
+  }, [data?.roster, month, role]);
 
   // Why: if URL month is outside joining→today, snap to the clamped API month.
   useEffect(() => {
@@ -840,6 +968,11 @@ export default function PayVerify() {
     { value: 'completed', label: 'Completed', icon: CheckCircle2, count: statusCounts.completed },
     { value: 'paid', label: 'Paid', icon: Lock, count: statusCounts.paid },
   ];
+
+  // Why: Regular Admins must not land on team payroll; Super Admin + workforce only.
+  if (isRegularAdmin) {
+    return <Navigate to="/admin/dashboard" replace />;
+  }
 
   return (
     <div className="min-w-0 w-full space-y-6 overflow-x-hidden sm:space-y-8">
@@ -1324,13 +1457,17 @@ export default function PayVerify() {
                                   </span>
                                 ) : null}
                               </div>
-                              <p className="text-xs text-muted-foreground">
-                                {formatHours(week.worked_hours)} worked · leave {week.leave_days ?? 0}d · OT{' '}
-                                {formatHours(week.ot_hours)}
-                              </p>
+                              <div className="mt-2">
+                                <VerifyTimeSummary
+                                  hours={week.worked_hours}
+                                  leaveDays={week.leave_days}
+                                  otHours={week.ot_hours}
+                                  days={asAttendanceDays(week.attendance_days)}
+                                />
+                              </div>
                               <p
                                 className={cn(
-                                  'mt-0.5 text-[11px]',
+                                  'mt-1.5 text-[11px]',
                                   needsCorrection
                                     ? 'font-medium text-amber-800 dark:text-amber-200'
                                     : 'text-muted-foreground'
@@ -1640,7 +1777,12 @@ export default function PayVerify() {
               ? 'sm:max-w-[680px]'
               : noteAction?.kind === 'adjustment'
                 ? 'sm:max-w-[520px]'
-                : 'sm:max-w-[420px]'
+                : noteAction?.kind === 'emp-week' ||
+                    noteAction?.kind === 'admin-week' ||
+                    noteAction?.kind === 'emp-month' ||
+                    noteAction?.kind === 'admin-month'
+                  ? 'sm:max-w-[600px]'
+                  : 'sm:max-w-[420px]'
           )}
         >
           <DialogHeader>
@@ -1669,7 +1811,9 @@ export default function PayVerify() {
                   ? `${noteAction.entry.user.name || noteAction.entry.user.username} · ${monthTitle(month)}. Unverified weeks in this month will be marked verified automatically.`
                   : noteAction.kind === 'rate'
                     ? `${noteAction.entry.user.name || noteAction.entry.user.username} · manage hourly rate and hike timeline`
-                    : `${noteAction.entry.user.name || noteAction.entry.user.username} · ${monthTitle(month)}`
+                    : noteAction.kind === 'emp-week' || noteAction.kind === 'admin-week'
+                      ? `${noteAction.entry.user.name || noteAction.entry.user.username} · ${shortWeek(noteAction.week.week_start, noteAction.week.week_end)}`
+                      : `${noteAction.entry.user.name || noteAction.entry.user.username} · ${monthTitle(month)}`
                 : null}
             </DialogDescription>
           </DialogHeader>
@@ -2086,7 +2230,28 @@ export default function PayVerify() {
               </div>
             </div>
           ) : (
-            <div className="flex flex-col gap-2">
+            <div className="flex flex-col gap-3">
+              {noteAction?.kind === 'emp-week' || noteAction?.kind === 'admin-week' ? (
+                <VerifyTimeSummary
+                  title="Times you are confirming"
+                  hours={noteAction.week.worked_hours}
+                  leaveDays={noteAction.week.leave_days}
+                  otHours={noteAction.week.ot_hours}
+                  days={asAttendanceDays(noteAction.week.attendance_days)}
+                />
+              ) : null}
+              {noteAction?.kind === 'emp-month' ||
+              (noteAction?.kind === 'admin-month' &&
+                (noteAction.action === 'lock' ||
+                  noteAction.action === 'correction_requested' ||
+                  noteAction.action === 'unlock')) ? (
+                <VerifyTimeSummary
+                  title="Month totals you are confirming"
+                  hours={noteAction.entry.month.total_hours}
+                  leaveDays={noteAction.entry.month.leave_days}
+                  otHours={noteAction.entry.month.ot_hours}
+                />
+              ) : null}
               {(noteAction?.kind === 'emp-week' && noteAction.status === 'correction_needed') ||
               (noteAction?.kind === 'admin-week' && noteAction.status === 'correction_requested') ||
               (noteAction?.kind === 'emp-month' && noteAction.status === 'correction_needed') ||
