@@ -32,6 +32,7 @@ export const CODO_STANDARD = {
     'the UI appears correct',
     'the developer tested Chrome',
     "the feature works on the developer's machine",
+    'the website works in Chrome/Safari only (URL-based Flutter apps)',
   ],
   definitionOfDone: [
     'Requirement implemented.',
@@ -47,6 +48,7 @@ export const CODO_STANDARD = {
     'Regression testing completed.',
     'Production deployment completed.',
     'Production smoke test passed.',
+    'For URL-based Flutter apps: applicable native-shell checks pass (download/preview/print, links, payment server-verify, clipboard, permissions, persistent login, network recovery, no blank screens, keyboard/pickers, forced update, FCM when in scope, release builds)—browser-only success is not acceptance.',
   ],
 } as const;
 

@@ -282,6 +282,66 @@ export const CODO_REAL_WORLD_EXAMPLES: Record<string, CodoRealWorldExample> = {
     en: `sitemap.xml proxies a flaky upstream and Search Console shows temporary processing errors. Own a stable sitemap that lists only final canonical, indexable URLs.`,
     ml: `sitemap.xml flaky upstream proxy ചെയ്യുന്നു — GSC temporary processing error. Final canonical, indexable URL മാത്രമുള്ള സ്ഥിരമായ owned sitemap നൽകുക.`,
   },
+  dev_rule_73: {
+    en: `A mid-sprint swap to another WebView package “because docs looked nicer” broke downloads on iOS. Inspect the current package, compare required features and regression risk, and centralize config before any migration.`,
+    ml: `Docs നല്ലതായതുകൊണ്ട് mid-sprint WebView package swap — iOS downloads തകർന്നു. നിലവിലുള്ള package പരിശോധിച്ച് features/regression compare ചെയ്ത് config കേന്ദ്രീകരിക്കുക.`,
+  },
+  dev_rule_74: {
+    en: `Meet links open inside the WebView as a broken page; YouTube target=_blank does nothing. Keep internal HTTPS in-WebView; open approved external destinations natively; never bypass TLS.`,
+    ml: `Meet links WebView-യിൽ തകർന്ന പേജ്; YouTube blank ഒന്നും ചെയ്യുന്നില്ല. Internal HTTPS WebView-യിൽ; external native/browser-ൽ; TLS bypass വേണ്ട.`,
+  },
+  dev_rule_75: {
+    en: `Invoice PDF downloads in Safari but fails silently in the app; window.print() and share do nothing in WebView. Implement authenticated download + native print/preview/share with visible recovery.`,
+    ml: `Invoice PDF Safari-ൽ ഡൗൺലോഡ്; ആപ്പിൽ നിശബ്ദ fail; print/share WebView-യിൽ പ്രവർത്തിക്കുന്നില്ല. Auth download + native print/preview/share + recovery നടപ്പിലാക്കുക.`,
+  },
+  dev_rule_76: {
+    en: `Long-press copy is blocked by an eager gesture recognizer; the team disables zoom to hide unbroken mobile CSS. Fix clipboard menus and coordinate viewport with the web team.`,
+    ml: `Eager gesture copy തടയുന്നു; zoom disable കൊണ്ട് broken CSS മറയ്ക്കുന്നു. Clipboard menus ഫിക്സ് ചെയ്ത് web team-ുമായി viewport യോജിപ്പിക്കുക.`,
+  },
+  dev_rule_77: {
+    en: `Camera permission is granted to every origin silently; permanent deny leaves an infinite spinner. Bridge OS permissions only for approved HTTPS origins with clear deny recovery.`,
+    ml: `എല്ലാ origin-നും camera silent grant; permanent deny infinite spinner. Approved HTTPS origin മാത്രം; deny recovery വ്യക്തം.`,
+  },
+  dev_rule_78: {
+    en: `Push tap opens a private route while logged out; FCM token still points at the previous user after logout. Bind tokens to the user, clear on logout, and route through auth.`,
+    ml: `Push tap logged out സമയം private route തുറക്കുന്നു; logout-നു് ശേഷവും token മുൻ user-ലേക്ക്. Token bind + logout clear + auth route.`,
+  },
+  dev_rule_79: {
+    en: `Remember-me stores the password in SharedPreferences so the app “stays logged in.” Use Keychain/Keystore refresh credentials and clear native + WebView auth on logout.`,
+    ml: `Remember-me password SharedPreferences-ൽ — “logged in” നിലനിർത്താൻ. Keychain/Keystore refresh; logout-ൽ native+WebView auth ക്ലിയർ.`,
+  },
+  dev_rule_80: {
+    en: `Airplane mode leaves a white WebView with no retry; reconnect auto-reloads and doubles a payment POST. Show dedicated offline UI and never blindly replay non-idempotent requests.`,
+    ml: `Airplane mode ശൂന്യ WebView; reconnect payment POST ഡബിൾ. Offline UI + retry; non-idempotent blind replay വേണ്ട.`,
+  },
+  dev_rule_81: {
+    en: `Date picker works in Chrome device mode but is clipped under the keyboard inside the app. Test pickers and IME insets on real Android/iOS WebViews with the web team.`,
+    ml: `Date picker Chrome device mode-ൽ OK; ആപ്പിൽ keyboard-ിനടിയിൽ clip. Real Android/iOS WebView-യിൽ pickers + IME web team-ുമായി ടെസ്റ്റ്.`,
+  },
+  dev_rule_82: {
+    en: `Mandatory update has no store link; a version-check outage blocks every user forever. Ship optional vs mandatory with store URLs and a timeout fallback policy.`,
+    ml: `Mandatory update-ന് store link ഇല്ല; version-check outage എല്ലാവരെയും permanent block. Optional/mandatory + store URL + timeout fallback.`,
+  },
+  dev_rule_83: {
+    en: `WebView process death auto-reloads and resubmits the last payment. Show recoverable reload and restore deep-link state without duplicating mutations.`,
+    ml: `WebView process death auto-reload payment വീണ്ടും submit ചെയ്യുന്നു. Recoverable reload; deep-link restore; duplicate mutation ഇല്ല.`,
+  },
+  dev_rule_84: {
+    en: `Download fails; Flutter, React, and PHP each add a different workaround. Document one native/web/backend contract for auth, download, payment, permissions, and push.`,
+    ml: `Download fail; Flutter/React/PHP മൂന്ന് വ്യത്യസ്ത workaround. Auth/download/payment/permissions/push-ന് ഒരു native/web/backend contract.`,
+  },
+  dev_rule_85: {
+    en: `A compromised page posts to an open JavaScript channel and triggers native file access; production also accepts invalid TLS. Allowlist HTTPS origins and validate every bridge message.`,
+    ml: `തുറന്ന JS channel വഴി compromised page native file access; production TLS bypass. HTTPS origin allowlist + bridge message validation നിർബന്ധം.`,
+  },
+  dev_rule_86: {
+    en: `After logout, User B briefly sees User A’s documents because WebView cookies were never cleared. Clear native credentials and WebView session storage on logout/account switch.`,
+    ml: `Logout-നു് ശേഷം User B-ക്ക് User A-യുടെ documents — WebView cookies ക്ലിയർ ചെയ്തില്ല. Logout/account switch-ൽ native + WebView session ക്ലിയർ ചെയ്യുക.`,
+  },
+  dev_rule_87: {
+    en: `Opening PDFs twenty times freezes the keyboard and the team “fixes” it with setTimeout reload. Dispose WebView resources and fix the root cause—no delay workarounds.`,
+    ml: `20 PDF തുറന്നതിനു് ശേഷം keyboard freeze; setTimeout reload "ഫിക്സ്". WebView resources dispose ചെയ്ത് root cause ഫിക്സ്—delay workaround വേണ്ട.`,
+  },
   qa_accessibility: {
     en: `Leave form can only be submitted with a mouse; errors are colour-only. Complete core flows with keyboard only; require visible focus and text errors.`,
     ml: `Leave ഫോം മൗസ് കൊണ്ട് മാത്രം സബ്മിറ്റ്; എററുകൾ നിറം മാത്രം. കീബോർഡ് മാത്രം കൊണ്ട് കോർ ഫ്ലോ പൂർത്തിയാക്കുക; visible focus + ടെക്സ്ട് എറർ നിർബന്ധം.`,
@@ -289,6 +349,10 @@ export const CODO_REAL_WORLD_EXAMPLES: Record<string, CodoRealWorldExample> = {
   qa_api_contract: {
     en: `API returns \`phone: null\` and the UI prints the string “null”. Capture real responses and reject field/type/pagination/error-shape mismatches.`,
     ml: `API phone: null തരുന്നു; UI "null" സ്ട്രിംഗ് പ്രിന്റ് ചെയ്യുന്നു. യഥാർത്ഥ റെസ്പോൺസ് ക്യാപ്ചർ ചെയ്ത് field/type/pagination/error-shape മിസ്മാച്ച് റിജക്ട് ചെയ്യുക.`,
+  },
+  qa_app_persistent_login: {
+    en: `App reopen keeps the previous user because the password was stored in prefs. Test kill/reopen, logout, and account switch with secure storage only.`,
+    ml: `App reopen മുൻ user നിലനിർത്തുന്നു — password prefs-ൽ. Kill/reopen, logout, account switch secure storage മാത്രം ടെസ്റ്റ്.`,
   },
   qa_apple_sandbox: {
     en: `A leave modal looks perfect in Chrome but cards clip and scrollbars vanish in Safari iOS. Always sign off layouts on Safari / WebKit before Done.`,
@@ -334,9 +398,17 @@ export const CODO_REAL_WORLD_EXAMPLES: Record<string, CodoRealWorldExample> = {
     en: `Projects with zero bugs show a blank panel or “undefined”. Force empty lists and require a clear empty-state message that does not collapse the layout.`,
     ml: `ബഗ് ഇല്ലാത്ത പ്രോജക്ട്ടില് ശൂന്യ പാനൽ അല്ലെങ്കിൽ undefined. Empty ലിസ്റ്റ് ഫോഴ്സ് ചെയ്ത് ലേഔട്ട് തകരാത്ത വ്യക്തമായ empty-state മെസേജ് ആവശ്യപ്പെടുക.`,
   },
+  qa_fcm_push_routing: {
+    en: `Push tap opens a private screen while logged out; token still bound after logout. Test FG/BG/terminated, auth-gated deep links, and token clear on logout.`,
+    ml: `Push tap logged out സമയം private screen; logout-നു് ശേഷവും token. FG/BG/terminated, auth deep link, logout token clear ടെസ്റ്റ്.`,
+  },
   qa_financial_integrity: {
     en: `UI shows ₹1,000.00 while DB stores 999.995. Compare displayed, API, DB, and hand-calculated amounts across partial/full/refund cases.`,
     ml: `UI ₹1,000.00 കാണിക്കുന്നു; DB-യിൽ 999.995. Partial/full/refund കേസുകളിൽ displayed, API, DB, കൈകൊണ്ട് കണക്കാക്കിയ തുക താരതമ്യം ചെയ്യുക.`,
+  },
+  qa_forced_app_update: {
+    en: `Mandatory update has no Play Store link; version-check timeout blocks every user. Verify optional vs mandatory, store URL, and timeout fallback.`,
+    ml: `Mandatory update-ന് Play Store link ഇല്ല; version-check timeout എല്ലാവരെയും block. Optional/mandatory, store URL, timeout fallback ടെസ്റ്റ്.`,
   },
   qa_googlebot_html: {
     en: `QA opens a blog in Chrome Elements after JS and assumes Google sees the same HTML. Accept only \`curl -A Googlebot\` / GSC tested HTML with unique H1+body+canonical.`,
@@ -347,8 +419,8 @@ export const CODO_REAL_WORLD_EXAMPLES: Record<string, CodoRealWorldExample> = {
     ml: `5 റോ കൊണ്ട് bugs ലിസ്റ്റ് നല്ലതാണ്; 200+-ല് ഫ്രീസ്, പേജിനേഷൻ ഇല്ല. 0, 1, സാധാരണ, 100+ റെക്കോർഡ് വ്യൂകൾ ഓഡിറ്റ് ചെയ്യുക.`,
   },
   qa_in_app_payment_upi: {
-    en: `UPI grid tested only on an Android emulator — empty on real devices. On physical Android and iOS, confirm app grid, external scheme handoff, and intact return session.`,
-    ml: `UPI ഗ്രിഡ് Android emulator-ല് മാത്രം ടെസ്റ്റ് — യഥാർത്ഥ ഡിവൈസില് ശൂന്യം. Physical Android/iOS-ല് app grid, external scheme handoff, return session നിലനിൽപ്പ് ഉറപ്പാക്കുക.`,
+    en: `UPI grid tested only on an Android emulator — empty on real devices. On physical Android and iOS, confirm app grid, external handoff, cold start/kill/duplicate callback, and backend payment verification — not client return URL alone.`,
+    ml: `UPI ഗ്രിഡ് Android emulator-ല് മാത്രം ടെസ്റ്റ് — യഥാർത്ഥ ഡിവൈസില് ശൂന്യം. Physical Android/iOS-ല് grid, handoff, cold start/kill/duplicate callback, backend verify — client return URL മാത്രം പോരാ.`,
   },
   qa_input_interception: {
     en: `QA edits a leave form, hits Esc, and data vanishes with no prompt. Dirty close must warn; cancel/error/success/refresh paths must not leak the previous record’s values.`,
@@ -425,6 +497,34 @@ export const CODO_REAL_WORLD_EXAMPLES: Record<string, CodoRealWorldExample> = {
   qa_theme_interruption: {
     en: `Form labels are readable in light mode only; toggling dark mid-edit makes errors disappear into the background. Toggle themes while typing and reject unreadable contrast.`,
     ml: `ലൈട്ട് മോഡിൽ മാത്രം ലേബൽ വായിക്കാം; എഡിറ്റിനിടയിൽ ഡാർക്ക് ടോഗിൾ ചെയ്താല് എറർ അപ്രത്യക്ഷമാകും. ടൈപ്പ് ചെയ്യുമ്പോൾ തീം മാറ്റി വായിക്കാനാകാത്ത കോൺട്രാസ്റ്റ് റിജക്ട് ചെയ്യുക.`,
+  },
+  qa_webview_clipboard_zoom: {
+    en: `Long-press copy fails in WebView OTP fields; pinch-zoom hides broken mobile CSS. Test clipboard across controls and reject zoom-as-layout-fix.`,
+    ml: `WebView OTP-ൽ long-press copy fail; pinch-zoom broken CSS മറയ്ക്കുന്നു. Clipboard controls ടെസ്റ്റ്; zoom-as-layout-fix reject.`,
+  },
+  qa_webview_download_print: {
+    en: `Invoice PDF works in Safari but silent-fails in the app; print/share were never tried. Run the full download/print/share matrix on physical Android and iOS.`,
+    ml: `Invoice PDF Safari-ൽ OK; ആപ്പിൽ നിശബ്ദ fail; print/share ഒരിക്കലും ടെസ്റ്റ് ചെയ്തില്ല. Physical Android/iOS-ൽ download/print/share matrix ഓടിക്കുക.`,
+  },
+  qa_webview_external_links: {
+    en: `Google Meet opens as a broken in-WebView page; target=_blank does nothing. Verify external destinations open natively and unsupported schemes fail safely.`,
+    ml: `Google Meet WebView-യിൽ തകർന്ന പേജ്; target=_blank ഒന്നും ചെയ്യുന്നില്ല. External native open + unsupported scheme safe fail ഉറപ്പാക്കുക.`,
+  },
+  qa_webview_keyboard_pickers: {
+    en: `Date picker works in Chrome device mode but is clipped under the keyboard in the app. Retest pickers and IME on real WebView builds.`,
+    ml: `Date picker Chrome device mode-ൽ OK; ആപ്പിൽ keyboard-ിനടിയിൽ clip. Real WebView builds-ൽ pickers + IME വീണ്ടും ടെസ്റ്റ്.`,
+  },
+  qa_webview_permissions: {
+    en: `Camera worked after first grant; permanent deny left an infinite spinner. Walk grant/deny/OS revoke and unapproved-origin cases.`,
+    ml: `ആദ്യ grant-നു് ശേഷം camera OK; permanent deny infinite spinner. Grant/deny/OS revoke + unapproved origin ടെസ്റ്റ്.`,
+  },
+  qa_webview_performance_stability: {
+    en: `Critical flow hung after repeated PDF opens; a 800ms delay “fixed” it. Reject hangs, freezes, and delay/reload-only workarounds on real devices.`,
+    ml: `തുടർച്ചയായ PDF തുറക്കലിനു് ശേഷം hang; 800ms delay "ഫിക്സ്". Real device-ൽ hang/freeze + delay/reload-only workaround reject.`,
+  },
+  qa_webview_session_isolation: {
+    en: `Logged out as A, into B, and still saw A’s invoice list until hard refresh. Confirm WebView cookies/cache never leak across accounts.`,
+    ml: `A logout → B login; hard refresh വരെ A-യുടെ invoice list. WebView cookies/cache cross-account leak ഇല്ലെന്ന് ഉറപ്പാക്കുക.`,
   },
 };
 

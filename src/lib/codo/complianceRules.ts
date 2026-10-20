@@ -131,7 +131,7 @@ export const DEVELOPER_RULES: DeveloperRule[] = [
     number: 17,
     titleEn: 'Custom Picker Normalization',
     description:
-      'Date and time pickers must handle null/undefined states cleanly and map display formatting separately from ISO payloads.\n\nMalayalam: തീയതി/സമയ പിക്കറുകൾ null/undefined സ്റ്റേറ്റുകൾ ശരിയായി കൈകാര്യം ചെയ്യുകയും ISO പേലോഡിൽ നിന്ന് ഡിസ്പ്ലേ ഫോർമാറ്റിംഗ് വേർതിരിക്കുകയും വേണം.',
+      'Date and time pickers must handle null/undefined states cleanly and map display formatting separately from ISO payloads. For URL-based Flutter apps, every project-specific custom dropdown, select, date picker, time picker, calendar, modal, popover, autocomplete, and multi-select must also be verified inside the Android/iOS WebView—not only in a desktop or mobile browser.\n\nMalayalam: തീയതി/സമയ പിക്കറുകൾ null/undefined സ്റ്റേറ്റുകൾ ശരിയായി കൈകാര്യം ചെയ്യുകയും ISO പേലോഡിൽ നിന്ന് ഡിസ്പ്ലേ ഫോർമാറ്റിംഗ് വേർതിരിക്കുകയും വേണം. URL-based Flutter apps-ൽ custom pickers Android/iOS WebView-യിലും ടെസ്റ്റ് ചെയ്യണം—browser മാത്രം പോരാ.',
   },
   {
     key: 'dev_rule_18',
@@ -425,7 +425,7 @@ export const DEVELOPER_RULES: DeveloperRule[] = [
     number: 63,
     titleEn: 'Production Observability',
     description:
-      'Important production operations must emit useful structured logs and monitoring signals (operation, user ID, request ID, outcome, duration). Logs must never contain passwords, access tokens, API secrets or sensitive personal data.\n\nMalayalam: പ്രധാന പ്രൊഡക്ഷൻ ഓപ്പറേഷനുകൾക്ക് ഉപകാരപ്രദമായ structured ലോഗിംഗും മോണിറ്ററിംഗും വേണം. ലോഗുകളിൽ പാസ്‌വേഡ്, ആക്സസ് ടോക്കൺ, API സീക്രട്ട്, സെൻസിറ്റീവ് വ്യക്തിഗത ഡാറ്റ ഒരിക്കലും ഉണ്ടാകരുത്.',
+      'Important production operations must emit useful structured logs and monitoring signals (operation, user ID, request ID, outcome, duration). For URL-based Flutter apps, include native app version/build, OS version, WebView/platform version where available, and a correlation/request ID for diagnosable failures (WebView load, download/print, deep-link, permission, push-routing, crashes). Logs must never contain passwords, access tokens, API secrets, sensitive personal data, document contents, or signed URLs.\n\nMalayalam: പ്രധാന പ്രൊഡക്ഷൻ ഓപ്പറേഷനുകൾക്ക് structured ലോഗിംഗ് വേണം. Flutter URL apps-ൽ app version/build, OS, WebView version, correlation ID ഉൾപ്പെടുത്തുക. പാസ്‌വേഡ്, ടോക്കൺ, signed URL, document contents ലോഗ് ചെയ്യരുത്.',
   },
   {
     key: 'dev_rule_64',
@@ -453,14 +453,14 @@ export const DEVELOPER_RULES: DeveloperRule[] = [
     number: 67,
     titleEn: 'Release Readiness',
     description:
-      'A feature is not complete because it works on the developer\'s machine. Before release it must be fully implemented, code reviewed, tested, security checked, performance checked, browser checked where applicable, verified as a production build, deployed, and smoke-tested on its critical flow in production.\n\nMalayalam: ഡെവലപ്പറുടെ മെഷീനിൽ പ്രവർത്തിച്ചതുകൊണ്ട് ഫീച്ചർ പൂർത്തിയായി എന്നല്ല. റിലീസിന് മുമ്പ് കോഡ് റിവ്യൂ, ടെസ്റ്റ്, സെക്യൂരിറ്റി, പെർഫോമൻസ്, ബ്രൗസർ പരിശോധന, പ്രൊഡക്ഷൻ ബിൽഡ്, ഡിപ്ലോയ്മെന്റ്, പ്രൊഡക്ഷൻ സ്മോക്ക് ടെസ്റ്റ് എന്നിവ പൂർത്തിയാകണം.',
+      'A feature is not complete because it works on the developer\'s machine. Before release it must be fully implemented, code reviewed, tested, security checked, performance checked, browser checked where applicable, verified as a production build, deployed, and smoke-tested on its critical flow in production. For URL-based Flutter apps, also verify signed/release Android and iOS builds (not debug emulator only), production URLs, permissions, app links, store update behavior, push configuration, download/print, and payment return flow. A website that works in a browser is not sufficient acceptance for the native shell.\n\nMalayalam: ഡെവലപ്പറുടെ മെഷീനിൽ പ്രവർത്തിച്ചതുകൊണ്ട് ഫീച്ചർ പൂർത്തിയായി എന്നല്ല. URL-based Flutter apps-ന് signed/release Android+iOS builds, download/print/payment return/push എന്നിവയും പാസ് വേണം—browser-ൽ website മാത്രം മതിയാവില്ല.',
   },
   {
     key: 'dev_rule_68',
     number: 68,
     titleEn: 'Embedded WebView Payment Gateway & Intent Scheme Interception',
     description:
-      'In Flutter/native WebViews that host payment gateways, select the User-Agent dynamically by platform (Android → Mobile Chrome; iOS → Safari). Explicitly intercept non-HTTP(S) schemes such as upi://, intent://, and gpay://: deny in-WebView navigation and delegate to the external app with LaunchMode.externalApplication so UPI/app grids populate and deep-link returns succeed.\n\nMalayalam: പേയ്മെന്റ് ഗേറ്റ്‌വേ ഹോസ്റ്റ് ചെയ്യുന്ന Flutter/native WebView-കളിൽ User-Agent പ്ലാറ്റ്‌ഫോം അനുസരിച്ച് ഡൈനാമിക് ആയി തിരഞ്ഞെടുക്കുക (Android → Mobile Chrome; iOS → Safari). upi://, intent://, gpay:// പോലുള്ള non-HTTP(S) സ്കീമുകൾ WebView-യിൽ ALLOW ചെയ്യരുത്; LaunchMode.externalApplication വഴി ബാഹ്യ ആപ്പിലേക്ക് ഡെലിഗേറ്റ് ചെയ്യുക.',
+      'In Flutter/native WebViews that host payment gateways, select the User-Agent dynamically by platform (Android → Mobile Chrome; iOS → Safari). Explicitly intercept non-HTTP(S) schemes such as upi://, intent://, and gpay://: deny in-WebView navigation and delegate to the external app with LaunchMode.externalApplication so UPI/app grids populate and deep-link returns succeed. Maintain an allowlist of permitted payment schemes/domains; do not launch arbitrary URI schemes from page content. Handle success, failure, pending, cancellation, return from payment app, duplicate callbacks, and repeated launches. A return/deep-link alone must never be treated as proof of payment—verify final status through the trusted backend/provider verification or webhook flow (see Rules 52 and 58). Payment status changes must be idempotent. Test in provider sandbox before production. Use an external browser or native SDK when required by provider policy rather than forcing every flow into a WebView.\n\nMalayalam: പേയ്മെന്റ് WebView-യിൽ platform UA; upi:// intent:// gpay:// externalApplication-ല്; scheme allowlist; return URL മാത്രം payment proof അല്ല—backend/webhook verify (Rules 52/58); idempotent; sandbox ടെസ്റ്റ്; provider require ചെയ്താൽ external browser/SDK.',
   },
   {
     key: 'dev_rule_69',
@@ -489,6 +489,111 @@ export const DEVELOPER_RULES: DeveloperRule[] = [
     titleEn: 'Sitemap Canonical Hygiene',
     description:
       'sitemap.xml must return 200 with valid XML under a reliable timeout, list only final canonical URLs (no slash duplicates, no redirected URLs, no noindex pages), and use accurate lastmod only when content actually changes. Prefer an owned endpoint with caching over a flaky upstream proxy that causes Search Console temporary processing errors.\n\nMalayalam: sitemap.xml 200 + valid XML ആയിരിക്കണം; final canonical URLs മാത്രം; slash/redirect/noindex ഒഴിവാക്കുക; lastmod കൃത്യമായിരിക്കണം. GSC temporary processing error ഉണ്ടാക്കുന്ന flaky proxy ഒഴിവാക്കുക.',
+  },
+  {
+    key: 'dev_rule_73',
+    number: 73,
+    titleEn: 'Approved WebView Integration',
+    description:
+      'Inspect the existing Flutter/WebView package and version before changes. Use a maintained, compatible package that meets project requirements (such as webview_flutter or flutter_inappwebview when justified). Do not migrate WebView packages merely because another exists—compare required features, maintenance, Android/iOS support, existing integration, and regression risk. Centralize WebView configuration and event handling. Test Android and iOS separately; their WebView engines and native APIs do not behave identically.\n\nMalayalam: Flutter/WebView പാക്കേജ് മാറ്റുന്നതിന് മുമ്പ് നിലവിലുള്ള പാക്കേജും വേർഷനും പരിശോധിക്കുക. ആവശ്യമായ കഴിവുകൾക്ക് maintained package ഉപയോഗിക്കുക; മറ്റൊരു പാക്കേജ് ഉണ്ടെന്നതുകൊണ്ട് മാത്രം migrate ചെയ്യരുത്. WebView config കേന്ദ്രീകരിക്കുക; Android, iOS വേറെ ടെസ്റ്റ് ചെയ്യുക.',
+  },
+  {
+    key: 'dev_rule_74',
+    number: 74,
+    titleEn: 'WebView Navigation and External Links',
+    description:
+      'Define a clear navigation policy for internal HTTPS routes, approved external websites, app deep links, authentication providers, payment providers, and unsupported schemes. Internal application routes should remain in the WebView when appropriate. Approved external destinations such as YouTube, Google Meet, target="_blank", window.open, and third-party websites must open using the intended native app or a safe browser fallback. Handle new-window navigation explicitly. Validate URLs and schemes against an allowlist. Support Android back: go back in web history when appropriate, otherwise follow documented exit behavior. Never bypass TLS certificate errors or accept invalid certificates in production.\n\nMalayalam: Internal HTTPS routes WebView-യിൽ നിലനിർത്തുക; YouTube, Meet, target=_blank, ബാഹ്യ സൈറ്റുകൾ native/browser-ൽ തുറക്കുക. Scheme allowlist നിർബന്ധം; Android back web history പിന്തുടരണം; production-ൽ TLS bypass അനുവദിക്കരുത്.',
+  },
+  {
+    key: 'dev_rule_75',
+    number: 75,
+    titleEn: 'Download, Print, and Document Preview',
+    description:
+      'Downloads must work in the app as well as in a normal browser, including authenticated downloads and supported blob: URLs. Handle MIME type, filename, Content-Disposition, cookies/authentication, progress, cancellation, failure, and duplicate taps. Use supported native download/storage mechanisms for the relevant Android/iOS versions; request only permissions actually needed. Printing must be intentional—do not assume window.print() works in every WebView; use a supported native or verified document-print flow. PDF, image, and other supported attachments must provide usable preview/open plus download, print, and share where the file type/platform supports them. Handle missing viewers, expired links, permission denial, unsupported types, large files, and failed downloads with visible recovery. Never log file contents, authorization headers, signed URLs, or other sensitive download data.\n\nMalayalam: Authenticated/blob downloads ആപ്പിൽ പ്രവർത്തിക്കണം; MIME, filename, permissions, progress, cancel, failure കൈകാര്യം ചെയ്യുക. Print intentional native flow; PDF/image preview+download+print+share; signed URL/headers ലോഗ് ചെയ്യരുത്.',
+  },
+  {
+    key: 'dev_rule_76',
+    number: 76,
+    titleEn: 'WebView Clipboard, Zoom, and Text Interaction',
+    description:
+      'Copy, cut, paste, select-all, long-press menus, and keyboard shortcuts must work for supported text controls inside the WebView (inputs, textareas, password/OTP, contenteditable, search, forms). Do not block clipboard with unnecessary gesture handlers, overlays, JavaScript interception, or WebView settings. If native clipboard bridging is required, expose only minimum functionality, validate origin and message data, and do not create an unrestricted JavaScript bridge. Follow the product pinch-zoom policy for fixed mobile interaction while preserving readable responsive layout and accessibility text scaling where possible. Implement viewport and WebView zoom settings consistently on Android and iOS. Do not use zoom disabling as a substitute for fixing a non-responsive website—coordinate viewport and CSS with the web developer.\n\nMalayalam: WebView-യിലെ ഇൻപുട്ടുകളിൽ copy/paste/select-all പ്രവർത്തിക്കണം; അനാവശ്യ gesture/overlay കൊണ്ട് clipboard തടയരുത്. Pinch-zoom policy പാലിച്ച് responsive layout/accessibility നിലനിർത്തുക; zoom disable കൊണ്ട് non-responsive site മറയ്ക്കരുത്.',
+  },
+  {
+    key: 'dev_rule_77',
+    number: 77,
+    titleEn: 'WebView Permission Bridge',
+    description:
+      'Support the permissions required by actual product features (camera, microphone, location, media/file selection, notifications). Use the correct native runtime permission process and WebView permission callbacks on each platform. Ask at the moment of need and explain purpose clearly. Grant WebView permission only to approved HTTPS origins and only for the resource the user authorized. Handle granted, denied, permanently denied, revoked in OS settings, and unsupported permissions without crashes or infinite loading. Do not repeatedly prompt or silently grant native permissions. Audit permission requests before release so the app does not request unused features.\n\nMalayalam: Camera/mic/location/files/notifications-ന് ശരിയായ native runtime + WebView permission bridge ഉപയോഗിക്കുക; ആവശ്യമുള്ള സമയം മാത്രം ചോദിക്കുക; approved HTTPS origin മാത്രം; deny/permanent-deny crash/infinite load ഇല്ലാതെ recover ചെയ്യുക.',
+  },
+  {
+    key: 'dev_rule_78',
+    number: 78,
+    titleEn: 'FCM Push for URL-Based Apps',
+    description:
+      'Configure FCM for every app where push notifications are part of the CODO/product delivery standard, unless approved project scope explicitly excludes them. Include required platform configuration, including Apple push setup for iOS where applicable. Request notification permission at an appropriate time and respect OS denial. Register and refresh device tokens safely; associate tokens with the correct authenticated user/device; handle logout/account switching; never log tokens. Handle foreground, background, terminated-app, notification tap, deep-link routing, expired sessions, duplicate notifications, and token refresh. Notification taps must open the correct screen without bypassing authentication or authorization. Validate push payloads; do not place sensitive personal or payment data in notification text unnecessarily.\n\nMalayalam: Scope-ലുള്ള URL apps-ന് FCM (+ iOS APNs) കോൺഫിഗർ ചെയ്യുക; token user/device-മായി ബന്ധിപ്പിക്കുക; logout-ൽ ക്ലിയർ ചെയ്യുക; tap ശരിയ screen-ലേക്ക് (auth bypass ഇല്ല); sensitive data notification text-ൽ ഇടരുത്.',
+  },
+  {
+    key: 'dev_rule_79',
+    number: 79,
+    titleEn: 'Secure Persistent App Login',
+    description:
+      'Do not store a user\'s password in plaintext or weaken backend session expiry just to keep the app logged in. Implement persistent app login using the project\'s supported secure authentication strategy (securely stored refresh credentials, token rotation, or a backend-supported mobile session). Use platform-secure storage (iOS Keychain / Android Keystore-backed storage) for sensitive credentials—not ordinary preferences, localStorage, or JavaScript-accessible storage. Handle WebView cookies/session state deliberately; verify required cookies persist across normal app restarts where intended. Access tokens should expire as designed and refresh safely when permitted. Logout must revoke/invalidate the session as supported and clear native and WebView authentication state. Handle account switching, revoked tokens, session expiry, offline launch, and server-side logout. Longer login duration requires an explicit security-approved session policy, not bypassing authentication.\n\nMalayalam: Password plaintext ആയി സൂക്ഷിക്കരുത്; Keychain/Keystore-backed secure storage ഉപയോഗിക്കുക; WebView cookies deliberate ആയി കൈകാര്യം ചെയ്യുക; logout native+WebView auth ക്ലിയർ ചെയ്യണം; session policy bypass ചെയ്യരുത്.',
+  },
+  {
+    key: 'dev_rule_80',
+    number: 80,
+    titleEn: 'WebView Network Errors and No Blank Screens',
+    description:
+      'Detect loading failure caused by no connection, DNS/TLS errors, timeout, HTTP errors, or server outage and distinguish these cases as far as practical. Show a dedicated offline/network-error state with a visible retry action—do not leave a blank WebView. When connectivity returns, retry or reload using a bounded, deliberate policy; avoid infinite automatic reload loops and repeated API mutations. Preserve safe unsent form data when practical; before retrying a mutation, determine whether the original request may already have succeeded. Use exponential backoff with bounds for suitable transient operations; do not blindly retry payment or other non-idempotent operations. A Service Worker can assist with approved web assets but is not a universal fix for native WebView networking. Flutter-level exceptions, WebView load errors, HTTP failures, JavaScript/web failures, unsupported URLs, and native plugin errors must produce a controlled fallback with retry/back/home when safe. Capture diagnostic context (app version, platform, URL category, error code, correlation ID) while redacting tokens, credentials, personal data, and signed URLs. Do not expose stack traces to end users.\n\nMalayalam: Offline/TLS/HTTP/timeout-ന് dedicated error UI + retry; ശൂന്യ WebView അനുവദിക്കരുത്; bounded reconnect; non-idempotent/payment blind retry വേണ്ട; Flutter/WebView/web error boundaries; sensitive data redact ചെയ്യുക.',
+  },
+  {
+    key: 'dev_rule_81',
+    number: 81,
+    titleEn: 'Keyboard, Pickers, and Responsive Shell Contract',
+    description:
+      'Forms inside WebView must remain usable when the native keyboard opens, resizes the viewport, switches input type, or closes. Prevent keyboard overlap, stuck keyboard, frozen scrolling, focus loss, hidden submit buttons, and broken scroll position. Test Android and iOS separately, including password managers, autofill, OTP, search, textareas, and numeric/date inputs. Use deliberate resize/inset behavior and scroll-to-focused-input; do not add arbitrary delays as keyboard workarounds. Test every project-specific custom dropdown, select, date/time picker, calendar, modal, popover, autocomplete, and multi-select inside the WebView—not only in a desktop/mobile browser. The App Developer and Web Developer must agree on supported viewport widths, safe areas, navigation, keyboard, dialogs, file workflows, and touch interactions before release. The app must account for status bars, notches, bottom navigation/system bars, keyboard insets, and portrait/landscape. Do not solve layout with arbitrary fixed heights, hidden overflow, or scaling the entire page. Avoid hover-only actions; provide touch-friendly interaction. Test real-device web content on representative Android and iOS devices.\n\nMalayalam: WebView forms keyboard open/close-ൽ usable ആയിരിക്കണം; custom dropdown/date/time pickers WebView-യിൽ ടെസ്റ്റ് ചെയ്യുക; App+Web team viewport/safe-area/keyboard contract യോജിപ്പിക്കുക; real device-ൽ ടെസ്റ്റ് ചെയ്യുക.',
+  },
+  {
+    key: 'dev_rule_82',
+    number: 82,
+    titleEn: 'Required App Update Flow',
+    description:
+      'Implement a remote-config/backend-driven version policy with separate latest version and minimum supported version where appropriate. Distinguish optional update from mandatory update. A mandatory update must provide a clear reason and a working official store link; users should not bypass it when the installed native binary is below the supported minimum. Compare appropriate native version/build values for each platform and release channel. Do not confuse a website deployment with a native app-binary update. Avoid permanently blocking users because the version-check service is temporarily unavailable—define a safe timeout/fallback policy, using a previously validated policy when appropriate. Test available update, mandatory update, store unavailable, offline startup, staged rollout, internal/test builds, and users returning after updating. Website content may update immediately through the WebView, but native code/plugin/permission changes still require a native app release and store distribution.\n\nMalayalam: Remote min/latest version policy; optional vs mandatory update; mandatory-ന് store link + bypass ഇല്ല; version-check timeout-ൽ permanent block വേണ്ട; website deploy ≠ native binary update.',
+  },
+  {
+    key: 'dev_rule_83',
+    number: 83,
+    titleEn: 'App Lifecycle and WebView Process Recovery',
+    description:
+      'Handle foreground/background, process recreation, OS memory pressure, WebView process termination, screen rotation, device lock/unlock, and returning from external apps (payments, Meet, etc.). Restore safe navigation/authentication state without duplicating mutations or losing important input. If the WebView process terminates, show a recoverable state and reload safely; do not blindly resubmit the last POST or payment request. Validate deep-link parameters before use; handle malformed, expired, duplicated, and unsupported links safely. Test app foreground/background, cold start, already-running app, and browser fallback cases for deep-link returns.\n\nMalayalam: BG/FG, rotation, device lock, external-app return, WebView process death കൈകാര്യം ചെയ്യുക; safe reload—POST/payment blind resubmit വേണ്ട; deep-link params validate ചെയ്യുക.',
+  },
+  {
+    key: 'dev_rule_84',
+    number: 84,
+    titleEn: 'Native / Web / Backend Responsibility Contract',
+    description:
+      'Document which behavior belongs to Flutter native code, which belongs to React/Next.js website code, and which belongs to PHP/Python backend code. Coordinate required changes instead of patching the same behavior independently in multiple layers. Shared workflows such as authentication, download, payment callback, permissions, and push routing must have one documented integration contract.\n\nMalayalam: Flutter native, React/Next website, PHP/Python backend responsibilities ഡോക്യുമെന്റ് ചെയ്യുക; auth/download/payment/permissions/push-ന് ഒരു integration contract മാത്രം.',
+  },
+  {
+    key: 'dev_rule_85',
+    number: 85,
+    titleEn: 'WebView Origin Allowlist and Native Bridge Security',
+    description:
+      'Load only approved HTTPS origins in the production WebView. Validate deep-link and navigation targets before use. Secure native–web communication (JavaScript bridges / postMessage): expose only minimum APIs, validate origin and message schema, and never create an unrestricted bridge that can invoke privileged native functions for arbitrary page content. Never bypass TLS certificate validation in production. Coordinate bridge and origin-policy changes with web developers before release.\n\nMalayalam: Production WebView-യിൽ approved HTTPS origins മാത്രം; deep-link validate ചെയ്യുക; JS bridge/postMessage minimum API + origin validation; unrestricted bridge വേണ്ട; TLS bypass production-ൽ അനുവദിക്കരുത്.',
+  },
+  {
+    key: 'dev_rule_86',
+    number: 86,
+    titleEn: 'App Session and WebView Data Isolation',
+    description:
+      'Cached data, cookies, WebView storage, and local/session storage must not expose one user\'s information to another. On logout and account switch, clear account-specific native credentials and WebView authentication/session state (cookies and relevant storage) as supported by the platform. After clearing, the next login must load only the new user\'s data without a hard refresh. Never leave the previous user\'s private screens, tokens, or document URLs reachable.\n\nMalayalam: Cache/cookies/WebView storage ഒരു user-ന്റെ data മറ്റൊരാൾക്ക് കാണിക്കരുത്; logout/account switch-ൽ native credentials + WebView session ക്ലിയർ ചെയ്യുക; അടുത്ത login-ൽ മുൻ user-ന്റെ private data ഇല്ല.',
+  },
+  {
+    key: 'dev_rule_87',
+    number: 87,
+    titleEn: 'WebView Performance and Stability',
+    description:
+      'Prevent WebView hangs, keyboard freezes, excessive loading indicators, memory leaks, slow rendering, and unnecessary or duplicate API requests in the native shell. Dispose controllers, listeners, and plugin resources on unmount. Avoid arbitrary delays, forced reloads, or security bypasses as workarounds (see Rule 66). Profile real-device performance for critical flows and keep interaction responsive under typical network conditions.\n\nMalayalam: WebView hang, keyboard freeze, excessive loading, memory leak, slow render, unnecessary API തടയുക; unmount-ൽ resources dispose ചെയ്യുക; setTimeout/reload/security bypass workaround വേണ്ട (Rule 66).',
   },
 ];
 
@@ -533,7 +638,7 @@ export const QA_STRESS_RULES: QaStressRule[] = [
     key: 'qa_network_break',
     title: 'The Network Break Strategy',
     description:
-      'Drop network visibility mid-action or check server error routing. Confirm immediate user notifications via interactive Toast alerts. Test ONLINE → OFFLINE → ONLINE during important operations, then retry after the failure: the app must recover, show the correct state and create no duplicate data.\n\nMalayalam: ആക്ഷൻ നടക്കുമ്പോൾ നെറ്റ്‌വർക്ക് ഡ്രോപ്പ് ചെയ്യുകയോ സർവർ എറർ റൂട്ടിംഗ് പരിശോധിക്കുകയോ ചെയ്യുക. Toast അലേർട്ടുകൾ ഉടൻ കാണിക്കുന്നുണ്ടെന്ന് ഉറപ്പാക്കുക. ONLINE → OFFLINE → ONLINE ടെസ്റ്റ് ചെയ്ത് റീട്രൈ ചെയ്യുക; ആപ്പ് ശരിയായി റിക്കവർ ചെയ്യണം, ഡ്യൂപ്ലിക്കേറ്റ് ഡാറ്റ ഉണ്ടാകരുത്.',
+      'Drop network visibility mid-action or check server error routing. Confirm immediate user notifications via interactive Toast alerts. Test ONLINE → OFFLINE → ONLINE during important operations, then retry after the failure: the app must recover, show the correct state and create no duplicate data. For URL-based Flutter apps, also verify dedicated WebView offline/network-error chrome with a visible retry—never leave a blank WebView—and that reconnect does not create duplicate mutations.\n\nMalayalam: ആക്ഷൻ നടക്കുമ്പോൾ നെറ്റ്‌വർക്ക് ഡ്രോപ്പ് ചെയ്യുക; Toast ഉടൻ കാണിക്കുക; ONLINE→OFFLINE→ONLINE റിക്കവർ; ഡ്യൂപ്ലിക്കേറ്റ് ഇല്ല. Flutter URL apps-ൽ WebView offline/error UI + retry; ശൂന്യ WebView reject.',
   },
   {
     key: 'qa_console_zero',
@@ -575,7 +680,7 @@ export const QA_STRESS_RULES: QaStressRule[] = [
     key: 'qa_loading_lifecycle',
     title: 'Loading Lifecycle Drill',
     description:
-      'Drive every asynchronous screen through LOADING → SUCCESS, EMPTY, ERROR, TIMEOUT and CANCELLED. Reject if loading can remain indefinitely, a skeleton stays after data loads, skeleton and data render together, or the wrong skeleton remains after navigation.\n\nMalayalam: ഓരോ async സ്ക്രീനും LOADING → SUCCESS, EMPTY, ERROR, TIMEOUT, CANCELLED എന്നിവയിലൂടെ ടെസ്റ്റ് ചെയ്യുക. ലോഡിംഗ് അനന്തമായി തുടർന്നാലോ ഡാറ്റ വന്ന ശേഷവും സ്കെലിറ്റൺ നിന്നാലോ റിജക്ട് ചെയ്യുക.',
+      'Drive every asynchronous screen through LOADING → SUCCESS, EMPTY, ERROR, TIMEOUT and CANCELLED. Reject if loading can remain indefinitely, a skeleton stays after data loads, skeleton and data render together, or the wrong skeleton remains after navigation. For URL-based Flutter apps, also reject unexplained blank WebViews or Flutter shell hangs after load failures, TLS errors, or WebView process issues.\n\nMalayalam: ഓരോ async സ്ക്രീനും LOADING → SUCCESS, EMPTY, ERROR, TIMEOUT, CANCELLED വഴി ടെസ്റ്റ് ചെയ്യുക. Flutter URL apps-ൽ unexplained blank WebView / shell hang reject.',
   },
   {
     key: 'qa_data_reconciliation',
@@ -629,7 +734,7 @@ export const QA_STRESS_RULES: QaStressRule[] = [
     key: 'qa_session_expiry',
     title: 'Session Expiry Test',
     description:
-      'Expire the session while viewing data, submitting a form, editing, deleting and uploading. The app must recover safely: no infinite loading, no silent failure, no unauthorized mutation and no data corruption.\n\nMalayalam: ഡാറ്റ കാണുമ്പോൾ, ഫോം സബ്മിറ്റ്, എഡിറ്റ്, ഡിലീറ്റ്, അപ്‌ലോഡ് ചെയ്യുമ്പോൾ സെഷൻ എക്സ്പയർ ചെയ്യുക. അനന്ത ലോഡിംഗ്, നിശ്ശബ്ദ പരാജയം, ഡാറ്റ കേടാകൽ എന്നിവ ഇല്ലാതെ സുരക്ഷിതമായി റിക്കവർ ചെയ്യണം.',
+      'Expire the session while viewing data, submitting a form, editing, deleting and uploading. The app must recover safely: no infinite loading, no silent failure, no unauthorized mutation and no data corruption. For URL-based Flutter apps, also test app kill/reopen, background/resume, account switch, and confirm secure storage behavior (no plaintext passwords; logout clears native and WebView auth—see Rule 79).\n\nMalayalam: സെഷൻ എക്സ്പയർ സമയം സുരക്ഷിതമായി റിക്കവർ ചെയ്യണം. Flutter URL apps-ൽ kill/reopen, account switch, secure storage (plaintext password ഇല്ല; logout auth ക്ലിയർ—Rule 79) ടെസ്റ്റ് ചെയ്യുക.',
   },
   {
     key: 'qa_permission_boundary',
@@ -659,7 +764,7 @@ export const QA_STRESS_RULES: QaStressRule[] = [
     key: 'qa_production_build_env',
     title: 'Production Build & Environment',
     description:
-      'Never approve a release from development mode alone; test the actual production build. Confirm production points to the production API, database, storage, credentials and configuration.\n\nMalayalam: ഡെവലപ്മെന്റ് മോഡ് മാത്രം നോക്കി റിലീസ് അംഗീകരിക്കരുത്; യഥാർത്ഥ പ്രൊഡക്ഷൻ ബിൽഡ് ടെസ്റ്റ് ചെയ്യുക. പ്രൊഡക്ഷൻ API, ഡാറ്റാബേസ്, സ്റ്റോറേജ്, ക്രെഡൻഷ്യൽ, കോൺഫിഗറേഷൻ ശരിയാണെന്ന് ഉറപ്പാക്കുക.',
+      'Never approve a release from development mode alone; test the actual production build. Confirm production points to the production API, database, storage, credentials and configuration. For URL-based Flutter apps, verify signed/staging or release-like Android and iOS builds—do not rely only on the debug emulator.\n\nMalayalam: ഡെവലപ്മെന്റ് മോഡ് മാത്രം നോക്കി റിലീസ് അംഗീകരിക്കരുത്. Flutter URL apps-ന് signed/staging Android+iOS builds ടെസ്റ്റ് ചെയ്യുക—debug emulator മാത്രം പോരാ.',
   },
   {
     key: 'qa_deployment_smoke',
@@ -671,7 +776,7 @@ export const QA_STRESS_RULES: QaStressRule[] = [
     key: 'qa_regression',
     title: 'Regression Testing',
     description:
-      'Every significant change must re-test the existing business flows it can affect. A new feature passing is not enough if an existing feature has broken.\n\nMalayalam: ഓരോ പ്രധാന മാറ്റത്തിനും ബാധിക്കാവുന്ന നിലവിലുള്ള ബിസിനസ് ഫ്ലോകൾ വീണ്ടും ടെസ്റ്റ് ചെയ്യണം. പുതിയ ഫീച്ചർ പാസ്സായാലും പഴയത് തകർന്നാൽ റിജക്ട് ചെയ്യുക.',
+      'Every significant change must re-test the existing business flows it can affect. A new feature passing is not enough if an existing feature has broken. For URL-based Flutter apps, every change to the website or the Flutter wrapper must retest the affected shared shell workflows (auth, download, payment return, permissions, push routing).\n\nMalayalam: ഓരോ പ്രധാന മാറ്റത്തിനും ബാധിക്കാവുന്ന flows വീണ്ടും ടെസ്റ്റ് ചെയ്യണം. Flutter URL apps-ൽ website അല്ലെങ്കിൽ Flutter wrapper മാറ്റം shared shell workflows regression ടെസ്റ്റ് ചെയ്യണം.',
   },
   {
     key: 'qa_performance_regression',
@@ -689,25 +794,85 @@ export const QA_STRESS_RULES: QaStressRule[] = [
     key: 'qa_responsive_matrix',
     title: 'Responsive Device Matrix',
     description:
-      'Test mobile, tablet, laptop, desktop and large desktop widths in both portrait and landscape. Reject on overflow, clipped controls, unreadable text or broken layouts.\n\nMalayalam: മൊബൈൽ, ടാബ്‌ലെറ്റ്, ലാപ്‌ടോപ്പ്, ഡെസ്ക്ടോപ്പ്, വലിയ ഡെസ്ക്ടോപ്പ് എന്നിവ portrait, landscape രണ്ടിലും ടെസ്റ്റ് ചെയ്യുക. ഓവർഫ്ലോ, മുറിഞ്ഞ കൺട്രോളുകൾ, തകർന്ന ലേഔട്ട് ഉണ്ടെങ്കിൽ റിജക്ട് ചെയ്യുക.',
+      'Test mobile, tablet, laptop, desktop and large desktop widths in both portrait and landscape. Reject on overflow, clipped controls, unreadable text or broken layouts. For URL-based Flutter apps, also verify notches, safe areas, and keyboard insets inside the native app shell on physical devices.\n\nMalayalam: മൊബൈൽ മുതൽ ലാർജ് ഡെസ്ക്ടോപ്പ് വരെ portrait/landscape ടെസ്റ്റ് ചെയ്യുക. Flutter URL apps-ൽ notch/safe area/keyboard insets native shell-ൽ physical device-ൽ ടെസ്റ്റ് ചെയ്യുക.',
   },
   {
     key: 'qa_release_acceptance',
     title: 'Final Release Acceptance',
     description:
-      'Before production approval confirm: critical flows pass, no blocking defects, no critical console errors, no data integrity, authentication or authorization issues, no major loading issues, no obvious browser inconsistencies, no major performance regression, and the production smoke test passes.\n\nMalayalam: പ്രൊഡക്ഷൻ അംഗീകാരത്തിന് മുമ്പ്: പ്രധാന ഫ്ലോകൾ പാസ്, ബ്ലോക്കിംഗ് ഡിഫെക്ട് ഇല്ല, കൺസോൾ എറർ ഇല്ല, ഡാറ്റ/ഓതന്റിക്കേഷൻ/ഓതറൈസേഷൻ പ്രശ്നങ്ങൾ ഇല്ല, ബ്രൗസർ പൊരുത്തക്കേട് ഇല്ല, പെർഫോമൻസ് റിഗ്രഷൻ ഇല്ല, പ്രൊഡക്ഷൻ സ്മോക്ക് ടെസ്റ്റ് പാസ് എന്ന് ഉറപ്പാക്കുക.',
+      'Before production approval confirm: critical flows pass, no blocking defects, no critical console errors, no data integrity, authentication or authorization issues, no major loading issues, no obvious browser inconsistencies, no major performance regression, and the production smoke test passes. For URL-based Flutter apps, the applicable native-shell checks (download/preview/print, external/deep links, payment server-verify, clipboard, permissions, persistent login, network recovery, no blank screens, keyboard/pickers, forced update, FCM when in scope, release builds) must also pass—browser-only success is not acceptance.\n\nMalayalam: പ്രൊഡക്ഷൻ അംഗീകാരത്തിന് മുമ്പ് critical flows + smoke പാസ്. Flutter URL apps-ന് native-shell checks കൂടി പാസ് വേണം—browser-only acceptance അല്ല.',
   },
   {
     key: 'qa_in_app_payment_upi',
     title: 'In-App Payment Gateway & UPI App Switch Drill',
     description:
-      'On physical Android and iOS devices, open an in-app payment gateway WebView and verify: UPI/payment app grids are populated on both platforms, custom-scheme intents (upi://, intent://, gpay://) trigger an external app handshake, and return deep-link callbacks restore session integrity without forcing re-login or losing payment context. Reject emulator-only verification or a blank UPI grid.\n\nMalayalam: യഥാർത്ഥ Android/iOS ഡിവൈസുകളിൽ in-app പേയ്മെന്റ് WebView തുറന്ന് പരിശോധിക്കുക: രണ്ട് പ്ലാറ്റ്‌ഫോമിലും UPI ആപ്പ് ഗ്രിഡ് നിറഞ്ഞിരിക്കണം, intent ട്രിഗറുകൾ ബാഹ്യ ആപ്പ് ഹാൻഡ്‌ഷേക്ക് ചെയ്യണം, റിട്ടേൺ കോൾബാക്ക് സെഷൻ നഷ്ടപ്പെടാതെ നിലനിർത്തണം. എമുലേറ്റർ മാത്രം ടെസ്റ്റ് ചെയ്താലോ ശൂന്യ UPI ഗ്രിഡ് വന്നാലോ റിജക്ട് ചെയ്യുക.',
+      'On physical Android and iOS devices, open an in-app payment gateway WebView and verify: UPI/payment app grids are populated on both platforms, custom-scheme intents (upi://, intent://, gpay://) trigger an external app handshake, and return deep-link callbacks restore session integrity without forcing re-login or losing payment context. Also cover UPI app available/unavailable, success/failure/pending/cancel, return to active app, cold start, repeated callback, app killed during payment, and network lost on return. Never accept the client callback alone as proof of payment—confirm backend/provider verification. Reject emulator-only verification or a blank UPI grid.\n\nMalayalam: യഥാർത്ഥ Android/iOS-ൽ UPI grid + intent handoff + return session. Cold start/kill/duplicate callback/offline return ടെസ്റ്റ്; client callback മാത്രം payment proof അല്ല—backend verify; emulator-only/ശൂന്യ grid reject.',
   },
   {
     key: 'qa_googlebot_html',
     title: 'Googlebot HTML Uniqueness Drill',
     description:
       'For public content URLs (especially blogs), fetch with curl -A Googlebot or Search Console URL Inspection → Test Live URL → View tested page HTML. Reject if #root is empty, H1/body text is missing, canonical is wrong/shared, slash URLs do not 301 once, or sitemap fails. Browser DevTools Elements panel after JS runs is not acceptance.\n\nMalayalam: Public content URLs curl -A Googlebot അല്ലെങ്കിൽ GSC Test Live URL HTML കൊണ്ട് പരിശോധിക്കുക. ശൂന്യ #root, missing H1/body, wrong canonical, slash 301 ഇല്ലാത്തത്, sitemap fail — reject. JS റൺ ആയ ശേഷമുള്ള DevTools DOM acceptance അല്ല.',
+  },
+  {
+    key: 'qa_webview_download_print',
+    title: 'WebView Download, Print and Document Matrix',
+    description:
+      'On physical Android and iOS (or release-like builds), verify document preview and download/print/share: open PDF/image/document; rotate screen; return to WebView; check loading/error. Cover normal URL, authenticated URL, Content-Disposition, supported blob: download, large file, cancelled download, denied permission, expired URL, duplicate tap, and download failure. Print a supported page/document on each platform; cancel print; no printer available; check rendered output and page scaling. Share via the platform share sheet where in scope. Reject if browser-only success is treated as app acceptance.\n\nMalayalam: Physical Android/iOS-ൽ PDF/image preview, download matrix, print matrix, share ടെസ്റ്റ് ചെയ്യുക; browser-only pass reject.',
+  },
+  {
+    key: 'qa_webview_external_links',
+    title: 'WebView External Link and Scheme Drill',
+    description:
+      'Verify same-site route stays in WebView; external HTTPS, YouTube, Google Meet, target="_blank", window.open open the intended native app or safe browser; unsupported schemes are blocked or fail safely; app installed vs not installed has a safe fallback; Android back follows web history then documented exit. Reject silent ignored new-window links or TLS bypass.\n\nMalayalam: Same-site WebView-യിൽ; external/YouTube/Meet/blank native/browser-ൽ; unsupported scheme safe fail; Android back ശരി; TLS bypass reject.',
+  },
+  {
+    key: 'qa_webview_clipboard_zoom',
+    title: 'WebView Clipboard and Zoom Drill',
+    description:
+      'On Android and iOS, verify copy/paste/long-press/select-all in text input, textarea, password, OTP, contenteditable, and search controls. Confirm accidental pinch-zoom policy, text scaling, orientation, and readability. Reject blocked clipboard menus or zoom used to hide non-responsive layout.\n\nMalayalam: Android/iOS-ൽ clipboard (input/textarea/password/OTP/contenteditable/search) + zoom/readability ടെസ്റ്റ്; blocked clipboard അല്ലെങ്കിൽ zoom-as-layout-fix reject.',
+  },
+  {
+    key: 'qa_webview_permissions',
+    title: 'WebView Native Permission Bridge Drill',
+    description:
+      'Test first request, grant, deny, deny permanently, revoke in OS settings, second attempt, unapproved origin request, offline request, and permission not required. Confirm UI explains and recovers without crash or infinite loading. This is OS/WebView permission bridging—not API role AuthZ (see Permission Boundary Test).\n\nMalayalam: Grant/deny/permanent-deny/OS revoke/second attempt/unapproved origin ടെസ്റ്റ്; crash/infinite load ഇല്ല; ഇത് OS permission bridge ആണ് — API AuthZ അല്ല.',
+  },
+  {
+    key: 'qa_app_persistent_login',
+    title: 'App Persistent Login and Secure Storage Drill',
+    description:
+      'Close and reopen app, background/resume, token expiry, refresh-token failure, logout, account switch, revoke session, and clear app data. Confirm no plaintext password storage and that logout clears native and WebView auth state. Reject weakened backend expiry used only to keep the app logged in.\n\nMalayalam: App reopen/background/token expiry/logout/account switch ടെസ്റ്റ്; plaintext password ഇല്ല; logout native+WebView auth ക്ലിയർ; session expiry weaken ചെയ്ത് login നിലനിർത്തൽ reject.',
+  },
+  {
+    key: 'qa_forced_app_update',
+    title: 'Forced / Optional App Update Drill',
+    description:
+      'Test current version, optional update, mandatory update, store link, offline startup, remote-config timeout/fallback, and successful update return. Reject if users can bypass mandatory update below minimum supported binary, or if temporary version-check outage permanently blocks all users without a defined fallback.\n\nMalayalam: Optional/mandatory update, store link, offline, remote-config timeout ടെസ്റ്റ്; mandatory bypass അല്ലെങ്കിൽ timeout-ൽ permanent block (fallback ഇല്ലാതെ) reject.',
+  },
+  {
+    key: 'qa_webview_keyboard_pickers',
+    title: 'WebView Keyboard and Picker Compatibility Drill',
+    description:
+      'Focus each input; open/close keyboard; scroll focused field; submit near the bottom; password manager/autofill; rotate device. Verify custom dropdown/calendar/date/time/multi-select with keyboard visible, modal within scroll container, long lists, timezone, locale, null values, and saved value persistence inside the WebView—not only in a mobile browser.\n\nMalayalam: Keyboard open/close/scroll/submit + autofill/rotate; custom dropdown/date/time pickers WebView-യിൽ (browser മാത്രമല്ല) ടെസ്റ്റ് ചെയ്യുക.',
+  },
+  {
+    key: 'qa_fcm_push_routing',
+    title: 'FCM Push Permission and Deep-Link Routing Drill',
+    description:
+      'When push is in scope: permission grant/denial, foreground/background/terminated app, token refresh, logout/account switch, notification tap deep link, expired session, duplicate message, and invalid payload. Reject if tap bypasses auth or lands on the wrong screen, or if tokens are not cleared on logout.\n\nMalayalam: Push scope-ൽ permission, FG/BG/terminated, token refresh, logout clear, tap deep link, expired session ടെസ്റ്റ്; auth bypass/wrong screen/token leak reject.',
+  },
+  {
+    key: 'qa_webview_session_isolation',
+    title: 'App Session and WebView Data Isolation Drill',
+    description:
+      'Login as user A, view private data, logout (or switch account), then login as user B. Confirm B never sees A\'s screens, cookies, documents, or tokens—without a hard refresh. Also test clear-app-data and session revoke. Reject any cross-user leak from WebView cache, cookies, or local storage.\n\nMalayalam: User A → logout/switch → User B; B-ക്ക് A-യുടെ screens/cookies/documents/tokens കാണരുത്; hard refresh ഇല്ലാതെ. Cross-user WebView cache/cookie leak reject.',
+  },
+  {
+    key: 'qa_webview_performance_stability',
+    title: 'WebView Performance and Stability Drill',
+    description:
+      'On physical or release-like Android and iOS builds, walk critical flows under normal and Slow 3G conditions. Reject WebView hangs, keyboard freezes, stuck loaders, obvious memory growth after repeated open/close of heavy screens, and duplicate or runaway API requests. Reject fixes that only hide issues with arbitrary delays or forced reloads.\n\nMalayalam: Physical/release builds-ൽ critical flows + Slow 3G; hang/keyboard freeze/stuck loader/memory growth/duplicate API reject; setTimeout/reload-only "fix" reject.',
   },
 ];
 

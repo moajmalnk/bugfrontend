@@ -1024,6 +1024,224 @@ response.setHeader("Cache-Control", "public, s-maxage=3600");`,
     language: 'QA Checklist',
   },
 
+  // ── Flutter URL-app WebView shell (DEV-73..84 + QA 37..44) ───────────────
+  dev_rule_73: {
+    bad: '// Migrated to another WebView package mid-sprint with no feature/regression comparison\nwebview_flutter → flutter_inappwebview // "because docs looked nicer"',
+    good: `// Keep one maintained package; centralize config; test Android + iOS
+final controller = WebViewController()
+  ..setJavaScriptMode(JavaScriptMode.unrestricted)
+  ..setNavigationDelegate(sharedNavigationPolicy);
+// Compare features, maintenance, platform gaps before any package swap`,
+    language: 'Dart',
+  },
+  dev_rule_74: {
+    bad: `navigationDelegate: (_) => NavigationDecision.navigate, // any scheme/URL
+onSslAuthError: (err) => err.proceed(), // TLS bypass in production`,
+    good: `if (!isAllowedHost(uri.host) && uri.scheme == 'https') {
+  await launchUrl(uri, mode: LaunchMode.externalApplication);
+  return NavigationDecision.prevent;
+}
+if (!allowedSchemes.contains(uri.scheme)) return NavigationDecision.prevent;
+// Never call proceed() on SSL errors in production`,
+    language: 'Dart',
+  },
+  dev_rule_75: {
+    bad: `// Assume browser download + window.print() work inside WebView
+onDownloadStart: null;
+// window.print() from JS only`,
+    good: `onDownloadStartRequest: (req) async {
+  await saveWithAuthCookies(req.url, req.suggestedFilename);
+};
+// Print + Share.shareXFiles via native flows — never log signed URLs`,
+    language: 'Dart',
+  },
+  dev_rule_76: {
+    bad: `gestureRecognizers: { Factory(() => EagerGestureRecognizer()) }, // steals long-press
+// zoom disabled to "fix" broken mobile CSS`,
+    good: `// Allow text selection / clipboard menus
+// Coordinate viewport with web team; disable accidental pinch only when product requires it
+userScalable: productAllowsPinchZoom,`,
+    language: 'Dart',
+  },
+  dev_rule_77: {
+    bad: `onPermissionRequest: (req) async => req.grant(), // silent grant any origin`,
+    good: `onPermissionRequest: (req) async {
+  if (!isApprovedHttpsOrigin(req.origin)) {
+    await req.deny();
+    return;
+  }
+  final osOk = await requestNativePermission(req.types);
+  if (osOk) await req.grant(); else await req.deny();
+},`,
+    language: 'Dart',
+  },
+  dev_rule_78: {
+    bad: `FirebaseMessaging.onMessageOpenedApp.listen((m) {
+  Navigator.pushNamed(context, m.data['path']); // no auth check; token never cleared
+});`,
+    good: `await bindFcmTokenToUser(userId);
+onLogout: clearFcmTokenBinding();
+onMessageOpenedApp: (m) => openAuthorizedRoute(m.data); // reject expired session`,
+    language: 'Dart',
+  },
+  dev_rule_79: {
+    bad: `prefs.setString('password', password); // plaintext
+prefs.setString('refresh', token); // ordinary SharedPreferences`,
+    good: `await secureStorage.write(key: 'refresh', value: refreshToken); // Keychain/Keystore
+onLogout: await secureStorage.deleteAll(); await clearWebViewCookies();`,
+    language: 'Dart',
+  },
+  dev_rule_80: {
+    bad: `onWebResourceError: (_) {}, // blank WebView
+while (true) { await webView.reload(); } // infinite reconnect`,
+    good: `onWebResourceError: (e) => showOfflineRetry(
+  kind: classify(e), // offline | tls | http | timeout
+  onRetry: boundedReload,
+);
+// Never blindly replay POST/payment after reconnect`,
+    language: 'Dart',
+  },
+  dev_rule_81: {
+    bad: `// Tested pickers only in Chrome responsive mode
+resizeToAvoidBottomInset: false, // keyboard covers Submit`,
+    good: `resizeToAvoidBottomInset: true,
+// Scroll focused input into view; verify dropdowns/date pickers inside WebView on device
+SafeArea(child: WebViewWidget(...))`,
+    language: 'Dart',
+  },
+  dev_rule_82: {
+    bad: `if (remote.latest != local) blockForever(); // no store link; blocks on API timeout`,
+    good: `if (local < remote.minSupported) {
+  showMandatoryUpdate(reason: remote.reason, storeUrl: remote.storeUrl);
+} else if (local < remote.latest) {
+  showOptionalUpdate(storeUrl: remote.storeUrl);
+}
+// On version-check timeout: use last validated policy; do not permanent-block everyone`,
+    language: 'Dart',
+  },
+  dev_rule_83: {
+    bad: `onWebViewProcessCrashed: () => webView.reload(), // may replay last POST`,
+    good: `onWebViewProcessCrashed: () => showRecoverableReload(
+  avoidResubmit: true, // never replay payment/POST blindly
+);
+onResumeFromExternalApp: restoreRouteSafely(deepLink);`,
+    language: 'Dart',
+  },
+  dev_rule_84: {
+    bad: '// Same download bug patched in Flutter, React, and PHP independently with three behaviors',
+    good: `// One contract: Flutter owns file save/print; web owns download link UX; backend owns auth URLs
+// Document owners for auth, payment callback, permissions, push routing`,
+    language: 'Markdown',
+  },
+  qa_webview_download_print: {
+    bad: 'PDF opened fine in Safari; skipped in-app download/print/share and assumed the Flutter shell was fine.',
+    good: `1. Open PDF/image in app; rotate; return to WebView
+2. Auth download, blob download, cancel, deny permission, expired URL, duplicate tap
+3. Print + share + cancel + no printer on Android and iOS
+4. Pass only if in-app flows work — browser-only is not acceptance`,
+    language: 'QA Checklist',
+  },
+  qa_webview_external_links: {
+    bad: 'Clicked an internal link only; ignored YouTube, Meet, target=_blank, and bad schemes.',
+    good: `1. Same-site stays in WebView
+2. External HTTPS / YouTube / Meet / blank open native or browser
+3. Unsupported scheme fails safely; Android back uses history then exit
+4. Reject TLS bypass or silently ignored new windows`,
+    language: 'QA Checklist',
+  },
+  qa_webview_clipboard_zoom: {
+    bad: 'Long-press did nothing in WebView inputs; pinch-zoom used to hide broken layout.',
+    good: `1. Copy/paste/select-all in input, textarea, password, OTP, contenteditable, search
+2. Android + iOS; check zoom policy and readability
+3. Pass only if clipboard works and zoom is not a layout workaround`,
+    language: 'QA Checklist',
+  },
+  qa_webview_permissions: {
+    bad: 'Camera worked once after grant; never tested deny, permanent deny, or OS revoke.',
+    good: `1. First request, grant, deny, permanent deny, OS revoke, second attempt
+2. Unapproved origin denied; offline request recovers
+3. Pass only with clear UI and no crash/infinite load`,
+    language: 'QA Checklist',
+  },
+  qa_app_persistent_login: {
+    bad: 'App stayed logged in by storing the password in SharedPreferences.',
+    good: `1. Kill/reopen, background/resume, token expiry, refresh failure
+2. Logout + account switch clear native and WebView auth
+3. Pass only with secure storage and no plaintext password`,
+    language: 'QA Checklist',
+  },
+  qa_forced_app_update: {
+    bad: 'Mandatory update screen had no store link; version-check timeout blocked every user forever.',
+    good: `1. Current, optional, mandatory, store link, offline startup
+2. Remote-config timeout uses defined fallback
+3. Pass only if mandatory cannot be bypassed below min version`,
+    language: 'QA Checklist',
+  },
+  qa_webview_keyboard_pickers: {
+    bad: 'Pickers worked in Chrome device mode; keyboard covered Submit inside the app WebView.',
+    good: `1. Focus each field; open/close keyboard; scroll; submit near bottom
+2. Autofill/OTP/rotate; custom dropdown/date/time inside WebView
+3. Pass only on physical or release-like Android + iOS builds`,
+    language: 'QA Checklist',
+  },
+  qa_fcm_push_routing: {
+    bad: 'Tapped a push while logged out and landed on a private screen; token still bound after logout.',
+    good: `1. Permission grant/deny; FG/BG/terminated; token refresh
+2. Logout clears binding; tap deep link respects auth
+3. Pass only if correct screen and no sensitive payload leakage`,
+    language: 'QA Checklist',
+  },
+  dev_rule_85: {
+    bad: `javascriptChannels: {
+  'Native': (msg) => eval(msg.message), // unrestricted bridge
+}
+onSslAuthError: (e) => e.proceed(),`,
+    good: `if (!approvedHttpsOrigins.contains(origin)) return;
+onBridgeMessage: (msg) {
+  if (!isAllowedOrigin(msg.origin)) return;
+  handleValidatedSchema(msg); // minimum APIs only
+};
+// Never proceed() on TLS errors in production`,
+    language: 'Dart',
+  },
+  dev_rule_86: {
+    bad: `// Logout only pops to login; WebView cookies and localStorage keep user A
+onLogout: () => Navigator.pushReplacementNamed(context, '/login');`,
+    good: `onLogout: () async {
+  await secureStorage.deleteAll();
+  await clearWebViewCookiesAndStorage();
+  await bindFcmTokenCleared();
+  Navigator.pushReplacementNamed(context, '/login');
+};`,
+    language: 'Dart',
+  },
+  dev_rule_87: {
+    bad: `setTimeout(() => webView.reload(), 500); // "fixes" hang
+// Controllers/listeners never disposed`,
+    good: `@override
+void dispose() {
+  webViewController = null;
+  subscription.cancel();
+  super.dispose();
+}
+// Fix root cause — no delay/reload workarounds (Rule 66)`,
+    language: 'Dart',
+  },
+  qa_webview_session_isolation: {
+    bad: 'Logged out as A and into B; briefly saw A\'s dashboard until hard refresh.',
+    good: `1. User A private data → logout/switch → User B
+2. No A screens/cookies/documents/tokens without hard refresh
+3. Pass only if WebView cache/cookie isolation holds`,
+    language: 'QA Checklist',
+  },
+  qa_webview_performance_stability: {
+    bad: 'Critical flow "fixed" with a 800ms delay before reload; ignored memory growth after 20 PDF opens.',
+    good: `1. Critical flows on device + Slow 3G
+2. No hang, keyboard freeze, stuck loader, runaway APIs
+3. Reject delay/reload-only workarounds`,
+    language: 'QA Checklist',
+  },
+
 };
 
 /** Split stored description into English requirement + Malayalam body. */

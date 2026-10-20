@@ -34,7 +34,24 @@ const WEB_ONLY = new Set([
   "dev_rule_72",
 ]);
 
-const APP_ONLY = new Set(["dev_rule_68"]);
+const APP_ONLY = new Set([
+  "dev_rule_68",
+  "dev_rule_73",
+  "dev_rule_74",
+  "dev_rule_75",
+  "dev_rule_76",
+  "dev_rule_77",
+  "dev_rule_78",
+  "dev_rule_79",
+  "dev_rule_80",
+  "dev_rule_81",
+  "dev_rule_82",
+  "dev_rule_83",
+  "dev_rule_84",
+  "dev_rule_85",
+  "dev_rule_86",
+  "dev_rule_87",
+]);
 
 export function developerTrack(ruleKey: string): DeveloperTrack {
   if (WEB_ONLY.has(ruleKey)) return "web";

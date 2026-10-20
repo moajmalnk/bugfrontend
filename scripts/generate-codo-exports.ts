@@ -6,9 +6,9 @@
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { buildCodoIdeSettingsJson } from '../src/lib/codo/codoIdeSetupKit';
 import {
   buildCodoAgentExportContent,
-  buildCodoIdeSettingsJson,
   CODO_AGENT_EXPORT_FORMATS,
   getBuiltinCodoRulesForExport,
   type CodoAgentExportId,
