@@ -263,8 +263,8 @@ export const CODO_REAL_WORLD_EXAMPLES: Record<string, CodoRealWorldExample> = {
     ml: `ഡെവലപ്പറുടെ Chrome localhost-ല് പ്രവർത്തിച്ചതുകൊണ്ട് Done ആക്കി. Done എന്നാൽ reviewed, tested, secured, production build, deploy, smoke test പൂർത്തിയായി എന്നാണ്.`,
   },
   dev_rule_68: {
-    en: `Flutter payment WebView allows \`upi://\` in-page; the UPI app grid is empty and return deep-links fail. Intercept non-HTTP schemes and open them with externalApplication; set platform-correct User-Agent.`,
-    ml: `Flutter പേയ്മെന്റ് WebView upi:// ഇൻ-പേജ് അനുവദിക്കുന്നു — UPI ഗ്രിഡ് ശൂന്യം, return deep-link fail. non-HTTP schemes intercept ചെയ്ത് externalApplication-ല് തുറക്കുക; പ്ലാട്ട്‌ഫോം-ശരിയായ User-Agent സജ്ജമാക്കുക.`,
+    en: `Flutter payment WebView allows \`upi://\` in-page; the UPI app grid is empty and return deep-links fail. Intercept non-HTTP schemes and open them with externalApplication; set platform-correct User-Agent. For Cashfree/JS checkout icons, also implement Rules 88–92—deep-link alone does not populate tiles.`,
+    ml: `Flutter പേയ്മെന്റ് WebView upi:// ഇൻ-പേജ് അനുവദിക്കുന്നു — UPI ഗ്രിഡ് ശൂന്യം, return deep-link fail. non-HTTP schemes intercept + platform UA. JS checkout icons-ന് Rules 88–92 കൂടി—deep-link മാത്രം പോരാ.`,
   },
   dev_rule_69: {
     en: `Two blog URLs return empty \`#root\` HTML to Googlebot; Google merges them as duplicates. First HTML response must include unique H1, article body, self-canonical, and Article JSON-LD.`,
@@ -341,6 +341,26 @@ export const CODO_REAL_WORLD_EXAMPLES: Record<string, CodoRealWorldExample> = {
   dev_rule_87: {
     en: `Opening PDFs twenty times freezes the keyboard and the team “fixes” it with setTimeout reload. Dispose WebView resources and fix the root cause—no delay workarounds.`,
     ml: `20 PDF തുറന്നതിനു് ശേഷം keyboard freeze; setTimeout reload "ഫിക്സ്". WebView resources dispose ചെയ്ത് root cause ഫിക്സ്—delay workaround വേണ്ട.`,
+  },
+  dev_rule_88: {
+    en: `Checkout in Chrome shows GPay/PhonePe/Paytm tiles; in-app WebView shows only “Pay by UPI ID / QR” because deep-links were intercepted but window.Android / nativeProcess was never registered. addJavaScriptHandler alone does not expose those names.`,
+    ml: `Chrome-ൽ GPay/PhonePe/Paytm tiles; ആപ്പിൽ “Pay by UPI ID/QR” മാത്രം—deep-link ഉണ്ട് പക്ഷേ window.Android / nativeProcess ഇല്ല. addJavaScriptHandler മാത്രം പോരാ.`,
+  },
+  dev_rule_89: {
+    en: `getAppList used CATEGORY_BROWSABLE or missing Manifest <queries>; queryIntentActivities returned empty and GPay/PhonePe disappeared. Or intent:// opened Play Store inside the WebView.`,
+    ml: `getAppList-ൽ CATEGORY_BROWSABLE അല്ലെങ്കിൽ <queries> ഇല്ല—GPay/PhonePe അപ്രത്യക്ഷം. അല്ലെങ്കിൽ intent:// Play Store WebView-യിൽ തുറന്നു.`,
+  },
+  dev_rule_90: {
+    en: `iOS checkout app list empty despite PhonePe installed—LSApplicationQueriesSchemes omitted phonepe/gpay/upi so canOpenURL was always false.`,
+    ml: `PhonePe ഇൻസ്റ്റാൾ ചെയ്തിട്ടും iOS app list ശൂന്യം—LSApplicationQueriesSchemes-ൽ phonepe/gpay/upi ഇല്ല; canOpenURL എപ്പോഴും false.`,
+  },
+  dev_rule_91: {
+    en: `UPI iframe navigated inside WebView → “Web Page not available”; or after canceling PhonePe the shell blindly reloaded and lost checkout. Desktop UA also hid mobile UPI options.`,
+    ml: `UPI iframe WebView-യിൽ → “Web Page not available”; PhonePe cancel-നു് ശേഷം blind reload checkout നഷ്ടപ്പെടുത്തി. Desktop UA mobile UPI മറച്ചു.`,
+  },
+  dev_rule_92: {
+    en: `Team asked Cashfree to enable UPI Intent before the native bridge shipped; flag went live but icons stayed missing until window.Android existed—then waited ~30–40 minutes after re-enable.`,
+    ml: `Bridge ഇല്ലാതെ Cashfree UPI Intent flag ചോദിച്ചു—flag വന്നിട്ടും icons ഇല്ല. window.Android വന്ന ശേഷം ~30–40 മിനിറ്റ് കാത്തിരുന്നു.`,
   },
   qa_accessibility: {
     en: `Leave form can only be submitted with a mouse; errors are colour-only. Complete core flows with keyboard only; require visible focus and text errors.`,
@@ -419,8 +439,8 @@ export const CODO_REAL_WORLD_EXAMPLES: Record<string, CodoRealWorldExample> = {
     ml: `5 റോ കൊണ്ട് bugs ലിസ്റ്റ് നല്ലതാണ്; 200+-ല് ഫ്രീസ്, പേജിനേഷൻ ഇല്ല. 0, 1, സാധാരണ, 100+ റെക്കോർഡ് വ്യൂകൾ ഓഡിറ്റ് ചെയ്യുക.`,
   },
   qa_in_app_payment_upi: {
-    en: `UPI grid tested only on an Android emulator — empty on real devices. On physical Android and iOS, confirm app grid, external handoff, cold start/kill/duplicate callback, and backend payment verification — not client return URL alone.`,
-    ml: `UPI ഗ്രിഡ് Android emulator-ല് മാത്രം ടെസ്റ്റ് — യഥാർത്ഥ ഡിവൈസില് ശൂന്യം. Physical Android/iOS-ല് grid, handoff, cold start/kill/duplicate callback, backend verify — client return URL മാത്രം പോരാ.`,
+    en: `UPI grid tested only on an Android emulator — empty on real devices. On physical Android and iOS, confirm app grid (JS SDKs: same tiles as Chrome/Safari—QA Stress 47), external handoff, cold start/kill/duplicate callback, and backend payment verification — not client return URL alone.`,
+    ml: `UPI ഗ്രിഡ് Android emulator-ല് മാത്രം ടെസ്റ്റ് — യഥാർത്ഥ ഡിവൈസില് ശൂന്യം. Physical Android/iOS-ല് grid (JS checkout: QA Stress 47), handoff, cold start/kill/duplicate callback, backend verify — client return URL മാത്രം പോരാ.`,
   },
   qa_input_interception: {
     en: `QA edits a leave form, hits Esc, and data vanishes with no prompt. Dirty close must warn; cancel/error/success/refresh paths must not leak the previous record’s values.`,
@@ -525,6 +545,10 @@ export const CODO_REAL_WORLD_EXAMPLES: Record<string, CodoRealWorldExample> = {
   qa_webview_session_isolation: {
     en: `Logged out as A, into B, and still saw A’s invoice list until hard refresh. Confirm WebView cookies/cache never leak across accounts.`,
     ml: `A logout → B login; hard refresh വരെ A-യുടെ invoice list. WebView cookies/cache cross-account leak ഇല്ലെന്ന് ഉറപ്പാക്കുക.`,
+  },
+  qa_webview_upi_js_checkout: {
+    en: `QA signed off because “Any UPI” worked; Chrome on the same phone showed GPay + PhonePe + Paytm. Reject until in-app tiles match browser for installed+SIM-bound apps on both OS—and intent:// never opens Play Store in WebView.`,
+    ml: `“Any UPI” മാത്രം പാസ്; അതേ ഫോണിൽ Chrome GPay+PhonePe+Paytm കാണിക്കുന്നു. Installed+SIM-bound apps-ന് in-app tiles = browser (രണ്ട് OS); intent:// Play Store WebView-യിൽ ഇല്ലെങ്കിൽ മാത്രം പാസ്.`,
   },
 };
 

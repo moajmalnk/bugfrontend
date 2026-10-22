@@ -961,12 +961,14 @@ navigationDelegate: (NavigationRequest req) async {
     language: 'QA Checklist',
   },
   qa_in_app_payment_upi: {
-    bad: 'Checked the payment WebView on an Android emulator only and assumed UPI apps would appear.',
+    bad: 'Checked the payment WebView on an Android emulator only and assumed UPI apps would appear. Or passed with only “Pay by UPI ID/QR” while Chrome showed GPay/PhonePe.',
     good: `1. Physical Android and iOS devices (not emulator-only)
 2. Confirm UPI / payment app grids are populated on both platforms
-3. Tap a UPI option — external app handshake must fire (upi:// / intent:// / gpay://)
-4. Complete or cancel and return — session and payment context must remain intact
-5. Pass only if both platforms hand off and return correctly`,
+3. For JS checkout SDKs: same tiles as Chrome/Safari for installed+SIM-bound apps (QA Stress 47)
+4. Tap a UPI option — external app handshake must fire (upi:// / intent:// / gpay://)
+5. Complete or cancel and return — session and payment context must remain intact
+6. Reject blank grid, ID/QR-only, Any-UPI-only, “Web Page not available” on upi://, Play Store in WebView
+7. Pass only if both platforms hand off and return correctly`,
     language: 'QA Checklist',
   },
 
@@ -1227,6 +1229,77 @@ void dispose() {
 // Fix root cause — no delay/reload workarounds (Rule 66)`,
     language: 'Dart',
   },
+  // ── Hosted JS checkout UPI (Cashfree-shaped) ───────────────────────────
+  dev_rule_88: {
+    bad: `// Deep-link only — icons never appear
+onLoadStart: (c, url) {
+  if (url.startsWith('upi://')) launchUrl(Uri.parse(url));
+}
+// Or: addJavaScriptHandler only → flutter_inappwebview.callHandler (wrong API)`,
+    good: `// Android: JavascriptInterface name MUST be exactly "Android"
+@JavascriptInterface
+fun getAppList(name: String): String { /* JSON [{appName, appPackage}] */ }
+@JavascriptInterface
+fun openApp(pkg: String, url: String) { /* startActivity if resolvable */ }
+
+// iOS: WKScriptMessageHandler name MUST be exactly "nativeProcess"
+// on getAppList → evaluateJavaScript window.receiveAppList([{displayName,id,icon}])
+// before opening UPI URL → verifyPaymentForiOS()`,
+    language: 'Kotlin / Swift',
+  },
+  dev_rule_89: {
+    bad: `val intent = Intent(Intent.ACTION_VIEW, uri)
+intent.addCategory(Intent.CATEGORY_BROWSABLE) // GPay/PhonePe often disappear
+pm.queryIntentActivities(intent, 0)
+// Missing <queries> on Android 11+ → empty list
+// intent:// fallback → load Play Store inside WebView`,
+    good: `// Discovery: ACTION_VIEW + Uri ONLY — no CATEGORY_BROWSABLE
+val intent = Intent(Intent.ACTION_VIEW, Uri.parse("upi://pay"))
+val apps = pm.queryIntentActivities(intent, 0)
+// Merge upi://pay + PSP schemes + known packages → JSON [{appName, appPackage}]
+// Manifest <queries>: VIEW per UPI scheme + <package> for known PSPs
+// intent://: parseUri(URI_INTENT_SCHEME); clear component/selector;
+// start only if queryIntentActivities non-empty; else return false (no store)`,
+    language: 'Kotlin',
+  },
+  dev_rule_90: {
+    bad: `// Info.plist missing LSApplicationQueriesSchemes
+// canOpenURL always false → receiveAppList([]) → only UPI ID/QR`,
+    good: `<!-- Info.plist — same UPI/PSP schemes as Android discovery (≤50) -->
+<key>LSApplicationQueriesSchemes</key>
+<array>
+  <string>upi</string>
+  <string>phonepe</string>
+  <string>gpay</string>
+  <string>tez</string>
+  <string>paytmmp</string>
+  <!-- …align with Rule 89; stay under Apple’s 50 limit -->
+</array>`,
+    language: 'XML (Info.plist)',
+  },
+  dev_rule_91: {
+    bad: `userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)…' // desktop
+// Or keep "wv" marker; allow upi:// in iframe → "Web Page not available"
+// After UPI return: webView.reload() // loses checkout state`,
+    good: `// Real mobile Chrome (Android, strip "wv") / Safari (iOS) UA; optional app token
+// Cancel UPI/intent/PSP schemes including iframes
+android: InAppWebViewSettings(
+  regexToCancelSubFramesLoading: r'^(upi|intent|phonepe|gpay|tez|paytmmp):',
+  // pattern must NOT match https://
+)
+// After UPI return: stay on checkout / pay-return — do not blind-reload`,
+    language: 'Dart',
+  },
+  dev_rule_92: {
+    bad: `// Requested Cashfree "UPI Intent in WebView" before bridge existed
+// Flag on; still only UPI ID/QR because window.Android missing`,
+    good: `1. Ship testable build with Rules 88–91 + Rule 68 deep-link handler
+2. Verify getAppList returns installed+bound apps on physical devices
+3. THEN request merchant flag (Cashfree Support / equivalent)
+4. Wait 30–40 minutes; retest icons vs Chrome/Safari
+5. Docs: cashfree.com/docs/payments/online/mobile/misc/upi_intent_support_js_sdk`,
+    language: 'Process Checklist',
+  },
   qa_webview_session_isolation: {
     bad: 'Logged out as A and into B; briefly saw A\'s dashboard until hard refresh.',
     good: `1. User A private data → logout/switch → User B
@@ -1239,6 +1312,16 @@ void dispose() {
     good: `1. Critical flows on device + Slow 3G
 2. No hang, keyboard freeze, stuck loader, runaway APIs
 3. Reject delay/reload-only workarounds`,
+    language: 'QA Checklist',
+  },
+  qa_webview_upi_js_checkout: {
+    bad: 'In-app checkout shows only “Pay by UPI ID / QR” or “Any UPI” + one wallet while Chrome shows GPay + PhonePe + Paytm. Emulator-only sign-off.',
+    good: `1. Physical Android + iOS; GPay + Paytm (or PhonePe) installed AND SIM-bound
+2. In-app UPI tiles match mobile Chrome/Safari for installed+bound apps
+3. Tap icon → opens that app; cancel → checkout (no Play Store / broken page)
+4. intent:// never opens Play Store inside WebView
+5. After UPI return, checkout usable (no blind reload loss)
+6. Pass only if BOTH platforms pass — reject ID/QR-only, Any-UPI-only, emulator-only`,
     language: 'QA Checklist',
   },
 

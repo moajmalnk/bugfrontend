@@ -51,6 +51,11 @@ const APP_ONLY = new Set([
   "dev_rule_85",
   "dev_rule_86",
   "dev_rule_87",
+  "dev_rule_88",
+  "dev_rule_89",
+  "dev_rule_90",
+  "dev_rule_91",
+  "dev_rule_92",
 ]);
 
 export function developerTrack(ruleKey: string): DeveloperTrack {
