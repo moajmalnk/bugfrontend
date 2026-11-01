@@ -36,6 +36,7 @@ import { CreativeMediaPreview } from '@/components/creative/CreativeMediaPreview
 import { MoveToFolderModal } from '@/components/creative/MoveToFolderModal';
 import { useAuth } from '@/context/AuthContext';
 import { usePermissions } from '@/hooks/usePermissions';
+import { setCreativeOrganizeBridge } from '@/lib/creativeOrganizeBridge';
 import {
   resolveWorkPeriod,
   type WorkPeriodPreset,
@@ -63,6 +64,7 @@ import {
   listCreativeAssets,
   listCreativeFolders,
   moveCreativeAssets,
+  reindexCreativeSearch,
   updateCreativeFolder,
 } from '@/services/creativeService';
 import {
@@ -514,6 +516,38 @@ export default function BugCreative() {
       .catch(() => {});
   }, []);
 
+  // Why: Background OCR/PDF index so global search matches poster copy without
+  // blocking the grid. Continues until pending hits 0 or Gemini is unavailable.
+  useEffect(() => {
+    if (!canView) return;
+    let cancelled = false;
+    let passes = 0;
+    const warm = async () => {
+      while (!cancelled && passes < 40) {
+        passes += 1;
+        try {
+          const result = await reindexCreativeSearch({
+            limit: 5,
+            extract_media: true,
+          });
+          if (cancelled) return;
+          if (!result.gemini_configured && result.pending <= 0) return;
+          if (result.pending <= 0) return;
+          if (result.indexed === 0 && result.errors > 0 && !result.gemini_configured) {
+            return;
+          }
+          await new Promise((r) => window.setTimeout(r, 1500));
+        } catch {
+          return;
+        }
+      }
+    };
+    void warm();
+    return () => {
+      cancelled = true;
+    };
+  }, [canView]);
+
   const load = useCallback(async () => {
     if (!canView) {
       setLoading(false);
@@ -686,16 +720,40 @@ export default function BugCreative() {
     });
   };
 
-  const handleCopySelection = () => {
-    if (selectedIds.length === 0) return;
-    setClipboard({ mode: 'copy', assetIds: [...selectedIds] });
-    toast({ title: `Copied ${selectedIds.length} asset(s)` });
+  const resolveOrganizeIds = (assetId?: string): string[] => {
+    if (assetId) {
+      if (selectedIds.includes(assetId)) return [...selectedIds];
+      const asset = items.find((row) => row.id === assetId);
+      if (asset && canSelectAsset(asset)) return [assetId];
+    }
+    return [...selectedIds];
   };
 
-  const handleCutSelection = () => {
-    if (selectedIds.length === 0) return;
-    setClipboard({ mode: 'cut', assetIds: [...selectedIds] });
-    toast({ title: `Cut ${selectedIds.length} asset(s)` });
+  const handleCopySelection = (assetId?: string) => {
+    const ids = resolveOrganizeIds(assetId);
+    if (ids.length === 0) return;
+    setClipboard({ mode: 'copy', assetIds: ids });
+    setSelectedIds((prev) =>
+      assetId && !prev.includes(assetId) ? [assetId] : prev
+    );
+    toast({ title: `Copied ${ids.length} asset(s)` });
+  };
+
+  const handleCutSelection = (assetId?: string) => {
+    const ids = resolveOrganizeIds(assetId);
+    if (ids.length === 0) return;
+    setClipboard({ mode: 'cut', assetIds: ids });
+    setSelectedIds((prev) =>
+      assetId && !prev.includes(assetId) ? [assetId] : prev
+    );
+    toast({ title: `Cut ${ids.length} asset(s)` });
+  };
+
+  const ensureContextTarget = (assetId: string) => {
+    if (!canOrganize) return;
+    const asset = items.find((row) => row.id === assetId);
+    if (!asset || !canSelectAsset(asset)) return;
+    setSelectedIds((prev) => (prev.includes(assetId) ? prev : [assetId]));
   };
 
   const handlePaste = async () => {
@@ -801,6 +859,42 @@ export default function BugCreative() {
       setOrganizeBusy(false);
     }
   };
+
+  // Why: Right-click ContextMenu is app-global; register organize actions so Move
+  // (and creative Copy/Cut/Paste) work from that menu on this page.
+  useEffect(() => {
+    if (!canOrganize) {
+      setCreativeOrganizeBridge(null);
+      return;
+    }
+    setCreativeOrganizeBridge({
+      canOrganize: true,
+      selectedCount: selectedIds.length,
+      hasClipboard: Boolean(clipboard),
+      busy: organizeBusy,
+      copy: handleCopySelection,
+      cut: handleCutSelection,
+      paste: () => {
+        void handlePaste();
+      },
+      move: (assetId) => {
+        const ids = resolveOrganizeIds(assetId);
+        if (ids.length === 0) return;
+        if (assetId && !selectedIds.includes(assetId)) {
+          setSelectedIds([assetId]);
+        }
+        openMoveModal(ids);
+      },
+      ensureContextTarget,
+    });
+    return () => setCreativeOrganizeBridge(null);
+  }, [
+    canOrganize,
+    selectedIds,
+    clipboard,
+    organizeBusy,
+    items,
+  ]);
 
   const handleCreateFolder = async (name: string) => {
     if (folderBusy) return;
@@ -986,44 +1080,57 @@ export default function BugCreative() {
         description="Design, review, and publish creative assets"
         accentBarClassName="from-fuchsia-600 to-violet-600"
         underlayClassName="from-fuchsia-50/50 via-transparent to-violet-50/50 dark:from-fuchsia-950/20 dark:via-transparent dark:to-violet-950/20"
-        count={loading && !stats ? undefined : (stats?.total ?? total)}
-        loading={loading && !stats}
-        countIcon={<Palette className="h-5 w-5" />}
-        countClassName="from-fuchsia-50 to-violet-50 dark:from-fuchsia-950/30 dark:to-violet-950/30 border-fuchsia-200 dark:border-fuchsia-800 text-fuchsia-700 dark:text-fuchsia-300"
         actions={
-          <div className="flex w-full min-w-0 flex-col gap-3 sm:w-auto sm:flex-row sm:flex-wrap sm:items-center">
-            <DashboardPeriodFilter
-              preset={periodPreset}
-              customFrom={customFrom}
-              customTo={customTo}
-              period={period}
-              onPresetChange={setPeriodPreset}
-              onCustomFromChange={setCustomFrom}
-              onCustomToChange={setCustomTo}
-              isFetching={loading}
-              className="lg:ml-0"
-            />
-            {canOrganize ? (
-              <Button
-                size="lg"
-                variant="outline"
-                className="h-11 w-full px-6 font-semibold sm:h-12 sm:w-auto rounded-xl"
-                onClick={() => setCreateFolderOpen(true)}
-                disabled={searching}
+          <div className="flex w-full min-w-0 flex-col gap-2 sm:w-auto sm:flex-row sm:flex-wrap sm:items-center sm:gap-3">
+            <div className="flex w-full min-w-0 items-center gap-2 sm:w-auto">
+              <DashboardPeriodFilter
+                preset={periodPreset}
+                customFrom={customFrom}
+                customTo={customTo}
+                period={period}
+                onPresetChange={setPeriodPreset}
+                onCustomFromChange={setCustomFrom}
+                onCustomToChange={setCustomTo}
+                isFetching={loading}
+                className="min-w-0 flex-1 lg:ml-0 lg:w-auto lg:max-w-md"
+              />
+              <div className="flex h-10 shrink-0 items-center gap-2 rounded-xl border border-fuchsia-200 bg-gradient-to-r from-fuchsia-50 to-violet-50 px-3 text-fuchsia-700 shadow-sm dark:border-fuchsia-800 dark:from-fuchsia-950/30 dark:to-violet-950/30 dark:text-fuchsia-300 sm:h-11 sm:gap-2.5 sm:px-4">
+                <Palette className="h-4 w-4 shrink-0" aria-hidden />
+                <span className="text-lg font-bold tabular-nums sm:text-xl">
+                  {loading && !stats ? '—' : (stats?.total ?? total)}
+                </span>
+              </div>
+            </div>
+            {canOrganize || canCreate ? (
+              <div
+                className={cn(
+                  'grid w-full gap-2 sm:flex sm:w-auto sm:flex-row',
+                  canOrganize && canCreate ? 'grid-cols-2' : 'grid-cols-1'
+                )}
               >
-                <FolderPlus className="mr-2 h-5 w-5" />
-                New folder
-              </Button>
-            ) : null}
-            {canCreate ? (
-              <Button
-                size="lg"
-                className="h-11 w-full px-6 font-semibold text-white shadow-lg sm:h-12 sm:w-auto bg-gradient-to-r from-fuchsia-600 to-violet-700 hover:from-fuchsia-700 hover:to-violet-800"
-                onClick={() => openAsset('new')}
-              >
-                <Plus className="mr-2 h-5 w-5" />
-                New asset
-              </Button>
+                {canOrganize ? (
+                  <Button
+                    size="lg"
+                    variant="outline"
+                    className="h-11 min-w-0 rounded-xl px-3 font-semibold sm:h-12 sm:w-auto sm:px-6"
+                    onClick={() => setCreateFolderOpen(true)}
+                    disabled={searching}
+                  >
+                    <FolderPlus className="mr-1.5 h-4 w-4 shrink-0 sm:mr-2 sm:h-5 sm:w-5" />
+                    <span className="truncate">New folder</span>
+                  </Button>
+                ) : null}
+                {canCreate ? (
+                  <Button
+                    size="lg"
+                    className="h-11 min-w-0 rounded-xl bg-gradient-to-r from-fuchsia-600 to-violet-700 px-3 font-semibold text-white shadow-lg hover:from-fuchsia-700 hover:to-violet-800 sm:h-12 sm:w-auto sm:px-6"
+                    onClick={() => openAsset('new')}
+                  >
+                    <Plus className="mr-1.5 h-4 w-4 shrink-0 sm:mr-2 sm:h-5 sm:w-5" />
+                    <span className="truncate">New asset</span>
+                  </Button>
+                ) : null}
+              </div>
             ) : null}
           </div>
         }
@@ -1133,13 +1240,17 @@ export default function BugCreative() {
                       setQ(e.target.value.slice(0, 200));
                       setPage(1);
                     }}
-                    placeholder="Search title, hook, creator…"
+                    placeholder="Search title, copy, creator, folders…"
                     className="w-full min-w-0 rounded-xl border border-border/70 bg-background py-2.5 pl-10 pr-3 text-sm font-medium shadow-sm transition-all duration-300 hover:shadow-md focus:border-fuchsia-500 focus:outline-none focus:ring-2 focus:ring-fuchsia-500/40 sm:py-3 sm:pl-12 sm:pr-4"
                     aria-label="Search creative assets"
                   />
+                  <p className="mt-1.5 hidden text-xs leading-snug text-muted-foreground sm:block">
+                    Full library search: metadata plus words inside uploaded posters, thumbnails, and PDFs
+                    (Drive-only cards match title, hook, and folder names until a thumbnail is indexed).
+                  </p>
                 </div>
 
-                <div className="grid grid-cols-1 gap-3 md:grid-cols-3 min-w-0">
+                <div className="grid grid-cols-2 gap-2 sm:gap-3 md:grid-cols-3 min-w-0">
                   <div className={filterFieldClass}>
                     <div className="shrink-0 rounded-lg bg-violet-500 p-1.5">
                       <ImageIcon className="h-4 w-4 text-white" />
@@ -1194,7 +1305,7 @@ export default function BugCreative() {
                     </div>
                   </div>
 
-                  <div className={filterFieldClass}>
+                  <div className={cn(filterFieldClass, 'col-span-2 md:col-span-1')}>
                     <div className="shrink-0 rounded-lg bg-blue-500 p-1.5">
                       <FolderOpen className="h-4 w-4 text-white" />
                     </div>
@@ -1353,6 +1464,7 @@ export default function BugCreative() {
               {items.map((asset) => (
                 <div
                   key={asset.id}
+                  data-creative-asset-id={asset.id}
                   className="col-span-12 min-w-0 sm:col-span-6 xl:col-span-4"
                 >
                   <AssetCard
@@ -1422,6 +1534,11 @@ export default function BugCreative() {
         <AssetFormModal
           open={formOpen}
           assetId={assetParam}
+          initialAsset={
+            assetParam && assetParam !== 'new'
+              ? items.find((a) => a.id === assetParam) ?? null
+              : null
+          }
           folderId={currentFolderId}
           canManage={canManage}
           canReview={canReview}

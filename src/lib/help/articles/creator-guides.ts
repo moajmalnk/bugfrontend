@@ -61,9 +61,9 @@ export const creatorGuideArticles: HelpArticle[] = [
           {
             type: "permission-table",
             rows: [
-              { role: "Creator", access: "Create, edit, and submit own assets" },
-              { role: "CREATIVE_VIEW", access: "Open BugCreative" },
-              { role: "CREATIVE_CREATE", access: "Create assets" },
+              { role: "Creator", access: "Browse the shared library; create, edit, and submit own assets" },
+              { role: "CREATIVE_VIEW", access: "Open BugCreative and see all folders and assets" },
+              { role: "CREATIVE_CREATE", access: "Create assets; edit and delete your own" },
               { role: "CREATIVE_MANAGE", access: "Edit any asset and assign creators" },
               { role: "CREATIVE_REVIEW", access: "Approve, request changes, or reject" },
             ],
@@ -104,10 +104,11 @@ export const creatorGuideArticles: HelpArticle[] = [
           {
             type: "list",
             items: [
-              "Click New folder to organise assets, Drive-style. Folders can nest up to 6 levels deep.",
+              "Everyone with BugCreative access sees the same shared folders and files (Drive-style).",
+              "Click New folder to organise assets. Folders can nest up to 6 levels deep.",
               "Folder names must be unique within the same parent folder.",
               "A folder can only be deleted once it is empty — move or delete its subfolders and assets first.",
-              "Select assets, then Copy, Cut, or Move to folder. You can act on up to 100 assets at once.",
+              "Select assets, then Copy, Cut, or Move to folder. You can act on up to 100 assets at once. Creators can only move or edit their own assets unless they have manage permission.",
             ],
           },
         ],

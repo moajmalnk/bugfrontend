@@ -1,6 +1,7 @@
 import type { PosterPalette, PosterPaletteKey } from './brand/brandKit';
 import type { LogoStyleKey } from './brand/logoStyles';
 import type { ModernTemplateKey } from './templates/modern/modernKeys';
+import type { StudioTemplateKey } from './templates/studio/studioSpec';
 
 /**
  * Layout a template is drawn at. `native` is a fixed artwork size (e.g. the
@@ -34,7 +35,8 @@ export type PosterTemplateKey =
   | 'regional_message'
   | 'brand_logo'
   | 'birthday'
-  | ModernTemplateKey;
+  | ModernTemplateKey
+  | StudioTemplateKey;
 
 /** Picker tab a template is listed under. */
 export type PosterTemplateGroup = 'signature' | 'speaker' | 'event' | 'type' | 'quote' | 'celebrate';

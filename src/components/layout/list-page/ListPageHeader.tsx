@@ -74,12 +74,12 @@ export function ListPageHeader({
           </div>
 
           {(actions || count !== undefined) && (
-            <div className="flex flex-col sm:flex-row sm:flex-wrap items-stretch sm:items-center gap-3 sm:gap-4 min-w-0 w-full sm:w-auto max-w-full">
+            <div className="flex w-full max-w-full min-w-0 flex-row flex-wrap items-stretch gap-2 sm:w-auto sm:items-center sm:gap-4">
               {actions}
               {count !== undefined ? (
                 <div
                   className={cn(
-                    "flex items-center gap-3 px-4 py-3 bg-gradient-to-r border rounded-xl shadow-sm w-full sm:w-auto justify-center sm:justify-start",
+                    "flex w-auto shrink-0 items-center justify-center gap-2 rounded-xl border bg-gradient-to-r px-3 py-2 shadow-sm sm:gap-3 sm:px-4 sm:py-3 sm:justify-start",
                     countClassName
                   )}
                 >

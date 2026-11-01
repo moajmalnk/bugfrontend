@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useMemo, useState, type CSSProperties } from 'react';
 import { Check, Search } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import {
@@ -14,11 +14,20 @@ import {
 const CHECKERBOARD =
   'linear-gradient(45deg, #d4d4d4 25%, transparent 25%), linear-gradient(-45deg, #d4d4d4 25%, transparent 25%), linear-gradient(45deg, transparent 75%, #d4d4d4 75%), linear-gradient(-45deg, transparent 75%, #d4d4d4 75%)';
 
-function swatchBackground(p: PosterPalette): string {
+/** Longhand only — never mix `background` shorthand with backgroundSize/Position. */
+function swatchStyle(p: PosterPalette): CSSProperties {
   if (p.background === 'transparent') {
-    return `linear-gradient(135deg, ${p.ink} 50%, transparent 50%), ${CHECKERBOARD}`;
+    // Ink diagonal + 4-layer checkerboard (same pattern as before).
+    return {
+      backgroundImage: `linear-gradient(135deg, ${p.ink} 50%, transparent 50%), ${CHECKERBOARD}`,
+      backgroundSize: 'auto, 8px 8px, 8px 8px, 8px 8px, 8px 8px',
+      backgroundPosition: '0 0, 0 0, 0 4px, 4px -4px, -4px 0',
+      backgroundRepeat: 'no-repeat, repeat, repeat, repeat, repeat',
+    };
   }
-  return `linear-gradient(145deg, ${p.background} 0%, ${p.background} 46%, ${p.accent} 46%, ${p.accent} 100%)`;
+  return {
+    backgroundImage: `linear-gradient(145deg, ${p.background} 0%, ${p.background} 46%, ${p.accent} 46%, ${p.accent} 100%)`,
+  };
 }
 
 type Props = {
@@ -71,12 +80,7 @@ export function PalettePicker({ options, value, onChange }: Props) {
           >
             <span
               className="h-8 w-8 shrink-0 rounded-xl border border-black/10 shadow-sm"
-              style={{
-                background: swatchBackground(selected),
-                backgroundSize: selected.background === 'transparent' ? '8px 8px, 8px 8px, 8px 8px, 8px 8px' : undefined,
-                backgroundPosition:
-                  selected.background === 'transparent' ? '0 0, 0 4px, 4px -4px, -4px 0' : undefined,
-              }}
+              style={swatchStyle(selected)}
             />
             <span className="min-w-0">
               <span className="block truncate text-xs font-semibold text-gray-900 dark:text-white">
@@ -103,7 +107,7 @@ export function PalettePicker({ options, value, onChange }: Props) {
       </div>
 
       <div
-        className="flex gap-1.5 overflow-x-auto pb-0.5 custom-scrollbar"
+        className="no-scrollbar flex w-full max-w-full gap-1.5 overflow-x-auto overscroll-x-contain touch-pan-x pb-0.5"
         role="tablist"
         aria-label="Palette categories"
       >
@@ -162,13 +166,7 @@ export function PalettePicker({ options, value, onChange }: Props) {
             >
               <span
                 className="relative h-10 w-10 rounded-xl border border-black/10 shadow-sm"
-                style={{
-                  background: swatchBackground(p),
-                  backgroundSize:
-                    p.background === 'transparent' ? '7px 7px, 7px 7px, 7px 7px, 7px 7px' : undefined,
-                  backgroundPosition:
-                    p.background === 'transparent' ? '0 0, 0 3.5px, 3.5px -3.5px, -3.5px 0' : undefined,
-                }}
+                style={swatchStyle(p)}
               >
                 {active && (
                   <span className="absolute inset-0 flex items-center justify-center rounded-xl bg-black/25">

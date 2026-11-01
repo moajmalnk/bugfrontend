@@ -1,11 +1,12 @@
 import { useCallback, useDeferredValue, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
-import { createPortal } from 'react-dom';
+import { createPortal, flushSync } from 'react-dom';
 import {
   Download,
   ImagePlus,
   Link2,
   Loader2,
   Palette,
+  Share2,
   Sparkles,
   Trash2,
   UploadCloud,
@@ -24,11 +25,20 @@ import {
   type BugDatesCalendarItem,
   type GrowthProgramSession,
 } from '@/services/bugDatesService';
-import { uploadCreativeFile } from '@/services/creativeService';
+import {
+  createCreativeFolder,
+  listCreativeFolders,
+  uploadCreativeFile,
+  type CreativeFolder,
+} from '@/services/creativeService';
 import { userService } from '@/services/userService';
 import { notifyAdminNavCountsChanged } from '@/lib/navCountsEvents';
 import { resolveAvatarUrl } from '@/lib/avatarUrl';
+import { getEffectiveRole, hasPermissionOrAdmin } from '@/lib/utils';
+import { useAuth } from '@/context/AuthContext';
+import { usePermissions } from '@/hooks/usePermissions';
 import type { User } from '@/types';
+import { MoveToFolderModal } from '@/components/creative/MoveToFolderModal';
 import { POSTER_PALETTES, type PosterPaletteKey } from './brand/brandKit';
 import { PalettePicker } from './PalettePicker';
 import { LogoStylePicker } from './LogoStylePicker';
@@ -37,6 +47,7 @@ import { loadPosterFonts } from './brand/posterFonts';
 import {
   buildPosterData,
   isRealPosterAvatar,
+  occasionPosterPreset,
   posterDisplayName,
   POSTER_FIELD_LABELS,
   POSTER_FIELD_LIMITS,
@@ -47,17 +58,13 @@ import {
   imageUrlToPosterDataUrl,
   posterFileName,
 } from './posterExport';
-import {
-  getPreset,
-  ORIGINAL_PRESET_ID,
-  presetDisplayLabel,
-  resolveRenderPlan,
-  sameAspect,
-} from './posterSizes';
-import { PosterSizePicker } from './PosterSizePicker';
+import { ORIGINAL_PRESET_ID, resolveRenderPlan, sameAspect } from './posterSizes';
 import { TemplatePicker } from './TemplatePicker';
 import { DiscardChangesDialog } from './DiscardChangesDialog';
+import { ExportSizeDialog, type ExportSizeIntent } from './ExportSizeDialog';
 import { POSTER_TEMPLATE_COMPONENTS, POSTER_TEMPLATES, templatesForCategory } from './templates/templateRegistry';
+import { StudioThumbSwatch } from './templates/studio/StudioEngine';
+import { isStudioTemplateKey, STUDIO_BY_KEY } from './templates/studio/studioSpec';
 import type { PosterData, PosterFieldKey, PosterSize, PosterTemplateKey } from './types';
 
 type Props = {
@@ -71,10 +78,11 @@ type Props = {
 };
 
 type FontState = 'loading' | 'ready' | 'error';
-type BusyState = null | 'ai' | 'save' | 'download' | 'image';
+type BusyState = null | 'ai' | 'save' | 'download' | 'share' | 'image';
 
 const MULTILINE_FIELDS: PosterFieldKey[] = ['quote', 'tagline', 'malayalamLine'];
-const THUMB_WIDTH = 96;
+/** Fallback thumb width before ResizeObserver reports the card size. */
+const THUMB_WIDTH_FALLBACK = 96;
 
 /** Flip when poster AI copy is wired and stable again. */
 const SHOW_AI_SUGGEST_COPY = false;
@@ -201,16 +209,35 @@ export default function PosterStudioModal({
   onClose,
   onSaved,
 }: Props) {
+  const { currentUser } = useAuth();
+  const { hasPermission } = usePermissions();
+  const role = getEffectiveRole(currentUser);
+  const canOrganizeFolders =
+    hasPermissionOrAdmin(role, hasPermission, 'CREATIVE_CREATE') ||
+    hasPermissionOrAdmin(role, hasPermission, 'CREATIVE_MANAGE');
+
   const category = String(item.layer || item.category || 'company_event');
-  const templateOrder = useMemo(() => templatesForCategory(category), [category]);
+  const templateOrder = useMemo(
+    () => templatesForCategory(category, item.title),
+    [category, item.title]
+  );
+  const occasion = useMemo(() => occasionPosterPreset(item.title), [item.title]);
   const initialData = useMemo(
     () => buildPosterData(item, session, occurrenceDate),
     [item, session, occurrenceDate]
   );
+  const initialPalette =
+    occasion?.defaultPalette ?? POSTER_TEMPLATES[templateOrder[0]].defaultPalette;
 
   const [templateKey, setTemplateKey] = useState<PosterTemplateKey>(templateOrder[0]);
-  const [paletteKey, setPaletteKey] = useState<PosterPaletteKey>(POSTER_TEMPLATES[templateOrder[0]].defaultPalette);
+  const [paletteKey, setPaletteKey] = useState<PosterPaletteKey>(initialPalette);
+  /** Preview stays on original; switched only for the download/share capture pass. */
   const [presetId, setPresetId] = useState<string>(ORIGINAL_PRESET_ID);
+  const [exportSizeIntent, setExportSizeIntent] = useState<ExportSizeIntent | null>(null);
+  const [showSaveFolder, setShowSaveFolder] = useState(false);
+  const [folders, setFolders] = useState<CreativeFolder[]>([]);
+  const [foldersLoading, setFoldersLoading] = useState(false);
+  const [folderCreating, setFolderCreating] = useState(false);
   const [data, setData] = useState<PosterData>(initialData);
   const [baseline, setBaseline] = useState<PosterData>(initialData);
   const [fontState, setFontState] = useState<FontState>('loading');
@@ -238,14 +265,6 @@ export default function PosterStudioModal({
   const def = POSTER_TEMPLATES[templateKey];
   const plan = resolveRenderPlan(def, presetId);
   const { layout, target } = plan;
-  const preset = getPreset(presetId);
-  const originalTarget = resolveRenderPlan(def, ORIGINAL_PRESET_ID).target;
-  const suggestion =
-    preset?.suggest &&
-    (preset.suggest.template !== templateKey ||
-      (preset.suggest.palette !== undefined && preset.suggest.palette !== paletteKey))
-      ? preset.suggest
-      : null;
   const isDirty = savedRef.current ? false : JSON.stringify(data) !== JSON.stringify(baseline);
   const requiredField = def.fields[0];
   const requiredError =
@@ -258,6 +277,10 @@ export default function PosterStudioModal({
   const [confirmDiscard, setConfirmDiscard] = useState(false);
   const confirmDiscardRef = useRef(confirmDiscard);
   confirmDiscardRef.current = confirmDiscard;
+  const exportSizeIntentRef = useRef(exportSizeIntent);
+  exportSizeIntentRef.current = exportSizeIntent;
+  const showSaveFolderRef = useRef(showSaveFolder);
+  showSaveFolderRef.current = showSaveFolder;
 
   const setBusyState = (next: BusyState) => {
     busyRef.current = next;
@@ -408,6 +431,18 @@ export default function PosterStudioModal({
         setConfirmDiscard(false);
         return;
       }
+      if (exportSizeIntentRef.current) {
+        e.stopPropagation();
+        if (busyRef.current !== 'download' && busyRef.current !== 'share') {
+          setExportSizeIntent(null);
+        }
+        return;
+      }
+      if (showSaveFolderRef.current) {
+        e.stopPropagation();
+        if (busyRef.current !== 'save') setShowSaveFolder(false);
+        return;
+      }
       // Why: nested pickers (poster date) must close before discarding the studio.
       if (document.querySelector('[data-radix-popper-content-wrapper]')) return;
       e.stopPropagation();
@@ -426,32 +461,40 @@ export default function PosterStudioModal({
     setPaletteKey(POSTER_TEMPLATES[key].defaultPalette);
   }, []);
 
-  /** Thumbnails trail the form at low priority: 40+ full poster renders would otherwise lag every keystroke. */
+  /**
+   * Thumbnails trail the form at low priority.
+   * Studio Library (~260) uses CSS swatches so we never mount 300 full poster trees.
+   * Signature / modern templates keep live ScaledPoster previews sized to the card.
+   */
   const thumbData = useDeferredValue(data);
   const renderTemplateThumb = useCallback(
-    (key: PosterTemplateKey) =>
-      fontState === 'loading' ? (
-        <div
-          className="animate-pulse bg-gray-200 dark:bg-gray-700"
-          style={{ width: THUMB_WIDTH * 0.8, height: THUMB_WIDTH }}
-        />
-      ) : (
+    (key: PosterTemplateKey, widthPx: number) => {
+      const w = Math.max(56, widthPx || THUMB_WIDTH_FALLBACK);
+      const layout = resolveRenderPlan(POSTER_TEMPLATES[key], ORIGINAL_PRESET_ID).layout;
+      if (fontState === 'loading') {
+        return <div className="h-full w-full animate-pulse rounded-lg bg-gray-200 dark:bg-gray-700" />;
+      }
+      if (isStudioTemplateKey(key)) {
+        const entry = STUDIO_BY_KEY[key];
+        const pal = POSTER_PALETTES[POSTER_TEMPLATES[key].defaultPalette];
+        return (
+          <div className="h-full w-full overflow-hidden rounded-lg">
+            <StudioThumbSwatch entry={entry} palette={pal} />
+          </div>
+        );
+      }
+      return (
         <ScaledPoster
           templateKey={key}
           data={thumbData}
           paletteKey={POSTER_TEMPLATES[key].defaultPalette}
-          layout={resolveRenderPlan(POSTER_TEMPLATES[key], ORIGINAL_PRESET_ID).layout}
-          width={THUMB_WIDTH * 0.8}
+          layout={layout}
+          width={w}
         />
-      ),
+      );
+    },
     [fontState, thumbData],
   );
-
-  const applySuggestion = () => {
-    if (!suggestion) return;
-    setTemplateKey(suggestion.template);
-    setPaletteKey(suggestion.palette ?? POSTER_TEMPLATES[suggestion.template].defaultPalette);
-  };
 
   const applyImage = async (load: () => Promise<string>) => {
     if (busyRef.current) return;
@@ -532,28 +575,54 @@ export default function PosterStudioModal({
     }
   };
 
-  const renderExport = async () => {
+  const renderExport = async (exportPreset: string = ORIGINAL_PRESET_ID) => {
     if (!posterRef.current) throw new Error('Preview is not ready yet');
-    return exportPosterNode(posterRef.current, layout, target);
+    const exportPlan = resolveRenderPlan(POSTER_TEMPLATES[templateKey], exportPreset);
+    return exportPosterNode(posterRef.current, exportPlan.layout, exportPlan.target);
   };
 
-  const exportName = (extension: string) =>
-    posterFileName(data.title || data.subtitle || String(item.title ?? ''), data.dateIso, extension, target);
-  const sizeLabel = preset ? `${preset.group} ${preset.label}` : 'Original';
+  const exportName = (extension: string, exportTarget = target) =>
+    posterFileName(
+      data.title || data.subtitle || String(item.title ?? ''),
+      data.dateIso,
+      extension,
+      exportTarget
+    );
 
-  const handleDownload = async () => {
+  const openDownloadSize = () => {
+    if (!canExport || busyRef.current) return;
+    setExportSizeIntent('download');
+  };
+
+  const openShareSize = () => {
+    if (!canExport || busyRef.current) return;
+    setExportSizeIntent('share');
+  };
+
+  const triggerLocalDownload = (blob: Blob, filename: string) => {
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+  };
+
+  const handleDownloadWithSize = async (chosenPreset: string) => {
     if (!canExport || busyRef.current) return;
     setBusyState('download');
     try {
-      const { blob, extension } = await renderExport();
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = exportName(extension);
-      document.body.appendChild(a);
-      a.click();
-      a.remove();
-      URL.revokeObjectURL(url);
+      // Why: responsive templates reflow at the export size — paint that layout before capture.
+      flushSync(() => setPresetId(chosenPreset));
+      await new Promise<void>((resolve) =>
+        requestAnimationFrame(() => requestAnimationFrame(() => resolve()))
+      );
+      const exportPlan = resolveRenderPlan(POSTER_TEMPLATES[templateKey], chosenPreset);
+      const { blob, extension } = await renderExport(chosenPreset);
+      triggerLocalDownload(blob, exportName(extension, exportPlan.target));
+      setExportSizeIntent(null);
     } catch (e) {
       toast({
         title: 'Could not export poster',
@@ -561,36 +630,150 @@ export default function PosterStudioModal({
         variant: 'destructive',
       });
     } finally {
+      flushSync(() => setPresetId(ORIGINAL_PRESET_ID));
       setBusyState(null);
     }
   };
 
-  const handleSave = async () => {
+  const handleShareWithSize = async (chosenPreset: string) => {
+    if (!canExport || busyRef.current) return;
+    setBusyState('share');
+    try {
+      flushSync(() => setPresetId(chosenPreset));
+      await new Promise<void>((resolve) =>
+        requestAnimationFrame(() => requestAnimationFrame(() => resolve()))
+      );
+      const exportPlan = resolveRenderPlan(POSTER_TEMPLATES[templateKey], chosenPreset);
+      const { blob, extension } = await renderExport(chosenPreset);
+      const filename = exportName(extension, exportPlan.target);
+      const file = new File([blob], filename, { type: blob.type || `image/${extension}` });
+      const title =
+        String(item.title || data.title || 'Poster').trim() || 'Poster';
+      const sharePayload: ShareData = {
+        files: [file],
+        title,
+        text: `${title} · ${occurrenceDate}`,
+      };
+
+      if (
+        typeof navigator.share === 'function' &&
+        typeof navigator.canShare === 'function' &&
+        navigator.canShare(sharePayload)
+      ) {
+        await navigator.share(sharePayload);
+        setExportSizeIntent(null);
+        toast({ title: 'Poster shared' });
+      } else if (typeof navigator.share === 'function') {
+        // Some browsers share images only as a single file without title/text.
+        const filesOnly: ShareData = { files: [file] };
+        if (navigator.canShare?.(filesOnly)) {
+          await navigator.share(filesOnly);
+          setExportSizeIntent(null);
+          toast({ title: 'Poster shared' });
+        } else {
+          triggerLocalDownload(blob, filename);
+          setExportSizeIntent(null);
+          toast({
+            title: 'Downloaded instead',
+            description: 'This device can’t share image files — poster downloaded so you can share it manually.',
+          });
+        }
+      } else {
+        triggerLocalDownload(blob, filename);
+        setExportSizeIntent(null);
+        toast({
+          title: 'Downloaded instead',
+          description: 'Sharing isn’t available here — poster downloaded so you can share it manually.',
+        });
+      }
+    } catch (e) {
+      if ((e as Error)?.name === 'AbortError') {
+        // User dismissed the system share sheet — keep size dialog closed if they finished.
+        return;
+      }
+      toast({
+        title: 'Could not share poster',
+        description: e instanceof Error ? e.message : 'Try again',
+        variant: 'destructive',
+      });
+    } finally {
+      flushSync(() => setPresetId(ORIGINAL_PRESET_ID));
+      setBusyState(null);
+    }
+  };
+
+  const openSaveFolder = async () => {
+    if (!canExport || busyRef.current || !item.id) return;
+    setShowSaveFolder(true);
+    setFoldersLoading(true);
+    try {
+      const items = await listCreativeFolders({ parent_id: 'all' });
+      setFolders(items);
+    } catch (e) {
+      toast({
+        title: 'Could not load folders',
+        description: e instanceof Error ? e.message : 'Try again',
+        variant: 'destructive',
+      });
+      setShowSaveFolder(false);
+    } finally {
+      setFoldersLoading(false);
+    }
+  };
+
+  const handleCreateFolderWhileSaving = async (
+    name: string,
+    parentId: string | null
+  ): Promise<CreativeFolder> => {
+    if (folderCreating) throw new Error('Busy');
+    setFolderCreating(true);
+    try {
+      const created = await createCreativeFolder({ name, parent_id: parentId });
+      setFolders((prev) => (prev.some((f) => f.id === created.id) ? prev : [...prev, created]));
+      toast({ title: parentId ? 'Subfolder created' : 'Folder created' });
+      return created;
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'Could not create folder';
+      toast({ title: 'Create failed', description: message, variant: 'destructive' });
+      throw err instanceof Error ? err : new Error(message);
+    } finally {
+      setFolderCreating(false);
+    }
+  };
+
+  const handleSaveToFolder = async (folderId: string | null) => {
     if (!canExport || busyRef.current || !item.id) return;
     setBusyState('save');
     try {
-      const { blob, extension } = await renderExport();
-      const file = new File([blob], exportName(extension), { type: blob.type });
+      // Save uses the original design size — size picker is download-only.
+      const { blob, extension } = await renderExport(ORIGINAL_PRESET_ID);
+      const originalPlan = resolveRenderPlan(def, ORIGINAL_PRESET_ID);
+      const file = new File([blob], exportName(extension, originalPlan.target), { type: blob.type });
       const uploaded = await uploadCreativeFile(file);
       const summary = [data.subtitle, data.tagline, data.quote, data.malayalamLine]
         .map((v) => v.trim())
         .filter(Boolean)
         .join(' · ');
+      const saveLabel = 'Original';
       const res = await generateBugCreativeCard({
         event_id: item.id,
         occurrence_date: occurrenceDate,
-        title: `${String(item.title || data.title).trim()} — Poster (${sizeLabel})`.slice(0, 255),
-        hook_content: `${summary || `Poster for ${item.title} on ${occurrenceDate}`}\n\nSize: ${sizeLabel} · ${target.width} × ${target.height}px`,
+        title: `${String(item.title || data.title).trim()} — Poster (${saveLabel})`.slice(0, 255),
+        hook_content: `${summary || `Poster for ${item.title} on ${occurrenceDate}`}\n\nSize: ${saveLabel} · ${originalPlan.target.width} × ${originalPlan.target.height}px`,
         material_type: 'Poster',
         uploaded_file_path: uploaded.file_path,
         preview_thumbnail_url: uploaded.preview_thumbnail_url ?? uploaded.file_path,
         template_key: templateKey,
+        folder_id: folderId,
       });
       savedRef.current = true;
+      setShowSaveFolder(false);
       notifyAdminNavCountsChanged();
       toast({
         title: res.updated ? 'Poster updated in BugCreative' : 'Poster saved to BugCreative',
-        description: 'Opening the creative card…',
+        description: folderId
+          ? 'Saved in the selected folder — opening the creative card…'
+          : 'Saved in All files — opening the creative card…',
       });
       skipConfirmRef.current = true;
       onSaved(res.asset_id);
@@ -647,12 +830,13 @@ export default function PosterStudioModal({
           </Button>
         </header>
 
-        <div className="grid min-h-0 flex-1 grid-cols-12 gap-4 overflow-y-auto custom-scrollbar p-4 sm:p-6 lg:overflow-hidden">
+        {/* Why: Mobile uses a simple column — a 12-col grid + flex-1 preview was overflowing. */}
+        <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto overscroll-contain custom-scrollbar p-4 sm:p-6 lg:grid lg:grid-cols-12 lg:gap-4 lg:overflow-hidden">
           {/* Preview */}
-          <section className="col-span-12 flex min-h-[340px] flex-col gap-3 lg:order-2 lg:col-span-7 lg:min-h-0">
+          <section className="flex w-full shrink-0 flex-col gap-3 lg:order-2 lg:col-span-7 lg:min-h-0 lg:overflow-hidden">
             <div
               ref={previewBoxRef}
-              className="relative flex min-h-[320px] flex-1 items-center justify-center rounded-2xl border border-gray-200/60 bg-gray-100 p-3 dark:border-gray-700/60 dark:bg-gray-800/60"
+              className="relative flex h-[min(42vh,320px)] w-full shrink-0 items-center justify-center overflow-hidden rounded-2xl border border-gray-200/60 bg-gray-100 p-3 dark:border-gray-700/60 dark:bg-gray-800/60 sm:h-[min(48vh,380px)] lg:h-auto lg:min-h-0 lg:flex-1"
             >
               {fontState === 'loading' || previewWidth === 0 ? (
                 <div
@@ -664,7 +848,7 @@ export default function PosterStudioModal({
                   aria-label="Loading poster preview"
                 />
               ) : (
-                <div className="overflow-hidden rounded-xl shadow-xl">
+                <div className="max-h-full max-w-full overflow-hidden rounded-xl shadow-xl">
                   <PosterComposite
                     templateKey={templateKey}
                     data={data}
@@ -682,51 +866,10 @@ export default function PosterStudioModal({
                 Brand fonts could not load — the preview uses fallback fonts. Check your connection before saving.
               </p>
             )}
-            <div className="grid grid-cols-12 items-end gap-4">
-              <div className="col-span-12 flex min-w-0 flex-col gap-1.5 sm:col-span-8">
-                <Label htmlFor="poster-size" className="text-xs font-semibold">
-                  Export size
-                </Label>
-                <PosterSizePicker
-                  id="poster-size"
-                  value={presetId}
-                  onChange={setPresetId}
-                  originalSize={originalTarget}
-                  selectedLabel={
-                    preset
-                      ? presetDisplayLabel(preset)
-                      : `Original design (${originalTarget.width} × ${originalTarget.height})`
-                  }
-                />
-              </div>
-              <p className="col-span-12 text-xs tabular-nums text-muted-foreground sm:col-span-4 sm:text-end">
-                {target.width} × {target.height}px
-                {!sameAspect(layout, target) && ' · fitted with soft fill'}
-              </p>
-            </div>
-            {preset?.note && (
-              <p className="text-xs font-medium text-amber-700 dark:text-amber-300">{preset.note}</p>
-            )}
-            {suggestion && (
-              <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-blue-200 bg-blue-50/70 px-3 py-2 dark:border-blue-900/60 dark:bg-blue-950/30">
-                <p className="text-xs font-medium text-blue-900 dark:text-blue-200">
-                  {POSTER_TEMPLATES[suggestion.template].label} suits this size best.
-                </p>
-                <Button
-                  type="button"
-                  size="sm"
-                  variant="outline"
-                  className="h-8 rounded-xl border-blue-300 text-xs dark:border-blue-800"
-                  onClick={applySuggestion}
-                >
-                  Use {POSTER_TEMPLATES[suggestion.template].label}
-                </Button>
-              </div>
-            )}
           </section>
 
           {/* Controls */}
-          <section className="col-span-12 flex min-w-0 flex-col gap-5 lg:order-1 lg:col-span-5 lg:min-h-0 lg:overflow-y-auto lg:pe-2 custom-scrollbar">
+          <section className="relative z-10 flex w-full min-w-0 max-w-full flex-col gap-5 overflow-x-hidden bg-background lg:order-1 lg:col-span-5 lg:min-h-0 lg:overflow-y-auto lg:overflow-x-hidden lg:pe-2 custom-scrollbar">
             <TemplatePicker
               order={templateOrder}
               value={templateKey}
@@ -1022,37 +1165,90 @@ export default function PosterStudioModal({
           </section>
         </div>
 
-        <footer className="flex shrink-0 flex-col gap-2 border-t border-gray-200/60 px-4 py-3 dark:border-gray-700/60 sm:flex-row sm:items-center sm:justify-end sm:px-6">
+        <footer className="flex shrink-0 flex-row flex-wrap items-center justify-end gap-2 border-t border-gray-200/60 px-4 py-3 dark:border-gray-700/60 sm:px-6">
+          {!item.id ? (
+            <p className="w-full text-xs text-muted-foreground sm:me-auto sm:w-auto sm:flex-1">
+              Team milestones aren&apos;t BugDates events, so this poster is download-only.
+            </p>
+          ) : null}
           <Button
             type="button"
             variant="outline"
-            className="h-11 w-full rounded-xl sm:w-auto"
+            className="h-11 min-w-0 flex-1 rounded-xl px-3 sm:w-auto sm:flex-none"
             disabled={!canExport}
-            onClick={handleDownload}
+            onClick={openDownloadSize}
           >
             {busy === 'download' ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
-            <span className="ms-2">Download</span>
+            <span className="ms-1.5 truncate sm:ms-2">Download</span>
+          </Button>
+          <Button
+            type="button"
+            variant="outline"
+            className="h-11 min-w-0 flex-1 rounded-xl px-3 sm:w-auto sm:flex-none"
+            disabled={!canExport}
+            onClick={openShareSize}
+          >
+            {busy === 'share' ? <Loader2 className="h-4 w-4 animate-spin" /> : <Share2 className="h-4 w-4" />}
+            <span className="ms-1.5 truncate sm:ms-2">Share</span>
           </Button>
           {item.id ? (
             <Button
               type="button"
-              className="h-11 w-full rounded-xl bg-gradient-to-r from-blue-600 to-indigo-700 font-semibold text-white shadow-md hover:from-blue-700 hover:to-indigo-800 sm:w-auto"
+              className="h-11 min-w-0 flex-1 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-700 px-3 font-semibold text-white shadow-md hover:from-blue-700 hover:to-indigo-800 sm:w-auto sm:flex-none"
               disabled={!canExport}
-              onClick={handleSave}
+              onClick={() => void openSaveFolder()}
             >
               {busy === 'save' ? <Loader2 className="h-4 w-4 animate-spin" /> : <Palette className="h-4 w-4" />}
-              <span className="ms-2">Save to BugCreative</span>
+              <span className="ms-1.5 truncate sm:ms-2">Save to BugCreative</span>
             </Button>
-          ) : (
-            <p className="order-first text-xs text-muted-foreground sm:order-none sm:me-auto">
-              Team milestones aren&apos;t BugDates events, so this poster is download-only.
-            </p>
-          )}
+          ) : null}
         </footer>
       </div>
       {confirmDiscard && (
         <DiscardChangesDialog onKeepEditing={() => setConfirmDiscard(false)} onDiscard={discardAndClose} />
       )}
+      {exportSizeIntent && (
+        <ExportSizeDialog
+          templateKey={templateKey}
+          paletteKey={paletteKey}
+          intent={exportSizeIntent}
+          busy={busy === 'download' || busy === 'share'}
+          onCancel={() => {
+            if (busyRef.current !== 'download' && busyRef.current !== 'share') {
+              setExportSizeIntent(null);
+            }
+          }}
+          onConfirm={(preset) => {
+            if (exportSizeIntent === 'share') void handleShareWithSize(preset);
+            else void handleDownloadWithSize(preset);
+          }}
+          onApplySuggestion={(nextTemplate, nextPalette) => {
+            setTemplateKey(nextTemplate);
+            setPaletteKey(nextPalette);
+          }}
+        />
+      )}
+      <MoveToFolderModal
+        open={showSaveFolder}
+        folders={folders}
+        busy={busy === 'save' || foldersLoading}
+        creating={folderCreating}
+        canCreate={canOrganizeFolders}
+        selectedCount={1}
+        itemLabel={String(item.title || data.title || 'Poster')}
+        title="Save to folder"
+        confirmLabel={foldersLoading ? 'Loading…' : 'Save here'}
+        description="Choose which BugCreative folder should hold this poster."
+        overlayClassName="z-[120]"
+        contentClassName="z-[121]"
+        onClose={() => {
+          if (busyRef.current !== 'save') setShowSaveFolder(false);
+        }}
+        onConfirm={handleSaveToFolder}
+        onCreateFolder={
+          canOrganizeFolders ? handleCreateFolderWhileSaving : undefined
+        }
+      />
     </div>,
     document.body
   );

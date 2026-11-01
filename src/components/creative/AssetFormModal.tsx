@@ -107,6 +107,11 @@ function normalizeSource(value?: string | null): CreativeSource {
 type Props = {
   open: boolean;
   assetId?: string | null;
+  /**
+   * List-row snapshot for instant open — skips the skeleton while get.php refreshes
+   * reviews and any fields the grid omits.
+   */
+  initialAsset?: CreativeAsset | null;
   /** Destination folder when creating a new asset from the current browse location. */
   folderId?: string | null;
   canManage: boolean;
@@ -125,6 +130,22 @@ type Props = {
   canMove?: boolean;
   onDirtyChange?: (dirty: boolean) => void;
 };
+
+function formFromAsset(row: CreativeAsset): FormState {
+  return {
+    title: row.title || '',
+    material_type: row.material_type || 'Poster',
+    platform: row.platform || 'Insta',
+    hook_content: row.hook_content || '',
+    asset_source: normalizeSource(row.asset_source),
+    drive_link: row.drive_link || '',
+    uploaded_file_path: row.uploaded_file_path || '',
+    preview_thumbnail_url: row.preview_thumbnail_url || '',
+    project_id: row.project_id || '',
+    scheduled_date: row.scheduled_date || '',
+    published_date: row.published_date || '',
+  };
+}
 
 /** Why: Creators may edit their own assets in every workflow tab / status. */
 const OWNER_EDITABLE_STATUSES: CreativeStatus[] = [
@@ -162,6 +183,7 @@ function formatDate(value?: string | null): string {
 export function AssetFormModal({
   open,
   assetId,
+  initialAsset = null,
   folderId = null,
   canManage,
   canReview,
@@ -234,33 +256,36 @@ export function AssetFormModal({
       setBaseline(INITIAL);
       setAsset(null);
       setMode('edit');
+      setLoading(false);
       return;
     }
 
     let cancelled = false;
-    setLoading(true);
     setMode('view');
+    // Why: paint from the grid row immediately so open doesn't wait on get.php.
+    // Read seed once per open — don't re-seed when the list refreshes mid-edit.
+    const seed =
+      initialAsset && initialAsset.id === assetId ? initialAsset : null;
+    if (seed) {
+      const next = formFromAsset(seed);
+      setAsset(seed);
+      setForm(next);
+      setBaseline(next);
+      setLoading(false);
+    } else {
+      setLoading(true);
+    }
+
     getCreativeAsset(assetId)
       .then((row) => {
         if (cancelled) return;
-        const next: FormState = {
-          title: row.title || '',
-          material_type: row.material_type || 'Poster',
-          platform: row.platform || 'Insta',
-          hook_content: row.hook_content || '',
-          asset_source: normalizeSource(row.asset_source),
-          drive_link: row.drive_link || '',
-          uploaded_file_path: row.uploaded_file_path || '',
-          preview_thumbnail_url: row.preview_thumbnail_url || '',
-          project_id: row.project_id || '',
-          scheduled_date: row.scheduled_date || '',
-          published_date: row.published_date || '',
-        };
+        const next = formFromAsset(row);
         setAsset(row);
         setForm(next);
         setBaseline(next);
       })
       .catch((err: Error) => {
+        if (cancelled || seed) return;
         toast({ title: 'Could not load asset', description: err.message, variant: 'destructive' });
       })
       .finally(() => {
@@ -270,6 +295,7 @@ export function AssetFormModal({
     return () => {
       cancelled = true;
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- seed only on open/id
   }, [open, assetId, isNew]);
 
   const titleError = form.title.trim() ? '' : 'Title is required';
@@ -569,21 +595,26 @@ export function AssetFormModal({
     ) : null;
 
   const detailView = (
-    <div className="grid grid-cols-12 gap-4">
-      <div className="col-span-12 overflow-hidden rounded-2xl border bg-muted/30 lg:col-span-7">
-        <div className="aspect-video w-full min-h-[220px]">
+    <div className="flex min-w-0 flex-col gap-4 lg:grid lg:grid-cols-12 lg:items-start">
+      <div className="min-w-0 overflow-hidden rounded-2xl border bg-muted/30 lg:col-span-7">
+        {/* Why: Fixed aspect box — avoid h-full/basis-0 chains that squash the poster to a strip. */}
+        <div className="relative w-full bg-muted" style={{ aspectRatio: '16 / 10' }}>
           {hasCardPreview ? (
             <CreativeMediaPreview
               path={thumbPath || undefined}
               fallbackPath={form.uploaded_file_path || undefined}
               driveLink={linkUrl || undefined}
               alt={form.title || 'Creative preview'}
-              className="h-full min-h-[220px]"
+              className="absolute inset-0 h-full w-full"
+              mediaClassName="object-contain"
               controls
               embedDriveFolder={!thumbPath && !form.uploaded_file_path}
             />
           ) : (
-            <CreativeMediaPreview className="h-full min-h-[220px]" alt="No media" />
+            <CreativeMediaPreview
+              className="absolute inset-0 h-full w-full"
+              alt="No media"
+            />
           )}
         </div>
         {fileUrl && mediaKind !== 'image' && mediaKind !== 'video' ? (
@@ -598,8 +629,8 @@ export function AssetFormModal({
         ) : null}
       </div>
 
-      <div className="col-span-12 flex flex-col gap-4 lg:col-span-5">
-        <div className="space-y-2">
+      <div className="flex min-w-0 flex-col gap-4 lg:col-span-5">
+        <div className="min-w-0 space-y-2">
           <div className="flex flex-wrap items-center gap-2">
             {asset?.status ? (
               <span
@@ -618,11 +649,11 @@ export function AssetFormModal({
               {form.platform}
             </span>
           </div>
-          <h2 className="text-xl font-bold leading-tight sm:text-2xl">
+          <h2 className="break-words text-lg font-bold leading-tight sm:text-xl">
             {form.title || 'Untitled asset'}
           </h2>
           {form.hook_content ? (
-            <p className="whitespace-pre-wrap text-sm text-muted-foreground">
+            <p className="whitespace-pre-wrap break-words text-sm text-muted-foreground">
               {form.hook_content}
             </p>
           ) : (
@@ -630,40 +661,47 @@ export function AssetFormModal({
           )}
         </div>
 
-        <div className="grid grid-cols-1 gap-3 rounded-xl border p-4 text-sm">
-          <div className="flex items-start gap-2 min-w-0">
+        <div className="grid min-w-0 grid-cols-1 gap-3 rounded-xl border p-3 text-sm sm:p-4">
+          <div className="flex min-w-0 items-start gap-2">
             <UserRound className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" />
-            <div className="min-w-0">
+            <div className="min-w-0 flex-1">
               <p className="text-xs text-muted-foreground">Creator</p>
-              <p className="truncate font-medium">{asset?.creator_name || '—'}</p>
+              <p className="truncate font-medium" title={asset?.creator_name || undefined}>
+                {asset?.creator_name || '—'}
+              </p>
             </div>
           </div>
-          <div className="flex items-start gap-2 min-w-0">
+          <div className="flex min-w-0 items-start gap-2">
             <FolderOpen className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" />
-            <div className="min-w-0">
+            <div className="min-w-0 flex-1">
               <p className="text-xs text-muted-foreground">Location</p>
-              <p className="break-all text-sm font-medium leading-snug sm:truncate sm:break-normal" title={folderPath}>
+              <p
+                className="break-words text-sm font-medium leading-snug"
+                title={folderPath}
+              >
                 {folderPath}
               </p>
             </div>
           </div>
-          <div className="flex items-start gap-2 min-w-0">
+          <div className="flex min-w-0 items-start gap-2">
             <FolderOpen className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" />
-            <div className="min-w-0">
+            <div className="min-w-0 flex-1">
               <p className="text-xs text-muted-foreground">Project</p>
-              <p className="truncate font-medium">{projectName || 'No project'}</p>
+              <p className="truncate font-medium" title={projectName || undefined}>
+                {projectName || 'No project'}
+              </p>
             </div>
           </div>
-          <div className="flex items-start gap-2 min-w-0">
+          <div className="flex min-w-0 items-start gap-2">
             <Calendar className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" />
-            <div className="min-w-0">
+            <div className="min-w-0 flex-1">
               <p className="text-xs text-muted-foreground">Scheduled</p>
               <p className="font-medium">{formatDate(form.scheduled_date)}</p>
             </div>
           </div>
-          <div className="flex items-start gap-2 min-w-0">
+          <div className="flex min-w-0 items-start gap-2">
             <Calendar className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" />
-            <div className="min-w-0">
+            <div className="min-w-0 flex-1">
               <p className="text-xs text-muted-foreground">Published</p>
               <p className="font-medium">{formatDate(form.published_date)}</p>
             </div>
@@ -675,10 +713,11 @@ export function AssetFormModal({
                 href={linkUrl}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="mt-0.5 inline-flex max-w-full items-center gap-1 truncate text-sm font-medium text-fuchsia-600 hover:underline dark:text-fuchsia-400"
+                className="mt-0.5 inline-flex max-w-full items-center gap-1 text-sm font-medium text-fuchsia-600 hover:underline dark:text-fuchsia-400"
+                title={linkUrl}
               >
                 <ExternalLink className="h-3.5 w-3.5 shrink-0" />
-                <span className="truncate">{linkUrl}</span>
+                <span className="min-w-0 break-all">{linkUrl}</span>
               </a>
             </div>
           ) : null}
@@ -1024,28 +1063,31 @@ export function AssetFormModal({
       <Dialog open={open} onOpenChange={(next) => !next && requestClose()}>
         <DialogContent
           className={cn(
-            'flex max-h-[92vh] w-[95vw] flex-col gap-0 overflow-hidden rounded-2xl p-0',
-            mode === 'view' || (canReview && asset)
-              ? 'max-w-[950px]'
-              : 'max-w-[600px]'
+            // Why: Full-bleed on phone (no waiting on a skinny skeleton card); near-full
+            // width on desktop so poster + meta fit without a cramped column.
+            '!flex !max-w-none flex-col gap-0 overflow-y-auto overscroll-contain p-0',
+            'h-[100dvh] max-h-[100dvh] w-screen rounded-none',
+            '!left-0 !top-0 !translate-x-0 !translate-y-0',
+            'sm:h-[min(94dvh,900px)] sm:max-h-[min(94dvh,900px)] sm:w-[min(100vw-1.5rem,1180px)] sm:rounded-2xl',
+            'sm:!left-1/2 sm:!top-[max(0.75rem,env(safe-area-inset-top))] sm:!translate-x-[-50%] sm:!translate-y-0'
           )}
         >
-          <DialogHeader className="border-b border-border/60 px-6 py-4">
-            <DialogTitle>
+          <DialogHeader className="sticky top-0 z-10 space-y-1 border-b border-border/60 bg-background px-4 py-3 pr-12 sm:px-6 sm:py-4">
+            <DialogTitle className="break-words pr-2 text-base sm:text-lg">
               {isNew
                 ? 'New creative asset'
                 : mode === 'view'
                   ? form.title || 'Creative asset'
                   : 'Edit creative asset'}
             </DialogTitle>
-            <DialogDescription>
+            <DialogDescription className="text-xs sm:text-sm">
               {mode === 'view'
                 ? 'Preview media, status, and review history.'
                 : 'Track posters, reels, and mockups from draft through publish.'}
             </DialogDescription>
           </DialogHeader>
 
-          <div className="min-h-0 flex-1 overflow-y-auto px-6 py-4">
+          <div className="min-w-0 px-4 py-4 sm:px-6">
             {loading ? (
               <div className="space-y-3">
                 {Array.from({ length: 6 }).map((_, i) => (
@@ -1059,7 +1101,7 @@ export function AssetFormModal({
             )}
           </div>
 
-          <DialogFooter className="flex-col gap-2 border-t border-border/60 px-6 py-4 sm:flex-row sm:justify-end">
+          <DialogFooter className="sticky bottom-0 z-10 flex-col gap-2 border-t border-border/60 bg-background px-4 py-3 sm:flex-row sm:justify-end sm:px-6 sm:py-4">
             {mode === 'view' && !isNew ? (
               <>
                 {showDelete || showMove ? (

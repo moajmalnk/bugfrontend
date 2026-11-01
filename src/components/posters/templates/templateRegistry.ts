@@ -1,5 +1,6 @@
 import type { ComponentType } from 'react';
 import { STANDARD_PALETTES } from '../brand/brandKit';
+import { occasionPosterPreset } from '../posterData';
 import type { PosterTemplateDefinition, PosterTemplateKey, PosterTemplateProps } from '../types';
 import { BirthdayTemplate } from './BirthdayTemplate';
 import { BrandLogoTemplate } from './BrandLogoTemplate';
@@ -9,6 +10,10 @@ import { MODERN_TEMPLATE_COMPONENTS, MODERN_TEMPLATES } from './modern/modernReg
 import { ProductHeroTemplate } from './ProductHeroTemplate';
 import { RegionalMessageTemplate } from './RegionalMessageTemplate';
 import { SpeakerSessionTemplate } from './SpeakerSessionTemplate';
+import {
+  STUDIO_TEMPLATE_COMPONENTS,
+  STUDIO_TEMPLATES,
+} from './studio/studioRegistry';
 import { TeamSessionTemplate } from './TeamSessionTemplate';
 import { TypographicQuoteTemplate } from './TypographicQuoteTemplate';
 
@@ -152,6 +157,7 @@ export const POSTER_TEMPLATES: Record<PosterTemplateKey, PosterTemplateDefinitio
     showsDate: false,
   },
   ...MODERN_TEMPLATES,
+  ...STUDIO_TEMPLATES,
 };
 
 export const POSTER_TEMPLATE_COMPONENTS: Record<PosterTemplateKey, ComponentType<PosterTemplateProps>> = {
@@ -165,19 +171,69 @@ export const POSTER_TEMPLATE_COMPONENTS: Record<PosterTemplateKey, ComponentType
   birthday: BirthdayTemplate,
   brand_logo: BrandLogoTemplate,
   ...MODERN_TEMPLATE_COMPONENTS,
+  ...STUDIO_TEMPLATE_COMPONENTS,
 };
 
 const CATEGORY_TEMPLATES: Record<string, PosterTemplateKey[]> = {
-  birthday: ['birthday', 'modern_celebration', 'modern_achievement'],
-  growth_program: ['growth_glimpse', 'team_session', 'speaker_session', 'typographic_quote', 'modern_webinar', 'modern_spotlight'],
-  holiday: ['heritage_hero', 'typographic_quote', 'regional_message', 'product_hero', 'modern_celebration'],
-  observance: ['product_hero', 'heritage_hero', 'typographic_quote', 'regional_message', 'modern_quote_card'],
-  company_event: ['team_session', 'speaker_session', 'product_hero', 'typographic_quote', 'regional_message', 'modern_announcement'],
+  birthday: ['birthday', 'modern_celebration', 'modern_achievement', 'studio_medal_ring_brand'],
+  growth_program: [
+    'growth_glimpse',
+    'team_session',
+    'speaker_session',
+    'typographic_quote',
+    'modern_webinar',
+    'modern_spotlight',
+    'studio_photo_circle_brand',
+    'studio_agenda_rows_clean',
+  ],
+  holiday: [
+    'heritage_hero',
+    'regional_message',
+    'studio_fest_script_warm',
+    'studio_fest_script_festoon',
+    'studio_date_hero_paper',
+    'typographic_quote',
+    'product_hero',
+    'modern_celebration',
+  ],
+  // Malayalam Message first so Kerala / regional days open bilingual-ready.
+  observance: [
+    'regional_message',
+    'heritage_hero',
+    'studio_fest_script_brand',
+    'studio_fest_script_warm',
+    'studio_bold_center_brand',
+    'studio_date_hero_paper',
+    'typographic_quote',
+    'product_hero',
+    'modern_quote_card',
+    'modern_celebration',
+  ],
+  company_event: [
+    'team_session',
+    'speaker_session',
+    'product_hero',
+    'typographic_quote',
+    'regional_message',
+    'modern_announcement',
+    'studio_ticket_band_brand',
+    'studio_agenda_rows_clean',
+  ],
 };
 
 /** Templates ordered by relevance for a BugDates category; first entry is the default. */
-export function templatesForCategory(category: string): PosterTemplateKey[] {
-  const preferred = CATEGORY_TEMPLATES[category] ?? CATEGORY_TEMPLATES.company_event;
+export function templatesForCategory(category: string, eventTitle?: string): PosterTemplateKey[] {
+  const occasion = eventTitle ? occasionPosterPreset(eventTitle) : null;
+  const preferredFromOccasion = (occasion?.preferredTemplates ?? []).filter(
+    (k): k is PosterTemplateKey => k in POSTER_TEMPLATES
+  );
+  const preferredBase = (CATEGORY_TEMPLATES[category] ?? CATEGORY_TEMPLATES.company_event).filter(
+    (k) => k in POSTER_TEMPLATES
+  );
+  const preferred = [
+    ...preferredFromOccasion,
+    ...preferredBase.filter((k) => !preferredFromOccasion.includes(k)),
+  ];
   const rest = (Object.keys(POSTER_TEMPLATES) as PosterTemplateKey[]).filter(
     (k) => !preferred.includes(k) && (k !== 'birthday' || category === 'birthday')
   );

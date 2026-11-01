@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useLayoutEffect, useState, useSyncExternalStore } from 'react';
 import { useAuth } from '@/context/AuthContext';
 import { useNavigate } from 'react-router-dom';
 import { User } from '@/types';
@@ -11,6 +11,10 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { useTheme } from '@/context/ThemeContext';
 import { toast } from '@/components/ui/use-toast';
+import {
+    getCreativeOrganizeBridge,
+    subscribeCreativeOrganizeBridge,
+} from '@/lib/creativeOrganizeBridge';
 import { translateToMalayalam, containsMalayalamScript } from '@/lib/malayalamUtils';
 import { isTextToSpeechSupported, speakText } from '@/lib/textToSpeech';
 import {
@@ -18,6 +22,7 @@ import {
     Sun,
     Folder,
     FolderPlus,
+    FolderInput,
     Bug,
     CheckSquare,
     Users,
@@ -65,6 +70,27 @@ const ContextMenu: React.FC<ContextMenuProps> = ({ mouseX, mouseY, onClose }) =>
     const { currentUser } = useAuth();
     const navigate = useNavigate();
     const { toggleTheme, theme } = useTheme();
+    const creativeBridge = useSyncExternalStore(
+        subscribeCreativeOrganizeBridge,
+        getCreativeOrganizeBridge,
+        () => null
+    );
+    const [contextAssetId, setContextAssetId] = useState<string | null>(null);
+
+    useLayoutEffect(() => {
+        if (mouseX === null || mouseY === null) {
+            setContextAssetId(null);
+            return;
+        }
+        const hit = document
+            .elementFromPoint(mouseX, mouseY)
+            ?.closest('[data-creative-asset-id]');
+        const id = hit?.getAttribute('data-creative-asset-id') || null;
+        setContextAssetId(id);
+        if (id && creativeBridge?.canOrganize) {
+            creativeBridge.ensureContextTarget(id);
+        }
+    }, [mouseX, mouseY, creativeBridge]);
 
     const getActiveEditable = () => {
         const active = document.activeElement as HTMLElement | null;
@@ -93,12 +119,31 @@ const ContextMenu: React.FC<ContextMenuProps> = ({ mouseX, mouseY, onClose }) =>
 
     const selectedText = getSelectedText();
     const hasSelection = selectedText.trim().length > 0;
+    const creativeSelected =
+        Boolean(creativeBridge?.canOrganize) &&
+        ((creativeBridge?.selectedCount ?? 0) > 0 || Boolean(contextAssetId));
+    const useCreativeClipboard = Boolean(creativeBridge?.canOrganize) && !hasSelection;
 
-    const canCopy = () => hasSelection;
-    const canCut = () => !!getActiveEditable() && hasSelection;
-    const canPaste = () => !!getActiveEditable();
+    const canCopy = () => (useCreativeClipboard ? creativeSelected : hasSelection);
+    const canCut = () =>
+        useCreativeClipboard
+            ? creativeSelected && !creativeBridge?.busy
+            : !!getActiveEditable() && hasSelection;
+    const canPaste = () =>
+        useCreativeClipboard
+            ? Boolean(creativeBridge?.hasClipboard) && !creativeBridge?.busy
+            : !!getActiveEditable();
+    const canMoveCreative =
+        Boolean(creativeBridge?.canOrganize) &&
+        creativeSelected &&
+        !creativeBridge?.busy;
 
     const copyAction = async () => {
+        if (useCreativeClipboard && creativeBridge) {
+            creativeBridge.copy(contextAssetId || undefined);
+            onClose();
+            return;
+        }
         const text = getSelectedText();
         try {
             if (text) {
@@ -114,6 +159,11 @@ const ContextMenu: React.FC<ContextMenuProps> = ({ mouseX, mouseY, onClose }) =>
     };
 
     const cutAction = async () => {
+        if (useCreativeClipboard && creativeBridge) {
+            creativeBridge.cut(contextAssetId || undefined);
+            onClose();
+            return;
+        }
         const editable = getActiveEditable();
         if (!editable) return onClose();
         const text = getSelectedText();
@@ -161,6 +211,11 @@ const ContextMenu: React.FC<ContextMenuProps> = ({ mouseX, mouseY, onClose }) =>
     };
 
     const pasteAction = async () => {
+        if (useCreativeClipboard && creativeBridge?.hasClipboard) {
+            creativeBridge.paste();
+            onClose();
+            return;
+        }
         try {
             const text = await navigator.clipboard.readText();
             if (text) insertTextAtCursor(text);
@@ -169,6 +224,15 @@ const ContextMenu: React.FC<ContextMenuProps> = ({ mouseX, mouseY, onClose }) =>
         } finally {
             onClose();
         }
+    };
+
+    const moveCreativeAction = () => {
+        if (!creativeBridge?.canOrganize) {
+            onClose();
+            return;
+        }
+        creativeBridge.move(contextAssetId || undefined);
+        onClose();
     };
 
     const replaceSelectedText = (replacement: string) => {
@@ -335,6 +399,16 @@ const ContextMenu: React.FC<ContextMenuProps> = ({ mouseX, mouseY, onClose }) =>
                 disabled: !canPaste(),
             },
         ];
+
+        if (creativeBridge?.canOrganize) {
+            clipboardItems.push({
+                label: 'Move to…',
+                action: moveCreativeAction,
+                icon: <FolderInput className="h-4 w-4" />,
+                shortcut: 'Ctrl+M',
+                disabled: !canMoveCreative,
+            });
+        }
 
         if (hasSelection) {
             clipboardItems.push({

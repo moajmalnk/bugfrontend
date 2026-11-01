@@ -80,7 +80,7 @@ export function LogoStylePicker({ value, onChange, data, palette }: Props) {
       ) : (
         <>
           <div
-            className="flex gap-1.5 overflow-x-auto pb-0.5 custom-scrollbar"
+            className="no-scrollbar flex gap-1.5 overflow-x-auto touch-pan-x pb-0.5"
             role="tablist"
             aria-label="Logo design groups"
           >

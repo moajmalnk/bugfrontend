@@ -1,4 +1,4 @@
-import { memo, useMemo, useState, type ReactNode } from 'react';
+import { memo, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { Search, X } from 'lucide-react';
 import { POSTER_TEMPLATES } from './templates/templateRegistry';
 import type { PosterTemplateGroup, PosterTemplateKey } from './types';
@@ -24,15 +24,76 @@ type Props = {
   order: PosterTemplateKey[];
   value: PosterTemplateKey;
   onChange: (key: PosterTemplateKey) => void;
-  /** Thumbnail renderer owned by the modal so previews share its live data. */
-  renderThumb: (key: PosterTemplateKey) => ReactNode;
+  /**
+   * Thumbnail renderer. `widthPx` is the measured card content width so previews
+   * fill the cell on every breakpoint (fixed 76px thumbs left huge empty space).
+   */
+  renderThumb: (key: PosterTemplateKey, widthPx: number) => ReactNode;
 };
 
+/** Measures the thumb slot so ScaledPoster / swatches can fill the fluid grid cell. */
+const MeasuredThumb = memo(function MeasuredThumb({
+  templateKey,
+  active,
+  label,
+  description,
+  onSelect,
+  renderThumb,
+}: {
+  templateKey: PosterTemplateKey;
+  active: boolean;
+  label: string;
+  description: string;
+  onSelect: () => void;
+  renderThumb: (key: PosterTemplateKey, widthPx: number) => ReactNode;
+}) {
+  const slotRef = useRef<HTMLDivElement>(null);
+  const [widthPx, setWidthPx] = useState(96);
+
+  useEffect(() => {
+    const el = slotRef.current;
+    if (!el || typeof ResizeObserver === 'undefined') return;
+    const ro = new ResizeObserver((entries) => {
+      const w = entries[0]?.contentRect.width ?? 0;
+      if (w > 0) setWidthPx(Math.max(56, Math.round(w)));
+    });
+    ro.observe(el);
+    setWidthPx(Math.max(56, Math.round(el.clientWidth || 96)));
+    return () => ro.disconnect();
+  }, []);
+
+  return (
+    <button
+      type="button"
+      onClick={onSelect}
+      aria-pressed={active}
+      title={description}
+      style={{ contentVisibility: 'auto', containIntrinsicSize: '0 160px' }}
+      className={`flex min-w-0 flex-col gap-1.5 rounded-xl border p-1.5 text-center transition ${
+        active
+          ? 'border-blue-600 ring-2 ring-blue-600/30'
+          : 'border-gray-200 hover:border-gray-300 dark:border-gray-700 dark:hover:border-gray-600'
+      }`}
+    >
+      <div
+        ref={slotRef}
+        className="pointer-events-none aspect-[4/5] w-full overflow-hidden rounded-lg bg-gray-100 dark:bg-gray-800"
+      >
+        <div className="flex h-full w-full items-center justify-center overflow-hidden">
+          {renderThumb(templateKey, widthPx)}
+        </div>
+      </div>
+      <span className="line-clamp-2 w-full min-w-0 px-0.5 text-[11px] font-semibold leading-tight text-gray-700 dark:text-gray-300">
+        {label}
+      </span>
+    </button>
+  );
+});
+
 /**
- * Template browser for 40+ templates: group tabs plus search keep the list
+ * Template browser for 300+ templates: group tabs plus search keep the list
  * scannable, and the grid scrolls inside its own panel so the form below
- * stays reachable. `content-visibility` skips painting off-screen thumbnails,
- * which matters because each thumbnail is a full poster render.
+ * stays reachable. Thumb slots are measured so previews fill each card.
  */
 export const TemplatePicker = memo(function TemplatePicker({ order, value, onChange, renderThumb }: Props) {
   const [group, setGroup] = useState<GroupFilter>('all');
@@ -60,13 +121,13 @@ export const TemplatePicker = memo(function TemplatePicker({ order, value, onCha
   const tabs = GROUP_ORDER.filter((g) => (counts[g] ?? 0) > 0);
 
   return (
-    <div className="flex flex-col gap-2">
-      <div className="flex items-center justify-between gap-2">
+    <div className="flex w-full min-w-0 max-w-full flex-col gap-2.5">
+      <div className="flex min-w-0 flex-col gap-0.5 sm:flex-row sm:items-center sm:justify-between sm:gap-2">
         <h3 className="text-sm font-bold text-gray-900 dark:text-white">Template</h3>
-        <span className="text-xs text-muted-foreground">{POSTER_TEMPLATES[value].label}</span>
+        <span className="truncate text-xs text-muted-foreground">{POSTER_TEMPLATES[value].label}</span>
       </div>
 
-      <div className="relative">
+      <div className="relative min-w-0">
         <Search className="pointer-events-none absolute start-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" aria-hidden />
         <input
           type="search"
@@ -75,21 +136,25 @@ export const TemplatePicker = memo(function TemplatePicker({ order, value, onCha
           maxLength={60}
           placeholder={`Search ${order.length} templates`}
           aria-label="Search templates"
-          className="h-9 w-full rounded-xl border border-gray-200 bg-background ps-9 pe-9 text-sm text-foreground outline-none transition placeholder:text-muted-foreground focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 dark:border-gray-700"
+          className="h-10 w-full min-w-0 rounded-xl border border-gray-200 bg-background ps-9 pe-9 text-sm text-foreground outline-none transition placeholder:text-muted-foreground focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 dark:border-gray-700"
         />
         {query && (
           <button
             type="button"
             onClick={() => setQuery('')}
             aria-label="Clear search"
-            className="absolute end-2 top-1/2 flex h-6 w-6 -translate-y-1/2 items-center justify-center rounded-xl text-muted-foreground hover:bg-gray-100 dark:hover:bg-gray-800"
+            className="absolute end-2 top-1/2 flex h-7 w-7 -translate-y-1/2 items-center justify-center rounded-xl text-muted-foreground hover:bg-gray-100 dark:hover:bg-gray-800"
           >
             <X className="h-3.5 w-3.5" />
           </button>
         )}
       </div>
 
-      <div role="tablist" aria-label="Template groups" className="flex flex-wrap gap-1.5">
+      <div
+        role="tablist"
+        aria-label="Template groups"
+        className="no-scrollbar flex w-full max-w-full gap-1.5 overflow-x-auto overscroll-x-contain touch-pan-x pb-0.5"
+      >
         {tabs.map((g) => (
           <button
             key={g}
@@ -97,7 +162,7 @@ export const TemplatePicker = memo(function TemplatePicker({ order, value, onCha
             role="tab"
             aria-selected={group === g}
             onClick={() => setGroup(g)}
-            className={`flex items-center gap-1 rounded-xl border px-2.5 py-1 text-xs font-semibold transition ${
+            className={`flex shrink-0 items-center gap-1 rounded-xl border px-2.5 py-1.5 text-xs font-semibold whitespace-nowrap transition ${
               group === g
                 ? 'border-blue-600 bg-blue-600 text-white'
                 : 'border-gray-200 text-gray-700 hover:border-gray-300 dark:border-gray-700 dark:text-gray-300 dark:hover:border-gray-600'
@@ -109,7 +174,7 @@ export const TemplatePicker = memo(function TemplatePicker({ order, value, onCha
         ))}
       </div>
 
-      <div className="max-h-[22rem] overflow-y-auto rounded-xl pe-1 custom-scrollbar">
+      <div className="max-h-[min(42vh,16rem)] overflow-y-auto overscroll-contain rounded-xl pe-0.5 custom-scrollbar sm:max-h-[min(48vh,22rem)] lg:max-h-[28rem]">
         {visible.length === 0 ? (
           <div className="flex flex-col items-center gap-2 rounded-xl border border-dashed border-gray-300 px-4 py-8 text-center dark:border-gray-700">
             <p className="text-sm text-muted-foreground">No templates match “{query.trim()}”.</p>
@@ -125,29 +190,19 @@ export const TemplatePicker = memo(function TemplatePicker({ order, value, onCha
             </button>
           </div>
         ) : (
-          <div className="grid grid-cols-3 gap-3 sm:grid-cols-5 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5">
+          <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
             {visible.map((key) => {
               const def = POSTER_TEMPLATES[key];
-              const active = key === value;
               return (
-                <button
+                <MeasuredThumb
                   key={key}
-                  type="button"
-                  onClick={() => onChange(key)}
-                  aria-pressed={active}
-                  title={def.description}
-                  style={{ contentVisibility: 'auto', containIntrinsicSize: '0 132px' }}
-                  className={`flex min-w-0 flex-col items-center gap-1.5 rounded-xl border p-1.5 text-center transition ${
-                    active
-                      ? 'border-blue-600 ring-2 ring-blue-600/30'
-                      : 'border-gray-200 hover:border-gray-300 dark:border-gray-700 dark:hover:border-gray-600'
-                  }`}
-                >
-                  <div className="pointer-events-none overflow-hidden rounded-lg">{renderThumb(key)}</div>
-                  <span className="line-clamp-2 text-[11px] font-semibold leading-tight text-gray-700 dark:text-gray-300">
-                    {def.label}
-                  </span>
-                </button>
+                  templateKey={key}
+                  active={key === value}
+                  label={def.label}
+                  description={def.description}
+                  onSelect={() => onChange(key)}
+                  renderThumb={renderThumb}
+                />
               );
             })}
           </div>

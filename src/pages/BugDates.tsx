@@ -36,6 +36,7 @@ import { EventFormModal } from '@/components/bugdates/EventFormModal';
 import { DayDrawer } from '@/components/bugdates/DayDrawer';
 import {
   deleteBugDatesEvent,
+  ensureKeralaPiraviObservance,
   getBugDatesCalendar,
   listGrowthSessions,
   type BugDatesCalendarItem,
@@ -254,7 +255,24 @@ export default function BugDates() {
         }),
         listGrowthSessions({ from: range.from, to: range.to }),
       ]);
-      setItems(cal.items || []);
+      let nextItems = cal.items || [];
+      // Seed Kerala Piravi when missing so Design Poster has an observance on 1 Nov.
+      if (canManage && range.from <= '2026-11-01' && range.to >= '2026-11-01') {
+        const created = await ensureKeralaPiraviObservance(nextItems);
+        if (created) {
+          const refreshed = await getBugDatesCalendar({
+            from: range.from,
+            to: range.to,
+            categories: filters.length ? filters : undefined,
+          });
+          nextItems = refreshed.items || [];
+          toast({
+            title: 'Kerala Piravi added',
+            description: 'Observance is on the calendar — open 1 Nov and Design Poster.',
+          });
+        }
+      }
+      setItems(nextItems);
       setSessions(sess || []);
     } catch (e) {
       toast({
@@ -265,7 +283,7 @@ export default function BugDates() {
     } finally {
       setLoading(false);
     }
-  }, [canView, range.from, range.to, filters]);
+  }, [canView, canManage, range.from, range.to, filters]);
 
   useEffect(() => {
     load();

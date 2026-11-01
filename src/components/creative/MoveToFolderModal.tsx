@@ -30,6 +30,15 @@ type Props = {
    * Used to mark “Current” and block a no-op move.
    */
   currentFolderId?: string | null;
+  /** Dialog heading — defaults to Move to folder. */
+  title?: string;
+  /** Primary action label — defaults to Move here. */
+  confirmLabel?: string;
+  /** Override the auto-built description under the title. */
+  description?: string;
+  /** Raise above stacked portals (e.g. Poster Studio z-[110]). */
+  overlayClassName?: string;
+  contentClassName?: string;
   onClose: () => void;
   onConfirm: (folderId: string | null) => void | Promise<void>;
   /**
@@ -81,6 +90,11 @@ export function MoveToFolderModal({
   selectedCount,
   itemLabel = null,
   currentFolderId,
+  title = 'Move to folder',
+  confirmLabel = 'Move here',
+  description: descriptionProp,
+  overlayClassName,
+  contentClassName,
   onClose,
   onConfirm,
   onCreateFolder,
@@ -170,11 +184,12 @@ export function MoveToFolderModal({
       : folderById.get(target)?.name ?? 'Selected folder';
 
   const description =
-    selectedCount === 1 && itemLabel
+    descriptionProp ??
+    (selectedCount === 1 && itemLabel
       ? `Choose a folder for “${itemLabel}”.`
       : selectedCount > 0
         ? `Move ${selectedCount} asset${selectedCount === 1 ? '' : 's'} to a destination folder.`
-        : 'Choose a destination folder.';
+        : 'Choose a destination folder.');
 
   const resetCreateForm = () => {
     setCreateOpen(false);
@@ -262,9 +277,15 @@ export function MoveToFolderModal({
         if (!o) handleClose();
       }}
     >
-      <DialogContent className="flex max-h-[min(92vh,720px)] w-[calc(100vw-1.5rem)] max-w-[600px] flex-col gap-0 overflow-hidden rounded-2xl p-0 sm:w-full">
+      <DialogContent
+        overlayClassName={overlayClassName}
+        className={cn(
+          'flex max-h-[min(92vh,720px)] w-[calc(100vw-1.5rem)] max-w-[600px] flex-col gap-0 overflow-hidden rounded-2xl p-0 sm:w-full',
+          contentClassName
+        )}
+      >
         <DialogHeader className="shrink-0 gap-1 border-b border-border/50 px-4 py-4 sm:px-6">
-          <DialogTitle>Move to folder</DialogTitle>
+          <DialogTitle>{title}</DialogTitle>
           <DialogDescription>{description}</DialogDescription>
         </DialogHeader>
 
@@ -481,7 +502,7 @@ export function MoveToFolderModal({
             disabled={locked || isSameLocation || selectedCount < 1}
             onClick={() => void onConfirm(target)}
           >
-            {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Move here'}
+            {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : confirmLabel}
           </Button>
         </DialogFooter>
       </DialogContent>

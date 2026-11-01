@@ -239,6 +239,72 @@ export async function createBugDatesEvent(input: BugDatesEventInput): Promise<Bu
   return data.data;
 }
 
+const KERALA_PIRAVI_SEED_KEY = 'bugdates:seeded:kerala-piravi';
+
+/**
+ * Why: production BugDates was missing Kerala Piravi on 1 Nov while peer observances
+ * existed — Design Poster had nothing to open. Idempotent create for managers so the
+ * observance appears without waiting on a manual SQL run.
+ * @returns true when a new event was created
+ */
+export async function ensureKeralaPiraviObservance(
+  calendarItems: BugDatesCalendarItem[]
+): Promise<boolean> {
+  const exists = calendarItems.some((i) => /kerala\s*piravi/i.test(String(i.title ?? '')));
+  if (exists) {
+    if (typeof sessionStorage !== 'undefined') {
+      sessionStorage.setItem(KERALA_PIRAVI_SEED_KEY, '1');
+    }
+    return false;
+  }
+  // Only skip create when we already repaired this session *and* the day still
+  // cannot show it for another reason (permissions). Always retry if missing on calendar.
+  if (
+    typeof sessionStorage !== 'undefined' &&
+    sessionStorage.getItem(KERALA_PIRAVI_SEED_KEY) === 'ok'
+  ) {
+    return false;
+  }
+  // Confirm against a tight window so a filtered calendar view cannot false-trigger a duplicate.
+  const year = new Date().getFullYear();
+  const seedYear = year >= 2026 ? year : 2026;
+  const day = `${seedYear}-11-01`;
+  try {
+    const check = await getBugDatesCalendar({ from: day, to: day, categories: ['observance', 'holiday'] });
+    const hit = (check.items || []).find((i) => /kerala\s*piravi/i.test(String(i.title ?? '')));
+    if (hit) {
+      sessionStorage.setItem(KERALA_PIRAVI_SEED_KEY, 'ok');
+      return false;
+    }
+    // Row may exist in DB but not expand onto this day (stale end_date / start_date).
+    const listed = await listBugDatesEvents({ category: 'observance' });
+    const existing = listed.find((e) => /kerala\s*piravi/i.test(String(e.title ?? '')));
+    const payload = {
+      title: 'Kerala Piravi',
+      description:
+        "[High] Kerala Formation Day (1 Nov 1956). Content angle: bilingual Malayalam greeting (ഏവർക്കും കേരളപ്പിറവി ആശംസകൾ), CODO AI Innovations 'built in Kerala · building for the world' pride post. Templates: Malayalam Message, Heritage Hero, Festive Script.",
+      category: 'observance' as const,
+      recurrence_type: 'yearly' as const,
+      start_date: day,
+      end_date: null,
+      is_office_closed: false,
+      auto_hooks: { creative: true },
+      visibility: 'company' as const,
+      status: 'approved' as const,
+    };
+    if (existing?.id) {
+      await updateBugDatesEvent({ ...payload, id: existing.id });
+    } else {
+      await createBugDatesEvent(payload);
+    }
+    sessionStorage.setItem(KERALA_PIRAVI_SEED_KEY, 'ok');
+    return true;
+  } catch {
+    // Non-managers / network errors — leave calendar as-is; migration 143 covers durable seed.
+    return false;
+  }
+}
+
 export async function updateBugDatesEvent(input: BugDatesEventInput & { id: number }): Promise<BugDatesEvent> {
   const res = await fetch(`${API}/events.php`, {
     method: 'POST',
@@ -316,10 +382,13 @@ export async function generateBugCreativeCard(input: {
   uploaded_file_path?: string;
   preview_thumbnail_url?: string | null;
   template_key?: string;
+  /** BugCreative destination; null/omit = All files (root). */
+  folder_id?: string | null;
 }): Promise<{
   asset_id: string;
   title?: string;
   scheduled_date?: string;
+  folder_id?: string | null;
   already_exists?: boolean;
   updated?: boolean;
 }> {

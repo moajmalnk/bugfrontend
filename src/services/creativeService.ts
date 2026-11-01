@@ -418,3 +418,31 @@ export async function copyCreativeAssets(payload: {
   const data = await parseJson(res);
   return data.data;
 }
+
+export type CreativeReindexResult = {
+  indexed: number;
+  errors: number;
+  extract_media: boolean;
+  pending: number;
+  gemini_configured: boolean;
+};
+
+/**
+ * Why: Backfills search_text (metadata + optional Gemini OCR/PDF extract) so
+ * BugCreative global search can match words inside posters and PDFs.
+ */
+export async function reindexCreativeSearch(payload?: {
+  limit?: number;
+  extract_media?: boolean;
+}): Promise<CreativeReindexResult> {
+  const res = await fetch(`${ENV.API_URL}/creative/reindex.php`, {
+    method: 'POST',
+    headers: authHeaders(),
+    body: JSON.stringify({
+      limit: payload?.limit ?? 5,
+      extract_media: payload?.extract_media ?? true,
+    }),
+  });
+  const data = await parseJson(res);
+  return data.data as CreativeReindexResult;
+}
