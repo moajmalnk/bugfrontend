@@ -1,10 +1,12 @@
 import { CalendarDays, Check, Clock, Megaphone, Mic, Sparkles, Star, Video, type LucideIcon } from 'lucide-react';
+import { PosterElement } from '../../edit/PosterElement';
 import { PosterFrame } from '../shared';
 import {
   CHAR_W,
   FONT,
   Fill,
   Footer,
+  LayerText,
   Logo,
   MetaList,
   Photo,
@@ -69,7 +71,9 @@ function Ticket({ ctx }: VP) {
       >
         <Footer ctx={ctx} color={p.ink} />
         <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
-        <div
+        <PosterElement
+          id="card"
+          role="group"
           style={{
             display: 'flex',
             flexDirection: tall ? 'column' : 'row',
@@ -93,14 +97,30 @@ function Ticket({ ctx }: VP) {
           >
             <div style={{ display: 'flex', flexDirection: 'column', gap: 16 * s }}>
               {c.topic && (
-                <div style={{ fontSize: 22 * s, fontWeight: 700, letterSpacing: 5, textTransform: 'uppercase', color: k.accent, ...ellipsis }}>
+                <LayerText
+                  id="subtitle"
+                  field="subtitle"
+                  style={{ fontSize: 22 * s, fontWeight: 700, letterSpacing: 5, textTransform: 'uppercase', color: k.accent, ...ellipsis }}
+                >
                   {c.topic}
-                </div>
+                </LayerText>
               )}
-              <div style={{ fontSize: fitLines(c.headline, 76, 40, mainW - 96, 3), fontWeight: 800, lineHeight: 1.05, ...clampLines(3) }}>
+              <LayerText
+                id="title"
+                field="title"
+                style={{ fontSize: fitLines(c.headline, 76, 40, mainW - 96, 3), fontWeight: 800, lineHeight: 1.05, ...clampLines(3) }}
+              >
                 {c.headline}
-              </div>
-              {c.body && <div style={{ fontSize: 24 * s, lineHeight: 1.45, color: k.muted, ...clampLines(tall ? 4 : 2) }}>{c.body}</div>}
+              </LayerText>
+              {c.body && (
+                <LayerText
+                  id="tagline"
+                  field="tagline"
+                  style={{ fontSize: 24 * s, lineHeight: 1.45, color: k.muted, ...clampLines(tall ? 4 : 2) }}
+                >
+                  {c.body}
+                </LayerText>
+              )}
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: 20 }}>
               {(c.speaker || c.image) && (
@@ -131,23 +151,27 @@ function Ticket({ ctx }: VP) {
             }}
           >
             {c.date ? (
-              <>
+              <PosterElement id="date" role="chrome" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6 }}>
                 <div style={{ fontSize: 30, fontWeight: 700, letterSpacing: 6, textTransform: 'uppercase', color: k.accent }}>
                   {c.date.monthShort}
                 </div>
                 <div style={{ fontFamily: FONT.display, fontSize: 150, lineHeight: 0.85 }}>{c.date.day}</div>
                 <div style={{ fontSize: 22, color: k.muted }}>{c.date.weekday}</div>
-              </>
+              </PosterElement>
             ) : (
               <Star size={90} color={k.accent} fill={k.accent} />
             )}
             {c.time && (
-              <div style={{ marginTop: 14, paddingTop: 14, borderTop: dash, fontSize: 30, fontWeight: 700, maxWidth: '100%', ...ellipsis }}>
+              <LayerText
+                id="time"
+                field="time"
+                style={{ marginTop: 14, paddingTop: 14, borderTop: dash, fontSize: 30, fontWeight: 700, maxWidth: '100%', ...ellipsis }}
+              >
                 {c.time}
-              </div>
+              </LayerText>
             )}
           </div>
-        </div>
+        </PosterElement>
         </div>
       </div>
     </PosterFrame>

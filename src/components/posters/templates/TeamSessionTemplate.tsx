@@ -1,5 +1,7 @@
 import type { ReactNode } from 'react';
+import { PosterElement } from '../edit/PosterElement';
 import type { PosterTemplateProps } from '../types';
+import { LayerText } from './modern/kit';
 import { fitFont, getDateParts, ordinalSuffix } from './posterUtils';
 import { PosterFrame } from './shared';
 
@@ -87,7 +89,9 @@ export function TeamSessionTemplate({ data, size }: PosterTemplateProps) {
 
       {/* Topic — gap under "TOPIC :" only; never covers the baked label. */}
       {topic && (
-        <div
+        <LayerText
+          id="title"
+          field="title"
           style={{
             position: 'absolute',
             left: TOPIC_SLOT.left,
@@ -119,12 +123,14 @@ export function TeamSessionTemplate({ data, size }: PosterTemplateProps) {
           >
             {renderTopic(topic)}
           </span>
-        </div>
+        </LayerText>
       )}
 
       {/* Time — centred on the baked clock icon, right of it. */}
       {time && (
-        <div
+        <LayerText
+          id="time"
+          field="time"
           style={{
             position: 'absolute',
             left: META.left,
@@ -143,12 +149,14 @@ export function TeamSessionTemplate({ data, size }: PosterTemplateProps) {
             <span style={{ fontSize: fitFont(timeMain, 24, 17, 5) }}>{timeMain}</span>
             {timeSuffix && <span style={{ fontSize: 15 }}>{timeSuffix}</span>}
           </span>
-        </div>
+        </LayerText>
       )}
 
       {/* Weekday + date — centred on the baked calendar icon, right of it. */}
       {date && (
-        <div
+        <PosterElement
+          id="date"
+          role="chrome"
           style={{
             position: 'absolute',
             left: META.left,
@@ -170,7 +178,7 @@ export function TeamSessionTemplate({ data, size }: PosterTemplateProps) {
           <div style={{ fontSize: fitFont(dayLabel, 17, 14, 8), color: 'rgba(255,255,255,0.88)' }}>
             {dayLabel}
           </div>
-        </div>
+        </PosterElement>
       )}
     </PosterFrame>
   );

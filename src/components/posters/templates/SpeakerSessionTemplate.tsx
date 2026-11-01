@@ -1,7 +1,9 @@
 import { Clock, Video } from 'lucide-react';
 import { CodoLogo } from '../brand/CodoLogo';
 import { POSTER_FONT_STACK } from '../brand/posterFonts';
+import { PosterElement } from '../edit/PosterElement';
 import type { PosterTemplateProps } from '../types';
+import { LayerText } from './modern/kit';
 import { HeroImage, PosterFrame, WebsiteTag } from './shared';
 import { fitFont, getDateParts } from './posterUtils';
 
@@ -63,7 +65,9 @@ export function SpeakerSessionTemplate({ data, palette, size }: PosterTemplatePr
           justifyContent: 'space-between',
         }}
       >
-        <CodoLogo variant={palette.logo} height={56 * s} />
+        <PosterElement id="logo" role="chrome" style={{ display: 'inline-flex', lineHeight: 0 }}>
+          <CodoLogo variant={palette.logo} height={56 * s} />
+        </PosterElement>
         <WebsiteTag color={palette.ink} fontSize={26 * s} />
       </div>
 
@@ -198,18 +202,30 @@ export function SpeakerSessionTemplate({ data, palette, size }: PosterTemplatePr
           color: palette.ink,
         }}
       >
-        <div style={{ fontSize: titleSize, fontWeight: 600, lineHeight: 1.02, letterSpacing: -2 }}>
+        <LayerText
+          id="title"
+          field="title"
+          style={{ fontSize: titleSize, fontWeight: 600, lineHeight: 1.02, letterSpacing: -2 }}
+        >
           {data.title}
-        </div>
+        </LayerText>
         {data.subtitle && (
-          <div style={{ fontSize: 62 * s, fontWeight: 600, lineHeight: 1.1, color: palette.accent }}>
+          <LayerText
+            id="subtitle"
+            field="subtitle"
+            style={{ fontSize: 62 * s, fontWeight: 600, lineHeight: 1.1, color: palette.accent }}
+          >
             {data.subtitle}
-          </div>
+          </LayerText>
         )}
         {data.tagline && (
-          <div style={{ fontSize: 28 * s, lineHeight: 1.35, color: palette.inkMuted, maxWidth: 480 }}>
+          <LayerText
+            id="tagline"
+            field="tagline"
+            style={{ fontSize: 28 * s, lineHeight: 1.35, color: palette.inkMuted, maxWidth: 480 }}
+          >
             {data.tagline}
-          </div>
+          </LayerText>
         )}
 
         {date && (
@@ -254,16 +270,22 @@ export function SpeakerSessionTemplate({ data, palette, size }: PosterTemplatePr
         {data.time && (
           <>
             <div style={{ height: 2, width: 470, background: 'rgba(255,255,255,0.25)' }} />
-            <div style={{ display: 'flex', alignItems: 'center', gap: 18, fontSize: 56 * s, fontWeight: 600 }}>
+            <LayerText
+              id="time"
+              field="time"
+              style={{ display: 'flex', alignItems: 'center', gap: 18, fontSize: 56 * s, fontWeight: 600 }}
+            >
               <Clock size={60 * s} color={palette.accent} strokeWidth={2.4} />
               <span>{data.time}</span>
-            </div>
+            </LayerText>
             <div style={{ height: 2, width: 470, background: 'rgba(255,255,255,0.25)' }} />
           </>
         )}
 
         {data.platform && (
-          <div
+          <LayerText
+            id="platform"
+            field="platform"
             style={{
               alignSelf: 'flex-start',
               display: 'flex',
@@ -278,12 +300,14 @@ export function SpeakerSessionTemplate({ data, palette, size }: PosterTemplatePr
           >
             <Video size={36 * s} color={palette.accent} />
             <span>{data.platform}</span>
-          </div>
+          </LayerText>
         )}
       </div>
 
       {data.hashtag && (
-        <div
+        <LayerText
+          id="hashtag"
+          field="hashtag"
           style={{
             position: 'absolute',
             right: 72,
@@ -295,7 +319,7 @@ export function SpeakerSessionTemplate({ data, palette, size }: PosterTemplatePr
           }}
         >
           {data.hashtag}
-        </div>
+        </LayerText>
       )}
     </PosterFrame>
   );

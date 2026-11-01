@@ -1,6 +1,8 @@
 import { CodoLogo } from '../brand/CodoLogo';
 import { POSTER_FONT_STACK } from '../brand/posterFonts';
+import { PosterElement } from '../edit/PosterElement';
 import type { PosterTemplateProps } from '../types';
+import { LayerText } from './modern/kit';
 import { HeroImage, PosterFrame, WebsiteTag } from './shared';
 import { fitFont, getDateParts } from './posterUtils';
 
@@ -8,6 +10,7 @@ import { fitFont, getDateParts } from './posterUtils';
 export function RegionalMessageTemplate({ data, palette, size }: PosterTemplateProps) {
   const date = getDateParts(data.dateIso);
   const headline = data.malayalamLine || data.title;
+  const headlineField = data.malayalamLine ? 'malayalamLine' : 'title';
   const headlineSize = fitFont(headline, 76, 46, 18);
   const cardW = size.key === 'square' ? 440 : 560;
   const cardH = size.key === 'square' ? 520 : size.key === 'story' ? 860 : 700;
@@ -30,7 +33,9 @@ export function RegionalMessageTemplate({ data, palette, size }: PosterTemplateP
           justifyContent: 'space-between',
         }}
       >
-        <CodoLogo variant={palette.logo} height={56} />
+        <PosterElement id="logo" role="chrome" style={{ display: 'inline-flex', lineHeight: 0 }}>
+          <CodoLogo variant={palette.logo} height={56} />
+        </PosterElement>
         <WebsiteTag color={palette.ink} fontSize={26} />
       </div>
 
@@ -47,8 +52,9 @@ export function RegionalMessageTemplate({ data, palette, size }: PosterTemplateP
           paddingBottom: 40,
         }}
       >
-        <div
-          lang="ml"
+        <LayerText
+          id={headlineField}
+          field={headlineField}
           style={{
             fontFamily: POSTER_FONT_STACK.malayalam,
             fontWeight: 700,
@@ -60,10 +66,12 @@ export function RegionalMessageTemplate({ data, palette, size }: PosterTemplateP
             whiteSpace: 'pre-line',
           }}
         >
-          {headline}
-        </div>
+          <span lang="ml">{headline}</span>
+        </LayerText>
 
-        <div
+        <PosterElement
+          id="card"
+          role="group"
           style={{
             width: cardW,
             height: cardH,
@@ -81,14 +89,16 @@ export function RegionalMessageTemplate({ data, palette, size }: PosterTemplateP
             ) : (
               <div style={{ textAlign: 'center', color: palette.backgroundAlt }}>
                 {date && (
-                  <div style={{ fontSize: 200, fontWeight: 800, lineHeight: 1 }}>{date.day}</div>
+                  <PosterElement id="date" role="chrome">
+                    <div style={{ fontSize: 200, fontWeight: 800, lineHeight: 1 }}>{date.day}</div>
+                    <div style={{ fontSize: 40, fontWeight: 600, letterSpacing: 4 }}>
+                      {date.monthLong.toUpperCase()}
+                    </div>
+                  </PosterElement>
                 )}
-                {date && (
-                  <div style={{ fontSize: 40, fontWeight: 600, letterSpacing: 4 }}>
-                    {date.monthLong.toUpperCase()}
-                  </div>
-                )}
-                <div
+                <LayerText
+                  id="title"
+                  field="title"
                   style={{
                     marginTop: 24,
                     fontSize: fitFont(data.title, 44, 28, 18),
@@ -97,7 +107,7 @@ export function RegionalMessageTemplate({ data, palette, size }: PosterTemplateP
                   }}
                 >
                   {data.title}
-                </div>
+                </LayerText>
               </div>
             )}
           </div>
@@ -106,12 +116,13 @@ export function RegionalMessageTemplate({ data, palette, size }: PosterTemplateP
               <div key={i} style={{ flex: 1, background: c }} />
             ))}
           </div>
-        </div>
+        </PosterElement>
       </div>
 
       {footer && (
-        <div
-          lang={footerIsMalayalam ? 'ml' : undefined}
+        <LayerText
+          id="hashtag"
+          field="hashtag"
           style={{
             position: 'absolute',
             left: 0,
@@ -124,8 +135,8 @@ export function RegionalMessageTemplate({ data, palette, size }: PosterTemplateP
             color: palette.ink,
           }}
         >
-          {footer}
-        </div>
+          <span lang={footerIsMalayalam ? 'ml' : undefined}>{footer}</span>
+        </LayerText>
       )}
     </PosterFrame>
   );

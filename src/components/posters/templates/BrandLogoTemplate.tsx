@@ -1,6 +1,7 @@
 import type { CSSProperties, ReactNode } from 'react';
 import { BRAND_MARK_ASSETS, brandMarkForPalette, type PosterPalette } from '../brand/brandKit';
 import { normalizeLogoStyle, type LogoStyleKey } from '../brand/logoStyles';
+import { PosterElement } from '../edit/PosterElement';
 import type { PosterTemplateProps } from '../types';
 import { PosterFrame } from './shared';
 
@@ -324,16 +325,18 @@ export function BrandLogoTemplate({ data, palette, size }: PosterTemplateProps) 
   const logoWidth = logoHeight * aspect;
 
   const logo = (
-    <img
-      src={mark.src}
-      alt="Brand logo"
-      width={logoWidth}
-      height={logoHeight}
-      crossOrigin="anonymous"
-      decoding="async"
-      draggable={false}
-      style={{ display: 'block', width: logoWidth, height: logoHeight, objectFit: 'contain' }}
-    />
+    <PosterElement id="logo" role="chrome" style={{ display: 'inline-flex', lineHeight: 0 }}>
+      <img
+        src={mark.src}
+        alt="Brand logo"
+        width={logoWidth}
+        height={logoHeight}
+        crossOrigin="anonymous"
+        decoding="async"
+        draggable={false}
+        style={{ display: 'block', width: logoWidth, height: logoHeight, objectFit: 'contain' }}
+      />
+    </PosterElement>
   );
 
   return (

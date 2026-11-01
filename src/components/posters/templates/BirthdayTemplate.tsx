@@ -1,7 +1,9 @@
 import { CodoLogo } from '../brand/CodoLogo';
 import { CODO_BRAND } from '../brand/brandKit';
 import { POSTER_FONT_STACK } from '../brand/posterFonts';
+import { PosterElement } from '../edit/PosterElement';
 import type { PosterTemplateProps } from '../types';
+import { LayerText } from './modern/kit';
 import { fitFont } from './posterUtils';
 import { HeroImage, PosterFrame } from './shared';
 
@@ -54,10 +56,14 @@ export function BirthdayTemplate({ data, size }: PosterTemplateProps) {
       ))}
 
       <div style={{ position: 'absolute', top: 72, left: 0, right: 0, display: 'flex', justifyContent: 'center' }}>
-        <CodoLogo height={64} asset="light" />
+        <PosterElement id="logo" role="chrome" style={{ display: 'inline-flex', lineHeight: 0 }}>
+          <CodoLogo height={64} asset="light" />
+        </PosterElement>
       </div>
 
-      <div
+      <PosterElement
+        id="card"
+        role="group"
         style={{
           position: 'absolute',
           left: CARD.left,
@@ -139,11 +145,21 @@ export function BirthdayTemplate({ data, size }: PosterTemplateProps) {
           color: BD.white,
         }}
       >
-        <div style={{ fontSize: nameSize, fontWeight: 700, lineHeight: 1.1, textTransform: 'uppercase' }}>{name}</div>
+        <LayerText
+          id="speakerName"
+          field="speakerName"
+          style={{ fontSize: nameSize, fontWeight: 700, lineHeight: 1.1, textTransform: 'uppercase' }}
+        >
+          {name}
+        </LayerText>
         {data.speakerRole.trim() && (
-          <div style={{ marginTop: 10, fontSize: 34, fontWeight: 600, lineHeight: 1.1, textTransform: 'uppercase' }}>
+          <LayerText
+            id="speakerRole"
+            field="speakerRole"
+            style={{ marginTop: 10, fontSize: 34, fontWeight: 600, lineHeight: 1.1, textTransform: 'uppercase' }}
+          >
             {data.speakerRole}
-          </div>
+          </LayerText>
         )}
       </div>
 

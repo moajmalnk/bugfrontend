@@ -53,6 +53,7 @@ export const EMPTY_POSTER_DATA: PosterData = {
   heroImage: null,
   showContacts: true,
   logoStyle: DEFAULT_LOGO_STYLE,
+  layerOffsets: {},
 };
 
 const BIRTHDAY_WISH =

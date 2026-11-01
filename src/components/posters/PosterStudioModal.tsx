@@ -6,6 +6,7 @@ import {
   Link2,
   Loader2,
   Palette,
+  RotateCcw,
   Share2,
   Sparkles,
   Trash2,
@@ -62,6 +63,7 @@ import { ORIGINAL_PRESET_ID, resolveRenderPlan, sameAspect } from './posterSizes
 import { TemplatePicker } from './TemplatePicker';
 import { DiscardChangesDialog } from './DiscardChangesDialog';
 import { ExportSizeDialog, type ExportSizeIntent } from './ExportSizeDialog';
+import { PosterEditProvider } from './edit/PosterEditContext';
 import { POSTER_TEMPLATE_COMPONENTS, POSTER_TEMPLATES, templatesForCategory } from './templates/templateRegistry';
 import { StudioThumbSwatch } from './templates/studio/StudioEngine';
 import { isStudioTemplateKey, STUDIO_BY_KEY } from './templates/studio/studioSpec';
@@ -459,7 +461,40 @@ export default function PosterStudioModal({
   const selectTemplate = useCallback((key: PosterTemplateKey) => {
     setTemplateKey(key);
     setPaletteKey(POSTER_TEMPLATES[key].defaultPalette);
+    // Why: layer ids differ per template — leftover offsets would look random.
+    setData((prev) =>
+      Object.keys(prev.layerOffsets ?? {}).length === 0
+        ? prev
+        : { ...prev, layerOffsets: {} }
+    );
   }, []);
+
+  const focusContentField = useCallback((field: PosterFieldKey) => {
+    const el = document.getElementById(`poster-${field}`);
+    if (!el) return;
+    el.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+    if (el instanceof HTMLElement) el.focus();
+  }, []);
+
+  const resetLayout = useCallback(() => {
+    setData((prev) =>
+      Object.keys(prev.layerOffsets ?? {}).length === 0
+        ? prev
+        : { ...prev, layerOffsets: {} }
+    );
+  }, []);
+
+  const previewHeight =
+    previewWidth > 0 ? (previewWidth * target.height) / target.width : 0;
+  const editScale =
+    previewWidth > 0
+      ? sameAspect(layout, target)
+        ? previewWidth / layout.width
+        : Math.min(previewWidth / layout.width, previewHeight / layout.height)
+      : 1;
+  const hasLayoutOffsets = Object.keys(data.layerOffsets ?? {}).length > 0;
+  const exportingBusy =
+    busy === 'download' || busy === 'share' || busy === 'save';
 
   /**
    * Thumbnails trail the form at low priority.
@@ -645,50 +680,35 @@ export default function PosterStudioModal({
       );
       const exportPlan = resolveRenderPlan(POSTER_TEMPLATES[templateKey], chosenPreset);
       const { blob, extension } = await renderExport(chosenPreset);
-      const filename = exportName(extension, exportPlan.target);
-      const file = new File([blob], filename, { type: blob.type || `image/${extension}` });
-      const title =
-        String(item.title || data.title || 'Poster').trim() || 'Poster';
-      const sharePayload: ShareData = {
-        files: [file],
-        title,
-        text: `${title} · ${occurrenceDate}`,
-      };
+      // Why: Safari/macOS Web Share often doubles items when title/text ride along with
+      // files (image + text snippet). Share exactly one image file.
+      const mime =
+        blob.type && blob.type.startsWith('image/')
+          ? blob.type
+          : extension === 'webp'
+            ? 'image/webp'
+            : 'image/png';
+      const safeExt = mime === 'image/webp' ? 'webp' : mime === 'image/jpeg' ? 'jpg' : 'png';
+      const filename = exportName(safeExt, exportPlan.target);
+      const file = new File([blob], filename, { type: mime });
+      const sharePayload: ShareData = { files: [file] };
 
-      if (
-        typeof navigator.share === 'function' &&
-        typeof navigator.canShare === 'function' &&
-        navigator.canShare(sharePayload)
-      ) {
+      // Close size dialog before the system sheet so Share can’t be tapped twice.
+      setExportSizeIntent(null);
+
+      if (typeof navigator.share === 'function' && navigator.canShare?.(sharePayload)) {
         await navigator.share(sharePayload);
-        setExportSizeIntent(null);
         toast({ title: 'Poster shared' });
-      } else if (typeof navigator.share === 'function') {
-        // Some browsers share images only as a single file without title/text.
-        const filesOnly: ShareData = { files: [file] };
-        if (navigator.canShare?.(filesOnly)) {
-          await navigator.share(filesOnly);
-          setExportSizeIntent(null);
-          toast({ title: 'Poster shared' });
-        } else {
-          triggerLocalDownload(blob, filename);
-          setExportSizeIntent(null);
-          toast({
-            title: 'Downloaded instead',
-            description: 'This device can’t share image files — poster downloaded so you can share it manually.',
-          });
-        }
       } else {
         triggerLocalDownload(blob, filename);
-        setExportSizeIntent(null);
         toast({
           title: 'Downloaded instead',
-          description: 'Sharing isn’t available here — poster downloaded so you can share it manually.',
+          description: 'This device can’t share image files — poster downloaded so you can share it manually.',
         });
       }
     } catch (e) {
       if ((e as Error)?.name === 'AbortError') {
-        // User dismissed the system share sheet — keep size dialog closed if they finished.
+        // User dismissed the system share sheet.
         return;
       }
       toast({
@@ -849,18 +869,30 @@ export default function PosterStudioModal({
                 />
               ) : (
                 <div className="max-h-full max-w-full overflow-hidden rounded-xl shadow-xl">
-                  <PosterComposite
-                    templateKey={templateKey}
+                  <PosterEditProvider
+                    enabled
+                    suppressChrome={exportingBusy}
+                    scale={editScale}
                     data={data}
-                    paletteKey={paletteKey}
-                    layout={layout}
-                    target={target}
-                    width={previewWidth}
-                    nodeRef={posterRef}
-                  />
+                    onChangeData={setData}
+                    onFocusField={focusContentField}
+                  >
+                    <PosterComposite
+                      templateKey={templateKey}
+                      data={data}
+                      paletteKey={paletteKey}
+                      layout={layout}
+                      target={target}
+                      width={previewWidth}
+                      nodeRef={posterRef}
+                    />
+                  </PosterEditProvider>
                 </div>
               )}
             </div>
+            <p className="text-[11px] text-muted-foreground">
+              Drag any layer to move it. Click text to edit in Content; double-click to type on the poster.
+            </p>
             {fontState === 'error' && (
               <p className="rounded-xl bg-amber-50 px-3 py-2 text-xs font-medium text-amber-800 dark:bg-amber-950/40 dark:text-amber-200">
                 Brand fonts could not load — the preview uses fallback fonts. Check your connection before saving.
@@ -1175,6 +1207,17 @@ export default function PosterStudioModal({
             type="button"
             variant="outline"
             className="h-11 min-w-0 flex-1 rounded-xl px-3 sm:w-auto sm:flex-none"
+            disabled={!hasLayoutOffsets || busy !== null}
+            onClick={resetLayout}
+            title="Reset dragged layer positions"
+          >
+            <RotateCcw className="h-4 w-4" />
+            <span className="ms-1.5 truncate sm:ms-2">Reset layout</span>
+          </Button>
+          <Button
+            type="button"
+            variant="outline"
+            className="h-11 min-w-0 flex-1 rounded-xl px-3 sm:w-auto sm:flex-none"
             disabled={!canExport}
             onClick={openDownloadSize}
           >
@@ -1223,7 +1266,7 @@ export default function PosterStudioModal({
             else void handleDownloadWithSize(preset);
           }}
           onApplySuggestion={(nextTemplate, nextPalette) => {
-            setTemplateKey(nextTemplate);
+            selectTemplate(nextTemplate);
             setPaletteKey(nextPalette);
           }}
         />

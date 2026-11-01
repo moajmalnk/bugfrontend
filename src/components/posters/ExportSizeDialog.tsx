@@ -42,6 +42,12 @@ export function ExportSizeDialog({
   const [presetId, setPresetId] = useState(ORIGINAL_PRESET_ID);
   const cancelRef = useRef<HTMLButtonElement>(null);
   const confirmRef = useRef<HTMLButtonElement>(null);
+  /** Blocks double-tap before parent `busy` re-renders. */
+  const confirmLockRef = useRef(false);
+
+  useEffect(() => {
+    if (!busy) confirmLockRef.current = false;
+  }, [busy]);
 
   const def = POSTER_TEMPLATES[templateKey];
   const plan = resolveRenderPlan(def, presetId);
@@ -167,7 +173,11 @@ export function ExportSizeDialog({
             type="button"
             className="h-11 min-w-0 flex-1 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-700 font-semibold text-white shadow-md hover:from-blue-700 hover:to-indigo-800 sm:w-auto sm:flex-none"
             disabled={busy}
-            onClick={() => onConfirm(presetId)}
+            onClick={() => {
+              if (busy || confirmLockRef.current) return;
+              confirmLockRef.current = true;
+              onConfirm(presetId);
+            }}
           >
             {busy ? (
               <Loader2 className="h-4 w-4 animate-spin" />

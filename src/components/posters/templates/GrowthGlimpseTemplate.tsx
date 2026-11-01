@@ -1,4 +1,5 @@
 import type { PosterTemplateProps } from '../types';
+import { LayerText } from './modern/kit';
 import { fitFont, getDateParts } from './posterUtils';
 import { HeroImage, PosterFrame } from './shared';
 
@@ -188,7 +189,9 @@ export function GrowthGlimpseTemplate({ data, size }: PosterTemplateProps) {
         }}
       >
         {data.subtitle && (
-          <div
+          <LayerText
+            id="subtitle"
+            field="subtitle"
             style={{
               fontSize: subtitleSize,
               fontWeight: 700,
@@ -198,10 +201,12 @@ export function GrowthGlimpseTemplate({ data, size }: PosterTemplateProps) {
             }}
           >
             {data.subtitle}
-          </div>
+          </LayerText>
         )}
         {data.tagline && (
-          <div
+          <LayerText
+            id="tagline"
+            field="tagline"
             style={{
               fontSize: 28,
               fontWeight: 400,
@@ -213,7 +218,7 @@ export function GrowthGlimpseTemplate({ data, size }: PosterTemplateProps) {
             }}
           >
             {data.tagline}
-          </div>
+          </LayerText>
         )}
       </div>
 
@@ -258,7 +263,9 @@ export function GrowthGlimpseTemplate({ data, size }: PosterTemplateProps) {
       )}
 
       {timeMain && (
-        <div
+        <LayerText
+          id="time"
+          field="time"
           style={{
             position: 'absolute',
             left: 165,
@@ -274,7 +281,7 @@ export function GrowthGlimpseTemplate({ data, size }: PosterTemplateProps) {
         >
           <span style={{ fontSize: 52, lineHeight: 1 }}>{timeMain}</span>
           {timeSuffix && <span style={{ fontSize: 36, lineHeight: 1 }}>{timeSuffix}</span>}
-        </div>
+        </LayerText>
       )}
     </PosterFrame>
   );

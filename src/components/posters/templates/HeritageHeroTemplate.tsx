@@ -1,6 +1,8 @@
 import { CodoLogo } from '../brand/CodoLogo';
 import { POSTER_FONT_STACK } from '../brand/posterFonts';
+import { PosterElement } from '../edit/PosterElement';
 import type { PosterTemplateProps } from '../types';
+import { LayerText } from './modern/kit';
 import { ContactBlock, HeroImage, PosterFrame, SocialIcons, WebsiteTag } from './shared';
 import { fitFont, getDateParts, paperTexture } from './posterUtils';
 
@@ -66,7 +68,9 @@ export function HeritageHeroTemplate({ data, palette, size }: PosterTemplateProp
           justifyContent: 'space-between',
         }}
       >
-        <CodoLogo variant={palette.logo} height={56 * s} />
+        <PosterElement id="logo" role="chrome" style={{ display: 'inline-flex', lineHeight: 0 }}>
+          <CodoLogo variant={palette.logo} height={56 * s} />
+        </PosterElement>
         {data.showContacts && <SocialIcons color={palette.inkMuted} size={36 * s} />}
       </div>
 
@@ -102,7 +106,9 @@ export function HeritageHeroTemplate({ data, palette, size }: PosterTemplateProp
               {date.monthLong}
             </span>
             {data.subtitle && (
-              <span
+              <LayerText
+                id="subtitle"
+                field="subtitle"
                 style={{
                   position: 'absolute',
                   left: '100%',
@@ -118,12 +124,14 @@ export function HeritageHeroTemplate({ data, palette, size }: PosterTemplateProp
                 }}
               >
                 {data.subtitle}
-              </span>
+              </LayerText>
             )}
           </div>
         )}
         <div style={{ position: 'relative', marginTop: 28 * s, display: 'flex', justifyContent: 'center' }}>
-          <span
+          <LayerText
+            id="title"
+            field="title"
             style={{
               fontFamily: POSTER_FONT_STACK.display,
               fontSize: titleSize,
@@ -135,9 +143,11 @@ export function HeritageHeroTemplate({ data, palette, size }: PosterTemplateProp
             }}
           >
             {title}
-          </span>
+          </LayerText>
           {data.scriptText && (
-            <span
+            <LayerText
+              id="scriptText"
+              field="scriptText"
               style={{
                 position: 'absolute',
                 top: '42%',
@@ -158,7 +168,7 @@ export function HeritageHeroTemplate({ data, palette, size }: PosterTemplateProp
               }}
             >
               {data.scriptText}
-            </span>
+            </LayerText>
           )}
         </div>
       </div>
@@ -208,11 +218,17 @@ export function HeritageHeroTemplate({ data, palette, size }: PosterTemplateProp
                 maxWidth: 820,
               }}
             >
-              &ldquo;{data.quote}&rdquo;
+              <LayerText id="quote" field="quote" style={{ display: 'inline' }}>
+                &ldquo;{data.quote}&rdquo;
+              </LayerText>
               {data.quoteAuthor && (
-                <div style={{ marginTop: 24, fontSize: 28 * s, letterSpacing: 4, color: palette.inkMuted }}>
+                <LayerText
+                  id="quoteAuthor"
+                  field="quoteAuthor"
+                  style={{ marginTop: 24, fontSize: 28 * s, letterSpacing: 4, color: palette.inkMuted }}
+                >
                   — {data.quoteAuthor.toUpperCase()} —
-                </div>
+                </LayerText>
               )}
             </div>
           )

@@ -1,11 +1,13 @@
 import type { CSSProperties } from 'react';
 import { CodoLogo } from '../../brand/CodoLogo';
 import { POSTER_FONT_STACK } from '../../brand/posterFonts';
+import { PosterElement } from '../../edit/PosterElement';
 import type { PosterTemplateProps } from '../../types';
 import { ContactBlock, HeroImage, PosterFrame, WebsiteTag } from '../shared';
 import { fitFont } from '../posterUtils';
 import {
   FONT,
+  LayerText,
   buildCtx,
   clampLines,
   fitLines,
@@ -164,7 +166,9 @@ function Header({ ctx, light }: { ctx: ModernCtx; light?: boolean }) {
         zIndex: 3,
       }}
     >
-      <CodoLogo variant={logo} height={48 * ctx.s} />
+      <PosterElement id="logo" role="chrome" style={{ display: 'inline-flex', lineHeight: 0 }}>
+        <CodoLogo variant={logo} height={48 * ctx.s} />
+      </PosterElement>
       <WebsiteTag color={withAlpha(ink, 0.85)} fontSize={22 * ctx.s} />
     </div>
   );
@@ -187,7 +191,13 @@ function Footer({ ctx, light }: { ctx: ModernCtx; light?: boolean }) {
         zIndex: 3,
       }}
     >
-      <div style={{ fontSize: 26 * ctx.s, fontWeight: 700, color: ink }}>{ctx.c.hashtag}</div>
+      {ctx.c.hashtag ? (
+        <LayerText id="hashtag" field="hashtag" style={{ fontSize: 26 * ctx.s, fontWeight: 700, color: ink }}>
+          {ctx.c.hashtag}
+        </LayerText>
+      ) : (
+        <span />
+      )}
       <ContactBlock color={ink} />
     </div>
   );
@@ -210,7 +220,9 @@ function PhotoBox({
     );
   }
   return (
-    <div
+    <PosterElement
+      id="photo"
+      role="chrome"
       style={{
         display: 'flex',
         alignItems: 'center',
@@ -224,7 +236,7 @@ function PhotoBox({
       }}
     >
       {initials(ctx.c.speaker || ctx.c.headline)}
-    </div>
+    </PosterElement>
   );
 }
 
@@ -243,7 +255,9 @@ function HeadlineBlock({
   return (
     <div style={{ textAlign: align, color: ink, minWidth: 0 }}>
       {ctx.c.topic && (
-        <div
+        <LayerText
+          id="subtitle"
+          field="subtitle"
           style={{
             fontSize: 28 * ctx.s,
             fontWeight: 600,
@@ -254,9 +268,11 @@ function HeadlineBlock({
           }}
         >
           {ctx.c.topic}
-        </div>
+        </LayerText>
       )}
-      <div
+      <LayerText
+        id="title"
+        field="title"
         style={{
           fontFamily: FONT.display,
           fontSize: fitLines(ctx.c.headline, max * ctx.s, 42 * ctx.s, ctx.W - 2 * ctx.P, 3, 0.5),
@@ -266,9 +282,11 @@ function HeadlineBlock({
         }}
       >
         {ctx.c.headline}
-      </div>
+      </LayerText>
       {ctx.c.body && (
-        <div
+        <LayerText
+          id="tagline"
+          field="tagline"
           style={{
             marginTop: 20 * ctx.s,
             fontSize: fitLines(ctx.c.body, 34 * ctx.s, 22 * ctx.s, ctx.W - 2 * ctx.P, 3),
@@ -278,7 +296,7 @@ function HeadlineBlock({
           }}
         >
           {ctx.c.body}
-        </div>
+        </LayerText>
       )}
     </div>
   );
@@ -288,8 +306,9 @@ function MalayalamLine({ ctx, color }: { ctx: ModernCtx; color?: string }) {
   const raw = (ctx as ModernCtx & { malayalam?: string }).malayalam;
   if (!raw) return null;
   return (
-    <div
-      lang="ml"
+    <LayerText
+      id="malayalamLine"
+      field="malayalamLine"
       style={{
         fontFamily: POSTER_FONT_STACK.malayalam,
         fontWeight: 700,
@@ -299,8 +318,8 @@ function MalayalamLine({ ctx, color }: { ctx: ModernCtx; color?: string }) {
         textAlign: 'center',
       }}
     >
-      {raw}
-    </div>
+      <span lang="ml">{raw}</span>
+    </LayerText>
   );
 }
 
@@ -335,13 +354,23 @@ function LayoutBody({ layout, ctx, data }: { layout: StudioLayoutId; ctx: Modern
           <div style={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center', gap: 20 * s, minWidth: 0 }}>
             <HeadlineBlock ctx={ctx} max={78} />
             {(c.speaker || c.role) && (
-              <div>
-                <div style={{ fontSize: 34 * s, fontWeight: 700 }}>{c.speaker}</div>
-                {c.role && <div style={{ fontSize: 24 * s, color: p.inkMuted }}>{c.role}</div>}
-              </div>
+              <PosterElement id="speaker" role="group">
+                {c.speaker ? (
+                  <LayerText id="speakerName" field="speakerName" style={{ fontSize: 34 * s, fontWeight: 700 }}>
+                    {c.speaker}
+                  </LayerText>
+                ) : null}
+                {c.role ? (
+                  <LayerText id="speakerRole" field="speakerRole" style={{ fontSize: 24 * s, color: p.inkMuted }}>
+                    {c.role}
+                  </LayerText>
+                ) : null}
+              </PosterElement>
             )}
             {c.meta.length > 0 && (
-              <div style={{ fontSize: 22 * s, color: p.inkMuted }}>{c.meta.map((m) => m.label).join(' · ')}</div>
+              <PosterElement id="meta" role="chrome" style={{ fontSize: 22 * s, color: p.inkMuted }}>
+                {c.meta.map((m) => m.label).join(' · ')}
+              </PosterElement>
             )}
           </div>
         </div>

@@ -1,5 +1,6 @@
 import type { CSSProperties, ReactNode } from 'react';
 import { Facebook, Instagram, Mail, Paperclip, Phone, Twitter } from 'lucide-react';
+import { PosterElement } from '../edit/PosterElement';
 import { CODO_BRAND } from '../brand/brandKit';
 import { POSTER_FONT_STACK } from '../brand/posterFonts';
 import type { PosterSize } from '../types';
@@ -37,17 +38,21 @@ export function PosterFrame({
 
 export function WebsiteTag({ color, fontSize = 26 }: { color: string; fontSize?: number }) {
   return (
-    <div style={{ display: 'flex', alignItems: 'center', gap: 10, color, fontSize, fontWeight: 400 }}>
+    <PosterElement
+      id="website"
+      role="chrome"
+      style={{ display: 'flex', alignItems: 'center', gap: 10, color, fontSize, fontWeight: 400 }}
+    >
       <Paperclip size={fontSize} strokeWidth={2} style={{ transform: 'rotate(-45deg)' }} />
       <span>{CODO_BRAND.website}</span>
-    </div>
+    </PosterElement>
   );
 }
 
 export function SocialIcons({ color, size = 30 }: { color: string; size?: number }) {
   const icons = [Facebook, Twitter, Instagram];
   return (
-    <div style={{ display: 'flex', gap: 12 }}>
+    <PosterElement id="socials" role="chrome" style={{ display: 'flex', gap: 12 }}>
       {icons.map((Icon, i) => (
         <div
           key={i}
@@ -64,13 +69,15 @@ export function SocialIcons({ color, size = 30 }: { color: string; size?: number
           <Icon size={size * 0.55} color="#FFFFFF" fill={i === 1 ? '#FFFFFF' : 'none'} strokeWidth={2} />
         </div>
       ))}
-    </div>
+    </PosterElement>
   );
 }
 
 export function ContactBlock({ color, align = 'right' }: { color: string; align?: 'left' | 'right' }) {
   return (
-    <div
+    <PosterElement
+      id="contacts"
+      role="chrome"
       style={{
         display: 'flex',
         flexDirection: 'column',
@@ -88,7 +95,7 @@ export function ContactBlock({ color, align = 'right' }: { color: string; align?
         <Phone size={22} />
         <span>{CODO_BRAND.phone}</span>
       </div>
-    </div>
+    </PosterElement>
   );
 }
 
@@ -106,16 +113,20 @@ export function HeroImage({
   fit?: 'contain' | 'cover';
 }) {
   return (
-    <img
-      src={src}
-      alt={alt}
-      crossOrigin="anonymous"
-      style={{
-        display: 'block',
-        objectFit: fit,
-        filter: grayscale ? 'grayscale(1) contrast(1.05)' : undefined,
-        ...style,
-      }}
-    />
+    <PosterElement id="hero" role="chrome" style={{ display: 'block', ...style }}>
+      <img
+        src={src}
+        alt={alt}
+        crossOrigin="anonymous"
+        draggable={false}
+        style={{
+          display: 'block',
+          width: '100%',
+          height: '100%',
+          objectFit: fit,
+          filter: grayscale ? 'grayscale(1) contrast(1.05)' : undefined,
+        }}
+      />
+    </PosterElement>
   );
 }

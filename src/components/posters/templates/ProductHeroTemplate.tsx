@@ -1,5 +1,6 @@
 import { CodoLogo } from '../brand/CodoLogo';
 import { POSTER_FONT_STACK } from '../brand/posterFonts';
+import { PosterElement } from '../edit/PosterElement';
 import type { PosterTemplateProps } from '../types';
 import { HeroImage, PosterFrame } from './shared';
 import { getDateParts } from './posterUtils';
@@ -199,7 +200,9 @@ export function ProductHeroTemplate({ data, palette, size }: PosterTemplateProps
           justifyContent: 'center',
         }}
       >
-        <CodoLogo variant={palette.logo} height={64} />
+        <PosterElement id="logo" role="chrome" style={{ display: 'inline-flex', lineHeight: 0 }}>
+          <CodoLogo variant={palette.logo} height={64} />
+        </PosterElement>
       </div>
     </PosterFrame>
   );

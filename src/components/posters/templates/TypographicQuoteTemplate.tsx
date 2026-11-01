@@ -1,6 +1,8 @@
 import { CodoLogo } from '../brand/CodoLogo';
 import { POSTER_FONT_STACK } from '../brand/posterFonts';
+import { PosterElement } from '../edit/PosterElement';
 import type { PosterTemplateProps } from '../types';
+import { LayerText } from './modern/kit';
 import { PosterFrame } from './shared';
 import { fitFont, getDateParts, paperTexture } from './posterUtils';
 
@@ -57,7 +59,9 @@ export function TypographicQuoteTemplate({ data, palette, size }: PosterTemplate
           </span>
         </div>
 
-        <div
+        <LayerText
+          id={data.quote ? 'quote' : 'title'}
+          field={data.quote ? 'quote' : 'title'}
           style={{
             marginTop: 30,
             maxWidth: 760,
@@ -70,11 +74,15 @@ export function TypographicQuoteTemplate({ data, palette, size }: PosterTemplate
           }}
         >
           {quoteText}
-        </div>
+        </LayerText>
         {data.quoteAuthor && (
-          <div style={{ marginTop: 16, fontSize: 26, letterSpacing: 3, color: palette.inkMuted }}>
+          <LayerText
+            id="quoteAuthor"
+            field="quoteAuthor"
+            style={{ marginTop: 16, fontSize: 26, letterSpacing: 3, color: palette.inkMuted }}
+          >
             -{data.quoteAuthor.toUpperCase()}-
-          </div>
+          </LayerText>
         )}
       </div>
 
@@ -88,7 +96,9 @@ export function TypographicQuoteTemplate({ data, palette, size }: PosterTemplate
           justifyContent: 'center',
         }}
       >
-        <CodoLogo variant={palette.logo} height={52} />
+        <PosterElement id="logo" role="chrome" style={{ display: 'inline-flex', lineHeight: 0 }}>
+          <CodoLogo variant={palette.logo} height={52} />
+        </PosterElement>
       </div>
     </PosterFrame>
   );

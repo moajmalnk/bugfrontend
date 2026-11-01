@@ -3,8 +3,28 @@ import { CalendarDays, Clock, Video } from 'lucide-react';
 import type { PosterPalette } from '../../brand/brandKit';
 import { CodoLogo } from '../../brand/CodoLogo';
 import { POSTER_FONT_STACK } from '../../brand/posterFonts';
-import type { PosterData, PosterSize } from '../../types';
+import { PosterElement } from '../../edit/PosterElement';
+import type { PosterData, PosterFieldKey, PosterSize } from '../../types';
 import { getDateParts, type DateParts } from '../posterUtils';
+
+/** Draggable / inline-editable text bound to a PosterData field. */
+export function LayerText({
+  id,
+  field,
+  style,
+  children,
+}: {
+  id: string;
+  field: PosterFieldKey;
+  style?: CSSProperties;
+  children: ReactNode;
+}) {
+  return (
+    <PosterElement id={id} field={field} role="text" style={style}>
+      {children}
+    </PosterElement>
+  );
+}
 
 export const FONT = POSTER_FONT_STACK;
 
@@ -261,7 +281,11 @@ export function Logo({
   height?: number;
   variant?: 'dark' | 'light';
 }) {
-  return <CodoLogo variant={variant ?? ctx.p.logo} height={height * ctx.s} />;
+  return (
+    <PosterElement id="logo" role="chrome" style={{ display: 'inline-flex', lineHeight: 0 }}>
+      <CodoLogo variant={variant ?? ctx.p.logo} height={height * ctx.s} />
+    </PosterElement>
+  );
 }
 
 const META_ICONS = { date: CalendarDays, time: Clock, platform: Video } as const;
@@ -287,7 +311,9 @@ export function MetaList({
   if (!list.length) return null;
   const px = size * ctx.s;
   return (
-    <div
+    <PosterElement
+      id="meta"
+      role="group"
       style={{
         display: 'flex',
         flexDirection: direction,
@@ -303,14 +329,22 @@ export function MetaList({
     >
       {list.map((m) => {
         const Icon = META_ICONS[m.kind];
+        const field =
+          m.kind === 'time' ? ('time' as const) : m.kind === 'platform' ? ('platform' as const) : undefined;
         return (
-          <div key={m.kind} style={{ display: 'flex', alignItems: 'center', gap: px * 0.4, minWidth: 0 }}>
+          <PosterElement
+            key={m.kind}
+            id={`meta-${m.kind}`}
+            field={field}
+            role={field ? 'text' : 'chrome'}
+            style={{ display: 'flex', alignItems: 'center', gap: px * 0.4, minWidth: 0 }}
+          >
             <Icon size={px * 1.05} color={iconColor ?? color} strokeWidth={2.2} style={{ flexShrink: 0 }} />
             <span style={ellipsis}>{m.label}</span>
-          </div>
+          </PosterElement>
         );
       })}
-    </div>
+    </PosterElement>
   );
 }
 
@@ -337,7 +371,7 @@ export function Photo({
   const base: CSSProperties = { position: 'relative', overflow: 'hidden', borderRadius: radius, ...style };
   if (ctx.c.image) {
     return (
-      <div style={base}>
+      <PosterElement id="photo" role="chrome" style={base}>
         <img
           src={ctx.c.image}
           alt={ctx.c.speaker || 'Poster photo'}
@@ -352,14 +386,18 @@ export function Photo({
             filter: grayscale ? 'grayscale(1) contrast(1.05)' : undefined,
           }}
         />
-      </div>
+      </PosterElement>
     );
   }
   const bg =
     fallbackBg ??
     `linear-gradient(140deg, ${withAlpha(ctx.p.accent, 0.55)} 0%, ${withAlpha(ctx.p.accent, 0.16)} 100%)`;
   return (
-    <div style={{ ...base, display: 'flex', alignItems: 'center', justifyContent: 'center', background: bg }}>
+    <PosterElement
+      id="photo"
+      role="chrome"
+      style={{ ...base, display: 'flex', alignItems: 'center', justifyContent: 'center', background: bg }}
+    >
       <span
         style={{
           fontFamily: FONT.display,
@@ -371,7 +409,7 @@ export function Photo({
       >
         {initials(ctx.c.speaker || ctx.c.headline)}
       </span>
-    </div>
+    </PosterElement>
   );
 }
 
@@ -394,7 +432,9 @@ export function Pill({
 }) {
   const px = size * ctx.s;
   return (
-    <div
+    <PosterElement
+      id="pill"
+      role="chrome"
       style={{
         display: 'inline-flex',
         alignItems: 'center',
@@ -418,7 +458,7 @@ export function Pill({
       }}
     >
       {children}
-    </div>
+    </PosterElement>
   );
 }
 
@@ -447,7 +487,14 @@ export function Footer({
     >
       <Logo ctx={ctx} variant={variant} />
       {ctx.c.hashtag && (
-        <span style={{ ...ellipsis, fontSize: 28 * ctx.s, fontWeight: 600, color, minWidth: 0 }}>{ctx.c.hashtag}</span>
+        <PosterElement
+          id="hashtag"
+          field="hashtag"
+          role="text"
+          style={{ ...ellipsis, fontSize: 28 * ctx.s, fontWeight: 600, color, minWidth: 0 }}
+        >
+          {ctx.c.hashtag}
+        </PosterElement>
       )}
     </div>
   );
@@ -469,16 +516,32 @@ export function SpeakerLine({
   if (!ctx.c.speaker && !ctx.c.role) return null;
   const px = size * ctx.s;
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: px * 0.15, textAlign: align, minWidth: 0 }}>
+    <PosterElement
+      id="speaker"
+      role="group"
+      style={{ display: 'flex', flexDirection: 'column', gap: px * 0.15, textAlign: align, minWidth: 0 }}
+    >
       {ctx.c.speaker && (
-        <div style={{ ...ellipsis, fontSize: px, fontWeight: 700, color, lineHeight: 1.15 }}>{ctx.c.speaker}</div>
+        <PosterElement
+          id="speakerName"
+          field="speakerName"
+          role="text"
+          style={{ ...ellipsis, fontSize: px, fontWeight: 700, color, lineHeight: 1.15 }}
+        >
+          {ctx.c.speaker}
+        </PosterElement>
       )}
       {ctx.c.role && (
-        <div style={{ ...ellipsis, fontSize: px * 0.68, fontWeight: 400, color: mutedColor, lineHeight: 1.25 }}>
+        <PosterElement
+          id="speakerRole"
+          field="speakerRole"
+          role="text"
+          style={{ ...ellipsis, fontSize: px * 0.68, fontWeight: 400, color: mutedColor, lineHeight: 1.25 }}
+        >
           {ctx.c.role}
-        </div>
+        </PosterElement>
       )}
-    </div>
+    </PosterElement>
   );
 }
 

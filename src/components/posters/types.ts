@@ -62,11 +62,16 @@ export type PosterData = {
   showContacts: boolean;
   /** Brand Logo design treatment; other templates ignore it. */
   logoStyle: LogoStyleKey;
+  /**
+   * Freeform studio offsets in poster pixels (applied via translate).
+   * Keys are stable layer ids from PosterElement wrappers.
+   */
+  layerOffsets: Record<string, { x: number; y: number }>;
 };
 
 export type PosterFieldKey = Exclude<
   keyof PosterData,
-  'heroImage' | 'showContacts' | 'dateIso' | 'logoStyle'
+  'heroImage' | 'showContacts' | 'dateIso' | 'logoStyle' | 'layerOffsets'
 >;
 
 export type PosterTemplateProps = {
