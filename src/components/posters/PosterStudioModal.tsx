@@ -65,6 +65,8 @@ import { TemplatePicker } from './TemplatePicker';
 import { DiscardChangesDialog } from './DiscardChangesDialog';
 import { ExportSizeDialog, type ExportSizeIntent } from './ExportSizeDialog';
 import { PosterEditProvider } from './edit/PosterEditContext';
+import { PosterSocialShareDialog } from './PosterSocialShareDialog';
+import { buildPosterShareCaption } from './posterSocialShare';
 import { POSTER_TEMPLATE_COMPONENTS, POSTER_TEMPLATES, templatesForCategory } from './templates/templateRegistry';
 import { StudioThumbSwatch } from './templates/studio/StudioEngine';
 import { isStudioTemplateKey, STUDIO_BY_KEY } from './templates/studio/studioSpec';
@@ -247,6 +249,13 @@ export default function PosterStudioModal({
   /** Preview stays on original; switched only for the download/share capture pass. */
   const [presetId, setPresetId] = useState<string>(ORIGINAL_PRESET_ID);
   const [exportSizeIntent, setExportSizeIntent] = useState<ExportSizeIntent | null>(null);
+  const [socialShare, setSocialShare] = useState<{
+    previewUrl: string;
+    blob: Blob;
+    file: File;
+    filename: string;
+    caption: string;
+  } | null>(null);
   const [showSaveFolder, setShowSaveFolder] = useState(false);
   const [folders, setFolders] = useState<CreativeFolder[]>([]);
   const [foldersLoading, setFoldersLoading] = useState(false);
@@ -292,6 +301,8 @@ export default function PosterStudioModal({
   confirmDiscardRef.current = confirmDiscard;
   const exportSizeIntentRef = useRef(exportSizeIntent);
   exportSizeIntentRef.current = exportSizeIntent;
+  const socialShareRef = useRef(socialShare);
+  socialShareRef.current = socialShare;
   const showSaveFolderRef = useRef(showSaveFolder);
   showSaveFolderRef.current = showSaveFolder;
 
@@ -448,6 +459,14 @@ export default function PosterStudioModal({
         e.stopPropagation();
         if (busyRef.current !== 'download' && busyRef.current !== 'share') {
           setExportSizeIntent(null);
+        }
+        return;
+      }
+      if (socialShareRef.current) {
+        e.stopPropagation();
+        if (busyRef.current !== 'share') {
+          URL.revokeObjectURL(socialShareRef.current.previewUrl);
+          setSocialShare(null);
         }
         return;
       }
@@ -681,6 +700,13 @@ export default function PosterStudioModal({
     }
   };
 
+  const closeSocialShare = () => {
+    setSocialShare((prev) => {
+      if (prev?.previewUrl) URL.revokeObjectURL(prev.previewUrl);
+      return null;
+    });
+  };
+
   const handleShareWithSize = async (chosenPreset: string) => {
     if (!canExport || busyRef.current) return;
     setBusyState('share');
@@ -691,8 +717,6 @@ export default function PosterStudioModal({
       );
       const exportPlan = resolveRenderPlan(POSTER_TEMPLATES[templateKey], chosenPreset);
       const { blob, extension } = await renderExport(chosenPreset);
-      // Why: Safari/macOS Web Share often doubles items when title/text ride along with
-      // files (image + text snippet). Share exactly one image file.
       const mime =
         blob.type && blob.type.startsWith('image/')
           ? blob.type
@@ -702,28 +726,22 @@ export default function PosterStudioModal({
       const safeExt = mime === 'image/webp' ? 'webp' : mime === 'image/jpeg' ? 'jpg' : 'png';
       const filename = exportName(safeExt, exportPlan.target);
       const file = new File([blob], filename, { type: mime });
-      const sharePayload: ShareData = { files: [file] };
+      const previewUrl = URL.createObjectURL(blob);
+      const caption = buildPosterShareCaption({
+        title: String(item.title || data.title || 'Poster'),
+        dateLabel: occurrenceDate,
+        hashtag: data.hashtag,
+        tagline: data.tagline || data.subtitle,
+      });
 
-      // Close size dialog before the system sheet so Share can’t be tapped twice.
       setExportSizeIntent(null);
-
-      if (typeof navigator.share === 'function' && navigator.canShare?.(sharePayload)) {
-        await navigator.share(sharePayload);
-        toast({ title: 'Poster shared' });
-      } else {
-        triggerLocalDownload(blob, filename);
-        toast({
-          title: 'Downloaded instead',
-          description: 'This device can’t share image files — poster downloaded so you can share it manually.',
-        });
-      }
+      setSocialShare((prev) => {
+        if (prev?.previewUrl) URL.revokeObjectURL(prev.previewUrl);
+        return { previewUrl, blob, file, filename, caption };
+      });
     } catch (e) {
-      if ((e as Error)?.name === 'AbortError') {
-        // User dismissed the system share sheet.
-        return;
-      }
       toast({
-        title: 'Could not share poster',
+        title: 'Could not prepare share',
         description: e instanceof Error ? e.message : 'Try again',
         variant: 'destructive',
       });
@@ -1312,6 +1330,20 @@ export default function PosterStudioModal({
             selectTemplate(nextTemplate);
             setPaletteKey(nextPalette);
           }}
+        />
+      )}
+      {socialShare && (
+        <PosterSocialShareDialog
+          open
+          busy={busy === 'share'}
+          previewUrl={socialShare.previewUrl}
+          filename={socialShare.filename}
+          blob={socialShare.blob}
+          file={socialShare.file}
+          initialCaption={socialShare.caption}
+          onClose={closeSocialShare}
+          onDownload={triggerLocalDownload}
+          onToast={(args) => toast(args)}
         />
       )}
       <MoveToFolderModal
