@@ -272,3 +272,23 @@ export function buildPosterData(
     hashtag: hashtagFor(title),
   };
 }
+
+/**
+ * Synthetic BugDates row for BugCreative → Design Poster (no calendar event).
+ * id is 0 so event-hooked save paths stay off unless standaloneSave is set.
+ */
+export function customPosterStudioItem(
+  occurrenceDate = new Date().toISOString().slice(0, 10)
+): BugDatesCalendarItem {
+  return {
+    id: 0,
+    title: 'Custom Poster',
+    description: 'Blank poster from BugCreative',
+    category: 'company_event',
+    layer: 'company_event',
+    recurrence_type: 'none',
+    start_date: occurrenceDate,
+    occurrence_date: occurrenceDate,
+    status: 'approved',
+  };
+}

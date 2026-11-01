@@ -27,6 +27,7 @@ import {
   type GrowthProgramSession,
 } from '@/services/bugDatesService';
 import {
+  createCreativeAsset,
   createCreativeFolder,
   listCreativeFolders,
   uploadCreativeFile,
@@ -75,6 +76,13 @@ type Props = {
   session: GrowthProgramSession | null;
   /** Stable key already in ?poster= — used to keep Back / share URLs correct. */
   posterKey?: string | null;
+  /**
+   * Save via createCreativeAsset (no BugDates event hook) — used when opening
+   * Design Poster from BugCreative for custom posters.
+   */
+  standaloneSave?: boolean;
+  /** Prefers this folder when the save picker opens (current BugCreative folder). */
+  preferredFolderId?: string | null;
   onClose: () => void;
   onSaved: (assetId: string) => void;
 };
@@ -208,6 +216,8 @@ export default function PosterStudioModal({
   occurrenceDate,
   session,
   posterKey = null,
+  standaloneSave = false,
+  preferredFolderId = null,
   onClose,
   onSaved,
 }: Props) {
@@ -217,6 +227,7 @@ export default function PosterStudioModal({
   const canOrganizeFolders =
     hasPermissionOrAdmin(role, hasPermission, 'CREATIVE_CREATE') ||
     hasPermissionOrAdmin(role, hasPermission, 'CREATIVE_MANAGE');
+  const canSaveToCreative = standaloneSave || !!item.id;
 
   const category = String(item.layer || item.category || 'company_event');
   const templateOrder = useMemo(
@@ -723,7 +734,7 @@ export default function PosterStudioModal({
   };
 
   const openSaveFolder = async () => {
-    if (!canExport || busyRef.current || !item.id) return;
+    if (!canExport || busyRef.current || !canSaveToCreative) return;
     setShowSaveFolder(true);
     setFoldersLoading(true);
     try {
@@ -762,7 +773,7 @@ export default function PosterStudioModal({
   };
 
   const handleSaveToFolder = async (folderId: string | null) => {
-    if (!canExport || busyRef.current || !item.id) return;
+    if (!canExport || busyRef.current || !canSaveToCreative) return;
     setBusyState('save');
     try {
       // Save uses the original design size — size picker is download-only.
@@ -775,28 +786,60 @@ export default function PosterStudioModal({
         .filter(Boolean)
         .join(' · ');
       const saveLabel = 'Original';
-      const res = await generateBugCreativeCard({
-        event_id: item.id,
-        occurrence_date: occurrenceDate,
-        title: `${String(item.title || data.title).trim()} — Poster (${saveLabel})`.slice(0, 255),
-        hook_content: `${summary || `Poster for ${item.title} on ${occurrenceDate}`}\n\nSize: ${saveLabel} · ${originalPlan.target.width} × ${originalPlan.target.height}px`,
-        material_type: 'Poster',
-        uploaded_file_path: uploaded.file_path,
-        preview_thumbnail_url: uploaded.preview_thumbnail_url ?? uploaded.file_path,
-        template_key: templateKey,
-        folder_id: folderId,
-      });
+      const title = `${String(
+        (data.title || item.title || 'Custom Poster').trim()
+      )} — Poster (${saveLabel})`.slice(0, 255);
+      const hookContent = `${
+        summary ||
+        (standaloneSave
+          ? `Custom poster · ${occurrenceDate}`
+          : `Poster for ${item.title} on ${occurrenceDate}`)
+      }\n\nSize: ${saveLabel} · ${originalPlan.target.width} × ${originalPlan.target.height}px${
+        templateKey ? `\n\nPoster template: ${templateKey}` : ''
+      }`;
+
+      let assetId: string;
+      let updated = false;
+      if (standaloneSave || !item.id) {
+        const created = await createCreativeAsset({
+          title,
+          material_type: 'Poster',
+          platform: 'Insta',
+          hook_content: hookContent,
+          asset_source: 'upload',
+          uploaded_file_path: uploaded.file_path,
+          preview_thumbnail_url: uploaded.preview_thumbnail_url ?? uploaded.file_path,
+          folder_id: folderId,
+          scheduled_date: occurrenceDate,
+          status: 'Draft',
+        });
+        assetId = created.id;
+      } else {
+        const res = await generateBugCreativeCard({
+          event_id: item.id,
+          occurrence_date: occurrenceDate,
+          title,
+          hook_content: hookContent,
+          material_type: 'Poster',
+          uploaded_file_path: uploaded.file_path,
+          preview_thumbnail_url: uploaded.preview_thumbnail_url ?? uploaded.file_path,
+          template_key: templateKey,
+          folder_id: folderId,
+        });
+        assetId = res.asset_id;
+        updated = !!res.updated;
+      }
       savedRef.current = true;
       setShowSaveFolder(false);
       notifyAdminNavCountsChanged();
       toast({
-        title: res.updated ? 'Poster updated in BugCreative' : 'Poster saved to BugCreative',
+        title: updated ? 'Poster updated in BugCreative' : 'Poster saved to BugCreative',
         description: folderId
           ? 'Saved in the selected folder — opening the creative card…'
           : 'Saved in All files — opening the creative card…',
       });
       skipConfirmRef.current = true;
-      onSaved(res.asset_id);
+      onSaved(assetId);
     } catch (e) {
       toast({
         title: 'Poster not saved',
@@ -1198,7 +1241,7 @@ export default function PosterStudioModal({
         </div>
 
         <footer className="flex shrink-0 flex-row flex-wrap items-center justify-end gap-2 border-t border-gray-200/60 px-4 py-3 dark:border-gray-700/60 sm:px-6">
-          {!item.id ? (
+          {!canSaveToCreative ? (
             <p className="w-full text-xs text-muted-foreground sm:me-auto sm:w-auto sm:flex-1">
               Team milestones aren&apos;t BugDates events, so this poster is download-only.
             </p>
@@ -1234,7 +1277,7 @@ export default function PosterStudioModal({
             {busy === 'share' ? <Loader2 className="h-4 w-4 animate-spin" /> : <Share2 className="h-4 w-4" />}
             <span className="ms-1.5 truncate sm:ms-2">Share</span>
           </Button>
-          {item.id ? (
+          {canSaveToCreative ? (
             <Button
               type="button"
               className="h-11 min-w-0 flex-1 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-700 px-3 font-semibold text-white shadow-md hover:from-blue-700 hover:to-indigo-800 sm:w-auto sm:flex-none"
@@ -1279,6 +1322,7 @@ export default function PosterStudioModal({
         canCreate={canOrganizeFolders}
         selectedCount={1}
         itemLabel={String(item.title || data.title || 'Poster')}
+        currentFolderId={preferredFolderId}
         title="Save to folder"
         confirmLabel={foldersLoading ? 'Loading…' : 'Save here'}
         description="Choose which BugCreative folder should hold this poster."

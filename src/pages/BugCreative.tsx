@@ -84,11 +84,15 @@ import {
   Plus,
   Search,
   Send,
+  Sparkles,
   Trash2,
   XCircle,
 } from 'lucide-react';
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
+import { customPosterStudioItem } from '@/components/posters/posterData';
+
+const PosterStudioModal = lazy(() => import('@/components/posters/PosterStudioModal'));
 
 const ASSET_PARAM = 'asset';
 const STATUS_PARAM = 'tab';
@@ -417,6 +421,8 @@ export default function BugCreative() {
   const [clipboard, setClipboard] = useState<CreativeClipboard>(null);
   const [organizeBusy, setOrganizeBusy] = useState(false);
   const [createFolderOpen, setCreateFolderOpen] = useState(false);
+  const [posterStudioOpen, setPosterStudioOpen] = useState(false);
+  const customPosterItem = useMemo(() => customPosterStudioItem(), []);
   const [renameFolder, setRenameFolder] = useState<CreativeFolder | null>(null);
   const [deleteFolderTarget, setDeleteFolderTarget] = useState<CreativeFolder | null>(null);
   const [moveModalOpen, setMoveModalOpen] = useState(false);
@@ -1167,11 +1173,22 @@ export default function BugCreative() {
             </button>
           </div>
         ))}
-        {searching ? (
-          <span className="ms-auto text-xs text-muted-foreground">
-            Searching all folders
-          </span>
-        ) : null}
+        <div className="ms-auto flex min-w-0 flex-wrap items-center justify-end gap-2">
+          {searching ? (
+            <span className="text-xs text-muted-foreground">Searching all folders</span>
+          ) : null}
+          {canCreate ? (
+            <Button
+              type="button"
+              size="sm"
+              className="h-9 shrink-0 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-700 px-3 font-semibold text-white shadow-md hover:from-blue-700 hover:to-indigo-800"
+              onClick={() => setPosterStudioOpen(true)}
+            >
+              <Sparkles className="mr-1.5 h-3.5 w-3.5" />
+              Design Poster
+            </Button>
+          ) : null}
+        </div>
       </div>
       <Tabs value={statusTab} onValueChange={setStatusTab} className="w-full">
         <BottomSheetTabs
@@ -1558,6 +1575,32 @@ export default function BugCreative() {
             void load();
           }}
         />
+      ) : null}
+
+      {posterStudioOpen ? (
+        <Suspense
+          fallback={
+            <div className="fixed inset-0 z-[110] flex items-center justify-center bg-black/60">
+              <Loader2 className="h-8 w-8 animate-spin text-white" aria-label="Loading poster studio" />
+            </div>
+          }
+        >
+          <PosterStudioModal
+            item={customPosterItem}
+            occurrenceDate={customPosterItem.occurrence_date}
+            session={null}
+            posterKey="custom"
+            standaloneSave
+            preferredFolderId={currentFolderId}
+            onClose={() => setPosterStudioOpen(false)}
+            onSaved={(assetId) => {
+              setPosterStudioOpen(false);
+              notifyAdminNavCountsChanged();
+              void load();
+              openAsset(assetId);
+            }}
+          />
+        </Suspense>
       ) : null}
 
       <CreateFolderModal
