@@ -6,10 +6,12 @@ import {
   Link2,
   Loader2,
   Palette,
+  Redo2,
   RotateCcw,
   Share2,
   Sparkles,
   Trash2,
+  Undo2,
   UploadCloud,
   X,
 } from 'lucide-react';
@@ -65,6 +67,8 @@ import { TemplatePicker } from './TemplatePicker';
 import { DiscardChangesDialog } from './DiscardChangesDialog';
 import { ExportSizeDialog, type ExportSizeIntent } from './ExportSizeDialog';
 import { PosterEditProvider } from './edit/PosterEditContext';
+import { PosterLayerOrderBar } from './edit/PosterLayerOrderBar';
+import { usePosterHistory } from './edit/usePosterHistory';
 import { PosterSocialShareDialog } from './PosterSocialShareDialog';
 import { buildPosterShareCaption } from './posterSocialShare';
 import { POSTER_TEMPLATE_COMPONENTS, POSTER_TEMPLATES, templatesForCategory } from './templates/templateRegistry';
@@ -244,8 +248,23 @@ export default function PosterStudioModal({
   const initialPalette =
     occasion?.defaultPalette ?? POSTER_TEMPLATES[templateOrder[0]].defaultPalette;
 
-  const [templateKey, setTemplateKey] = useState<PosterTemplateKey>(templateOrder[0]);
-  const [paletteKey, setPaletteKey] = useState<PosterPaletteKey>(initialPalette);
+  const {
+    data,
+    setData,
+    templateKey,
+    paletteKey,
+    setPaletteKey,
+    applyTemplate,
+    undo,
+    redo,
+    canUndo,
+    canRedo,
+  } = usePosterHistory({
+    data: initialData,
+    templateKey: templateOrder[0],
+    paletteKey: initialPalette,
+  });
+
   /** Preview stays on original; switched only for the download/share capture pass. */
   const [presetId, setPresetId] = useState<string>(ORIGINAL_PRESET_ID);
   const [exportSizeIntent, setExportSizeIntent] = useState<ExportSizeIntent | null>(null);
@@ -260,8 +279,7 @@ export default function PosterStudioModal({
   const [folders, setFolders] = useState<CreativeFolder[]>([]);
   const [foldersLoading, setFoldersLoading] = useState(false);
   const [folderCreating, setFolderCreating] = useState(false);
-  const [data, setData] = useState<PosterData>(initialData);
-  const [baseline, setBaseline] = useState<PosterData>(initialData);
+  const [baseline, setBaseline] = useState(initialData);
   const [fontState, setFontState] = useState<FontState>('loading');
   const [busy, setBusy] = useState<BusyState>(null);
   const [aiError, setAiError] = useState('');
@@ -328,7 +346,10 @@ export default function PosterStudioModal({
     imageUrlToPosterDataUrl(resolveAvatarUrl(avatar, label), controller.signal)
       .then((url) => {
         heroLoadedRef.current = true;
-        setData((prev) => (prev.heroImage ? prev : { ...prev, heroImage: url }));
+        setData(
+          (prev) => (prev.heroImage ? prev : { ...prev, heroImage: url }),
+          { record: false }
+        );
         setBaseline((prev) => ({ ...prev, heroImage: url }));
         if (session?.host_user_id) setSelectedSpeakerId(session.host_user_id);
       })
@@ -449,6 +470,31 @@ export default function PosterStudioModal({
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
+      const mod = e.metaKey || e.ctrlKey;
+      if (mod && !e.altKey && e.key.toLowerCase() === 'z') {
+        const target = e.target as HTMLElement | null;
+        const tag = target?.tagName;
+        // Allow native undo inside plain inputs; poster canvas / studio uses our stack.
+        const inNativeField =
+          tag === 'INPUT' || tag === 'TEXTAREA' || target?.isContentEditable;
+        if (!inNativeField) {
+          e.preventDefault();
+          e.stopPropagation();
+          if (e.shiftKey) redo();
+          else undo();
+          return;
+        }
+      }
+      if (mod && !e.altKey && !e.shiftKey && e.key.toLowerCase() === 'y') {
+        const target = e.target as HTMLElement | null;
+        const tag = target?.tagName;
+        if (tag !== 'INPUT' && tag !== 'TEXTAREA' && !target?.isContentEditable) {
+          e.preventDefault();
+          e.stopPropagation();
+          redo();
+          return;
+        }
+      }
       if (e.key !== 'Escape') return;
       if (confirmDiscardRef.current) {
         e.stopPropagation();
@@ -482,22 +528,24 @@ export default function PosterStudioModal({
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [requestClose]);
+  }, [requestClose, undo, redo]);
 
   const updateField = (key: PosterFieldKey, value: string) => {
     setData((prev) => ({ ...prev, [key]: value.slice(0, POSTER_FIELD_LIMITS[key]) }));
   };
 
-  const selectTemplate = useCallback((key: PosterTemplateKey) => {
-    setTemplateKey(key);
-    setPaletteKey(POSTER_TEMPLATES[key].defaultPalette);
-    // Why: layer ids differ per template — leftover offsets would look random.
-    setData((prev) =>
-      Object.keys(prev.layerOffsets ?? {}).length === 0
-        ? prev
-        : { ...prev, layerOffsets: {} }
-    );
-  }, []);
+  const selectTemplate = useCallback(
+    (key: PosterTemplateKey) => {
+      // Why: layer ids differ per template — leftover offsets/z would look random.
+      applyTemplate(key, POSTER_TEMPLATES[key].defaultPalette, (prev) => {
+        const noOffsets = Object.keys(prev.layerOffsets ?? {}).length === 0;
+        const noZ = Object.keys(prev.layerZIndex ?? {}).length === 0;
+        if (noOffsets && noZ) return prev;
+        return { ...prev, layerOffsets: {}, layerZIndex: {} };
+      });
+    },
+    [applyTemplate]
+  );
 
   const focusContentField = useCallback((field: PosterFieldKey) => {
     const el = document.getElementById(`poster-${field}`);
@@ -507,12 +555,13 @@ export default function PosterStudioModal({
   }, []);
 
   const resetLayout = useCallback(() => {
-    setData((prev) =>
-      Object.keys(prev.layerOffsets ?? {}).length === 0
-        ? prev
-        : { ...prev, layerOffsets: {} }
-    );
-  }, []);
+    setData((prev) => {
+      const noOffsets = Object.keys(prev.layerOffsets ?? {}).length === 0;
+      const noZ = Object.keys(prev.layerZIndex ?? {}).length === 0;
+      if (noOffsets && noZ) return prev;
+      return { ...prev, layerOffsets: {}, layerZIndex: {} };
+    });
+  }, [setData]);
 
   const previewHeight =
     previewWidth > 0 ? (previewWidth * target.height) / target.width : 0;
@@ -522,7 +571,9 @@ export default function PosterStudioModal({
         ? previewWidth / layout.width
         : Math.min(previewWidth / layout.width, previewHeight / layout.height)
       : 1;
-  const hasLayoutOffsets = Object.keys(data.layerOffsets ?? {}).length > 0;
+  const hasLayoutOffsets =
+    Object.keys(data.layerOffsets ?? {}).length > 0 ||
+    Object.keys(data.layerZIndex ?? {}).length > 0;
   const exportingBusy =
     busy === 'download' || busy === 'share' || busy === 'save';
 
@@ -915,29 +966,29 @@ export default function PosterStudioModal({
         <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto overscroll-contain custom-scrollbar p-4 sm:p-6 lg:grid lg:grid-cols-12 lg:gap-4 lg:overflow-hidden">
           {/* Preview */}
           <section className="flex w-full shrink-0 flex-col gap-3 lg:order-2 lg:col-span-7 lg:min-h-0 lg:overflow-hidden">
-            <div
-              ref={previewBoxRef}
-              className="relative flex h-[min(42vh,320px)] w-full shrink-0 items-center justify-center overflow-hidden rounded-2xl border border-gray-200/60 bg-gray-100 p-3 dark:border-gray-700/60 dark:bg-gray-800/60 sm:h-[min(48vh,380px)] lg:h-auto lg:min-h-0 lg:flex-1"
+            <PosterEditProvider
+              enabled
+              suppressChrome={exportingBusy}
+              scale={editScale}
+              data={data}
+              onChangeData={setData}
+              onFocusField={focusContentField}
             >
-              {fontState === 'loading' || previewWidth === 0 ? (
-                <div
-                  className="animate-pulse rounded-xl bg-gray-200 dark:bg-gray-700"
-                  style={{
-                    width: previewWidth || 280,
-                    height: ((previewWidth || 280) * target.height) / target.width,
-                  }}
-                  aria-label="Loading poster preview"
-                />
-              ) : (
-                <div className="max-h-full max-w-full overflow-hidden rounded-xl shadow-xl">
-                  <PosterEditProvider
-                    enabled
-                    suppressChrome={exportingBusy}
-                    scale={editScale}
-                    data={data}
-                    onChangeData={setData}
-                    onFocusField={focusContentField}
-                  >
+              <div
+                ref={previewBoxRef}
+                className="relative flex h-[min(42vh,320px)] w-full shrink-0 items-center justify-center overflow-hidden rounded-2xl border border-gray-200/60 bg-gray-100 p-3 dark:border-gray-700/60 dark:bg-gray-800/60 sm:h-[min(48vh,380px)] lg:h-auto lg:min-h-0 lg:flex-1"
+              >
+                {fontState === 'loading' || previewWidth === 0 ? (
+                  <div
+                    className="animate-pulse rounded-xl bg-gray-200 dark:bg-gray-700"
+                    style={{
+                      width: previewWidth || 280,
+                      height: ((previewWidth || 280) * target.height) / target.width,
+                    }}
+                    aria-label="Loading poster preview"
+                  />
+                ) : (
+                  <div className="max-h-full max-w-full overflow-hidden rounded-xl shadow-xl">
                     <PosterComposite
                       templateKey={templateKey}
                       data={data}
@@ -947,13 +998,19 @@ export default function PosterStudioModal({
                       width={previewWidth}
                       nodeRef={posterRef}
                     />
-                  </PosterEditProvider>
+                  </div>
+                )}
+                <div className="pointer-events-none absolute inset-x-0 bottom-2 z-20 flex justify-center px-2">
+                  <div className="pointer-events-auto">
+                    <PosterLayerOrderBar />
+                  </div>
                 </div>
-              )}
-            </div>
-            <p className="text-[11px] text-muted-foreground">
-              Drag any layer to move it. Click text to edit in Content; double-click to type on the poster.
-            </p>
+              </div>
+              <p className="text-[11px] text-muted-foreground">
+                Drag any layer to move it. Use Layer ↑↓ when selected to change stack order. Click text to
+                edit in Content; double-click to type on the poster.
+              </p>
+            </PosterEditProvider>
             {fontState === 'error' && (
               <p className="rounded-xl bg-amber-50 px-3 py-2 text-xs font-medium text-amber-800 dark:bg-amber-950/40 dark:text-amber-200">
                 Brand fonts could not load — the preview uses fallback fonts. Check your connection before saving.
@@ -1267,10 +1324,34 @@ export default function PosterStudioModal({
           <Button
             type="button"
             variant="outline"
+            size="icon"
+            className="h-11 w-11 shrink-0 rounded-xl"
+            disabled={!canUndo || busy !== null}
+            onClick={undo}
+            title="Undo (⌘Z / Ctrl+Z)"
+            aria-label="Undo"
+          >
+            <Undo2 className="h-4 w-4" />
+          </Button>
+          <Button
+            type="button"
+            variant="outline"
+            size="icon"
+            className="h-11 w-11 shrink-0 rounded-xl"
+            disabled={!canRedo || busy !== null}
+            onClick={redo}
+            title="Redo (⌘⇧Z / Ctrl+Y)"
+            aria-label="Redo"
+          >
+            <Redo2 className="h-4 w-4" />
+          </Button>
+          <Button
+            type="button"
+            variant="outline"
             className="h-11 min-w-0 flex-1 rounded-xl px-3 sm:w-auto sm:flex-none"
             disabled={!hasLayoutOffsets || busy !== null}
             onClick={resetLayout}
-            title="Reset dragged layer positions"
+            title="Reset layer positions and stack order"
           >
             <RotateCcw className="h-4 w-4" />
             <span className="ms-1.5 truncate sm:ms-2">Reset layout</span>
@@ -1327,8 +1408,12 @@ export default function PosterStudioModal({
             else void handleDownloadWithSize(preset);
           }}
           onApplySuggestion={(nextTemplate, nextPalette) => {
-            selectTemplate(nextTemplate);
-            setPaletteKey(nextPalette);
+            applyTemplate(nextTemplate, nextPalette, (prev) => {
+              const noOffsets = Object.keys(prev.layerOffsets ?? {}).length === 0;
+              const noZ = Object.keys(prev.layerZIndex ?? {}).length === 0;
+              if (noOffsets && noZ) return prev;
+              return { ...prev, layerOffsets: {}, layerZIndex: {} };
+            });
           }}
         />
       )}

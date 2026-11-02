@@ -54,6 +54,7 @@ export const EMPTY_POSTER_DATA: PosterData = {
   showContacts: true,
   logoStyle: DEFAULT_LOGO_STYLE,
   layerOffsets: {},
+  layerZIndex: {},
 };
 
 const BIRTHDAY_WISH =

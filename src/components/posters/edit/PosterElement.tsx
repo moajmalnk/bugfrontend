@@ -2,7 +2,6 @@ import {
   useCallback,
   useEffect,
   useRef,
-  useState,
   type CSSProperties,
   type ReactNode,
 } from 'react';
@@ -42,17 +41,27 @@ export function PosterElement({
     selectedId,
     editingId,
     layerOffsets,
+    layerZIndex,
     data,
     select,
     setEditing,
     setOffset,
+    registerLayer,
+    unregisterLayer,
     updateField,
   } = usePosterEdit();
 
   const offset = layerOffsets[id] ?? { x: 0, y: 0 };
+  const zIndex = layerZIndex[id] ?? 0;
   const selected = enabled && !suppressChrome && selectedId === id;
   const editing = enabled && !suppressChrome && editingId === id && Boolean(field);
   const nodeRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!enabled) return;
+    registerLayer(id);
+    return () => unregisterLayer(id);
+  }, [enabled, id, registerLayer, unregisterLayer]);
   const dragRef = useRef<{
     pointerId: number;
     startClientX: number;
@@ -61,28 +70,35 @@ export function PosterElement({
     originY: number;
     moved: boolean;
   } | null>(null);
-  const [draft, setDraft] = useState('');
+  const inlineRef = useRef<HTMLDivElement>(null);
+  /** Why: keep draft out of React children — rewriting contentEditable text resets the caret to 0 and reverses typed characters. */
+  const draftRef = useRef('');
 
   useEffect(() => {
     if (!editing || !field) return;
-    setDraft(String(data[field] ?? ''));
-    const el = nodeRef.current?.querySelector('[data-poster-inline-edit]') as HTMLElement | null;
+    const initial = String(data[field] ?? '');
+    draftRef.current = initial;
+    const el = inlineRef.current;
     if (!el) return;
+    el.textContent = initial;
     el.focus();
     const range = document.createRange();
     range.selectNodeContents(el);
     const sel = window.getSelection();
     sel?.removeAllRanges();
     sel?.addRange(range);
-  }, [editing, field, data]);
+    // Intentionally omit `data` — only seed once when inline edit opens.
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- seed on edit enter only
+  }, [editing, field]);
 
   const commitInline = useCallback(() => {
     if (!field) return;
     const limit = POSTER_FIELD_LIMITS[field];
-    const next = draft.slice(0, limit);
+    const raw = inlineRef.current?.textContent ?? draftRef.current;
+    const next = raw.slice(0, limit);
     updateField(field, next);
     setEditing(null);
-  }, [draft, field, setEditing, updateField]);
+  }, [field, setEditing, updateField]);
 
   const cancelInline = useCallback(() => {
     setEditing(null);
@@ -143,6 +159,10 @@ export function PosterElement({
     setEditing(id);
   };
 
+  const needsPosition =
+    zIndex !== 0 &&
+    (!style?.position || style.position === 'static');
+
   const combinedStyle: CSSProperties = {
     ...style,
     transform: `translate(${offset.x}px, ${offset.y}px)${
@@ -153,7 +173,8 @@ export function PosterElement({
     outlineOffset: selected && !editing ? 4 : style?.outlineOffset,
     touchAction: enabled ? 'none' : style?.touchAction,
     userSelect: editing ? 'text' : enabled ? 'none' : style?.userSelect,
-    position: style?.position ?? (role === 'group' ? undefined : style?.position),
+    position: style?.position ?? (needsPosition ? 'relative' : style?.position),
+    zIndex: zIndex !== 0 ? zIndex : style?.zIndex,
   };
 
   return (
@@ -172,11 +193,13 @@ export function PosterElement({
     >
       {editing && field ? (
         <div
+          ref={inlineRef}
           data-poster-inline-edit
           contentEditable
           suppressContentEditableWarning
           role="textbox"
           aria-label={`Edit ${field}`}
+          dir="ltr"
           style={{
             font: 'inherit',
             color: 'inherit',
@@ -186,6 +209,8 @@ export function PosterElement({
             fontSize: 'inherit',
             fontWeight: 'inherit',
             textAlign: 'inherit',
+            direction: 'ltr',
+            unicodeBidi: 'plaintext',
             outline: '2px solid rgba(37, 99, 235, 0.9)',
             outlineOffset: 2,
             minWidth: '1ch',
@@ -194,14 +219,20 @@ export function PosterElement({
           }}
           onPointerDown={(e) => e.stopPropagation()}
           onInput={(e) => {
-            const text = (e.currentTarget.textContent ?? '').slice(
-              0,
-              POSTER_FIELD_LIMITS[field]
-            );
-            setDraft(text);
-            if ((e.currentTarget.textContent ?? '').length > POSTER_FIELD_LIMITS[field]) {
-              e.currentTarget.textContent = text;
+            const limit = POSTER_FIELD_LIMITS[field];
+            let text = e.currentTarget.textContent ?? '';
+            if (text.length > limit) {
+              text = text.slice(0, limit);
+              const el = e.currentTarget;
+              el.textContent = text;
+              const range = document.createRange();
+              range.selectNodeContents(el);
+              range.collapse(false);
+              const sel = window.getSelection();
+              sel?.removeAllRanges();
+              sel?.addRange(range);
             }
+            draftRef.current = text;
           }}
           onBlur={commitInline}
           onKeyDown={(e) => {
@@ -215,9 +246,7 @@ export function PosterElement({
               (e.currentTarget as HTMLElement).blur();
             }
           }}
-        >
-          {draft}
-        </div>
+        />
       ) : (
         children
       )}

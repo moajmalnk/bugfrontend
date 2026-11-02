@@ -67,11 +67,16 @@ export type PosterData = {
    * Keys are stable layer ids from PosterElement wrappers.
    */
   layerOffsets: Record<string, { x: number; y: number }>;
+  /**
+   * Stacking order overrides (CSS z-index). Higher draws above.
+   * Keys match PosterElement layer ids; unset layers stay at template default (0).
+   */
+  layerZIndex: Record<string, number>;
 };
 
 export type PosterFieldKey = Exclude<
   keyof PosterData,
-  'heroImage' | 'showContacts' | 'dateIso' | 'logoStyle' | 'layerOffsets'
+  'heroImage' | 'showContacts' | 'dateIso' | 'logoStyle' | 'layerOffsets' | 'layerZIndex'
 >;
 
 export type PosterTemplateProps = {
