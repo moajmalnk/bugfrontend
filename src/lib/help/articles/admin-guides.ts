@@ -41,7 +41,7 @@ export const adminGuideArticles: HelpArticle[] = [
             type: "table",
             headers: ["Page", "Purpose"],
             rows: [
-              ["Users", "Add, edit, deactivate users; tester type; per-user permissions; View as user"],
+              ["Users", "Add, edit, deactivate users; tester type; per-user permissions; View as user (Super Admin only)"],
               ["Clients", "Client companies, contacts, and notes"],
               ["BugAssets", "Domains, servers, hosting, hardware, mailboxes, tools, and renewals"],
               ["OT requests", "Approve overtime from Daily Work Update"],
@@ -300,7 +300,7 @@ export const adminGuideArticles: HelpArticle[] = [
     categoryId: "administration",
     title: "Per-User Permissions & Dashboard Links",
     description:
-      "Override role defaults, generate dashboard access links, and manage impersonation-style access.",
+      "Override role defaults. Dashboard / impersonation links are Super Admin only.",
     roles: ["admin"],
     keywords: ["permissions", "dashboard link", "impersonate", "user access"],
     readMinutes: 7,

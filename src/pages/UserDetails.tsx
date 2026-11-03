@@ -657,14 +657,13 @@ export default function UserDetails() {
     }
   };
 
+  // Why: Impersonation is Super Admin only — regular Admins never see the option.
   const canOpenUserDashboard =
-    effectiveRole === "admin" &&
+    actorIsSuperAdmin &&
     Boolean(currentUser?.id) &&
     Boolean(user?.id) &&
     currentUser!.id !== user!.id &&
-    !targetIsSuperAdmin &&
-    // Why: Regular Admins never open Admin / Super Admin sessions.
-    (actorIsSuperAdmin || String(user?.role || "").toLowerCase() !== "admin");
+    !targetIsSuperAdmin;
 
   const handleGenerateDashboardLink = async () => {
     if (!user?.id || !canOpenUserDashboard) {
@@ -672,7 +671,7 @@ export default function UserDetails() {
         title: "Not allowed",
         description: targetIsSuperAdmin
           ? "Super Admin accounts cannot be impersonated."
-          : "Only a Super Admin can open an Admin dashboard session.",
+          : "Only a Super Admin can impersonate users.",
         variant: "destructive",
       });
       return;

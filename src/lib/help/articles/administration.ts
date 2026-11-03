@@ -77,7 +77,7 @@ export const administrationArticles: HelpArticle[] = [
               ["Change password", "Set a new password for the user"],
               ["Deactivate", "Disable login without deleting data"],
               ["Delete", "Remove user (10s undo; force delete if dependencies exist)"],
-              ["Dashboard link", "Generate impersonation-style access link"],
+              ["Dashboard link", "Super Admin only — generate impersonation access link"],
             ],
           },
         ],

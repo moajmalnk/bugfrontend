@@ -271,9 +271,9 @@ export const adminOperationsArticles: HelpArticle[] = [
     id: "impersonation-guide",
     categoryId: "administration",
     title: "View as a User (Impersonation)",
-    description: "Open BugRicer as another user to see exactly what they see.",
+    description: "Super Admin only — open BugRicer as another user to see exactly what they see.",
     roles: ["admin"],
-    keywords: ["impersonate", "view as", "login as", "user dashboard", "exit to admin", "support"],
+    keywords: ["impersonate", "view as", "login as", "user dashboard", "exit to admin", "support", "super admin"],
     readMinutes: 3,
     relatedIds: ["admin-user-details", "users-management", "admin-activity-audit"],
     sections: [
@@ -282,11 +282,17 @@ export const adminOperationsArticles: HelpArticle[] = [
         heading: "How it works",
         blocks: [
           {
+            type: "callout",
+            variant: "warning",
+            title: "Super Admin only",
+            text: "Regular Admins do not get the impersonate option. Only a Super Admin can open another user’s dashboard session. Super Admin accounts cannot be impersonated.",
+          },
+          {
             type: "steps",
             steps: [
               {
                 title: "Open the user",
-                body: "Go to Users, open the person, and click Dashboard (Open user's dashboard in a new tab).",
+                body: "As Super Admin, go to Users, open the person, and click Dashboard (Open user's dashboard in a new tab).",
               },
               {
                 title: "Work in the new tab",
