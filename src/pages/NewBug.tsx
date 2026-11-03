@@ -332,11 +332,19 @@ const NewBug = () => {
         }
       });
 
+      // Why: Large videos on slow / captive Wi‑Fi need far more than the default 30s.
+      // Scale timeout with payload size (~50 KB/s floor), min 90s, max 10 minutes.
+      const attachmentBytes =
+        screenshots.reduce((n, f) => n + (f.size || 0), 0) +
+        files.reduce((n, f) => n + (f.size || 0), 0) +
+        voiceNotes.reduce((n, v) => n + (v.blob?.size || 0), 0);
+      const uploadTimeoutMs = Math.min(
+        10 * 60 * 1000,
+        Math.max(90_000, Math.ceil(attachmentBytes / (50 * 1024)) * 1000)
+      );
+
       const response = await apiClient.post('/bugs/create.php', formData, {
-        headers: {
-          'Content-Type': 'multipart/form-data',
-        },
-        timeout: 30000,
+        timeout: uploadTimeoutMs,
       });
 
       const data = response.data as ApiResponse<any>;

@@ -448,8 +448,18 @@ const TesterReportBug = () => {
         }
       });
 
+      // Why: Large screen recordings on slow / captive Wi‑Fi need more than 30s.
+      const attachmentBytes =
+        screenshots.reduce((n, f) => n + (f.size || 0), 0) +
+        videos.reduce((n, f) => n + (f.size || 0), 0) +
+        voiceNotes.reduce((n, v) => n + (v.blob?.size || 0), 0);
+      const uploadTimeoutMs = Math.min(
+        10 * 60 * 1000,
+        Math.max(90_000, Math.ceil(attachmentBytes / (50 * 1024)) * 1000)
+      );
+
       const response = await apiClient.post("/bugs/create.php", formData, {
-        timeout: 30000,
+        timeout: uploadTimeoutMs,
       });
       const data = response.data as ApiResponse<{
         bug?: { id?: string };
