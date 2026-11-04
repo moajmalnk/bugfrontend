@@ -142,16 +142,31 @@ async function handleResponseError(error: {
       return apiClient.request(failed);
     }
   }
-  // console.error('Response Error:', {
-  //   url: error.config?.url,
-  //   status: error.response?.status,
-  //   statusText: error.response?.statusText,
-  //   data: error.response?.data,
-  //   message: error.message
-  // });
+
+  // Why: ERR_NETWORK_CHANGED aborts in-flight calls when Wi‑Fi/VPN/IP flips.
+  // Safe to retry GET/HEAD only — POST create could double-submit if the first
+  // request already reached the server.
+  const method = String(failed?.method || "get").toLowerCase();
+  const isSafeRetryMethod = method === "get" || method === "head";
+  const isTransientNetwork =
+    !error.response &&
+    (error.code === "ERR_NETWORK" ||
+      error.code === "ERR_NETWORK_CHANGED" ||
+      error.code === "ECONNABORTED" ||
+      error.message === "Network Error" ||
+      /network.?changed/i.test(error.message || ""));
+  if (failed && isSafeRetryMethod && isTransientNetwork) {
+    const attempt = failed.__retryCount ?? 0;
+    if (attempt < API_MAX_RETRIES) {
+      failed.__retryCount = attempt + 1;
+      await sleep(retryDelayMs(attempt));
+      return apiClient.request(failed);
+    }
+  }
 
   if (
     error.code === "ERR_NETWORK" ||
+    error.code === "ERR_NETWORK_CHANGED" ||
     error.code === "ECONNABORTED" ||
     error.response?.status === 0
   ) {

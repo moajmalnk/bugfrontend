@@ -69,8 +69,15 @@ export function getNetworkErrorMessage(
   const code = axiosLike?.code ?? '';
   const message = (axiosLike?.message ?? '').trim();
 
-  if (code === 'ERR_NETWORK' || message === 'Network Error') {
-    return 'Connection to the server was lost. Check your signal and try again — on public or office Wi-Fi, switch to mobile data or complete the Wi-Fi sign-in page.';
+  // Why: Chrome logs net::ERR_NETWORK_CHANGED when Wi‑Fi/VPN/IP changes mid-request;
+  // axios surfaces that as ERR_NETWORK / "Network Error" with no HTTP status.
+  if (
+    code === 'ERR_NETWORK' ||
+    code === 'ERR_NETWORK_CHANGED' ||
+    message === 'Network Error' ||
+    /network.?changed/i.test(message)
+  ) {
+    return 'Connection dropped because the network changed (Wi‑Fi ↔ mobile, VPN, or unstable office Wi‑Fi). Stay on one network and try again — or switch to mobile data.';
   }
 
   if (code === 'ECONNABORTED' || /timeout/i.test(message)) {
