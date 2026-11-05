@@ -177,6 +177,16 @@ const STATUS_META: Record<
   },
 };
 
+function userAckStatus(rule: CodoCommonRule): CodoAckStatus | null {
+  const a = rule.acknowledgements;
+  if (!a) return null;
+  if (a.current_user_status === 'acknowledged' || a.current_user_status === 'doubt' || a.current_user_status === 'not_required') {
+    return a.current_user_status;
+  }
+  if (a.current_user_acknowledged) return 'acknowledged';
+  return null;
+}
+
 function formatAckDateTime(value?: string | null): string | null {
   if (!value) return null;
   const raw = value.includes('T') ? value : value.replace(' ', 'T');
@@ -283,10 +293,6 @@ export default function CommonCodoRules() {
   const [deleteTarget, setDeleteTarget] = useState<CodoCommonRule | null>(null);
   const [deleting, setDeleting] = useState(false);
   const [acknowledgingId, setAcknowledgingId] = useState<number | null>(null);
-  const [confirmRespond, setConfirmRespond] = useState<{
-    rule: CodoCommonRule;
-    status: CodoAckStatus;
-  } | null>(null);
   const [expandedAck, setExpandedAck] = useState<Record<number, boolean>>({});
   const [isDownloadingReport, setIsDownloadingReport] = useState(false);
   const [isMobileTabSelectorOpen, setIsMobileTabSelectorOpen] = useState(false);
@@ -536,6 +542,29 @@ export default function CommonCodoRules() {
     if (activeTab === 'analytics' || activeTab === 'export') return [];
     return filtered;
   }, [filtered, activeTab]);
+
+  /** Why: split the list so “what I still owe” vs “already done” is obvious at a glance. */
+  const { pendingRules, acknowledgedRules, otherRespondedRules, referenceRules } =
+    useMemo(() => {
+      const pending: CodoCommonRule[] = [];
+      const acknowledged: CodoCommonRule[] = [];
+      const other: CodoCommonRule[] = [];
+      const reference: CodoCommonRule[] = [];
+      for (const rule of listFiltered) {
+        const status = userAckStatus(rule);
+        const must = !!rule.acknowledgements?.current_user_must_acknowledge;
+        if (!status && must) pending.push(rule);
+        else if (status === 'acknowledged') acknowledged.push(rule);
+        else if (status === 'doubt' || status === 'not_required') other.push(rule);
+        else reference.push(rule);
+      }
+      return {
+        pendingRules: pending,
+        acknowledgedRules: acknowledged,
+        otherRespondedRules: other,
+        referenceRules: reference,
+      };
+    }, [listFiltered]);
 
   const analyticsCompletion = useMemo(
     () => (canViewAnalytics ? computeAnalyticsCompletion(rules) : 0),
@@ -840,9 +869,7 @@ export default function CommonCodoRules() {
     const Icon = meta.icon;
     const ack = rule.acknowledgements;
     const ackOpen = !!expandedAck[rule.id];
-    const userStatus =
-      (ack?.current_user_status as CodoAckStatus | null | undefined) ||
-      (ack?.current_user_acknowledged ? ('acknowledged' as const) : null);
+    const userStatus = userAckStatus(rule);
     const responded = ack?.responded_count ?? ack?.acknowledged_count ?? 0;
     const ackPct =
       ack && ack.required_total > 0
@@ -850,12 +877,24 @@ export default function CommonCodoRules() {
         : 0;
     const allDone = ack ? ack.pending_count === 0 && ack.required_total > 0 : false;
     const canRespond = !!ack && (ack.current_user_must_acknowledge || !!userStatus);
-    const showChoiceButtons = !!ack?.current_user_must_acknowledge && !userStatus;
+    // Why: keep action buttons visible after respond so the filled “Acknowledge”
+    // state is obvious — not only a quiet text label.
+    const showChoiceButtons = canRespond;
+    const savingThis = acknowledgingId === rule.id;
 
     return (
       <div
         key={rule.id}
-        className="group relative w-full min-w-0 bg-white/80 dark:bg-gray-900/80 backdrop-blur-sm border border-gray-200/50 dark:border-gray-700/50 rounded-2xl p-3.5 sm:p-5 hover:shadow-md hover:border-cyan-300/40 dark:hover:border-cyan-700/40 transition-all duration-300 overflow-hidden"
+        className={cn(
+          'group relative w-full min-w-0 bg-white/80 dark:bg-gray-900/80 backdrop-blur-sm border rounded-2xl p-3.5 sm:p-5 hover:shadow-md transition-all duration-300 overflow-hidden',
+          userStatus === 'acknowledged'
+            ? 'border-emerald-400/70 dark:border-emerald-600/50 ring-1 ring-emerald-500/20 hover:border-emerald-400'
+            : userStatus === 'doubt'
+              ? 'border-amber-300/70 dark:border-amber-700/50 hover:border-amber-400/60'
+              : !userStatus && ack?.current_user_must_acknowledge
+                ? 'border-amber-200/80 dark:border-amber-800/40 hover:border-amber-300/60'
+                : 'border-gray-200/50 dark:border-gray-700/50 hover:border-cyan-300/40 dark:hover:border-cyan-700/40'
+        )}
       >
         <div className="flex gap-2.5 sm:gap-4 min-w-0">
           <div
@@ -1044,25 +1083,31 @@ export default function CommonCodoRules() {
                                 type="button"
                                 size="sm"
                                 variant={active ? 'default' : 'outline'}
+                                aria-pressed={active}
                                 className={cn(
-                                  'rounded-lg h-8 px-2 sm:px-3 text-xs font-semibold min-w-0',
+                                  'rounded-xl h-9 px-2.5 sm:px-3 text-xs font-semibold min-w-0 shadow-sm transition-all',
                                   status === 'not_required' && 'col-span-2 sm:col-span-1',
                                   active
-                                    ? sMeta.activeClass
+                                    ? cn(sMeta.activeClass, 'ring-2 ring-offset-1 ring-offset-background scale-[1.02]')
                                     : 'bg-white/70 dark:bg-gray-900/60 text-gray-800 dark:text-gray-100 border-gray-200 dark:border-gray-700'
                                 )}
-                                disabled={acknowledgingId === rule.id}
+                                disabled={savingThis}
                                 onClick={() => {
-                                  if (active) return;
-                                  setConfirmRespond({ rule, status });
+                                  if (active || savingThis) return;
+                                  // Instant optimistic update — no confirm modal delay.
+                                  void handleRespond(rule, status);
                                 }}
                               >
-                                {acknowledgingId === rule.id && active ? (
+                                {savingThis && active ? (
                                   <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
                                 ) : (
                                   <SIcon className="mr-1.5 h-3.5 w-3.5" />
                                 )}
-                                <span className="truncate">{sMeta.label}</span>
+                                <span className="truncate">
+                                  {active && status === 'acknowledged'
+                                    ? 'Acknowledged'
+                                    : sMeta.label}
+                                </span>
                               </Button>
                             );
                           })
@@ -1640,8 +1685,80 @@ export default function CommonCodoRules() {
                 </div>
               </div>
             ) : (
-              <div className="grid gap-3 sm:gap-4 grid-cols-1 min-w-0" aria-label="CODO rules list">
-                {listFiltered.map((rule) => renderRuleCard(rule))}
+              <div className="flex flex-col gap-6 min-w-0" aria-label="CODO rules list">
+                {(
+                  [
+                    {
+                      key: 'pending',
+                      title: 'Not acknowledged',
+                      hint: 'Rules that still need your response',
+                      rules: pendingRules,
+                      tone: 'pending' as const,
+                    },
+                    {
+                      key: 'acknowledged',
+                      title: 'Acknowledged',
+                      hint: 'Rules you have already acknowledged',
+                      rules: acknowledgedRules,
+                      tone: 'done' as const,
+                    },
+                    {
+                      key: 'other',
+                      title: 'Other responses',
+                      hint: 'Doubt or not required',
+                      rules: otherRespondedRules,
+                      tone: 'other' as const,
+                    },
+                    {
+                      key: 'reference',
+                      title: 'For reference',
+                      hint: 'No response required from you',
+                      rules: referenceRules,
+                      tone: 'ref' as const,
+                    },
+                  ] as const
+                )
+                  .filter((section) => section.rules.length > 0)
+                  .map((section) => (
+                    <section key={section.key} className="min-w-0 flex flex-col gap-3">
+                      <div className="flex flex-wrap items-center gap-2 px-0.5">
+                        <h2
+                          className={cn(
+                            'text-sm font-bold tracking-tight',
+                            section.tone === 'pending' &&
+                              'text-amber-800 dark:text-amber-200',
+                            section.tone === 'done' &&
+                              'text-emerald-800 dark:text-emerald-200',
+                            section.tone === 'other' &&
+                              'text-slate-700 dark:text-slate-200',
+                            section.tone === 'ref' &&
+                              'text-muted-foreground'
+                          )}
+                        >
+                          {section.title}
+                        </h2>
+                        <span
+                          className={cn(
+                            'inline-flex h-6 min-w-6 items-center justify-center rounded-xl px-2 text-xs font-semibold tabular-nums',
+                            section.tone === 'pending' &&
+                              'bg-amber-100 text-amber-900 dark:bg-amber-950/50 dark:text-amber-200',
+                            section.tone === 'done' &&
+                              'bg-emerald-100 text-emerald-900 dark:bg-emerald-950/50 dark:text-emerald-200',
+                            section.tone === 'other' &&
+                              'bg-slate-100 text-slate-800 dark:bg-slate-800 dark:text-slate-200',
+                            section.tone === 'ref' &&
+                              'bg-muted text-muted-foreground'
+                          )}
+                        >
+                          {section.rules.length}
+                        </span>
+                        <span className="text-xs text-muted-foreground">{section.hint}</span>
+                      </div>
+                      <div className="grid gap-3 sm:gap-4 grid-cols-1 min-w-0">
+                        {section.rules.map((rule) => renderRuleCard(rule))}
+                      </div>
+                    </section>
+                  ))}
               </div>
             )}
           </TabsContent>
@@ -1655,66 +1772,6 @@ export default function CommonCodoRules() {
         defaultPhase={defaultPhase}
         onSubmit={handleSave}
       />
-
-      <AlertDialog
-        open={!!confirmRespond}
-        onOpenChange={(o) => !o && !acknowledgingId && setConfirmRespond(null)}
-      >
-        <AlertDialogContent className="rounded-2xl w-[calc(100%-1.5rem)] max-w-[400px] mx-auto">
-          <AlertDialogHeader>
-            <AlertDialogTitle>
-              {confirmRespond
-                ? `Confirm: ${STATUS_META[confirmRespond.status].label}?`
-                : 'Confirm response'}
-            </AlertDialogTitle>
-            <AlertDialogDescription>
-              {confirmRespond?.status === 'acknowledged' &&
-                'Mark this rule as acknowledged. Your response will be recorded for compliance.'}
-              {confirmRespond?.status === 'doubt' &&
-                'Mark this rule as doubt. Admins can follow up on your question.'}
-              {confirmRespond?.status === 'not_required' &&
-                'Mark this rule as not required for you. Use this only when the rule does not apply to your work.'}
-              {confirmRespond ? (
-                <>
-                  {' '}
-                  <span className="font-medium text-foreground">
-                    “{confirmRespond.rule.title}”
-                  </span>
-                </>
-              ) : null}
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter className="gap-2 sm:gap-2">
-            <AlertDialogCancel
-              className="rounded-xl"
-              disabled={acknowledgingId != null}
-            >
-              Cancel
-            </AlertDialogCancel>
-            <AlertDialogAction
-              className={cn(
-                'rounded-xl',
-                confirmRespond && STATUS_META[confirmRespond.status].activeClass
-              )}
-              disabled={acknowledgingId != null || !confirmRespond}
-              onClick={(e) => {
-                e.preventDefault();
-                if (!confirmRespond || acknowledgingId != null) return;
-                const payload = confirmRespond;
-                setConfirmRespond(null);
-                void handleRespond(payload.rule, payload.status);
-              }}
-            >
-              {acknowledgingId != null ? (
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-              ) : null}
-              {confirmRespond
-                ? STATUS_META[confirmRespond.status].label
-                : 'Confirm'}
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
 
       <AlertDialog open={!!deleteTarget} onOpenChange={(o) => !o && setDeleteTarget(null)}>
         <AlertDialogContent className="rounded-2xl w-[calc(100%-1.5rem)] max-w-[400px] mx-auto">
