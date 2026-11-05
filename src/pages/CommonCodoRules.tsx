@@ -96,13 +96,20 @@ import {
   UserX,
   Users,
 } from 'lucide-react';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { format, parseISO, isValid } from 'date-fns';
 
 type TabKey = 'all' | 'web' | 'app' | 'tester' | 'project' | 'analytics' | 'export';
 
 const VALID_TABS: TabKey[] = ['all', 'web', 'app', 'tester', 'project', 'analytics', 'export'];
+/** Why: reload must reopen the rule the reader was on, not jump back to rule 1. */
+const CODO_FOCUS_PARAM = 'focus';
+const CODO_READING_STORAGE = 'codo-reading-rule';
+
+function codoRuleDomId(ruleKey: string): string {
+  return `codo-rule-${ruleKey}`;
+}
 
 const DEVELOPER_TRACK_COPY: Record<
   'web' | 'app',
@@ -712,6 +719,97 @@ export default function CommonCodoRules() {
     // No dialog param — keep closed unless user opened another way this session
   }, [searchParams, rules]);
 
+  const readingKeyRef = useRef<string | null>(
+    searchParams.get(CODO_FOCUS_PARAM) ||
+      (typeof sessionStorage !== 'undefined'
+        ? sessionStorage.getItem(CODO_READING_STORAGE)
+        : null)
+  );
+  const allowReadingTrackRef = useRef(false);
+
+  // Restore the last rule after the list paints (reload / shared link).
+  useEffect(() => {
+    if (loading) return;
+    if (activeTab === 'analytics' || activeTab === 'export') {
+      allowReadingTrackRef.current = true;
+      return;
+    }
+    const key =
+      searchParams.get(CODO_FOCUS_PARAM) ||
+      sessionStorage.getItem(CODO_READING_STORAGE) ||
+      '';
+    if (!key) {
+      allowReadingTrackRef.current = true;
+      return;
+    }
+    const el = document.getElementById(codoRuleDomId(key));
+    if (!el) {
+      const section = searchParams.get('section');
+      const sectionEl = section
+        ? document.getElementById(`codo-section-${section}`)
+        : null;
+      if (sectionEl) sectionEl.scrollIntoView({ block: 'start', behavior: 'auto' });
+      allowReadingTrackRef.current = true;
+      return;
+    }
+    readingKeyRef.current = key;
+    const timer = window.setTimeout(() => {
+      el.scrollIntoView({ block: 'start', behavior: 'auto' });
+      const next = new URLSearchParams(window.location.search);
+      if (next.get(CODO_FOCUS_PARAM) !== key) {
+        next.set(CODO_FOCUS_PARAM, key);
+        const qs = next.toString();
+        window.history.replaceState(
+          window.history.state,
+          '',
+          `${window.location.pathname}?${qs}${window.location.hash}`
+        );
+      }
+      allowReadingTrackRef.current = true;
+    }, 120);
+    return () => window.clearTimeout(timer);
+  }, [loading, activeTab, rules.length]);
+
+  // Keep ?focus= and session storage on the rule currently in view.
+  useEffect(() => {
+    if (loading || activeTab === 'analytics' || activeTab === 'export') return;
+    const nodes = document.querySelectorAll<HTMLElement>('[data-codo-rule]');
+    if (!nodes.length) return;
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (!allowReadingTrackRef.current) return;
+        const visible = entries
+          .filter((entry) => entry.isIntersecting && entry.intersectionRatio > 0)
+          .sort((a, b) => a.boundingClientRect.top - b.boundingClientRect.top);
+        const top = visible[0]?.target as HTMLElement | undefined;
+        const key = top?.dataset.codoRule;
+        if (!key || readingKeyRef.current === key) return;
+        readingKeyRef.current = key;
+        try {
+          sessionStorage.setItem(CODO_READING_STORAGE, key);
+        } catch {
+          /* private mode */
+        }
+        const next = new URLSearchParams(window.location.search);
+        const section = top.dataset.codoSection;
+        if (next.get(CODO_FOCUS_PARAM) === key && (!section || next.get('section') === section)) {
+          return;
+        }
+        next.set(CODO_FOCUS_PARAM, key);
+        if (section) next.set('section', section);
+        const qs = next.toString();
+        window.history.replaceState(
+          window.history.state,
+          '',
+          `${window.location.pathname}${qs ? `?${qs}` : ''}${window.location.hash}`
+        );
+      },
+      { root: null, rootMargin: '-12% 0px -55% 0px', threshold: [0.15, 0.4, 0.7] }
+    );
+    nodes.forEach((node) => observer.observe(node));
+    return () => observer.disconnect();
+  }, [loading, activeTab, listFiltered]);
+
   const handleSave = async (payload: {
     phase: CodoRulePhase;
     title: string;
@@ -864,7 +962,7 @@ export default function CommonCodoRules() {
   const defaultPhase: CodoRulePhase =
     activeTab === 'tester' || activeTab === 'project' ? activeTab : 'developer';
 
-  const renderRuleCard = (rule: CodoCommonRule) => {
+  const renderRuleCard = (rule: CodoCommonRule, sectionKey?: string) => {
     const meta = PHASE_META[rule.phase];
     const Icon = meta.icon;
     const ack = rule.acknowledgements;
@@ -885,7 +983,11 @@ export default function CommonCodoRules() {
     return (
       <div
         key={rule.id}
+        id={codoRuleDomId(rule.rule_key)}
+        data-codo-rule={rule.rule_key}
+        data-codo-section={sectionKey}
         className={cn(
+          'scroll-mt-24',
           'group relative w-full min-w-0 bg-white/80 dark:bg-gray-900/80 backdrop-blur-sm border rounded-2xl p-3.5 sm:p-5 hover:shadow-md transition-all duration-300 overflow-hidden',
           userStatus === 'acknowledged'
             ? 'border-emerald-400/70 dark:border-emerald-600/50 ring-1 ring-emerald-500/20 hover:border-emerald-400'
@@ -1720,7 +1822,11 @@ export default function CommonCodoRules() {
                 )
                   .filter((section) => section.rules.length > 0)
                   .map((section) => (
-                    <section key={section.key} className="min-w-0 flex flex-col gap-3">
+                    <section
+                      key={section.key}
+                      id={`codo-section-${section.key}`}
+                      className="min-w-0 flex scroll-mt-24 flex-col gap-3"
+                    >
                       <div className="flex flex-wrap items-center gap-2 px-0.5">
                         <h2
                           className={cn(
@@ -1755,7 +1861,7 @@ export default function CommonCodoRules() {
                         <span className="text-xs text-muted-foreground">{section.hint}</span>
                       </div>
                       <div className="grid gap-3 sm:gap-4 grid-cols-1 min-w-0">
-                        {section.rules.map((rule) => renderRuleCard(rule))}
+                        {section.rules.map((rule) => renderRuleCard(rule, section.key))}
                       </div>
                     </section>
                   ))}
