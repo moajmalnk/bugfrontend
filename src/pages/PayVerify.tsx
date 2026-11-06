@@ -1,5 +1,5 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Navigate, useSearchParams } from 'react-router-dom';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import { Navigate, useNavigate, useSearchParams } from 'react-router-dom';
 import {
   AlertTriangle,
   Banknote,
@@ -20,6 +20,7 @@ import {
   Trash2,
   TrendingUp,
   Unlock,
+  UserRound,
   Users,
   Wallet,
 } from 'lucide-react';
@@ -264,7 +265,17 @@ type AttendanceDayRow = {
   check_in?: string | null;
   check_out?: string | null;
   work_mode?: string | null;
+  leave_type_code?: string | null;
+  leave_type_name?: string | null;
 };
+
+/** Casual, sick, personal, and official leave are paid. Unpaid leave credits none. */
+function leaveIsPaid(day: AttendanceDayRow): boolean {
+  const code = String(day.leave_type_code || '').toLowerCase();
+  if (code === 'paid' || code === 'sick' || code === 'personal' || code === 'corporate') return true;
+  if (code === 'unpaid') return false;
+  return Number(day.hours || 0) > 0;
+}
 
 function asAttendanceDays(raw: PayVerifyWeek['attendance_days']): AttendanceDayRow[] {
   if (!Array.isArray(raw)) return [];
@@ -281,33 +292,62 @@ function shortDayLabel(iso: string): string {
 function VerifyTimeSummary({
   hours,
   leaveDays,
+  leaveHours,
   otHours,
   days,
   title,
+  paid,
 }: {
   hours: number | string | undefined;
   leaveDays: number | string | undefined;
+  leaveHours?: number | string;
   otHours: number | string | undefined;
   days?: AttendanceDayRow[];
   title?: string;
+  paid?: boolean;
 }) {
   const dayRows = (days || []).filter((d) => {
     const status = String(d.day_status || '');
     return status === 'worked' || status === 'leave' || Number(d.hours) > 0;
   });
+  const leaveRows = dayRows.filter((d) => String(d.day_status || '') === 'leave');
+  const leaveHoursShown =
+    leaveHours != null && leaveHours !== ''
+      ? Number(leaveHours)
+      : leaveRows.reduce((sum, d) => sum + Number(d.hours || 0), 0);
 
   return (
     <div className="rounded-xl border border-emerald-200/70 bg-emerald-50/50 p-3 dark:border-emerald-900/40 dark:bg-emerald-950/25">
-      {title ? (
-        <p className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-emerald-800/80 dark:text-emerald-200/80">
-          {title}
-        </p>
-      ) : null}
+      <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+        {title ? (
+          <p className="text-[11px] font-semibold uppercase tracking-wide text-emerald-800/80 dark:text-emerald-200/80">
+            {title}
+          </p>
+        ) : (
+          <span />
+        )}
+        {paid != null ? (
+          <span
+            className={cn(
+              'rounded-xl px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide',
+              paid
+                ? 'bg-emerald-600 text-white'
+                : 'bg-gray-200 text-gray-700 dark:bg-gray-800 dark:text-gray-200'
+            )}
+          >
+            {paid ? 'Paid' : 'Unpaid'}
+          </span>
+        ) : null}
+      </div>
       <div className="grid grid-cols-12 gap-2">
         {[
-          { label: 'Hours', value: formatHours(hours) },
-          { label: 'Leave', value: `${leaveDays ?? 0}d` },
-          { label: 'OT', value: formatHours(otHours) },
+          { label: 'Hours', value: formatHours(hours), detail: null as string | null },
+          {
+            label: 'Leave',
+            value: `${leaveDays ?? 0}d`,
+            detail: leaveHoursShown > 0 ? formatHours(leaveHoursShown) : null,
+          },
+          { label: 'OT', value: formatHours(otHours), detail: null as string | null },
         ].map((cell) => (
           <div
             key={cell.label}
@@ -317,9 +357,41 @@ function VerifyTimeSummary({
               {cell.label}
             </p>
             <p className="mt-0.5 text-sm font-semibold tabular-nums text-foreground">{cell.value}</p>
+            {cell.detail ? (
+              <p className="mt-0.5 text-[10px] tabular-nums text-muted-foreground">{cell.detail}</p>
+            ) : null}
           </div>
         ))}
       </div>
+      {leaveRows.length > 0 ? (
+        <div className="mt-2 flex flex-col gap-1">
+          <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+            Each leave
+          </p>
+          {leaveRows.map((d) => {
+            const date = String(d.date || '');
+            const paidLeave = leaveIsPaid(d);
+            const typeName = String(d.leave_type_name || '').trim();
+            return (
+              <div
+                key={`leave-${date}`}
+                className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-amber-200/70 bg-amber-50/70 px-2.5 py-1.5 text-[11px] dark:border-amber-900/50 dark:bg-amber-950/30"
+              >
+                <span className="min-w-0 font-medium text-foreground">
+                  {date ? shortDayLabel(date) : '—'}
+                  <span className={cn('ml-1.5', paidLeave ? 'text-emerald-700 dark:text-emerald-300' : 'text-rose-700 dark:text-rose-300')}>
+                    {paidLeave ? 'Paid' : 'Unpaid'}
+                  </span>
+                  {typeName ? <span className="ml-1.5 text-muted-foreground">{typeName}</span> : null}
+                </span>
+                <span className="tabular-nums font-semibold text-foreground">
+                  {formatHours(d.hours)}
+                </span>
+              </div>
+            );
+          })}
+        </div>
+      ) : null}
       {dayRows.length > 0 ? (
         <div className="mt-2 flex flex-col gap-1.5">
           <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
@@ -336,16 +408,33 @@ function VerifyTimeSummary({
                   key={date || `${status}-${d.hours}`}
                   className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-border/60 bg-background/80 px-2.5 py-1.5 text-[11px]"
                 >
-                  <span className="font-medium text-foreground">
+                  <span className="min-w-0 font-medium text-foreground">
                     {date ? shortDayLabel(date) : '—'}
                     {status === 'leave' ? (
-                      <span className="ml-1.5 text-amber-700 dark:text-amber-300">Leave</span>
+                      <span
+                        className={cn(
+                          'ml-1.5',
+                          leaveIsPaid(d)
+                            ? 'text-emerald-700 dark:text-emerald-300'
+                            : 'text-rose-700 dark:text-rose-300'
+                        )}
+                      >
+                        {leaveIsPaid(d) ? 'Paid leave' : 'Unpaid leave'}
+                      </span>
                     ) : null}
                   </span>
                   <span className="tabular-nums text-muted-foreground">
-                    {inAt && outAt ? `${inAt}–${outAt} · ` : null}
-                    {formatHours(Number(d.hours || 0) + Number(d.overtime_hours || 0))}
-                    {Number(d.overtime_hours) > 0 ? ` · incl. ${formatHours(d.overtime_hours)} OT` : ''}
+                    {status === 'leave' ? (
+                      formatHours(d.hours)
+                    ) : (
+                      <>
+                        {inAt && outAt ? `${inAt}–${outAt} · ` : null}
+                        {formatHours(Number(d.hours || 0) + Number(d.overtime_hours || 0))}
+                        {Number(d.overtime_hours) > 0
+                          ? ` · incl. ${formatHours(d.overtime_hours)} OT`
+                          : ''}
+                      </>
+                    )}
                   </span>
                 </div>
               );
@@ -478,6 +567,7 @@ function RosterCardSkeleton() {
 }
 
 export default function PayVerify() {
+  const navigate = useNavigate();
   const { currentUser: user } = useAuth();
   // Why: Team payroll UI is Super Admin only — regular Admins share JWT role `admin`.
   const isAdmin = isSuperAdminUser(user);
@@ -584,23 +674,9 @@ export default function PayVerify() {
     void load();
   }, [load]);
 
-  // Why: From "Open Pay Verify", open week details once per month load (do not fight Collapse).
-  const autoExpandKeyRef = useRef('');
   useEffect(() => {
-    if (!data?.roster?.length) return;
-    const key = `${month}|${role}|${data.roster.map((e) => e.user.id).join(',')}`;
-    if (autoExpandKeyRef.current === key) return;
-    autoExpandKeyRef.current = key;
-    const pending = data.roster.find((e) =>
-      e.weeks.some(
-        (w) =>
-          w.employee_status !== 'verified' &&
-          w.admin_status !== 'approved' &&
-          canVerifyWeekPeriod(w)
-      )
-    );
-    setExpandedId((pending || data.roster[0]).user.id);
-  }, [data?.roster, month, role]);
+    setExpandedId(null);
+  }, [month, role]);
 
   // Why: if URL month is outside joining→today, snap to the clamped API month.
   useEffect(() => {
@@ -1307,7 +1383,7 @@ export default function PayVerify() {
             return (
               <article
                 key={entry.user.id}
-                className="col-span-12 flex flex-col gap-4 rounded-2xl border border-gray-200/60 bg-white/85 p-4 shadow-sm dark:border-gray-700/60 dark:bg-gray-900/85 sm:p-5 xl:col-span-6"
+                className="@container col-span-12 flex flex-col gap-4 rounded-2xl border border-gray-200/60 bg-white/85 p-4 shadow-sm dark:border-gray-700/60 dark:bg-gray-900/85 sm:p-5 xl:col-span-6"
               >
                 {/* Card header */}
                 <div className="flex flex-wrap items-start justify-between gap-3">
@@ -1429,7 +1505,7 @@ export default function PayVerify() {
                           <div
                             key={week.week_start}
                             className={cn(
-                              'flex flex-col gap-2 rounded-xl border px-3 py-2.5 sm:flex-row sm:items-center sm:justify-between',
+                              'flex flex-col gap-3 rounded-xl border px-3 py-2.5',
                               needsCorrection
                                 ? 'border-amber-300/80 bg-amber-50/50 dark:border-amber-800/50 dark:bg-amber-950/25'
                                 : periodState === 'upcoming'
@@ -1465,8 +1541,10 @@ export default function PayVerify() {
                                 <VerifyTimeSummary
                                   hours={week.worked_hours}
                                   leaveDays={week.leave_days}
+                                  leaveHours={week.leave_hours}
                                   otHours={week.ot_hours}
                                   days={asAttendanceDays(week.attendance_days)}
+                                  paid={week.admin_status === 'approved'}
                                 />
                               </div>
                               <p
@@ -1492,9 +1570,9 @@ export default function PayVerify() {
                                 />
                               </div>
                             </div>
-                            <div className="flex flex-wrap items-center gap-2">
+                            <div className="grid grid-cols-12 gap-2">
                               {!weekCompletable ? (
-                                <span className="text-[11px] text-muted-foreground">
+                                <span className="col-span-12 text-[11px] text-muted-foreground">
                                   {periodState === 'upcoming'
                                     ? 'Available after this week starts and ends'
                                     : 'Verify after the week ends'}
@@ -1508,7 +1586,7 @@ export default function PayVerify() {
                                     <Button
                                       type="button"
                                       size="sm"
-                                      className="h-8 rounded-xl bg-emerald-600 text-white hover:bg-emerald-700"
+                                      className="col-span-12 h-11 min-w-0 justify-center rounded-xl bg-emerald-600 px-3 text-white hover:bg-emerald-700 @sm:col-span-6"
                                       disabled={busy || monthLocked}
                                       onClick={() =>
                                         setNoteAction({
@@ -1526,7 +1604,7 @@ export default function PayVerify() {
                                       type="button"
                                       size="sm"
                                       variant="outline"
-                                      className="h-8 rounded-xl"
+                                      className="col-span-12 h-11 min-w-0 justify-center rounded-xl px-3 @sm:col-span-6"
                                       disabled={busy || monthLocked}
                                       onClick={() =>
                                         setNoteAction({
@@ -1549,7 +1627,7 @@ export default function PayVerify() {
                                     <Button
                                       type="button"
                                       size="sm"
-                                      className="h-8 rounded-xl"
+                                      className="col-span-12 h-11 min-w-0 justify-center rounded-xl px-3 @sm:col-span-6"
                                       disabled={busy}
                                       onClick={() =>
                                         setNoteAction({
@@ -1566,7 +1644,7 @@ export default function PayVerify() {
                                       type="button"
                                       size="sm"
                                       variant="outline"
-                                      className="h-8 rounded-xl"
+                                      className="col-span-12 h-11 min-w-0 justify-center rounded-xl px-3 @sm:col-span-6"
                                       disabled={busy}
                                       onClick={() =>
                                         setNoteAction({
@@ -1699,12 +1777,25 @@ export default function PayVerify() {
                   {!monthCompletable && !monthLocked ? (
                     <p className="text-[11px] text-muted-foreground">{monthPeriodHint}</p>
                   ) : null}
-                  <div className="flex flex-wrap gap-2">
+                  <div className="grid grid-cols-12 gap-2">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="col-span-12 h-11 min-w-0 justify-center rounded-xl px-3 @sm:col-span-6"
+                    onClick={() =>
+                      navigate(
+                        `/${(user?.role || 'admin').toLowerCase()}/users/${entry.user.id}`
+                      )
+                    }
+                  >
+                    <UserRound className="mr-1.5 h-4 w-4 shrink-0" />
+                    <span className="truncate">Profile details</span>
+                  </Button>
                   {(self || isAdmin) && m.employee_status !== 'verified' && !monthLocked && (
                     <>
                       <Button
                         type="button"
-                        className="rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 text-white hover:from-emerald-700 hover:to-teal-700"
+                        className="col-span-12 h-11 min-w-0 justify-center rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 px-3 text-white hover:from-emerald-700 hover:to-teal-700 @sm:col-span-6"
                         disabled={busy || !monthCompletable}
                         title={
                           monthCompletable
@@ -1719,7 +1810,7 @@ export default function PayVerify() {
                       <Button
                         type="button"
                         variant="outline"
-                        className="rounded-xl"
+                        className="col-span-12 h-11 min-w-0 justify-center rounded-xl px-3 @sm:col-span-6"
                         disabled={busy || !monthCompletable}
                         title={
                           monthCompletable
@@ -1739,57 +1830,57 @@ export default function PayVerify() {
                       <Button
                         type="button"
                         variant="outline"
-                        className="rounded-xl gap-1.5"
+                        className="col-span-12 h-11 min-w-0 justify-center gap-1.5 rounded-xl px-3 @sm:col-span-6"
                         disabled={busy}
                         onClick={() => void openBankDetails(entry)}
                       >
-                        <Landmark className="h-3.5 w-3.5" />
-                        Bank details
+                        <Landmark className="h-3.5 w-3.5 shrink-0" />
+                        <span className="truncate">Bank details</span>
                       </Button>
                       <Button
                         type="button"
                         variant="outline"
-                        className="rounded-xl gap-1.5"
+                        className="col-span-12 h-11 min-w-0 justify-center gap-1.5 rounded-xl px-3 @sm:col-span-6"
                         disabled={busy}
                         onClick={() => void openSalaryHike(entry)}
                       >
-                        <TrendingUp className="h-3.5 w-3.5" />
-                        Salary hike
+                        <TrendingUp className="h-3.5 w-3.5 shrink-0" />
+                        <span className="truncate">Salary hike</span>
                       </Button>
                       {!monthLocked && (
                         <Button
                           type="button"
                           variant="outline"
-                          className="rounded-xl"
+                          className="col-span-12 h-11 min-w-0 justify-center rounded-xl px-3 @sm:col-span-6"
                           disabled={busy}
                           onClick={() => void openAdjustment(entry)}
                         >
-                          Add adjustment
+                          <span className="truncate">Add adjustment</span>
                         </Button>
                       )}
                       {m.employee_status === 'verified' && !monthLocked && (
                         <Button
                           type="button"
-                          className="rounded-xl gap-1.5"
+                          className="col-span-12 h-11 min-w-0 justify-center gap-1.5 rounded-xl px-3 @sm:col-span-6"
                           disabled={busy}
                           onClick={() => setNoteAction({ kind: 'admin-month', entry, action: 'lock' })}
                         >
-                          <Lock className="h-3.5 w-3.5" />
-                          Mark as paid
+                          <Lock className="h-3.5 w-3.5 shrink-0" />
+                          <span className="truncate">Mark as paid</span>
                         </Button>
                       )}
                       {monthLocked && (
                         <Button
                           type="button"
                           variant="outline"
-                          className="rounded-xl gap-1.5"
+                          className="col-span-12 h-11 min-w-0 justify-center gap-1.5 rounded-xl px-3 @sm:col-span-6"
                           disabled={busy}
                           onClick={() =>
                             setNoteAction({ kind: 'admin-month', entry, action: 'unlock' })
                           }
                         >
-                          <Unlock className="h-3.5 w-3.5" />
-                          Mark unpaid
+                          <Unlock className="h-3.5 w-3.5 shrink-0" />
+                          <span className="truncate">Mark unpaid</span>
                         </Button>
                       )}
                     </>
@@ -2270,8 +2361,10 @@ export default function PayVerify() {
                   title="Times you are confirming"
                   hours={noteAction.week.worked_hours}
                   leaveDays={noteAction.week.leave_days}
+                  leaveHours={noteAction.week.leave_hours}
                   otHours={noteAction.week.ot_hours}
                   days={asAttendanceDays(noteAction.week.attendance_days)}
+                  paid={noteAction.week.admin_status === 'approved'}
                 />
               ) : null}
               {noteAction?.kind === 'emp-month' ||
@@ -2283,7 +2376,10 @@ export default function PayVerify() {
                   title="Month totals you are confirming"
                   hours={noteAction.entry.month.total_hours}
                   leaveDays={noteAction.entry.month.leave_days}
+                  leaveHours={noteAction.entry.month.leave_hours}
                   otHours={noteAction.entry.month.ot_hours}
+                  days={noteAction.entry.month.attendance_days as AttendanceDayRow[] | undefined}
+                  paid={noteAction.entry.month.admin_status === 'approved'}
                 />
               ) : null}
               {(noteAction?.kind === 'emp-week' && noteAction.status === 'correction_needed') ||

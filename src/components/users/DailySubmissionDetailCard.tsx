@@ -437,9 +437,9 @@ export function DailySubmissionDetailCard({
           >
             {isOfficial
               ? 'Official leave credited as 8 work hours for this day.'
-              : ['paid', 'personal'].includes(leaveCode)
+              : ['paid', 'sick', 'personal'].includes(leaveCode)
                 ? 'Leave credited as 8 work hours for this day.'
-                : 'Attendance is blocked for this approved leave day.'}
+                : 'Unpaid leave. No hours credited for this day.'}
             {submission.leave_request_id
               ? ` · Request #${submission.leave_request_id}`
               : ''}
