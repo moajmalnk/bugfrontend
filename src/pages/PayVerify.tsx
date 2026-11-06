@@ -344,8 +344,8 @@ function VerifyTimeSummary({
                   </span>
                   <span className="tabular-nums text-muted-foreground">
                     {inAt && outAt ? `${inAt}–${outAt} · ` : null}
-                    {formatHours(d.hours)}
-                    {Number(d.overtime_hours) > 0 ? ` · OT ${formatHours(d.overtime_hours)}` : ''}
+                    {formatHours(Number(d.hours || 0) + Number(d.overtime_hours || 0))}
+                    {Number(d.overtime_hours) > 0 ? ` · incl. ${formatHours(d.overtime_hours)} OT` : ''}
                   </span>
                 </div>
               );
@@ -1331,7 +1331,11 @@ export default function PayVerify() {
                 {/* Metrics */}
                 <div className="grid grid-cols-12 gap-2">
                   {[
-                    { label: 'Hours', value: formatHours(m.total_hours), hint: null as string | null },
+                    {
+                      label: 'Hours',
+                      value: formatHours(m.total_hours),
+                      hint: Number(m.ot_hours) > 0 ? `includes ${formatHours(m.ot_hours)} approved OT` : null,
+                    },
                     { label: 'Days', value: String(m.worked_days ?? 0), hint: null },
                     { label: 'Leave', value: `${m.leave_days ?? 0}d`, hint: null },
                     { label: 'OT', value: formatHours(m.ot_hours), hint: null },
@@ -1672,9 +1676,8 @@ export default function PayVerify() {
                 {/* Salary math */}
                 <div className="rounded-xl border border-emerald-200/50 bg-gradient-to-r from-emerald-50/80 to-teal-50/60 px-3 py-2.5 text-xs dark:border-emerald-900/40 dark:from-emerald-950/20 dark:to-teal-950/20">
                   <span className="font-medium text-foreground">
-                    {Number(m.ot_hours) > 0
-                      ? `(${formatHours(m.total_hours)} + ${formatHours(m.ot_hours)} OT)`
-                      : formatHours(m.total_hours)}
+                    {formatHours(m.total_hours)}
+                    {Number(m.ot_hours) > 0 ? ` (includes ${formatHours(m.ot_hours)} approved OT)` : ''}
                     {rate > 0 ? ` × ₹${rate}` : ' × (no rate)'}
                   </span>
                   <span className="text-muted-foreground"> = {formatInr(m.gross_estimate)}</span>
