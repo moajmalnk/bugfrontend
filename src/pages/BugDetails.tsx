@@ -34,6 +34,21 @@ interface ApiResponse<T> {
   data?: T;
 }
 
+/** Why: Arrow keys must not steal caret movement inside forms, editors, or open dialogs. */
+function isBugNavTypingTarget(target: EventTarget | null): boolean {
+  if (!(target instanceof HTMLElement)) return false;
+  const tag = target.tagName;
+  if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT") return true;
+  if (target.isContentEditable) return true;
+  if (target.closest('[contenteditable="true"], [role="textbox"], [role="combobox"]')) {
+    return true;
+  }
+  if (target.closest('[role="dialog"][data-state="open"], [role="alertdialog"][data-state="open"]')) {
+    return true;
+  }
+  return false;
+}
+
 // Skeleton components for loading state
 const BugHeaderSkeleton = () => (
   <div className="space-y-4">
@@ -945,6 +960,49 @@ const BugDetails = () => {
     return true;
   };
 
+  const openSiblingRef = useRef(openSibling);
+  openSiblingRef.current = openSibling;
+  const siblingNavRef = useRef({
+    prevBugId,
+    nextBugId,
+    busy: false,
+  });
+  siblingNavRef.current = {
+    prevBugId,
+    nextBugId,
+    busy: isNavigating || bugListLoading || isLoading,
+  };
+
+  // Why: Left/Right arrows match the Previous/Next bar so reviewers can walk the queue without the mouse.
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.defaultPrevented) return;
+      if (event.altKey || event.ctrlKey || event.metaKey || event.shiftKey) return;
+      if (event.repeat) return;
+      if (event.key !== "ArrowLeft" && event.key !== "ArrowRight") return;
+      if (isBugNavTypingTarget(event.target) || isBugNavTypingTarget(document.activeElement)) {
+        return;
+      }
+
+      const { prevBugId: prevId, nextBugId: nextId, busy } = siblingNavRef.current;
+      if (busy) return;
+
+      if (event.key === "ArrowLeft") {
+        if (!prevId) return;
+        event.preventDefault();
+        openSiblingRef.current(prevId);
+        return;
+      }
+
+      if (!nextId) return;
+      event.preventDefault();
+      openSiblingRef.current(nextId);
+    };
+
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, []);
+
   const commitJump = () => {
     if (jumpBusyRef.current || isNavigating) return;
     const typed = Number.parseInt(jumpValue, 10);
@@ -1210,6 +1268,8 @@ const BugDetails = () => {
               onClick={() => openSibling(prevBugId)}
               disabled={!prevBugId || bugListLoading || isLoading || isNavigating}
               aria-label="Previous bug"
+              aria-keyshortcuts="ArrowLeft"
+              title="Previous bug (←)"
             >
               {isNavigating && idsEqual(navigatingToBugIdRef.current, prevBugId) ? (
                 <>
@@ -1279,6 +1339,8 @@ const BugDetails = () => {
               onClick={() => openSibling(nextBugId)}
               disabled={!nextBugId || bugListLoading || isLoading || isNavigating}
               aria-label="Next bug"
+              aria-keyshortcuts="ArrowRight"
+              title="Next bug (→)"
             >
               {isNavigating && idsEqual(navigatingToBugIdRef.current, nextBugId) ? (
                 <>
@@ -1293,6 +1355,12 @@ const BugDetails = () => {
               )}
             </button>
           </div>
+          <p className="relative pb-3 text-center text-[11px] text-muted-foreground">
+            Keyboard: <kbd className="rounded-md border border-border/60 bg-background px-1.5 py-0.5 font-medium">←</kbd>
+            {" "}previous ·{" "}
+            <kbd className="rounded-md border border-border/60 bg-background px-1.5 py-0.5 font-medium">→</kbd>
+            {" "}next
+          </p>
         </div>
       </nav>
     </div>
