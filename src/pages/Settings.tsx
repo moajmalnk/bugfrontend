@@ -1,6 +1,10 @@
 import { AnnouncementManager, type AnnouncementManagerHandle } from "@/components/settings/AnnouncementManager";
 import { BugTypesTab, type BugTypesTabHandle } from "@/components/settings/BugTypesTab";
 import {
+  CustomPrintingTab,
+  type CustomPrintingTabHandle,
+} from "@/components/settings/CustomPrintingTab";
+import {
   NotificationSettingsCard,
   type NotificationSettingsHandle,
 } from "@/components/settings/NotificationSettings";
@@ -56,6 +60,7 @@ import {
   Megaphone,
   Moon,
   Plus,
+  Printer,
   Save,
   Settings as SettingsIcon,
   Shield,
@@ -103,12 +108,14 @@ const Settings = () => {
   const rolesRef = useRef<RolesTabHandle>(null);
   const announcementsRef = useRef<AnnouncementManagerHandle>(null);
   const notificationsRef = useRef<NotificationSettingsHandle>(null);
+  const printingRef = useRef<CustomPrintingTabHandle>(null);
   const settingsTabs = [
     { value: "general", label: "General", shortLabel: "General", icon: SettingsIcon },
     { value: "notifications", label: "Notifications", shortLabel: "Alerts", icon: Bell },
     { value: "announcements", label: "Announcements", shortLabel: "News", icon: Megaphone },
     { value: "types", label: "Bug Types", shortLabel: "Types", icon: Tags },
     { value: "roles", label: "Roles", shortLabel: "Roles", icon: Users },
+    { value: "printing", label: "Printing", shortLabel: "Print", icon: Printer },
   ];
   const activeSettingsTab =
     settingsTabs.find((tab) => tab.value === activeTab) ?? settingsTabs[0];
@@ -321,6 +328,13 @@ const Settings = () => {
           onClick: () => notificationsRef.current?.save(),
           disabled: false,
         };
+      case "printing":
+        return {
+          label: "Print image",
+          icon: Printer,
+          onClick: () => printingRef.current?.openPrint(),
+          disabled: false,
+        };
       default:
         return {
           label: "Save changes",
@@ -404,7 +418,7 @@ const Settings = () => {
                   <ChevronDown className="h-4 w-4 opacity-70" />
                 </Button>
               </div>
-              <TabsList className="hidden lg:grid w-full grid-cols-5 h-14 bg-transparent p-1">
+              <TabsList className="hidden lg:grid w-full grid-cols-6 h-14 bg-transparent p-1">
                 {settingsTabs.map((tab) => (
                   <TabsTrigger
                     key={tab.value}
@@ -881,6 +895,15 @@ const Settings = () => {
               <div className="absolute inset-0 bg-gradient-to-r from-gray-50/30 to-blue-50/30 dark:from-gray-800/30 dark:to-blue-900/30 rounded-2xl pointer-events-none" />
               <div className="relative bg-white/70 dark:bg-gray-900/70 backdrop-blur-sm border border-gray-200/50 dark:border-gray-700/50 rounded-2xl p-3 sm:p-6 md:p-8 shadow-xl min-w-0 overflow-x-hidden">
                 <RolesTab ref={rolesRef} />
+              </div>
+            </div>
+          </TabsContent>
+
+          <TabsContent value="printing" className="space-y-4 sm:space-y-6 mt-4 sm:mt-6 min-w-0">
+            <div className="relative min-w-0 w-full">
+              <div className="absolute inset-0 bg-gradient-to-r from-sky-50/30 to-blue-50/30 dark:from-sky-900/20 dark:to-blue-900/20 rounded-2xl pointer-events-none" />
+              <div className="relative bg-white/70 dark:bg-gray-900/70 backdrop-blur-sm border border-gray-200/50 dark:border-gray-700/50 rounded-2xl p-3 sm:p-6 md:p-8 shadow-xl min-w-0 overflow-x-hidden">
+                <CustomPrintingTab ref={printingRef} />
               </div>
             </div>
           </TabsContent>

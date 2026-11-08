@@ -274,9 +274,18 @@ export class ReceiptWriter {
       this.brand(fallbackText);
       return;
     }
-    const { width, height, rows, previewUrl } = logo;
-    this.fullWidthRaster(height, placeRows(rows, width, this.centreStart(width)));
-    this.block({ type: "image", src: previewUrl, widthDots: width, heightDots: height });
+    this.bitmap(logo);
+  }
+
+  /**
+   * Why: Custom / Canva PNGs must go out as ESC/POS raster. OS Print sends
+   * PostScript and the HOP-H58 prints that as literal text.
+   */
+  bitmap(image: MonoBitmap) {
+    const { width, height, rows, previewUrl } = image;
+    const drawWidth = Math.min(width, this.area);
+    this.fullWidthRaster(height, placeRows(rows, width, this.centreStart(drawWidth)));
+    this.block({ type: "image", src: previewUrl, widthDots: drawWidth, heightDots: height });
   }
 
   /** Centred, bold, double-height title such as a project or employee name. */
