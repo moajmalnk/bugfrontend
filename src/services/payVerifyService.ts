@@ -118,11 +118,22 @@ export type PayVerifyRosterEntry = {
     role: string;
     role_bucket: string;
     tester_type?: string | null;
+    /** 1 = active account, 0 = deactivated (still listed when paid/hours exist). */
+    account_active?: number | boolean | null;
   };
   weeks: PayVerifyWeek[];
   month: PayVerifyMonth;
   rate_info?: PayVerifyRateInfo | null;
 };
+
+/** Why: Paid tab must distinguish salary-paid active vs deactivated staff. */
+export function isPayVerifyAccountActive(
+  entry: Pick<PayVerifyRosterEntry, 'user'> | { user?: { account_active?: number | boolean | null } }
+): boolean {
+  const v = entry.user?.account_active;
+  if (v === false || v === 0) return false;
+  return true;
+}
 
 export type PayVerifyMonthBounds = {
   min: string;

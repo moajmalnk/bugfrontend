@@ -20,7 +20,9 @@ import {
   Trash2,
   TrendingUp,
   Unlock,
+  UserCheck,
   UserRound,
+  UserX,
   Users,
   Wallet,
 } from 'lucide-react';
@@ -95,6 +97,7 @@ import {
   adminWeekVerifyLabel,
   canVerifyMonthPeriod,
   canVerifyWeekPeriod,
+  isPayVerifyAccountActive,
   payVerifyPeriodHint,
   payVerifyPeriodState,
   seedPayVerifyRates,
@@ -112,6 +115,7 @@ import {
 } from '@/services/payVerifyService';
 
 type PayStatusFilter = 'all' | 'pending' | 'completed' | 'paid';
+type AccountActivityFilter = 'all' | 'active' | 'inactive';
 
 type NoteAction =
   | { kind: 'emp-week'; entry: PayVerifyRosterEntry; week: PayVerifyWeek; status: 'verified' | 'correction_needed' }
@@ -584,6 +588,9 @@ export default function PayVerify() {
       : statusParam === 'all'
         ? 'all'
         : 'pending';
+  const accountParam = (searchParams.get('account') || 'all').toLowerCase();
+  const accountFilter: AccountActivityFilter =
+    accountParam === 'active' || accountParam === 'inactive' ? accountParam : 'all';
 
   const [data, setData] = useState<PayVerifyMonthResponse | null>(null);
   const [loading, setLoading] = useState(true);
@@ -632,6 +639,16 @@ export default function PayVerify() {
     const next = new URLSearchParams(searchParams);
     if (s === 'all') next.delete('status');
     else next.set('status', s);
+    // Why: Active/Inactive chips only apply inside Paid — reset when leaving Paid.
+    if (s !== 'paid') next.delete('account');
+    setSearchParams(next, { replace: true });
+  };
+
+  const setAccountFilter = (a: AccountActivityFilter) => {
+    const next = new URLSearchParams(searchParams);
+    if (a === 'all') next.delete('account');
+    else next.set('account', a);
+    next.set('status', 'paid');
     setSearchParams(next, { replace: true });
   };
 
@@ -694,11 +711,16 @@ export default function PayVerify() {
     const q = search.trim().toLowerCase();
     return data.roster.filter((e) => {
       if (statusFilter !== 'all' && entryPayStatus(e) !== statusFilter) return false;
+      if (statusFilter === 'paid' && accountFilter !== 'all') {
+        const active = isPayVerifyAccountActive(e);
+        if (accountFilter === 'active' && !active) return false;
+        if (accountFilter === 'inactive' && active) return false;
+      }
       if (!q) return true;
       const hay = `${e.user.name} ${e.user.username}`.toLowerCase();
       return hay.includes(q);
     });
-  }, [data, search, statusFilter]);
+  }, [data, search, statusFilter, accountFilter]);
 
   const statusCounts = useMemo(() => {
     const roster = data?.roster ?? [];
@@ -707,6 +729,18 @@ export default function PayVerify() {
       counts[entryPayStatus(e)] += 1;
     }
     return counts;
+  }, [data]);
+
+  const paidAccountCounts = useMemo(() => {
+    const roster = data?.roster ?? [];
+    let active = 0;
+    let inactive = 0;
+    for (const e of roster) {
+      if (entryPayStatus(e) !== 'paid') continue;
+      if (isPayVerifyAccountActive(e)) active += 1;
+      else inactive += 1;
+    }
+    return { active, inactive, all: active + inactive };
   }, [data]);
 
   const pipeline = useMemo(() => {
@@ -1247,6 +1281,62 @@ export default function PayVerify() {
                 ))}
               </ListPageTabsShell>
             </Tabs>
+            {statusFilter === 'paid' ? (
+              <div className="mt-3 flex flex-wrap items-center gap-2">
+                <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+                  Account
+                </p>
+                {(
+                  [
+                    { value: 'all', label: 'All paid', count: paidAccountCounts.all, icon: Users },
+                    {
+                      value: 'active',
+                      label: 'Active',
+                      count: paidAccountCounts.active,
+                      icon: UserCheck,
+                    },
+                    {
+                      value: 'inactive',
+                      label: 'Inactive',
+                      count: paidAccountCounts.inactive,
+                      icon: UserX,
+                    },
+                  ] as const
+                ).map((chip) => {
+                  const selected = accountFilter === chip.value;
+                  return (
+                    <button
+                      key={chip.value}
+                      type="button"
+                      onClick={() => setAccountFilter(chip.value)}
+                      className={cn(
+                        'inline-flex h-9 items-center gap-1.5 rounded-xl border px-3 text-xs font-semibold transition-colors',
+                        selected
+                          ? chip.value === 'inactive'
+                            ? 'border-rose-300 bg-rose-50 text-rose-800 dark:border-rose-800 dark:bg-rose-950/40 dark:text-rose-200'
+                            : 'border-emerald-300 bg-emerald-50 text-emerald-800 dark:border-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-200'
+                          : 'border-border bg-background/80 text-muted-foreground hover:bg-muted/60'
+                      )}
+                    >
+                      <chip.icon className="h-3.5 w-3.5 shrink-0" aria-hidden />
+                      <span>{chip.label}</span>
+                      <span
+                        className={cn(
+                          'inline-flex h-5 min-w-[1.25rem] items-center justify-center rounded-lg px-1.5 text-[10px] font-bold tabular-nums',
+                          selected
+                            ? chip.value === 'inactive'
+                              ? 'bg-rose-100 text-rose-800 dark:bg-rose-950/60 dark:text-rose-200'
+                              : 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-200'
+                            : 'bg-muted text-muted-foreground'
+                        )}
+                      >
+                        {chip.count}
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+            ) : null}
           </div>
 
           {/* Team (admin) */}
@@ -1352,6 +1442,8 @@ export default function PayVerify() {
           <p className="mx-auto mt-1 max-w-md text-sm text-muted-foreground">
             {search.trim()
               ? 'No names match your search. Clear the filter or try another month.'
+              : statusFilter === 'paid' && accountFilter !== 'all'
+                ? `No ${accountFilter} paid people in this view for the selected month.`
               : statusFilter !== 'all'
                 ? `No ${statusFilter} people in this view for the selected month.`
                 : 'There are no roster members for this filter in the selected month.'}
@@ -1368,6 +1460,7 @@ export default function PayVerify() {
             const prevRate = entry.rate_info?.previous_rate ?? null;
             const self = isSelf(entry);
             const monthLocked = m.admin_status === 'approved';
+            const accountActive = isPayVerifyAccountActive(entry);
             const displayName = entry.user.name || entry.user.username;
             const open = expandedId === entry.user.id;
             const weeksUserDone = entry.weeks.filter((w) => w.employee_status === 'verified').length;
@@ -1392,9 +1485,31 @@ export default function PayVerify() {
                       {initials(displayName)}
                     </div>
                     <div className="min-w-0">
-                      <h2 className="truncate text-base font-semibold text-foreground sm:text-lg">
-                        {displayName}
-                      </h2>
+                      <div className="flex flex-wrap items-center gap-2">
+                        <h2 className="truncate text-base font-semibold text-foreground sm:text-lg">
+                          {displayName}
+                        </h2>
+                        <span
+                          className={cn(
+                            'inline-flex items-center gap-1 rounded-xl border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide',
+                            accountActive
+                              ? 'border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-300'
+                              : 'border-rose-200 bg-rose-50 text-rose-700 dark:border-rose-800 dark:bg-rose-950/40 dark:text-rose-300'
+                          )}
+                          title={
+                            accountActive
+                              ? 'Account is active'
+                              : 'Account is inactive (deactivated) — salary may still show as Paid'
+                          }
+                        >
+                          {accountActive ? (
+                            <UserCheck className="h-3 w-3 shrink-0" aria-hidden />
+                          ) : (
+                            <UserX className="h-3 w-3 shrink-0" aria-hidden />
+                          )}
+                          {accountActive ? 'Active' : 'Inactive'}
+                        </span>
+                      </div>
                       <p className="truncate text-xs text-muted-foreground">
                         @{entry.user.username} · {entry.user.role_bucket.replace(/_/g, ' ')}
                         {self ? ' · you' : ''}
