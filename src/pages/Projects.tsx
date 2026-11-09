@@ -66,10 +66,8 @@ import {
 import { Project, projectService } from "@/services/projectService";
 import { complianceService } from "@/services/complianceService";
 import { userService } from "@/services/userService";
-import {
-  whatsappService,
-  type ProjectWhatsAppShareData,
-} from "@/services/whatsappService";
+import { type ProjectWhatsAppShareData } from "@/services/whatsappService";
+import { ProjectCopyDialog } from "@/components/projects/ProjectCopyDialog";
 import { ProjectPrintDialog } from "@/components/projects/ProjectPrintDialog";
 import { useUrlDialogParam } from "@/hooks/useUrlDialogParam";
 import { clientService } from "@/services/clientService";
@@ -85,10 +83,8 @@ import {
   Code,
   FolderKanban,
   Layers,
-  Loader2,
   Lock,
   Copy,
-  Check,
   Shield,
   ShieldCheck,
   TestTube,
@@ -318,8 +314,7 @@ const Projects = () => {
   } = useUrlPagination({ defaultPageSize: 12 });
   const listFromState = listReturnState(location.pathname, location.search);
   const [projectToUndo, setProjectToUndo] = useState<Project | null>(null);
-  const [copyingProjectId, setCopyingProjectId] = useState<string | null>(null);
-  const [copiedProjectId, setCopiedProjectId] = useState<string | null>(null);
+  const [copyProject, setCopyProject] = useState<Project | null>(null);
   const printDialog = useUrlDialogParam("print");
   const printParam = printDialog.value;
   const printProjectId = currentUser?.role === "admin" ? printParam : null;
@@ -502,53 +497,18 @@ const Projects = () => {
     ]
   );
 
-  const handleCopyProject = useCallback(
-    async (project: Project) => {
-      if (copyingProjectId) return;
-      setCopyingProjectId(project.id);
+  const openCopyDialog = useCallback((project: Project) => {
+    setCopyProject(project);
+  }, []);
 
-      try {
-        const briefing = whatsappService.formatProjectShareMessage(
-          await buildProjectShareData(project)
-        );
+  const closeCopyDialog = useCallback(() => {
+    setCopyProject(null);
+  }, []);
 
-        if (navigator.clipboard?.writeText) {
-          await navigator.clipboard.writeText(briefing);
-        } else {
-          const ta = document.createElement("textarea");
-          ta.value = briefing;
-          ta.style.position = "fixed";
-          ta.style.left = "-9999px";
-          document.body.appendChild(ta);
-          ta.select();
-          document.execCommand("copy");
-          ta.remove();
-        }
-
-        setCopiedProjectId(project.id);
-        window.setTimeout(() => {
-          setCopiedProjectId((current) =>
-            current === project.id ? null : current
-          );
-        }, 2000);
-
-        toast({
-          title: "Briefing copied",
-          description: "Project details are on your clipboard — paste anywhere.",
-        });
-      } catch (error) {
-        console.error("Failed to copy project briefing:", error);
-        toast({
-          title: "Copy failed",
-          description: "Could not copy the project briefing. Please try again.",
-          variant: "destructive",
-        });
-      } finally {
-        setCopyingProjectId(null);
-      }
-    },
-    [copyingProjectId, buildProjectShareData]
-  );
+  const loadCopyProjectData = useCallback(() => {
+    if (!copyProject) return Promise.reject(new Error("No project selected"));
+    return buildProjectShareData(copyProject);
+  }, [copyProject, buildProjectShareData]);
 
   const loadPrintProjectData = useCallback(() => {
     if (!printProject) return Promise.reject(new Error("No project selected"));
@@ -2196,19 +2156,12 @@ const Projects = () => {
                           "h-11 w-full min-w-0 px-2 rounded-xl border-emerald-200 dark:border-emerald-800 hover:bg-emerald-50 dark:hover:bg-emerald-950/20 text-emerald-700 dark:text-emerald-300 font-semibold shadow-sm hover:shadow-md transition-all duration-300",
                           copySpansFull && "col-span-2"
                         )}
-                        title="Copy project briefing to clipboard"
-                        disabled={copyingProjectId === project.id}
-                        onClick={() => void handleCopyProject(project)}
+                        title="Copy project details or pin message for WhatsApp"
+                        onClick={() => openCopyDialog(project)}
                       >
-                        {copyingProjectId === project.id ? (
-                          <Loader2 className="h-4 w-4 shrink-0 animate-spin" />
-                        ) : copiedProjectId === project.id ? (
-                          <Check className="h-4 w-4 shrink-0" />
-                        ) : (
-                          <Copy className="h-4 w-4 shrink-0" />
-                        )}
+                        <Copy className="h-4 w-4 shrink-0" />
                         <span className="truncate text-xs sm:text-sm ml-1.5">
-                          {copiedProjectId === project.id ? "Copied" : "Copy"}
+                          Copy
                         </span>
                       </Button>
                     )}
@@ -2513,6 +2466,16 @@ const Projects = () => {
         duration={10}
         onUndo={handleUndoClick}
         onConfirmNow={confirmDelete}
+      />
+
+      <ProjectCopyDialog
+        project={
+          copyProject
+            ? { id: copyProject.id, name: copyProject.name }
+            : null
+        }
+        onClose={closeCopyDialog}
+        loadData={loadCopyProjectData}
       />
 
       {currentUser?.role === "admin" && (

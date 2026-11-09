@@ -120,6 +120,97 @@ class WhatsAppService {
     return cleaned.map((n) => `• ${n}`).join("\n");
   }
 
+  /**
+   * Why: Internal "Bugs | {project}" WhatsApp groups pin a short status board
+   * so testers/devs/TL/CRM see live counts without scrolling the full briefing.
+   */
+  formatProjectPinMessage(data: ProjectWhatsAppShareData): string {
+    const projectUrl = this.getRoleBasedUrl(`/projects/${data.projectId}`);
+    const groupLabel = `Bugs | ${data.projectName}`;
+    const total = Number(data.totalBugs ?? 0);
+    const open = Number(data.openBugs ?? 0);
+    const fixed = Number(data.fixedBugs ?? 0);
+    const updates = data.updatesCount != null ? Number(data.updatesCount) : null;
+    const retests =
+      data.retestsPending != null ? Number(data.retestsPending) : null;
+    const fixRate =
+      total > 0 ? `${Math.round((fixed / total) * 100)}%` : "N/A";
+
+    let message = `📌 *PIN — ${groupLabel}*\n`;
+    message += `_Internal CODO group · no client_\n\n`;
+    message += `*${data.projectName}*\n`;
+    message += this.line("📌 Status:", data.statusLabel);
+
+    if (data.deadlineDateLabel && data.deadlineDateLabel !== "Not set") {
+      let deadline = `🗓️ Deadline: *${data.deadlineDateLabel}*`;
+      const reminder = data.deadlineReminderLabel?.trim();
+      const tone = data.deadlineReminderTone;
+      if (reminder && tone === "overdue") {
+        deadline += `\n⚠️ *Deadline not met — ${reminder}*`;
+      } else if (reminder && (tone === "today" || tone === "soon")) {
+        deadline += `\n⏰ *${reminder}*`;
+      }
+      message += `${deadline}\n`;
+    }
+
+    if (
+      data.testingStartDateLabel &&
+      data.testingStartDateLabel !== "Not set"
+    ) {
+      message += this.line("🧪 Testing start:", data.testingStartDateLabel);
+    }
+
+    message += `\n📊 *Bugs & updates*\n`;
+    message += `• Total: *${total}* · Open: *${open}* · Fixed: *${fixed}*\n`;
+    message += `• Fix rate: *${fixRate}*\n`;
+    if (retests != null) {
+      message += `• Retests pending: *${retests}*\n`;
+    }
+    if (updates != null) {
+      message += `• Updates published: *${updates}*\n`;
+    }
+
+    const devCount = data.developerCount ?? data.developers?.length ?? 0;
+    const testerCount = data.testerCount ?? data.testers?.length ?? 0;
+    message += `\n👥 *Team*\n`;
+    message += `• Developers: *${devCount}* · Testers: *${testerCount}*\n`;
+
+    const hasComplianceCounts =
+      data.developerComplianceTotal != null ||
+      data.testerComplianceTotal != null ||
+      data.adminVerified != null;
+    if (data.complianceStage || hasComplianceCounts) {
+      const fraction = (verified?: number | null, totalCount?: number | null) =>
+        `*${verified ?? 0}/${totalCount ?? 0}*`;
+      message += `\n✅ *Compliance*\n`;
+      if (data.complianceStage) {
+        message += `• Stage: *${data.complianceStage}*\n`;
+      }
+      message += `• Dev ${fraction(
+        data.developerComplianceVerified,
+        data.developerComplianceTotal
+      )} · Tester ${fraction(
+        data.testerComplianceVerified,
+        data.testerComplianceTotal
+      )}\n`;
+      message += `• Admin: *${data.adminVerified ? "Verified" : "Not verified"}*\n`;
+    }
+
+    if (data.sharedBy) {
+      message += `\n👤 Prepared by: ${data.sharedBy}`;
+      if (data.sharedByRole) message += ` (${data.sharedByRole})`;
+      message += `\n`;
+    }
+    if (data.copiedAtLabel) {
+      message += `🕒 Copied: ${data.copiedAtLabel}\n`;
+    }
+
+    message += `\n🔗 ${projectUrl}`;
+    message += `\n\n_Pin in ${groupLabel} · refresh when counts/deadline change · BugRicer_`;
+
+    return message;
+  }
+
   /** Rich project briefing for WhatsApp (oriented to developers). */
   formatProjectShareMessage(data: ProjectWhatsAppShareData): string {
     const projectUrl = this.getRoleBasedUrl(`/projects/${data.projectId}`);
