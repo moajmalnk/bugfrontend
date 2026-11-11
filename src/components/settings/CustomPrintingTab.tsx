@@ -5,7 +5,10 @@ import { Textarea } from "@/components/ui/textarea";
 import { toast } from "@/components/ui/use-toast";
 import {
   buildCustomPrintReceipt,
+  customPrintColumns,
   CUSTOM_PRINT_MESSAGE_MAX,
+  formatCustomPrintPreview,
+  normalizeCustomPrintMessage,
 } from "@/lib/customPrintReceipt";
 import type { MonoBitmap } from "@/lib/escposReceipt";
 import {
@@ -22,6 +25,7 @@ import {
   ImagePlus,
   Loader2,
   Printer,
+  Rows3,
   Trash2,
   Type,
   Upload,
@@ -50,14 +54,12 @@ const INK_OPTIONS: { value: ThermalInkMode; label: string; hint: string }[] = [
 function textFromDataTransfer(data: DataTransfer | null | undefined): string {
   if (!data) return "";
   const plain = data.getData("text/plain")?.trim() ?? "";
-  if (plain) return plain.slice(0, CUSTOM_PRINT_MESSAGE_MAX);
+  if (plain) return normalizeCustomPrintMessage(plain);
   const html = data.getData("text/html")?.trim() ?? "";
   if (!html) return "";
   const tmp = document.createElement("div");
   tmp.innerHTML = html;
-  return (tmp.innerText || tmp.textContent || "")
-    .trim()
-    .slice(0, CUSTOM_PRINT_MESSAGE_MAX);
+  return normalizeCustomPrintMessage(tmp.innerText || tmp.textContent || "");
 }
 
 export type CustomPrintingTabHandle = {
@@ -172,15 +174,25 @@ export const CustomPrintingTab = forwardRef<CustomPrintingTabHandle>(
     );
 
     const applyMessage = useCallback((text: string, announce = true) => {
-      const next = text.slice(0, CUSTOM_PRINT_MESSAGE_MAX);
+      const next = normalizeCustomPrintMessage(text);
       setMessage(next);
       if (announce) {
         toast({
           title: "Text ready",
-          description: "Message will print on the thermal slip (image optional).",
+          description: "Reflowed to fit 58mm paper top to bottom.",
         });
       }
     }, []);
+
+    const reflowMessage = useCallback(() => {
+      if (!message.trim()) return;
+      const next = normalizeCustomPrintMessage(message);
+      setMessage(next);
+      toast({
+        title: "Layout fixed",
+        description: "Broken PDF wraps joined — slip fits top to bottom.",
+      });
+    }, [message]);
 
     const changeInk = (next: ThermalInkMode) => {
       setInk(next);
@@ -298,8 +310,10 @@ export const CustomPrintingTab = forwardRef<CustomPrintingTabHandle>(
 
     const previewText = useMemo(() => {
       if (!hasMessage) return "";
-      return message.replace(/\r\n/g, "\n").replace(/\r/g, "\n");
+      return formatCustomPrintPreview(message);
     }, [hasMessage, message]);
+
+    const previewCols = customPrintColumns();
 
     return (
       <div className="flex flex-col gap-6 min-w-0">
@@ -441,6 +455,19 @@ export const CustomPrintingTab = forwardRef<CustomPrintingTabHandle>(
                     Remove image
                   </Button>
                 ) : null}
+                {hasMessage ? (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="rounded-xl"
+                    onClick={reflowMessage}
+                    disabled={converting}
+                    title="Join broken PDF line wraps and fit 58mm width"
+                  >
+                    <Rows3 className="mr-2 h-4 w-4" />
+                    Fit top–bottom
+                  </Button>
+                ) : null}
               </div>
 
               <div className="flex flex-col gap-1.5 shrink-0">
@@ -494,11 +521,17 @@ export const CustomPrintingTab = forwardRef<CustomPrintingTabHandle>(
                   onChange={(e) =>
                     setMessage(e.target.value.slice(0, CUSTOM_PRINT_MESSAGE_MAX))
                   }
+                  onPaste={(e) => {
+                    const text = textFromDataTransfer(e.clipboardData);
+                    if (!text) return;
+                    e.preventDefault();
+                    applyMessage(text);
+                  }}
                 />
                 <div className="flex flex-wrap items-center justify-between gap-2">
                   <p className="text-xs text-muted-foreground">
-                    Scroll inside this box for long notes. Non-English may print as
-                    &quot;?&quot; — prefer ASCII when possible.
+                    Paste from PDF/WhatsApp — use Fit top–bottom if words look
+                    split. Non-English may print as &quot;?&quot;.
                   </p>
                   <p className="text-[11px] tabular-nums text-muted-foreground">
                     {message.length}/{CUSTOM_PRINT_MESSAGE_MAX}
@@ -514,39 +547,46 @@ export const CustomPrintingTab = forwardRef<CustomPrintingTabHandle>(
               <div className="flex flex-col gap-1 shrink-0">
                 <h3 className="text-sm font-semibold text-foreground">Thermal preview</h3>
                 <p className="text-xs text-muted-foreground">
-                  58mm · USB ESC/POS · scroll to read full slip
+                  58mm · {previewCols} cols · fits top → bottom · scroll if long
                 </p>
               </div>
 
               <div
                 className={cn(
-                  "flex max-h-[min(65vh,560px)] min-h-[220px] flex-col items-center justify-start gap-3",
+                  "flex max-h-[min(65vh,560px)] flex-col items-center justify-start",
                   "overflow-y-auto overscroll-contain rounded-xl border bg-white p-3 shadow-inner",
-                  "[scrollbar-width:thin] custom-scrollbar"
+                  "[scrollbar-width:thin] custom-scrollbar",
+                  mono || hasMessage ? "min-h-0" : "min-h-[180px]"
                 )}
               >
                 {converting ? (
-                  <div className="flex min-h-[180px] w-full items-center justify-center">
+                  <div className="flex min-h-[160px] w-full items-center justify-center">
                     <Loader2 className="h-6 w-6 animate-spin text-slate-400" />
                   </div>
                 ) : mono || hasMessage ? (
-                  <>
+                  <div
+                    className="flex w-full flex-col items-center gap-3"
+                    style={{ maxWidth: `min(100%, ${previewCols}ch)` }}
+                  >
                     {mono ? (
                       <img
                         src={mono.previewUrl}
                         alt="Black and white thermal preview"
-                        className="max-h-[240px] max-w-full h-auto shrink-0 object-contain"
-                        style={{ width: Math.min(mono.width, 280) }}
+                        className="max-h-[220px] max-w-full h-auto shrink-0 object-contain"
+                        style={{ width: Math.min(mono.width, previewCols * 8) }}
                       />
                     ) : null}
                     {hasMessage ? (
-                      <pre className="w-full max-w-[280px] whitespace-pre-wrap break-words font-mono text-[11px] leading-relaxed text-slate-800">
+                      <pre
+                        className="w-full whitespace-pre-wrap break-words font-mono text-[11px] leading-snug text-slate-900"
+                        style={{ width: `${previewCols}ch`, maxWidth: "100%" }}
+                      >
                         {previewText}
                       </pre>
                     ) : null}
-                  </>
+                  </div>
                 ) : (
-                  <div className="flex min-h-[180px] w-full items-center justify-center">
+                  <div className="flex min-h-[160px] w-full items-center justify-center">
                     <p className="text-sm text-slate-500 text-center px-4">
                       Add an image and/or message to see the thermal preview.
                     </p>
