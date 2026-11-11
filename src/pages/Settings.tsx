@@ -330,7 +330,7 @@ const Settings = () => {
         };
       case "printing":
         return {
-          label: "Print image",
+          label: "Print",
           icon: Printer,
           onClick: () => printingRef.current?.openPrint(),
           disabled: false,

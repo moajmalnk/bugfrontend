@@ -296,13 +296,9 @@ export const CustomPrintingTab = forwardRef<CustomPrintingTabHandle>(
         });
     }, [mono, message, hasMessage]);
 
-    const previewLines = useMemo(() => {
-      if (!hasMessage) return [];
-      return message
-        .replace(/\r\n/g, "\n")
-        .replace(/\r/g, "\n")
-        .split("\n")
-        .slice(0, 40);
+    const previewText = useMemo(() => {
+      if (!hasMessage) return "";
+      return message.replace(/\r\n/g, "\n").replace(/\r/g, "\n");
     }, [hasMessage, message]);
 
     return (
@@ -319,10 +315,10 @@ export const CustomPrintingTab = forwardRef<CustomPrintingTabHandle>(
           </p>
         </div>
 
-        <div className="grid grid-cols-12 gap-6 items-stretch min-w-0">
+        <div className="grid grid-cols-12 gap-6 items-start min-w-0">
           {/* Source card */}
           <div className="col-span-12 lg:col-span-6 min-w-0">
-            <div className="flex h-full min-h-[520px] flex-col gap-4 rounded-2xl border border-border/70 bg-card p-4 sm:p-5 shadow-sm">
+            <div className="flex flex-col gap-4 rounded-2xl border border-border/70 bg-card p-4 sm:p-5 shadow-sm">
               <div className="flex flex-col gap-1">
                 <h3 className="text-sm font-semibold text-foreground">Source</h3>
                 <p className="text-xs text-muted-foreground">
@@ -356,7 +352,7 @@ export const CustomPrintingTab = forwardRef<CustomPrintingTabHandle>(
                 }}
                 onDrop={onDrop}
                 className={cn(
-                  "relative flex min-h-[180px] flex-col items-center justify-center gap-3 rounded-xl border-2 border-dashed p-4 text-center transition-colors outline-none focus-visible:ring-2 focus-visible:ring-sky-500",
+                  "relative flex min-h-[120px] max-h-[200px] flex-col items-center justify-center gap-3 overflow-y-auto rounded-xl border-2 border-dashed p-4 text-center transition-colors outline-none focus-visible:ring-2 focus-visible:ring-sky-500 [scrollbar-width:thin]",
                   dragOver
                     ? "border-sky-500 bg-sky-50/80 dark:bg-sky-950/40"
                     : "border-muted-foreground/25 bg-muted/30 hover:border-sky-400/60 hover:bg-muted/50"
@@ -481,7 +477,7 @@ export const CustomPrintingTab = forwardRef<CustomPrintingTabHandle>(
                 </div>
               </div>
 
-              <div className="flex flex-col gap-2 shrink-0">
+              <div className="flex flex-col gap-2 min-w-0">
                 <Label htmlFor="custom-print-message" className="text-sm font-semibold">
                   Message / text
                 </Label>
@@ -489,20 +485,20 @@ export const CustomPrintingTab = forwardRef<CustomPrintingTabHandle>(
                   id="custom-print-message"
                   value={message}
                   maxLength={CUSTOM_PRINT_MESSAGE_MAX}
-                  rows={8}
+                  rows={12}
                   disabled={converting}
                   placeholder={
                     "Paste a WhatsApp message or type notes to print…\n\nExample:\n1. Task Manager — fix scroll\n2. HQ Events — view details\n3. Franchise — add State / District"
                   }
-                  className="rounded-xl resize-y min-h-[140px]"
+                  className="rounded-xl resize-y min-h-[180px] max-h-[min(50vh,420px)] overflow-y-auto [scrollbar-width:thin]"
                   onChange={(e) =>
                     setMessage(e.target.value.slice(0, CUSTOM_PRINT_MESSAGE_MAX))
                   }
                 />
                 <div className="flex flex-wrap items-center justify-between gap-2">
                   <p className="text-xs text-muted-foreground">
-                    Works alone or under an image. Non-English may print as &quot;?&quot;
-                    — prefer ASCII when possible.
+                    Scroll inside this box for long notes. Non-English may print as
+                    &quot;?&quot; — prefer ASCII when possible.
                   </p>
                   <p className="text-[11px] tabular-nums text-muted-foreground">
                     {message.length}/{CUSTOM_PRINT_MESSAGE_MAX}
@@ -512,17 +508,25 @@ export const CustomPrintingTab = forwardRef<CustomPrintingTabHandle>(
             </div>
           </div>
 
-          {/* Preview card */}
-          <div className="col-span-12 lg:col-span-6 min-w-0">
-            <div className="flex h-full min-h-[520px] flex-col gap-4 rounded-2xl border border-border/70 bg-card p-4 sm:p-5 shadow-sm">
+          {/* Preview card — sticky so Print stays reachable while scrolling */}
+          <div className="col-span-12 lg:col-span-6 min-w-0 lg:sticky lg:top-4 self-start">
+            <div className="flex flex-col gap-4 rounded-2xl border border-border/70 bg-card p-4 sm:p-5 shadow-sm">
               <div className="flex flex-col gap-1 shrink-0">
                 <h3 className="text-sm font-semibold text-foreground">Thermal preview</h3>
-                <p className="text-xs text-muted-foreground">58mm · USB ESC/POS</p>
+                <p className="text-xs text-muted-foreground">
+                  58mm · USB ESC/POS · scroll to read full slip
+                </p>
               </div>
 
-              <div className="flex min-h-0 flex-1 flex-col items-center justify-start gap-3 overflow-auto rounded-xl border bg-white p-3 shadow-inner [scrollbar-width:thin]">
+              <div
+                className={cn(
+                  "flex max-h-[min(65vh,560px)] min-h-[220px] flex-col items-center justify-start gap-3",
+                  "overflow-y-auto overscroll-contain rounded-xl border bg-white p-3 shadow-inner",
+                  "[scrollbar-width:thin] custom-scrollbar"
+                )}
+              >
                 {converting ? (
-                  <div className="flex flex-1 items-center justify-center">
+                  <div className="flex min-h-[180px] w-full items-center justify-center">
                     <Loader2 className="h-6 w-6 animate-spin text-slate-400" />
                   </div>
                 ) : mono || hasMessage ? (
@@ -531,19 +535,18 @@ export const CustomPrintingTab = forwardRef<CustomPrintingTabHandle>(
                       <img
                         src={mono.previewUrl}
                         alt="Black and white thermal preview"
-                        className="max-h-[240px] max-w-full h-auto object-contain"
+                        className="max-h-[240px] max-w-full h-auto shrink-0 object-contain"
                         style={{ width: Math.min(mono.width, 280) }}
                       />
                     ) : null}
                     {hasMessage ? (
                       <pre className="w-full max-w-[280px] whitespace-pre-wrap break-words font-mono text-[11px] leading-relaxed text-slate-800">
-                        {previewLines.join("\n")}
-                        {message.split("\n").length > previewLines.length ? "\n…" : ""}
+                        {previewText}
                       </pre>
                     ) : null}
                   </>
                 ) : (
-                  <div className="flex flex-1 items-center justify-center">
+                  <div className="flex min-h-[180px] w-full items-center justify-center">
                     <p className="text-sm text-slate-500 text-center px-4">
                       Add an image and/or message to see the thermal preview.
                     </p>
