@@ -19,6 +19,10 @@ import {
   ThermalImageError,
   type ThermalInkMode,
 } from "@/lib/thermalImage";
+import {
+  needsUnicodeThermalRaster,
+  textToThermalMonoBitmap,
+} from "@/lib/thermalText";
 import { cn } from "@/lib/utils";
 import {
   ClipboardPaste,
@@ -75,11 +79,14 @@ export const CustomPrintingTab = forwardRef<CustomPrintingTabHandle>(
     const [mono, setMono] = useState<MonoBitmap | null>(null);
     const [fileName, setFileName] = useState<string | null>(null);
     const [message, setMessage] = useState("");
+    const [messageRaster, setMessageRaster] = useState<MonoBitmap | null>(null);
+    const [rasterizingText, setRasterizingText] = useState(false);
     const [ink, setInk] = useState<ThermalInkMode>(DEFAULT_THERMAL_INK);
     const [converting, setConverting] = useState(false);
     const [dragOver, setDragOver] = useState(false);
     const [printOpen, setPrintOpen] = useState(false);
     const convertIdRef = useRef(0);
+    const textRasterIdRef = useRef(0);
 
     const clearImage = useCallback(() => {
       convertIdRef.current += 1;
@@ -95,12 +102,16 @@ export const CustomPrintingTab = forwardRef<CustomPrintingTabHandle>(
 
     const clearAll = useCallback(() => {
       clearImage();
+      textRasterIdRef.current += 1;
       setMessage("");
+      setMessageRaster(null);
+      setRasterizingText(false);
     }, [clearImage]);
 
     useEffect(() => {
       return () => {
         convertIdRef.current += 1;
+        textRasterIdRef.current += 1;
         sourceBlobRef.current = null;
         setSourcePreviewUrl((prev) => {
           if (prev?.startsWith("blob:")) URL.revokeObjectURL(prev);
@@ -108,6 +119,55 @@ export const CustomPrintingTab = forwardRef<CustomPrintingTabHandle>(
         });
       };
     }, []);
+
+    /**
+     * Why: Malayalam cannot ride ESC/POS text (code page 437 → "?"). Rasterize
+     * any Unicode message to a mono bitmap before print/preview.
+     */
+    useEffect(() => {
+      const cleaned = normalizeCustomPrintMessage(message);
+      if (!cleaned) {
+        textRasterIdRef.current += 1;
+        setMessageRaster(null);
+        setRasterizingText(false);
+        return;
+      }
+      if (!needsUnicodeThermalRaster(cleaned)) {
+        textRasterIdRef.current += 1;
+        setMessageRaster(null);
+        setRasterizingText(false);
+        return;
+      }
+
+      const requestId = ++textRasterIdRef.current;
+      setRasterizingText(true);
+      const timer = window.setTimeout(() => {
+        void (async () => {
+          try {
+            const bitmap = await textToThermalMonoBitmap(cleaned);
+            if (requestId !== textRasterIdRef.current) return;
+            setMessageRaster(bitmap);
+          } catch (error) {
+            if (requestId !== textRasterIdRef.current) return;
+            setMessageRaster(null);
+            toast({
+              title: "Could not prepare Malayalam text",
+              description:
+                error instanceof Error
+                  ? error.message
+                  : "Try again or shorten the message.",
+              variant: "destructive",
+            });
+          } finally {
+            if (requestId === textRasterIdRef.current) setRasterizingText(false);
+          }
+        })();
+      }, 280);
+
+      return () => {
+        window.clearTimeout(timer);
+      };
+    }, [message]);
 
     const convertBlob = useCallback(
       async (blob: Blob, mode: ThermalInkMode, options?: { announce?: boolean }) => {
@@ -280,14 +340,22 @@ export const CustomPrintingTab = forwardRef<CustomPrintingTabHandle>(
     };
 
     const hasMessage = Boolean(message.trim());
-    const ready = (Boolean(mono) || hasMessage) && !converting;
+    const messageNeedsRaster =
+      hasMessage && needsUnicodeThermalRaster(normalizeCustomPrintMessage(message));
+    const messageReady =
+      !hasMessage ||
+      (messageNeedsRaster ? Boolean(messageRaster) && !rasterizingText : true);
+    const busy = converting || rasterizingText;
+    const ready = (Boolean(mono) || hasMessage) && messageReady && !busy;
 
     useImperativeHandle(ref, () => ({
       openPrint: () => {
         if (!ready) {
           toast({
-            title: "Add image or text first",
-            description: "Upload/paste an image, or type a message, then print.",
+            title: busy ? "Still preparing…" : "Add image or text first",
+            description: busy
+              ? "Malayalam text is being rendered for the thermal printer."
+              : "Upload/paste an image, or type a message, then print.",
             variant: "destructive",
           });
           return;
@@ -298,20 +366,22 @@ export const CustomPrintingTab = forwardRef<CustomPrintingTabHandle>(
 
     const buildReceipt = useMemo<ReceiptBuilder | null>(() => {
       if (!mono && !hasMessage) return null;
+      if (messageNeedsRaster && !messageRaster) return null;
       return ({ copy, style }) =>
         buildCustomPrintReceipt({
           image: mono,
-          message,
+          message: messageNeedsRaster ? null : message,
+          messageRaster: messageNeedsRaster ? messageRaster : null,
           copy,
           // Why: slip is custom content; do not prepend the BugRicer logo.
           style: { ...style, logo: null },
         });
-    }, [mono, message, hasMessage]);
+    }, [mono, message, hasMessage, messageNeedsRaster, messageRaster]);
 
     const previewText = useMemo(() => {
-      if (!hasMessage) return "";
+      if (!hasMessage || messageNeedsRaster) return "";
       return formatCustomPrintPreview(message);
-    }, [hasMessage, message]);
+    }, [hasMessage, message, messageNeedsRaster]);
 
     const previewCols = customPrintColumns();
 
@@ -417,7 +487,7 @@ export const CustomPrintingTab = forwardRef<CustomPrintingTabHandle>(
                   variant="outline"
                   className="rounded-xl"
                   onClick={() => fileInputRef.current?.click()}
-                  disabled={converting}
+                  disabled={busy}
                 >
                   <Upload className="mr-2 h-4 w-4" />
                   Upload
@@ -427,7 +497,7 @@ export const CustomPrintingTab = forwardRef<CustomPrintingTabHandle>(
                   variant="outline"
                   className="rounded-xl"
                   onClick={() => void pasteFromClipboard()}
-                  disabled={converting}
+                  disabled={busy}
                 >
                   <ClipboardPaste className="mr-2 h-4 w-4" />
                   Paste
@@ -438,7 +508,7 @@ export const CustomPrintingTab = forwardRef<CustomPrintingTabHandle>(
                     variant="ghost"
                     className="rounded-xl text-destructive hover:text-destructive"
                     onClick={clearAll}
-                    disabled={converting}
+                    disabled={busy}
                   >
                     <Trash2 className="mr-2 h-4 w-4" />
                     Clear
@@ -450,7 +520,7 @@ export const CustomPrintingTab = forwardRef<CustomPrintingTabHandle>(
                     variant="ghost"
                     className="rounded-xl"
                     onClick={clearImage}
-                    disabled={converting}
+                    disabled={busy}
                   >
                     Remove image
                   </Button>
@@ -461,7 +531,7 @@ export const CustomPrintingTab = forwardRef<CustomPrintingTabHandle>(
                     variant="outline"
                     className="rounded-xl"
                     onClick={reflowMessage}
-                    disabled={converting}
+                    disabled={busy}
                     title="Join broken PDF line wraps and fit 58mm width"
                   >
                     <Rows3 className="mr-2 h-4 w-4" />
@@ -485,7 +555,7 @@ export const CustomPrintingTab = forwardRef<CustomPrintingTabHandle>(
                         type="button"
                         role="radio"
                         aria-checked={active}
-                        disabled={converting || !sourcePreviewUrl}
+                        disabled={busy || !sourcePreviewUrl}
                         onClick={() => changeInk(option.value)}
                         className={cn(
                           "flex flex-col items-center rounded-xl px-2 py-1.5 text-center transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-500 disabled:opacity-60",
@@ -513,7 +583,7 @@ export const CustomPrintingTab = forwardRef<CustomPrintingTabHandle>(
                   value={message}
                   maxLength={CUSTOM_PRINT_MESSAGE_MAX}
                   rows={12}
-                  disabled={converting}
+                  disabled={busy}
                   placeholder={
                     "Paste a WhatsApp message or type notes to print…\n\nExample:\n1. Task Manager — fix scroll\n2. HQ Events — view details\n3. Franchise — add State / District"
                   }
@@ -530,8 +600,8 @@ export const CustomPrintingTab = forwardRef<CustomPrintingTabHandle>(
                 />
                 <div className="flex flex-wrap items-center justify-between gap-2">
                   <p className="text-xs text-muted-foreground">
-                    Paste from PDF/WhatsApp — use Fit top–bottom if words look
-                    split. Non-English may print as &quot;?&quot;.
+                    Malayalam prints as a sharp image on the slip (not &quot;?&quot;).
+                    Use Fit top–bottom if PDF words look split.
                   </p>
                   <p className="text-[11px] tabular-nums text-muted-foreground">
                     {message.length}/{CUSTOM_PRINT_MESSAGE_MAX}
@@ -547,7 +617,11 @@ export const CustomPrintingTab = forwardRef<CustomPrintingTabHandle>(
               <div className="flex flex-col gap-1 shrink-0">
                 <h3 className="text-sm font-semibold text-foreground">Thermal preview</h3>
                 <p className="text-xs text-muted-foreground">
-                  58mm · {previewCols} cols · fits top → bottom · scroll if long
+                  58mm ·{" "}
+                  {messageNeedsRaster
+                    ? "Malayalam as image"
+                    : `${previewCols} cols`}{" "}
+                  · scroll if long
                 </p>
               </div>
 
@@ -559,24 +633,34 @@ export const CustomPrintingTab = forwardRef<CustomPrintingTabHandle>(
                   mono || hasMessage ? "min-h-0" : "min-h-[180px]"
                 )}
               >
-                {converting ? (
-                  <div className="flex min-h-[160px] w-full items-center justify-center">
+                {busy ? (
+                  <div className="flex min-h-[160px] w-full flex-col items-center justify-center gap-2">
                     <Loader2 className="h-6 w-6 animate-spin text-slate-400" />
+                    <p className="text-xs text-slate-500">
+                      {rasterizingText
+                        ? "Rendering Malayalam for thermal…"
+                        : "Preparing image…"}
+                    </p>
                   </div>
                 ) : mono || hasMessage ? (
-                  <div
-                    className="flex w-full flex-col items-center gap-3"
-                    style={{ maxWidth: `min(100%, ${previewCols}ch)` }}
-                  >
+                  <div className="flex w-full flex-col items-center gap-3">
                     {mono ? (
                       <img
                         src={mono.previewUrl}
                         alt="Black and white thermal preview"
                         className="max-h-[220px] max-w-full h-auto shrink-0 object-contain"
-                        style={{ width: Math.min(mono.width, previewCols * 8) }}
+                        style={{ width: Math.min(mono.width, 280) }}
                       />
                     ) : null}
-                    {hasMessage ? (
+                    {messageNeedsRaster && messageRaster ? (
+                      <img
+                        src={messageRaster.previewUrl}
+                        alt="Malayalam thermal text preview"
+                        className="max-w-full h-auto shrink-0 object-contain"
+                        style={{ width: Math.min(messageRaster.width, 280) }}
+                      />
+                    ) : null}
+                    {!messageNeedsRaster && hasMessage ? (
                       <pre
                         className="w-full whitespace-pre-wrap break-words font-mono text-[11px] leading-snug text-slate-900"
                         style={{ width: `${previewCols}ch`, maxWidth: "100%" }}
@@ -599,7 +683,11 @@ export const CustomPrintingTab = forwardRef<CustomPrintingTabHandle>(
                   <p className="text-xs text-muted-foreground">
                     {[
                       mono ? `${mono.width}×${mono.height} dots` : null,
-                      hasMessage ? "text message" : null,
+                      messageNeedsRaster && messageRaster
+                        ? `Malayalam ${messageRaster.width}×${messageRaster.height}`
+                        : hasMessage
+                          ? "text message"
+                          : null,
                       "USB ESC/POS",
                     ]
                       .filter(Boolean)
@@ -616,8 +704,12 @@ export const CustomPrintingTab = forwardRef<CustomPrintingTabHandle>(
                   disabled={!ready}
                   onClick={() => setPrintOpen(true)}
                 >
-                  <Printer className="mr-2 h-4 w-4" />
-                  Print on thermal printer
+                  {rasterizingText ? (
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  ) : (
+                    <Printer className="mr-2 h-4 w-4" />
+                  )}
+                  {rasterizingText ? "Preparing Malayalam…" : "Print on thermal printer"}
                 </Button>
               </div>
             </div>
@@ -629,9 +721,16 @@ export const CustomPrintingTab = forwardRef<CustomPrintingTabHandle>(
           onClose={() => setPrintOpen(false)}
           title="Print custom slip"
           subtitle={
-            fileName || (hasMessage ? "Text message" : undefined)
+            fileName ||
+            (messageNeedsRaster
+              ? "Malayalam / Unicode message"
+              : hasMessage
+                ? "Text message"
+                : undefined)
           }
-          status={ready ? "ready" : converting ? "loading" : "error"}
+          status={
+            ready ? "ready" : busy ? "loading" : "error"
+          }
           errorMessage="Add an image or text message before printing."
           buildReceipt={buildReceipt}
           successDescription={(printer) => `Slip sent to ${printer}.`}

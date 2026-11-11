@@ -9,8 +9,8 @@ import {
   type ReceiptStyle,
 } from "@/lib/escposReceipt";
 
-/** Soft cap so a pasted WhatsApp / PDF note still fits a short thermal slip. */
-export const CUSTOM_PRINT_MESSAGE_MAX = 4000;
+/** Soft cap for pasted WhatsApp / PDF / HQ notes on a thermal slip. */
+export const CUSTOM_PRINT_MESSAGE_MAX = 10000;
 
 /** Why: Font B on 58mm is the default slip width — preview must match print. */
 export function customPrintColumns(style?: ReceiptStyle): number {
@@ -89,22 +89,30 @@ export function formatCustomPrintPreview(
 /**
  * Why: Custom print must accept image-only, text-only, or both — e.g. a Canva
  * PNG, a pasted WhatsApp note, or an HQ requirements list without a photo.
+ * Malayalam / Unicode must arrive as messageRaster (GS v 0); ESC/POS text
+ * would print as "?".
  */
 export function buildCustomPrintReceipt(options: {
   image?: MonoBitmap | null;
   message?: string | null;
+  /** Pre-rendered Unicode/Malayalam slip body (preferred over ESC/POS text). */
+  messageRaster?: MonoBitmap | null;
   copy?: ReceiptCopy;
   style?: ReceiptStyle;
 }): ReceiptResult {
   const w = new ReceiptWriter(options.style ?? DEFAULT_RECEIPT_STYLE);
   const image = options.image ?? null;
+  const messageRaster = options.messageRaster ?? null;
   const message = normalizeCustomPrintMessage(options.message ?? "");
 
   if (image) {
     w.bitmap(image);
   }
 
-  if (message) {
+  if (messageRaster) {
+    if (image) w.line();
+    w.bitmap(messageRaster);
+  } else if (message) {
     if (image) w.line();
     emitMessageBody(w, message);
   }
