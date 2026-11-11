@@ -3,7 +3,10 @@ import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "@/components/ui/use-toast";
-import { buildCustomImageReceipt } from "@/lib/customPrintReceipt";
+import {
+  buildCustomPrintReceipt,
+  CUSTOM_PRINT_MESSAGE_MAX,
+} from "@/lib/customPrintReceipt";
 import type { MonoBitmap } from "@/lib/escposReceipt";
 import {
   DEFAULT_THERMAL_INK,
@@ -20,6 +23,7 @@ import {
   Loader2,
   Printer,
   Trash2,
+  Type,
   Upload,
 } from "lucide-react";
 import {
@@ -43,6 +47,19 @@ const INK_OPTIONS: { value: ThermalInkMode; label: string; hint: string }[] = [
   { value: "rich", label: "Rich", hint: "Darker ink" },
 ];
 
+function textFromDataTransfer(data: DataTransfer | null | undefined): string {
+  if (!data) return "";
+  const plain = data.getData("text/plain")?.trim() ?? "";
+  if (plain) return plain.slice(0, CUSTOM_PRINT_MESSAGE_MAX);
+  const html = data.getData("text/html")?.trim() ?? "";
+  if (!html) return "";
+  const tmp = document.createElement("div");
+  tmp.innerHTML = html;
+  return (tmp.innerText || tmp.textContent || "")
+    .trim()
+    .slice(0, CUSTOM_PRINT_MESSAGE_MAX);
+}
+
 export type CustomPrintingTabHandle = {
   openPrint: () => void;
 };
@@ -55,7 +72,7 @@ export const CustomPrintingTab = forwardRef<CustomPrintingTabHandle>(
     const [sourcePreviewUrl, setSourcePreviewUrl] = useState<string | null>(null);
     const [mono, setMono] = useState<MonoBitmap | null>(null);
     const [fileName, setFileName] = useState<string | null>(null);
-    const [caption, setCaption] = useState("");
+    const [message, setMessage] = useState("");
     const [ink, setInk] = useState<ThermalInkMode>(DEFAULT_THERMAL_INK);
     const [converting, setConverting] = useState(false);
     const [dragOver, setDragOver] = useState(false);
@@ -73,6 +90,11 @@ export const CustomPrintingTab = forwardRef<CustomPrintingTabHandle>(
       });
       if (fileInputRef.current) fileInputRef.current.value = "";
     }, []);
+
+    const clearAll = useCallback(() => {
+      clearImage();
+      setMessage("");
+    }, [clearImage]);
 
     useEffect(() => {
       return () => {
@@ -149,6 +171,17 @@ export const CustomPrintingTab = forwardRef<CustomPrintingTabHandle>(
       [convertBlob, ink]
     );
 
+    const applyMessage = useCallback((text: string, announce = true) => {
+      const next = text.slice(0, CUSTOM_PRINT_MESSAGE_MAX);
+      setMessage(next);
+      if (announce) {
+        toast({
+          title: "Text ready",
+          description: "Message will print on the thermal slip (image optional).",
+        });
+      }
+    }, []);
+
     const changeInk = (next: ThermalInkMode) => {
       setInk(next);
       const blob = sourceBlobRef.current;
@@ -164,21 +197,34 @@ export const CustomPrintingTab = forwardRef<CustomPrintingTabHandle>(
       event.preventDefault();
       setDragOver(false);
       const image = imageFromDataTransfer(event.dataTransfer);
-      if (image) void ingestBlob(image, image instanceof File ? image.name : undefined);
-      else {
-        toast({
-          title: "No image found",
-          description: "Drop a PNG or JPEG onto this area.",
-          variant: "destructive",
-        });
+      if (image) {
+        void ingestBlob(image, image instanceof File ? image.name : undefined);
+        return;
       }
+      const text = textFromDataTransfer(event.dataTransfer);
+      if (text) {
+        applyMessage(text);
+        return;
+      }
+      toast({
+        title: "Nothing to print",
+        description: "Drop a PNG/JPEG image or plain text here.",
+        variant: "destructive",
+      });
     };
 
     const onPaste = (event: ClipboardEvent<HTMLDivElement>) => {
       const image = imageFromDataTransfer(event.clipboardData);
-      if (!image) return;
-      event.preventDefault();
-      void ingestBlob(image, image instanceof File ? image.name : "Pasted image");
+      if (image) {
+        event.preventDefault();
+        void ingestBlob(image, image instanceof File ? image.name : "Pasted image");
+        return;
+      }
+      const text = textFromDataTransfer(event.clipboardData);
+      if (text) {
+        event.preventDefault();
+        applyMessage(text);
+      }
     };
 
     const pasteFromClipboard = async () => {
@@ -199,9 +245,17 @@ export const CustomPrintingTab = forwardRef<CustomPrintingTabHandle>(
           await ingestBlob(blob, "Clipboard image");
           return;
         }
+        for (const item of items) {
+          if (!item.types.includes("text/plain")) continue;
+          const blob = await item.getType("text/plain");
+          const text = (await blob.text()).trim();
+          if (!text) continue;
+          applyMessage(text);
+          return;
+        }
         toast({
-          title: "No image on clipboard",
-          description: "Copy an image first, then paste here.",
+          title: "Clipboard empty",
+          description: "Copy an image or text message first, then paste here.",
           variant: "destructive",
         });
       } catch {
@@ -213,12 +267,15 @@ export const CustomPrintingTab = forwardRef<CustomPrintingTabHandle>(
       }
     };
 
+    const hasMessage = Boolean(message.trim());
+    const ready = (Boolean(mono) || hasMessage) && !converting;
+
     useImperativeHandle(ref, () => ({
       openPrint: () => {
-        if (!mono || converting) {
+        if (!ready) {
           toast({
-            title: "Add an image first",
-            description: "Upload or paste a PNG, then print.",
+            title: "Add image or text first",
+            description: "Upload/paste an image, or type a message, then print.",
             variant: "destructive",
           });
           return;
@@ -228,17 +285,25 @@ export const CustomPrintingTab = forwardRef<CustomPrintingTabHandle>(
     }));
 
     const buildReceipt = useMemo<ReceiptBuilder | null>(() => {
-      if (!mono) return null;
+      if (!mono && !hasMessage) return null;
       return ({ copy, style }) =>
-        buildCustomImageReceipt(mono, {
-          caption,
+        buildCustomPrintReceipt({
+          image: mono,
+          message,
           copy,
-          // Why: slip is the uploaded image; do not prepend the BugRicer logo.
+          // Why: slip is custom content; do not prepend the BugRicer logo.
           style: { ...style, logo: null },
         });
-    }, [mono, caption]);
+    }, [mono, message, hasMessage]);
 
-    const ready = Boolean(mono) && !converting;
+    const previewLines = useMemo(() => {
+      if (!hasMessage) return [];
+      return message
+        .replace(/\r\n/g, "\n")
+        .replace(/\r/g, "\n")
+        .split("\n")
+        .slice(0, 40);
+    }, [hasMessage, message]);
 
     return (
       <div className="flex flex-col gap-6 min-w-0">
@@ -248,8 +313,9 @@ export const CustomPrintingTab = forwardRef<CustomPrintingTabHandle>(
             Custom thermal print
           </h2>
           <p className="text-sm text-muted-foreground max-w-2xl">
-            Photos print light by default so they do not flood black on 58mm paper.
-            Use Soft/Rich only if you need more ink.
+            Print an image, a text message, or both on 58mm USB ESC/POS paper.
+            Photos default to Light so they do not flood black — use Soft/Rich only
+            if you need more ink.
           </p>
         </div>
 
@@ -258,9 +324,9 @@ export const CustomPrintingTab = forwardRef<CustomPrintingTabHandle>(
           <div className="col-span-12 lg:col-span-6 min-w-0">
             <div className="flex h-full min-h-[520px] flex-col gap-4 rounded-2xl border border-border/70 bg-card p-4 sm:p-5 shadow-sm">
               <div className="flex flex-col gap-1">
-                <h3 className="text-sm font-semibold text-foreground">Source image</h3>
+                <h3 className="text-sm font-semibold text-foreground">Source</h3>
                 <p className="text-xs text-muted-foreground">
-                  Upload, drop, or paste a Canva PNG / photo
+                  Image and/or text — WhatsApp notes, screenshots, HQ lists
                 </p>
               </div>
 
@@ -268,7 +334,7 @@ export const CustomPrintingTab = forwardRef<CustomPrintingTabHandle>(
                 ref={dropRef}
                 tabIndex={0}
                 role="button"
-                aria-label="Upload or paste an image to print"
+                aria-label="Upload or paste an image or text message to print"
                 onKeyDown={(e) => {
                   if (e.key === "Enter" || e.key === " ") {
                     e.preventDefault();
@@ -290,7 +356,7 @@ export const CustomPrintingTab = forwardRef<CustomPrintingTabHandle>(
                 }}
                 onDrop={onDrop}
                 className={cn(
-                  "relative flex min-h-0 flex-1 flex-col items-center justify-center gap-3 rounded-xl border-2 border-dashed p-4 text-center transition-colors outline-none focus-visible:ring-2 focus-visible:ring-sky-500",
+                  "relative flex min-h-[180px] flex-col items-center justify-center gap-3 rounded-xl border-2 border-dashed p-4 text-center transition-colors outline-none focus-visible:ring-2 focus-visible:ring-sky-500",
                   dragOver
                     ? "border-sky-500 bg-sky-50/80 dark:bg-sky-950/40"
                     : "border-muted-foreground/25 bg-muted/30 hover:border-sky-400/60 hover:bg-muted/50"
@@ -313,7 +379,7 @@ export const CustomPrintingTab = forwardRef<CustomPrintingTabHandle>(
                     <img
                       src={sourcePreviewUrl}
                       alt={fileName || "Selected image"}
-                      className="max-h-full max-w-full rounded-xl object-contain shadow-sm"
+                      className="max-h-40 max-w-full rounded-xl object-contain shadow-sm"
                     />
                     <p className="text-xs text-muted-foreground truncate max-w-full shrink-0">
                       {fileName}
@@ -321,11 +387,14 @@ export const CustomPrintingTab = forwardRef<CustomPrintingTabHandle>(
                   </div>
                 ) : (
                   <>
-                    <ImagePlus className="h-10 w-10 text-muted-foreground" />
+                    <div className="flex items-center gap-2 text-muted-foreground">
+                      <ImagePlus className="h-8 w-8" />
+                      <Type className="h-7 w-7" />
+                    </div>
                     <div className="space-y-1">
-                      <p className="text-sm font-semibold">Drop image here</p>
+                      <p className="text-sm font-semibold">Drop image or text here</p>
                       <p className="text-xs text-muted-foreground">
-                        or click Upload · paste with ⌘V / Ctrl+V
+                        Upload · Paste image · Paste message (⌘V / Ctrl+V)
                       </p>
                     </div>
                   </>
@@ -353,16 +422,27 @@ export const CustomPrintingTab = forwardRef<CustomPrintingTabHandle>(
                   <ClipboardPaste className="mr-2 h-4 w-4" />
                   Paste
                 </Button>
-                {sourcePreviewUrl ? (
+                {sourcePreviewUrl || hasMessage ? (
                   <Button
                     type="button"
                     variant="ghost"
                     className="rounded-xl text-destructive hover:text-destructive"
-                    onClick={clearImage}
+                    onClick={clearAll}
                     disabled={converting}
                   >
                     <Trash2 className="mr-2 h-4 w-4" />
                     Clear
+                  </Button>
+                ) : null}
+                {sourcePreviewUrl ? (
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    className="rounded-xl"
+                    onClick={clearImage}
+                    disabled={converting}
+                  >
+                    Remove image
                   </Button>
                 ) : null}
               </div>
@@ -382,7 +462,7 @@ export const CustomPrintingTab = forwardRef<CustomPrintingTabHandle>(
                         type="button"
                         role="radio"
                         aria-checked={active}
-                        disabled={converting}
+                        disabled={converting || !sourcePreviewUrl}
                         onClick={() => changeInk(option.value)}
                         className={cn(
                           "flex flex-col items-center rounded-xl px-2 py-1.5 text-center transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-500 disabled:opacity-60",
@@ -402,23 +482,32 @@ export const CustomPrintingTab = forwardRef<CustomPrintingTabHandle>(
               </div>
 
               <div className="flex flex-col gap-2 shrink-0">
-                <Label htmlFor="custom-print-caption" className="text-sm font-semibold">
-                  Caption (optional)
+                <Label htmlFor="custom-print-message" className="text-sm font-semibold">
+                  Message / text
                 </Label>
                 <Textarea
-                  id="custom-print-caption"
-                  value={caption}
-                  maxLength={200}
-                  rows={2}
+                  id="custom-print-message"
+                  value={message}
+                  maxLength={CUSTOM_PRINT_MESSAGE_MAX}
+                  rows={8}
                   disabled={converting}
-                  placeholder="Short note under the image…"
-                  className="rounded-xl resize-none"
-                  onChange={(e) => setCaption(e.target.value.slice(0, 200))}
+                  placeholder={
+                    "Paste a WhatsApp message or type notes to print…\n\nExample:\n1. Task Manager — fix scroll\n2. HQ Events — view details\n3. Franchise — add State / District"
+                  }
+                  className="rounded-xl resize-y min-h-[140px]"
+                  onChange={(e) =>
+                    setMessage(e.target.value.slice(0, CUSTOM_PRINT_MESSAGE_MAX))
+                  }
                 />
-                <p className="text-xs text-muted-foreground">
-                  Non-English characters may print as &quot;?&quot; on this printer. Keep
-                  captions short and ASCII when possible.
-                </p>
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <p className="text-xs text-muted-foreground">
+                    Works alone or under an image. Non-English may print as &quot;?&quot;
+                    — prefer ASCII when possible.
+                  </p>
+                  <p className="text-[11px] tabular-nums text-muted-foreground">
+                    {message.length}/{CUSTOM_PRINT_MESSAGE_MAX}
+                  </p>
+                </div>
               </div>
             </div>
           </div>
@@ -431,30 +520,52 @@ export const CustomPrintingTab = forwardRef<CustomPrintingTabHandle>(
                 <p className="text-xs text-muted-foreground">58mm · USB ESC/POS</p>
               </div>
 
-              <div className="flex min-h-0 flex-1 items-center justify-center overflow-auto rounded-xl border bg-white p-3 shadow-inner [scrollbar-width:thin]">
+              <div className="flex min-h-0 flex-1 flex-col items-center justify-start gap-3 overflow-auto rounded-xl border bg-white p-3 shadow-inner [scrollbar-width:thin]">
                 {converting ? (
-                  <Loader2 className="h-6 w-6 animate-spin text-slate-400" />
-                ) : mono ? (
-                  <img
-                    src={mono.previewUrl}
-                    alt="Black and white thermal preview"
-                    className="max-h-full max-w-full h-auto object-contain"
-                    style={{ width: Math.min(mono.width, 280) }}
-                  />
+                  <div className="flex flex-1 items-center justify-center">
+                    <Loader2 className="h-6 w-6 animate-spin text-slate-400" />
+                  </div>
+                ) : mono || hasMessage ? (
+                  <>
+                    {mono ? (
+                      <img
+                        src={mono.previewUrl}
+                        alt="Black and white thermal preview"
+                        className="max-h-[240px] max-w-full h-auto object-contain"
+                        style={{ width: Math.min(mono.width, 280) }}
+                      />
+                    ) : null}
+                    {hasMessage ? (
+                      <pre className="w-full max-w-[280px] whitespace-pre-wrap break-words font-mono text-[11px] leading-relaxed text-slate-800">
+                        {previewLines.join("\n")}
+                        {message.split("\n").length > previewLines.length ? "\n…" : ""}
+                      </pre>
+                    ) : null}
+                  </>
                 ) : (
-                  <p className="text-sm text-slate-500 text-center px-4">
-                    Upload or paste an image to see the dithered print preview.
-                  </p>
+                  <div className="flex flex-1 items-center justify-center">
+                    <p className="text-sm text-slate-500 text-center px-4">
+                      Add an image and/or message to see the thermal preview.
+                    </p>
+                  </div>
                 )}
               </div>
 
               <div className="flex flex-col gap-3 shrink-0">
-                {mono ? (
+                {mono || hasMessage ? (
                   <p className="text-xs text-muted-foreground">
-                    {mono.width}×{mono.height} dots · will print via USB ESC/POS
+                    {[
+                      mono ? `${mono.width}×${mono.height} dots` : null,
+                      hasMessage ? "text message" : null,
+                      "USB ESC/POS",
+                    ]
+                      .filter(Boolean)
+                      .join(" · ")}
                   </p>
                 ) : (
-                  <p className="text-xs text-muted-foreground">Waiting for an image…</p>
+                  <p className="text-xs text-muted-foreground">
+                    Waiting for an image or text message…
+                  </p>
                 )}
                 <Button
                   type="button"
@@ -473,12 +584,14 @@ export const CustomPrintingTab = forwardRef<CustomPrintingTabHandle>(
         <ThermalPrintDialog
           open={printOpen}
           onClose={() => setPrintOpen(false)}
-          title="Print custom image"
-          subtitle={fileName || undefined}
+          title="Print custom slip"
+          subtitle={
+            fileName || (hasMessage ? "Text message" : undefined)
+          }
           status={ready ? "ready" : converting ? "loading" : "error"}
-          errorMessage="Add an image before printing."
+          errorMessage="Add an image or text message before printing."
           buildReceipt={buildReceipt}
-          successDescription={(printer) => `Image sent to ${printer}.`}
+          successDescription={(printer) => `Slip sent to ${printer}.`}
         />
       </div>
     );
