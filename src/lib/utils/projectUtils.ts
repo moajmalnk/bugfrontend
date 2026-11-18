@@ -615,6 +615,30 @@ export function projectToFormValues(project: Project): ProjectFormValues {
   };
 }
 
+/**
+ * Why: Assigned developers/testers only send delivery setup fields —
+ * never name, team, client, timeline, or status.
+ */
+export function formValuesToSetupPayload(values: ProjectFormValues): UpdateProjectData {
+  return {
+    technology_stack: values.technology_stack.trim() || undefined,
+    reference_sites_or_themes: values.reference_sites_or_themes.trim() || undefined,
+    frontend_domain: values.frontend_domain.trim() || undefined,
+    backend_domain: values.backend_domain.trim() || undefined,
+    vercel_domain: values.vercel_domain.trim() || undefined,
+    platforms: serializeProjectPlatforms(values.platforms) || undefined,
+    project_categories: serializeProjectCategories(values.project_categories) || undefined,
+    app_publisher_meta: serializeAppPublisherMeta(values.app_publisher_meta),
+    category_asset_links: serializeCategoryAssetLinks(values.category_asset_links),
+    app_url_ios: values.app_url_ios.trim() || undefined,
+    app_url_android: values.app_url_android.trim() || undefined,
+    testflight_url: values.testflight_url.trim() || undefined,
+    github_frontend: values.github_frontend.trim() || undefined,
+    github_backend: values.github_backend.trim() || undefined,
+    github_app: values.github_app.trim() || undefined,
+  };
+}
+
 export function formValuesToPayload(values: ProjectFormValues): CreateProjectData {
   const members: ProjectMemberInput[] = [];
   if (values.project_lead_id) {

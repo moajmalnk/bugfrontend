@@ -15,6 +15,7 @@ export {
   emptyCategoryAssetLinks,
   emptyProjectFormValues,
   formValuesToPayload,
+  formValuesToSetupPayload,
   projectToFormValues,
   getProjectStatusLabel,
   computeProjectDurationDays,

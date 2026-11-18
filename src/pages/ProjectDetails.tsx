@@ -4979,6 +4979,14 @@ const ProjectDetails = () => {
                   </Link>
                 </Button>
               )}
+              {(currentUser?.role === "developer" ||
+                currentUser?.role === "tester") && (
+                <Button asChild className="w-full sm:w-auto" size="sm" variant="outline">
+                  <Link to={`/${currentUser.role}/projects/${projectId}/edit`}>
+                    <Pencil className="mr-2 h-4 w-4" /> Update Setup
+                  </Link>
+                </Button>
+              )}
             </div>
           </div>
         </div>

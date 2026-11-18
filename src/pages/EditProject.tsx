@@ -9,6 +9,7 @@ import { googleSheetsService } from '@/services/googleSheetsService';
 import { complianceService } from '@/services/complianceService';
 import {
   formValuesToPayload,
+  formValuesToSetupPayload,
   projectService,
   projectToFormValues,
   type TaggedProjectFile,
@@ -17,7 +18,7 @@ import { userService } from '@/services/userService';
 import { clientService } from '@/services/clientService';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { ArrowLeft, FolderKanban, Pencil } from 'lucide-react';
-import { FormEvent, useEffect, useRef, useState } from 'react';
+import { FormEvent, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 
 const EditProject = () => {
@@ -25,6 +26,8 @@ const EditProject = () => {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const { currentUser } = useAuth();
+  const role = (currentUser?.role || '').toLowerCase();
+  const isAdmin = role === 'admin';
   const [values, setValues] = useState(projectToFormValues({
     id: '',
     name: '',
@@ -76,13 +79,13 @@ const EditProject = () => {
   const { data: users = [] } = useQuery({
     queryKey: ['users', 'project-form'],
     queryFn: () => userService.getUsers(),
-    enabled: currentUser?.role === 'admin',
+    enabled: isAdmin,
   });
 
   const { data: clients = [] } = useQuery({
     queryKey: ['clients', 'project-form'],
     queryFn: () => clientService.getClients(),
-    enabled: currentUser?.role === 'admin',
+    enabled: isAdmin,
   });
 
   const { data: attachments = [] } = useQuery({
@@ -99,7 +102,7 @@ const EditProject = () => {
       const result = await googleDocsService.getAllDocuments(false);
       return result.documents.flatMap((group) => group.documents);
     },
-    enabled: currentUser?.role === 'admin',
+    enabled: isAdmin,
   });
 
   const { data: allBugSheets = [], isFetched: bugSheetsFetched } = useQuery({
@@ -108,7 +111,7 @@ const EditProject = () => {
       const result = await googleSheetsService.getAllSheets(false);
       return result.sheets.flatMap((group) => group.sheets);
     },
-    enabled: currentUser?.role === 'admin',
+    enabled: isAdmin,
   });
 
   useEffect(() => {
@@ -156,13 +159,17 @@ const EditProject = () => {
     fetchCreator();
   }, [project?.created_by]);
 
-  if (currentUser?.role !== 'admin') {
-    return (
-      <div className="flex items-center justify-center min-h-[60vh] text-muted-foreground">
-        You do not have permission to edit projects.
-      </div>
+  const isAssignedMember = useMemo(() => {
+    if (!project || !currentUser?.id) return false;
+    return (project.members_detail || []).some(
+      (m) => String(m.user_id) === String(currentUser.id)
     );
-  }
+  }, [project, currentUser?.id]);
+
+  const canEditSetup =
+    isAdmin ||
+    ((role === 'developer' || role === 'tester') && isAssignedMember);
+  const formSections = isAdmin ? 'full' : 'setup';
 
   if (projectLoading) {
     return (
@@ -177,6 +184,14 @@ const EditProject = () => {
     return (
       <div className="flex items-center justify-center min-h-[60vh] text-muted-foreground">
         Project not found
+      </div>
+    );
+  }
+
+  if (!canEditSetup) {
+    return (
+      <div className="flex items-center justify-center min-h-[60vh] text-muted-foreground">
+        You can only update setup on projects you are assigned to.
       </div>
     );
   }
@@ -197,74 +212,83 @@ const EditProject = () => {
     setIsSubmitting(true);
 
     try {
-      const payload = formValuesToPayload(values);
+      const payload = isAdmin
+        ? formValuesToPayload(values)
+        : formValuesToSetupPayload(values);
       await projectService.updateProject(projectId!, payload);
 
       if (attachmentFiles.length > 0) {
         await projectService.uploadAttachments(projectId!, attachmentFiles);
       }
 
-      const previouslyLinkedDocIds = allBugDocs
-        .filter((doc) => String(doc.project_id) === String(projectId))
-        .map((doc) => doc.id);
-      const docsToLink = selectedBugDocIds.filter((id) => !previouslyLinkedDocIds.includes(id));
-      const docsToUnlink = previouslyLinkedDocIds.filter((id) => !selectedBugDocIds.includes(id));
+      if (isAdmin) {
+        const previouslyLinkedDocIds = allBugDocs
+          .filter((doc) => String(doc.project_id) === String(projectId))
+          .map((doc) => doc.id);
+        const docsToLink = selectedBugDocIds.filter((id) => !previouslyLinkedDocIds.includes(id));
+        const docsToUnlink = previouslyLinkedDocIds.filter((id) => !selectedBugDocIds.includes(id));
 
-      await Promise.all([
-        ...docsToLink.map((id) => {
-          const doc = allBugDocs.find((item) => item.id === id);
-          if (!doc) return Promise.resolve();
-          return googleDocsService.updateDocument(
-            doc.id,
-            doc.doc_title,
-            projectId!,
-            null,
-            doc.role || 'all'
-          );
-        }),
-        ...docsToUnlink.map((id) => {
-          const doc = allBugDocs.find((item) => item.id === id);
-          if (!doc) return Promise.resolve();
-          return googleDocsService.updateDocument(
-            doc.id,
-            doc.doc_title,
-            null,
-            null,
-            doc.role || 'all'
-          );
-        }),
-      ]);
+        await Promise.all([
+          ...docsToLink.map((id) => {
+            const doc = allBugDocs.find((item) => item.id === id);
+            if (!doc) return Promise.resolve();
+            return googleDocsService.updateDocument(
+              doc.id,
+              doc.doc_title,
+              projectId!,
+              null,
+              doc.role || 'all'
+            );
+          }),
+          ...docsToUnlink.map((id) => {
+            const doc = allBugDocs.find((item) => item.id === id);
+            if (!doc) return Promise.resolve();
+            return googleDocsService.updateDocument(
+              doc.id,
+              doc.doc_title,
+              null,
+              null,
+              doc.role || 'all'
+            );
+          }),
+        ]);
 
-      const previouslyLinkedSheetIds = allBugSheets
-        .filter((sheet) => String(sheet.project_id) === String(projectId))
-        .map((sheet) => sheet.id);
-      const sheetsToLink = selectedBugSheetIds.filter((id) => !previouslyLinkedSheetIds.includes(id));
-      const sheetsToUnlink = previouslyLinkedSheetIds.filter((id) => !selectedBugSheetIds.includes(id));
+        const previouslyLinkedSheetIds = allBugSheets
+          .filter((sheet) => String(sheet.project_id) === String(projectId))
+          .map((sheet) => sheet.id);
+        const sheetsToLink = selectedBugSheetIds.filter(
+          (id) => !previouslyLinkedSheetIds.includes(id)
+        );
+        const sheetsToUnlink = previouslyLinkedSheetIds.filter(
+          (id) => !selectedBugSheetIds.includes(id)
+        );
 
-      await Promise.all([
-        ...sheetsToLink.map((id) => {
-          const sheet = allBugSheets.find((item) => item.id === id);
-          if (!sheet) return Promise.resolve();
-          return googleSheetsService.updateSheet(
-            sheet.id,
-            sheet.sheet_title,
-            projectId!,
-            null,
-            sheet.role || 'all'
-          );
-        }),
-        ...sheetsToUnlink.map((id) => {
-          const sheet = allBugSheets.find((item) => item.id === id);
-          if (!sheet) return Promise.resolve();
-          return googleSheetsService.updateSheet(
-            sheet.id,
-            sheet.sheet_title,
-            null,
-            null,
-            sheet.role || 'all'
-          );
-        }),
-      ]);
+        await Promise.all([
+          ...sheetsToLink.map((id) => {
+            const sheet = allBugSheets.find((item) => item.id === id);
+            if (!sheet) return Promise.resolve();
+            return googleSheetsService.updateSheet(
+              sheet.id,
+              sheet.sheet_title,
+              projectId!,
+              null,
+              sheet.role || 'all'
+            );
+          }),
+          ...sheetsToUnlink.map((id) => {
+            const sheet = allBugSheets.find((item) => item.id === id);
+            if (!sheet) return Promise.resolve();
+            return googleSheetsService.updateSheet(
+              sheet.id,
+              sheet.sheet_title,
+              null,
+              null,
+              sheet.role || 'all'
+            );
+          }),
+        ]);
+      }
+
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: ['project', projectId] }),
         queryClient.invalidateQueries({ queryKey: ['project-attachments', projectId] }),
@@ -276,7 +300,9 @@ const EditProject = () => {
 
       toast({
         title: 'Success',
-        description: 'Project updated successfully',
+        description: isAdmin
+          ? 'Project updated successfully'
+          : 'Project setup updated successfully',
       });
 
       navigate(`/${currentUser!.role}/projects/${projectId}`);
@@ -317,13 +343,15 @@ const EditProject = () => {
                   </div>
                   <div>
                     <h1 className="text-3xl sm:text-4xl lg:text-5xl font-bold bg-gradient-to-r from-gray-900 via-gray-800 to-gray-700 dark:from-white dark:via-gray-100 dark:to-gray-300 bg-clip-text text-transparent tracking-tight">
-                      Edit Project
+                      {isAdmin ? 'Edit Project' : 'Update Project Setup'}
                     </h1>
                     <div className="h-1 w-20 bg-gradient-to-r from-blue-500 to-emerald-600 rounded-full mt-2" />
                   </div>
                 </div>
                 <p className="text-gray-600 dark:text-gray-400 text-base lg:text-lg font-medium max-w-2xl">
-                  Update {project.name} — client details, team, timeline, and docs
+                  {isAdmin
+                    ? `Update ${project.name} — client details, team, timeline, and docs`
+                    : `Update ${project.name} — stack, domains, platforms, GitHub, assets, and attachments`}
                 </p>
               </div>
 
@@ -341,6 +369,7 @@ const EditProject = () => {
 
         <ProjectForm
           mode="edit"
+          sections={formSections}
           values={values}
           onChange={setValues}
           onSubmit={handleSubmit}
@@ -354,27 +383,37 @@ const EditProject = () => {
           attachmentFiles={attachmentFiles}
           onAttachmentFilesChange={setAttachmentFiles}
           currentProjectId={projectId}
-          timelineHistory={project.timeline_history}
-          availableBugDocs={allBugDocs.map((doc) => ({
-            id: doc.id,
-            title: doc.doc_title,
-            creatorName: doc.creator_name || null,
-            projectId: doc.project_id,
-            projectName: doc.project_name,
-          }))}
-          selectedBugDocIds={selectedBugDocIds}
-          onSelectedBugDocIdsChange={setSelectedBugDocIds}
-          availableBugSheets={allBugSheets.map((sheet) => ({
-            id: sheet.id,
-            title: sheet.sheet_title,
-            creatorName: sheet.creator_name || null,
-            projectId: sheet.project_id,
-            projectName: sheet.project_name,
-          }))}
-          selectedBugSheetIds={selectedBugSheetIds}
-          onSelectedBugSheetIdsChange={setSelectedBugSheetIds}
+          timelineHistory={isAdmin ? project.timeline_history : undefined}
+          availableBugDocs={
+            isAdmin
+              ? allBugDocs.map((doc) => ({
+                  id: doc.id,
+                  title: doc.doc_title,
+                  creatorName: doc.creator_name || null,
+                  projectId: doc.project_id,
+                  projectName: doc.project_name,
+                }))
+              : undefined
+          }
+          selectedBugDocIds={isAdmin ? selectedBugDocIds : undefined}
+          onSelectedBugDocIdsChange={isAdmin ? setSelectedBugDocIds : undefined}
+          availableBugSheets={
+            isAdmin
+              ? allBugSheets.map((sheet) => ({
+                  id: sheet.id,
+                  title: sheet.sheet_title,
+                  creatorName: sheet.creator_name || null,
+                  projectId: sheet.project_id,
+                  projectName: sheet.project_name,
+                }))
+              : undefined
+          }
+          selectedBugSheetIds={isAdmin ? selectedBugSheetIds : undefined}
+          onSelectedBugSheetIdsChange={isAdmin ? setSelectedBugSheetIds : undefined}
           error={error}
-          complianceSummary={complianceSummary ?? project?.compliance ?? null}
+          complianceSummary={
+            isAdmin ? complianceSummary ?? project?.compliance ?? null : null
+          }
         />
     </div>
   );

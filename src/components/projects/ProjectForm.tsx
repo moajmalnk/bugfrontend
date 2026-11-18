@@ -83,6 +83,8 @@ import { Link, useNavigate } from 'react-router-dom';
 
 interface ProjectFormProps {
   mode: 'create' | 'edit';
+  /** full = admin create/edit; setup = assigned developer/tester delivery fields only */
+  sections?: 'full' | 'setup';
   values: ProjectFormValues;
   onChange: (values: ProjectFormValues) => void;
   onSubmit: (e: FormEvent) => void;
@@ -373,6 +375,7 @@ function MultiUserSelect({
 
 export function ProjectForm({
   mode,
+  sections = 'full',
   values,
   onChange,
   onSubmit,
@@ -400,6 +403,7 @@ export function ProjectForm({
   const navigate = useNavigate();
   const { currentUser } = useAuth();
   const effectiveRole = getEffectiveRole(currentUser || {});
+  const isSetupOnly = sections === 'setup';
 
   const setField = <K extends keyof ProjectFormValues>(key: K, value: ProjectFormValues[K]) => {
     if (
@@ -510,7 +514,8 @@ export function ProjectForm({
   const adminsAndDevs = users.filter((u) => ['admin', 'developer'].includes(u.role));
 
   const showDocLinking =
-    onSelectedBugDocIdsChange !== undefined || onSelectedBugSheetIdsChange !== undefined;
+    !isSetupOnly &&
+    (onSelectedBugDocIdsChange !== undefined || onSelectedBugSheetIdsChange !== undefined);
 
   const formatDocOptionLabel = (item: {
     title: string;
@@ -538,12 +543,18 @@ export function ProjectForm({
               <div className="p-2 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-lg shrink-0">
                 <FileText className="h-5 w-5 text-white" />
               </div>
-              {mode === 'create' ? 'Project Setup Form' : 'Edit Project Form'}
+              {isSetupOnly
+                ? 'Update Project Setup'
+                : mode === 'create'
+                  ? 'Project Setup Form'
+                  : 'Edit Project Form'}
             </CardTitle>
             <CardDescription className="text-gray-600 dark:text-gray-400 text-base mt-2">
-              {mode === 'create'
-                ? 'Add client details, team allocation, timeline, and documentation'
-                : 'Update project metadata, team, timeline, and attachments'}
+              {isSetupOnly
+                ? 'Update stack, domains, platforms, GitHub, category assets, and attachments for this assigned project'
+                : mode === 'create'
+                  ? 'Add client details, team allocation, timeline, and documentation'
+                  : 'Update project metadata, team, timeline, and attachments'}
             </CardDescription>
           </CardHeader>
 
@@ -582,6 +593,8 @@ export function ProjectForm({
                 </div>
               )}
 
+              {!isSetupOnly && (
+              <>
               <SectionBlock
                 title="Project Details"
                 description="Name, description, status, and compliance"
@@ -880,6 +893,40 @@ export function ProjectForm({
                   placeholder="No creators assigned"
                 />
               </SectionBlock>
+              </>
+              )}
+
+              {isSetupOnly && (
+                <SectionBlock
+                  title="Project Categories"
+                  description="Select delivery categories so WEB / PWA / APP asset slots appear below"
+                  icon={FolderKanban}
+                  iconClass="bg-gradient-to-br from-blue-500 to-indigo-600"
+                >
+                  <div className="flex flex-wrap gap-2">
+                    {PROJECT_CATEGORY_OPTIONS.map((opt) => {
+                      const selected = (values.project_categories || []).includes(opt.value);
+                      return (
+                        <button
+                          key={opt.value}
+                          type="button"
+                          onClick={() => toggleProjectCategory(opt.value)}
+                          title={opt.hint}
+                          className={cnCategoryChip(selected)}
+                        >
+                          {selected ? <Check className="h-4 w-4" /> : null}
+                          {opt.label}
+                        </button>
+                      );
+                    })}
+                  </div>
+                  {(values.project_categories || []).length === 0 && (
+                    <p className="text-xs text-amber-600 dark:text-amber-400 font-medium">
+                      Choose at least one category (WEB, PWA, APP, SEO, or CREATIVE).
+                    </p>
+                  )}
+                </SectionBlock>
+              )}
 
               <SectionBlock
                 title="Technology Stack"
@@ -1105,6 +1152,7 @@ export function ProjectForm({
                 </div>
               </SectionBlock>
 
+              {!isSetupOnly && (
               <SectionBlock
                 title="Project Timeline"
                 description={timelineSectionDescription}
@@ -1227,6 +1275,7 @@ export function ProjectForm({
                   </div>
                 </div>
               </SectionBlock>
+              )}
 
               {showDocLinking && (
                 <SectionBlock
@@ -1454,9 +1503,8 @@ export function ProjectForm({
                   type="submit"
                   disabled={
                     isSubmitting ||
-                    !values.name.trim() ||
-                    !values.description.trim() ||
-                    !(values.project_categories || []).length
+                    !(values.project_categories || []).length ||
+                    (!isSetupOnly && (!values.name.trim() || !values.description.trim()))
                   }
                   className="h-12 px-8 bg-gradient-to-r from-blue-600 to-emerald-700 hover:from-blue-700 hover:to-emerald-800 text-white font-semibold shadow-lg hover:shadow-xl transition-all duration-300 transform hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100"
                 >
@@ -1468,7 +1516,11 @@ export function ProjectForm({
                   ) : (
                     <>
                       <Plus className="mr-2 h-4 w-4" />
-                      {mode === 'create' ? 'Create Project' : 'Save Changes'}
+                      {isSetupOnly
+                        ? 'Save Setup'
+                        : mode === 'create'
+                          ? 'Create Project'
+                          : 'Save Changes'}
                     </>
                   )}
                 </Button>
