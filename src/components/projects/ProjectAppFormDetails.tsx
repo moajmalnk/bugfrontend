@@ -1,8 +1,14 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
+import {
+  AppStoreListingPromptDialog,
+  type StoreListingPromptPlatform,
+} from '@/components/projects/AppStoreListingPromptDialog';
 import { AppPublishingFormWizard } from '@/components/projects/AppPublishingFormWizard';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/context/AuthContext';
+import { useUrlDialogParam } from '@/hooks/useUrlDialogParam';
+import { storeListingPlatformFlags } from '@/lib/appStoreListingPrompts';
 import {
   APP_AUDIENCE_OPTIONS,
   AppPublishingFormData,
@@ -27,9 +33,17 @@ import {
   Link2,
   Pencil,
   Smartphone,
+  SquareTerminal,
   X,
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
+
+/** Why: Shareable deep link — `?store-prompt=ios|android` (Rule 26 Back closes). */
+const STORE_PROMPT_URL_PARAM = 'store-prompt';
+
+function isStorePromptPlatform(value: string | null): value is StoreListingPromptPlatform {
+  return value === 'ios' || value === 'android';
+}
 
 function DetailItem({
   label,
@@ -138,9 +152,14 @@ export function ProjectAppFormDetails({
   const queryClient = useQueryClient();
   const role = currentUser?.role || 'admin';
   const [editing, setEditing] = useState(startEditing);
+  const storePromptDialog = useUrlDialogParam(STORE_PROMPT_URL_PARAM);
+  const {
+    value: storePromptParam,
+    open: openStorePromptParam,
+    close: closeStorePromptParam,
+  } = storePromptDialog;
 
-  if (!projectShowsAppForm(project)) return null;
-
+  const showsAppForm = projectShowsAppForm(project);
   const form = parseAppPublishingForm(project.app_publishing_form);
   const hasData = appPublishingFormHasContent(form) || form.status === 'submitted';
   const canEdit = canEditAppPublishingDetails(currentUser, project);
@@ -150,6 +169,55 @@ export function ProjectAppFormDetails({
       currentUser?.is_super_admin ||
       currentUser?.role === 'developer' ||
       currentUser?.role === 'tester');
+  const { showIos: promptShowIos, showAndroid: promptShowAndroid } =
+    storeListingPlatformFlags(form);
+
+  const promptPlatform: StoreListingPromptPlatform = isStorePromptPlatform(
+    storePromptParam
+  )
+    ? storePromptParam
+    : 'ios';
+  const promptOpen =
+    showsAppForm &&
+    canEdit &&
+    hasData &&
+    isStorePromptPlatform(storePromptParam) &&
+    ((storePromptParam === 'ios' && promptShowIos) ||
+      (storePromptParam === 'android' && promptShowAndroid));
+
+  const openStorePrompt = (platform: StoreListingPromptPlatform) => {
+    openStorePromptParam(platform);
+  };
+
+  // Why: Strip stale/unauthorized deep links (wrong role, no data, wrong platform).
+  useEffect(() => {
+    if (!storePromptParam) return;
+    if (!showsAppForm || !canEdit || !hasData) {
+      closeStorePromptParam();
+      return;
+    }
+    if (!isStorePromptPlatform(storePromptParam)) {
+      closeStorePromptParam();
+      return;
+    }
+    if (storePromptParam === 'ios' && !promptShowIos) {
+      closeStorePromptParam();
+      return;
+    }
+    if (storePromptParam === 'android' && !promptShowAndroid) {
+      closeStorePromptParam();
+    }
+  }, [
+    storePromptParam,
+    showsAppForm,
+    canEdit,
+    hasData,
+    promptShowIos,
+    promptShowAndroid,
+    closeStorePromptParam,
+  ]);
+
+  if (!showsAppForm) return null;
 
   const attachments = project.attachments || [];
   const assetSlots: { label: string; folder: string; files: ProjectAttachment[] }[] = [
@@ -185,6 +253,7 @@ export function ProjectAppFormDetails({
   const showIos = needsIosSection(form.publish_platforms);
 
   return (
+    <>
     <section className="relative overflow-hidden rounded-2xl border border-violet-200/70 dark:border-violet-800/50 bg-white/80 dark:bg-gray-900/80 backdrop-blur-sm">
       <div className="pointer-events-none absolute inset-0 bg-gradient-to-br from-violet-50/50 via-transparent to-fuchsia-50/30 dark:from-violet-950/20 dark:to-fuchsia-950/10" />
       <div className="relative p-4 sm:p-5 lg:p-6 space-y-5">
@@ -231,6 +300,38 @@ export function ProjectAppFormDetails({
             </div>
           </div>
           <div className="flex flex-wrap items-center gap-2 shrink-0">
+            {canEdit && hasData && !editing ? (
+              <>
+                {promptShowIos ? (
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    className="rounded-xl"
+                    title="Fill details and copy iOS Cursor prompt"
+                    aria-label="Fill details and copy iOS Cursor prompt"
+                    onClick={() => openStorePrompt('ios')}
+                  >
+                    <SquareTerminal className="h-3.5 w-3.5 mr-1.5" />
+                    Copy iOS
+                  </Button>
+                ) : null}
+                {promptShowAndroid ? (
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    className="rounded-xl"
+                    title="Fill details and copy Android Cursor prompt"
+                    aria-label="Fill details and copy Android Cursor prompt"
+                    onClick={() => openStorePrompt('android')}
+                  >
+                    <Smartphone className="h-3.5 w-3.5 mr-1.5" />
+                    Copy Android
+                  </Button>
+                ) : null}
+              </>
+            ) : null}
             {canEdit ? (
               <Button
                 type="button"
@@ -452,5 +553,22 @@ export function ProjectAppFormDetails({
         )}
       </div>
     </section>
+    {canEdit && hasData ? (
+      <AppStoreListingPromptDialog
+        open={promptOpen}
+        onOpenChange={(next) => {
+          if (!next) closeStorePromptParam();
+          else if (isStorePromptPlatform(storePromptParam)) {
+            openStorePromptParam(storePromptParam);
+          } else {
+            openStorePromptParam(promptPlatform);
+          }
+        }}
+        form={form}
+        project={project}
+        initialPlatform={promptPlatform}
+      />
+    ) : null}
+    </>
   );
 }
