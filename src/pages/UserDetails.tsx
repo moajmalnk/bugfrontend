@@ -59,6 +59,7 @@ import { formatDistanceToNow } from "date-fns";
 import {
   Activity,
   AtSign,
+  Award,
   BarChart3,
   Briefcase,
   Cake,
@@ -99,6 +100,7 @@ import {
 } from "react-router-dom";
 import { getReturnPathFromState } from "@/hooks/useUrlPagination";
 import { useUrlDialogParam } from "@/hooks/useUrlDialogParam";
+import { ExperienceCertificateDialog } from "@/components/users/ExperienceCertificateDialog";
 import { UserReportPrintDialog } from "@/components/users/UserReportPrintDialog";
 import type { UserReportBank, UserReportProfile } from "@/lib/userReportReceipt";
 import { defaultPayVerifyYearMonth } from "@/services/payVerifyService";
@@ -472,6 +474,36 @@ export default function UserDetails() {
     if (!actorIsSuperAdmin || printParam !== "report") closeReport();
   }, [printParam, currentUser, actorIsSuperAdmin, closeReport]);
 
+  /** Why: `?certificate=experience` — shareable/refresh-safe; Back closes modal (Rule 26). */
+  const certificateDialog = useUrlDialogParam("certificate");
+  const { value: certificateParam, close: closeCertificate, open: openCertificateParam } =
+    certificateDialog;
+  const openCertificate = () => openCertificateParam("experience");
+  const certificateOpen =
+    actorIsSuperAdmin &&
+    certificateParam === "experience" &&
+    Boolean(user) &&
+    user?.account_active === 0;
+
+  // Why: Only Super Admin + deactivated targets; strip stale/unauthorized deep links.
+  useEffect(() => {
+    if (!certificateParam || !currentUser) return;
+    if (
+      !actorIsSuperAdmin ||
+      certificateParam !== "experience" ||
+      !user ||
+      user.account_active !== 0
+    ) {
+      closeCertificate();
+    }
+  }, [
+    certificateParam,
+    currentUser,
+    actorIsSuperAdmin,
+    user,
+    closeCertificate,
+  ]);
+
   const reportProfile = useMemo<UserReportProfile | null>(() => {
     if (!user) return null;
     const ob = onboardingData?.user;
@@ -814,6 +846,18 @@ export default function UserDetails() {
                   >
                     <Printer className="h-4 w-4 shrink-0 mr-2" />
                     Print report
+                  </Button>
+                ) : null}
+                {actorIsSuperAdmin && isAccountDeactivated && userId ? (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="h-11 w-full sm:w-auto rounded-xl border-emerald-200 dark:border-emerald-800 bg-white/70 dark:bg-gray-900/50 text-emerald-700 dark:text-emerald-300 hover:bg-emerald-50 dark:hover:bg-emerald-950/40"
+                    disabled={!user}
+                    onClick={openCertificate}
+                  >
+                    <Award className="h-4 w-4 shrink-0 mr-2" />
+                    Experience Certificate
                   </Button>
                 ) : null}
                 {canManageUserProjects && user ? (
@@ -1538,6 +1582,14 @@ export default function UserDetails() {
                       />
                     )}
 
+                    {actorIsSuperAdmin && isAccountDeactivated && (
+                      <UserActionCard
+                        icon={Award}
+                        label="Experience Certificate"
+                        onClick={openCertificate}
+                      />
+                    )}
+
                     {canDeleteTargetUser && (
                       <DeleteUserDialog
                         user={user}
@@ -1638,6 +1690,19 @@ export default function UserDetails() {
                         >
                           <UserCheck className="h-4 w-4 shrink-0" />
                           Activate
+                        </Button>
+                      </div>
+                    )}
+
+                    {actorIsSuperAdmin && isAccountDeactivated && (
+                      <div>
+                        <Button
+                          variant="outline"
+                          className="h-11 lg:h-10 rounded-xl w-full inline-flex items-center justify-center gap-2 border-emerald-200 dark:border-emerald-800 text-emerald-700 dark:text-emerald-300"
+                          onClick={openCertificate}
+                        >
+                          <Award className="h-4 w-4 shrink-0" />
+                          Experience
                         </Button>
                       </div>
                     )}
@@ -1957,6 +2022,20 @@ export default function UserDetails() {
             profile={reportProfile}
             bank={reportBank}
             printedBy={currentUser?.username}
+          />
+        ) : null}
+
+        {actorIsSuperAdmin ? (
+          <ExperienceCertificateDialog
+            open={certificateOpen}
+            onOpenChange={(next) => {
+              if (!next) closeCertificate();
+              else openCertificate();
+            }}
+            user={user}
+            jobTitleFallback={reportProfile?.job_title}
+            contractTypeFallback={reportProfile?.contract_type}
+            joiningDateFallback={reportProfile?.joining_date}
           />
         ) : null}
     </div>

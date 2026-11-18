@@ -980,6 +980,58 @@ class UserService {
     return true;
   }
 
+  /**
+   * Why: Super Admin drafts Experience Certificates with role-based AI/catalog
+   * suggestions for technologies, responsibilities, and assessment copy.
+   */
+  async suggestExperienceCertificate(input: {
+    designation: string;
+    app_role?: string | null;
+    salutation?: string;
+    full_name?: string;
+    employment_type?: string;
+  }): Promise<{
+    pack_key: string;
+    pack_label: string;
+    technologies: string;
+    responsibilities: string;
+    assessment: string;
+    source: "ai" | "catalog";
+  }> {
+    const token = localStorage.getItem("token");
+    if (!token) throw new Error("Authentication token not found");
+
+    const response = await axios.post<{
+      success: boolean;
+      data?: {
+        pack_key: string;
+        pack_label: string;
+        technologies: string;
+        responsibilities: string;
+        assessment: string;
+        source: "ai" | "catalog";
+      };
+      message?: string;
+    }>(
+      `${ENV.API_URL}/users/experience_certificate_suggest.php`,
+      {
+        designation: input.designation,
+        app_role: input.app_role ?? "",
+        salutation: input.salutation ?? "Mr",
+        full_name: input.full_name ?? "",
+        employment_type: input.employment_type ?? "full-time",
+      },
+      { headers: { Authorization: `Bearer ${token}` } }
+    );
+
+    if (!response.data.success || !response.data.data) {
+      throw new Error(
+        response.data.message || "Failed to suggest certificate content"
+      );
+    }
+    return response.data.data;
+  }
+
   async generateUserDashboardLink(userId: string): Promise<{ url: string; expires_at: string; ttl_seconds: number }> {
     try {
       const token = localStorage.getItem('token');
