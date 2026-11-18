@@ -62,6 +62,7 @@ const ResetPassword = lazy(() => import("@/pages/ResetPassword"));
 const NotFound = lazy(() => import("@/pages/NotFound"));
 const PrivacyPolicy = lazy(() => import("@/pages/PrivacyPolicy"));
 const PublicAttachmentPage = lazy(() => import("@/pages/PublicAttachmentPage"));
+const PublicAppPublishingPage = lazy(() => import("@/pages/PublicAppPublishingPage"));
 const TermsOfUse = lazy(() => import("@/pages/TermsOfUse"));
 
 // New layout for role-based routes
@@ -76,6 +77,7 @@ const Projects = lazy(() => import("@/pages/Projects"));
 const ProjectDetails = lazy(() => import("@/pages/ProjectDetails"));
 const NewProject = lazy(() => import("@/pages/NewProject"));
 const EditProject = lazy(() => import("@/pages/EditProject"));
+const ProjectAppForm = lazy(() => import("@/pages/ProjectAppForm"));
 const ProjectCompliance = lazy(() => import("@/pages/ProjectCompliance"));
 const ComplianceOverview = lazy(() => import("@/pages/ComplianceOverview"));
 const Bugs = lazy(() => import("@/pages/Bugs"));
@@ -340,6 +342,14 @@ const RouteConfig = () => {
         }
       />
       <Route
+        path="/app-publish/:token"
+        element={
+          <Suspense fallback={<SkeletonFallback />}>
+            <PublicAppPublishingPage />
+          </Suspense>
+        }
+      />
+      <Route
         path="/privacy-policy"
         element={
           <Suspense fallback={<SkeletonFallback />}>
@@ -456,6 +466,7 @@ const RouteConfig = () => {
           <Route path="cursor-tips" element={<CursorTips />} />
           <Route path="projects/new" element={<NewProject />} />
           <Route path="projects/:projectId/edit" element={<EditProject />} />
+          <Route path="projects/:projectId/app-form" element={<ProjectAppForm />} />
           <Route path="projects/:projectId" element={<ProjectDetails />} />
           <Route path="document" element={<DocumentPreviewPage />} />
           <Route path="bugs" element={<Bugs />} />

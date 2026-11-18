@@ -23,6 +23,10 @@ export {
   parseProjectPlatforms,
   parseProjectCategories,
   parseCategoryAssetLinks,
+  projectShowsAppForm,
+  parseAppPublishingForm,
+  serializeAppPublishingForm,
+  emptyAppPublishingForm,
   PROJECT_PLATFORM_OPTIONS,
   PROJECT_CATEGORY_OPTIONS,
   serializeProjectCategories,
@@ -32,6 +36,8 @@ export {
 
 export type {
   AppPublisherMeta,
+  AppPublishingFormData,
+  AppPublishingStatus,
   CategoryAssetLinks,
   CreateProjectData,
   Project,

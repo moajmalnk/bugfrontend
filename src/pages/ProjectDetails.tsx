@@ -8,6 +8,7 @@ import {
   BugTypeFilterSelect,
   bugMatchesTypeFilter,
 } from "@/components/bugs/BugTypeFilterSelect";
+import { ProjectAppFormDetails } from "@/components/projects/ProjectAppFormDetails";
 import { ProjectInfoOverview } from "@/components/projects/ProjectInfoOverview";
 import { ProjectAnalytics } from "@/components/projects/ProjectAnalytics";
 import { ProjectRetestsTab } from "@/components/projects/ProjectRetestsTab";
@@ -87,6 +88,8 @@ import { cn } from "@/lib/utils";
 import {
   getProjectStatusLabel,
   isProjectComplianceRequired,
+  parseAppPublishingForm,
+  projectShowsAppForm,
   projectStatusBadgeClass,
 } from "@/lib/utils/projectUtils";
 import { formatLocalDate } from "@/lib/utils/dateUtils";
@@ -127,6 +130,7 @@ import {
   Share2,
   Shield,
   ShieldCheck,
+  Smartphone,
   TestTube,
   User,
   UserCheck,
@@ -4951,6 +4955,53 @@ const ProjectDetails = () => {
               {(currentUser?.role === "admin" ||
                 currentUser?.role === "developer" ||
                 currentUser?.role === "tester") &&
+                projectShowsAppForm(project) && (
+                <Button
+                  asChild
+                  variant="outline"
+                  size="sm"
+                  className="w-full sm:w-auto border-violet-300 dark:border-violet-700 hover:bg-violet-50 dark:hover:bg-violet-950/40"
+                >
+                  <Link
+                    to={`/${currentUser.role}/projects/${projectId}/app-form`}
+                    state={{
+                      from: getReturnPathFromState(
+                        location.state,
+                        `/${currentUser.role}/projects`
+                      ),
+                    }}
+                  >
+                    <Smartphone className="mr-2 h-4 w-4" /> App Form
+                    {(() => {
+                      const filled = parseAppPublishingForm(
+                        project.app_publishing_form
+                      );
+                      const started =
+                        filled.status === "submitted" ||
+                        Boolean(
+                          filled.company_name ||
+                            filled.app_name ||
+                            filled.publish_platforms
+                        );
+                      if (!started) return null;
+                      return (
+                        <span
+                          className={
+                            filled.status === "submitted"
+                              ? "ml-2 rounded-full bg-emerald-100 px-1.5 py-0.5 text-[10px] font-semibold text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-200"
+                              : "ml-2 rounded-full bg-amber-100 px-1.5 py-0.5 text-[10px] font-semibold text-amber-900 dark:bg-amber-950/60 dark:text-amber-200"
+                          }
+                        >
+                          {filled.status === "submitted" ? "Submitted" : "Draft"}
+                        </span>
+                      );
+                    })()}
+                  </Link>
+                </Button>
+              )}
+              {(currentUser?.role === "admin" ||
+                currentUser?.role === "developer" ||
+                currentUser?.role === "tester") &&
                 canAccessCodoStandards(currentUser) &&
                 isProjectComplianceRequired(project) && (
                 <Button
@@ -5187,6 +5238,10 @@ const ProjectDetails = () => {
             </div>
 
             <ProjectInfoOverview project={project} createdByName={projectOwner?.username} />
+
+            {projectShowsAppForm(project) ? (
+              <ProjectAppFormDetails project={project} />
+            ) : null}
 
             <div className="grid grid-cols-1 xl:grid-cols-3 gap-4 sm:gap-6 min-w-0">
               <div className="xl:col-span-2 relative rounded-2xl border border-gray-200/60 dark:border-gray-800/60 bg-white/80 dark:bg-gray-900/80 backdrop-blur-sm min-w-0">

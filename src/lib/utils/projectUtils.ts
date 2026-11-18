@@ -305,6 +305,8 @@ export interface Project {
   project_categories?: string | null;
   /** JSON string of AppPublisherMeta */
   app_publisher_meta?: string | null;
+  /** JSON string of client Mobile App Publishing Information Form */
+  app_publishing_form?: string | null;
   /** JSON map of category → Drive/cloud folder URL */
   category_asset_links?: string | null;
   app_url_ios?: string | null;
@@ -397,6 +399,7 @@ export interface CreateProjectData {
   platforms?: string;
   project_categories?: string;
   app_publisher_meta?: string;
+  app_publishing_form?: string;
   category_asset_links?: string;
   app_url_ios?: string;
   app_url_android?: string;
@@ -639,6 +642,15 @@ export function formValuesToSetupPayload(values: ProjectFormValues): UpdateProje
   };
 }
 
+export {
+  parseAppPublishingForm,
+  serializeAppPublishingForm,
+  emptyAppPublishingForm,
+  appPublishingFormHasContent,
+  appPublishingStatusLabel,
+} from '@/lib/utils/appPublishingForm';
+export type { AppPublishingFormData, AppPublishingStatus } from '@/lib/utils/appPublishingForm';
+
 export function formValuesToPayload(values: ProjectFormValues): CreateProjectData {
   const members: ProjectMemberInput[] = [];
   if (values.project_lead_id) {
@@ -725,6 +737,20 @@ export function isProjectComplianceRequired(
   const s = String(raw).trim().toLowerCase();
   if (s === '0' || s === 'false' || s === 'no' || s === 'off') return false;
   return true;
+}
+
+/**
+ * Why: App Form collects mobile publish data when APP category or iOS/Android
+ * platforms are selected on the project.
+ */
+export function projectShowsAppForm(
+  project?: Pick<Project, 'project_categories' | 'platforms'> | null
+): boolean {
+  if (!project) return false;
+  const categories = parseProjectCategories(project.project_categories);
+  if (categories.includes('APP')) return true;
+  const platforms = parseProjectPlatforms(project.platforms);
+  return platforms.includes('ios') || platforms.includes('android');
 }
 
 export function projectStatusBadgeClass(status?: ProjectStatus | string | null): string {
