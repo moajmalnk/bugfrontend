@@ -37,7 +37,7 @@ import {
 } from '@/lib/appStoreListingPrompts';
 import type { AppPublishingFormData } from '@/lib/utils/appPublishingForm';
 import { cn } from '@/lib/utils';
-import { Check, Download, Loader2, SquareTerminal } from 'lucide-react';
+import { Check, Download, Loader2, SquareTerminal, X } from 'lucide-react';
 
 export type StoreListingPromptPlatform = 'ios' | 'android';
 
@@ -202,8 +202,8 @@ export function AppStoreListingPromptDialog({
         }}
       >
         <DialogContent
-          showCloseButton={!busy}
-          className="max-w-[720px] w-[calc(100%-1.5rem)] rounded-2xl max-h-[90vh] overflow-y-auto p-0 gap-0"
+          showCloseButton={false}
+          className="max-w-[720px] w-[calc(100%-1.5rem)] rounded-2xl max-h-[90vh] overflow-hidden p-0 gap-0 flex flex-col"
           onPointerDownOutside={(e) => {
             if (busy || isDirty) e.preventDefault();
             if (isDirty && !busy) setDiscardOpen(true);
@@ -219,7 +219,7 @@ export function AppStoreListingPromptDialog({
             }
           }}
         >
-          <DialogHeader className="px-5 pt-5 pb-3 border-b border-border/60">
+          <DialogHeader className="relative shrink-0 px-5 pt-5 pb-3 pr-14 border-b border-border/60">
             <DialogTitle className="flex items-center gap-2 text-lg">
               <SquareTerminal className="h-5 w-5 text-violet-600 dark:text-violet-300" />
               Fill store prompt — {appLabel}
@@ -229,9 +229,21 @@ export function AppStoreListingPromptDialog({
               Cursor publish prompt
               {initialPlatform === 'ios' ? ' (opened for iOS)' : ' (opened for Android)'}.
             </DialogDescription>
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon"
+              className="absolute right-3 top-3 h-9 w-9 rounded-xl"
+              disabled={Boolean(busy)}
+              title="Close"
+              aria-label="Close"
+              onClick={requestClose}
+            >
+              <X className="h-4 w-4" />
+            </Button>
           </DialogHeader>
 
-          <div className="px-5 py-4 grid grid-cols-12 gap-4">
+          <div className="px-5 py-4 grid grid-cols-12 gap-4 overflow-y-auto min-h-0 flex-1">
             <Field className="sm:col-span-4" label="Version">
               <Input
                 className="h-10 rounded-xl"
@@ -593,7 +605,7 @@ export function AppStoreListingPromptDialog({
             ) : null}
           </div>
 
-          <DialogFooter className="px-5 py-4 border-t border-border/60 flex-wrap gap-2 sm:justify-between">
+          <DialogFooter className="shrink-0 px-5 py-4 border-t border-border/60 flex-wrap gap-2 sm:justify-between bg-background">
             <Button
               type="button"
               variant="outline"
@@ -601,7 +613,8 @@ export function AppStoreListingPromptDialog({
               disabled={Boolean(busy)}
               onClick={requestClose}
             >
-              Cancel
+              <X className="h-3.5 w-3.5 mr-1.5" />
+              Close
             </Button>
             <div className="flex flex-wrap items-center gap-2">
               {showIos ? (
